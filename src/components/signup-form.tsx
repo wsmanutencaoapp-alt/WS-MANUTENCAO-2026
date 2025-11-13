@@ -22,9 +22,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { handleSignUp } from '@/app/auth/actions';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth, useFirestore } from '@/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -36,6 +38,9 @@ const formSchema = z.object({
 export function SignUpForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const auth = useAuth();
+  const firestore = useFirestore();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -47,19 +52,63 @@ export function SignUpForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    const result = await handleSignUp(values);
+    if (!auth || !firestore) {
+      toast({
+        variant: 'destructive',
+        title: 'Uh oh! Something went wrong.',
+        description: 'Firebase is not initialized.',
+      });
+      return;
+    }
+    try {
+      // 1. Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
+      );
+      const user = userCredential.user;
 
-    if (result.success) {
+      // 2. Save additional user info to Firestore
+      const userDocRef = doc(firestore, 'employees', user.uid);
+      await setDoc(userDocRef, {
+        id: user.uid,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: values.email,
+        phone: '', // Phone is optional in this form
+      });
+
       toast({
         title: 'Success!',
         description: 'Your account has been created. Redirecting to dashboard...',
       });
       router.push('/dashboard');
-    } else {
+
+    } catch (error: any) {
+      let errorMessage = 'An unexpected error occurred.';
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = 'This email address is already in use.';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'The email address is not valid.';
+            break;
+          case 'auth/operation-not-allowed':
+            errorMessage = 'Email/password accounts are not enabled.';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'The password is too weak.';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+      }
       toast({
         variant: 'destructive',
         title: 'Uh oh! Something went wrong.',
-        description: result.error || 'Could not create account.',
+        description: errorMessage,
       });
     }
   }
