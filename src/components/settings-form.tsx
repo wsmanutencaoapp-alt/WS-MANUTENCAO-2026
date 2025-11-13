@@ -105,8 +105,6 @@ export function SettingsForm() {
       return;
     }
   
-    form.formState.isSubmitting = true;
-  
     try {
       let photoURL = values.photoURL;
   
@@ -155,8 +153,6 @@ export function SettingsForm() {
         title: 'Erro ao Salvar',
         description: 'Não foi possível salvar suas alterações. Verifique as permissões.',
       });
-    } finally {
-       form.formState.isSubmitting = false;
     }
   }
 
