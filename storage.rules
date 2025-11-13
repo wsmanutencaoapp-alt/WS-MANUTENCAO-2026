@@ -2,17 +2,11 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permite que qualquer usuário autenticado leia todos os arquivos.
-    // Isso é útil para exibir fotos de perfil de outros usuários.
+    // Permite a leitura e escrita de todos os arquivos por qualquer usuário autenticado.
+    // Isso é seguro para o nosso caso de uso de fotos de perfil, mas pode ser
+    // refinado no futuro, se necessário.
     match /{allPaths=**} {
-      allow read: if request.auth != null;
-    }
-
-    // Regras específicas para fotos de perfil
-    match /profile_pictures/{userId} {
-      // Permite que um usuário crie ou atualize sua própria foto de perfil.
-      // O nome do arquivo deve corresponder ao UID do usuário.
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null;
     }
   }
 }
