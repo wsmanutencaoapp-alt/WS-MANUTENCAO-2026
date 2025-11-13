@@ -1,3 +1,46 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "rivets",
+      "description": "Box of aircraft rivets",
+      "imageUrl": "https://images.unsplash.com/photo-1736532850126-9c83ea9de615?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8cml2ZXRzJTIwYWlyY3JhZnR8ZW58MHx8fHwxNzYzMDQ1NjQ5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "rivets aircraft"
+    },
+    {
+      "id": "hydraulic-fluid",
+      "description": "Can of hydraulic fluid",
+      "imageUrl": "https://images.unsplash.com/photo-1729060263286-ea0913535eb1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxoeWRyYXVsaWMlMjBmbHVpZHxlbnwwfHx8fDE3NjMwNDU2NDl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "hydraulic fluid"
+    },
+    {
+      "id": "avionics-display",
+      "description": "An avionics display unit",
+      "imageUrl": "https://images.unsplash.com/photo-1576278507280-e30971fcb377?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxhdmlvbmljcyUyMGRpc3BsYXl8ZW58MHx8fHwxNzYzMDQ1NjQ5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "avionics display"
+    },
+    {
+      "id": "wrench",
+      "description": "A torque wrench",
+      "imageUrl": "https://images.unsplash.com/photo-1669136048337-5daa3adef7b2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8dG9ycXVlJTIwd3JlbmNofGVufDB8fHx8MTc2MzA0NTY0OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "torque wrench"
+    },
+    {
+      "id": "multimeter",
+      "description": "A digital multimeter for avionics",
+      "imageUrl": "https://images.unsplash.com/photo-1758295745926-88faff7ec2f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxkaWdpdGFsJTIwbXVsdGltZXRlcnxlbnwwfHx8fDE3NjMwMDA4ODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "digital multimeter"
+    },
+    {
+      "id": "landing-gear",
+      "description": "A landing gear assembly",
+      "imageUrl": "https://images.unsplash.com/photo-1692128236180-8d27c7e0a1d4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxsYW5kaW5nJTIwZ2VhcnxlbnwwfHx8fDE3NjMwNDU2NDl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "landing gear"
+    },
+    {
+      "id": "user-avatar",
+      "description": "A user's profile picture",
+      "imageUrl": "https://images.unsplash.com/photo-1704726135027-9c6f034cfa41?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHx1c2VyJTIwYXZhdGFyfGVufDB8fHx8MTc2Mjk2NjM4NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "user avatar"
+    }
+  ]
 }
