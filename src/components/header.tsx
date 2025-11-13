@@ -10,6 +10,8 @@ import {
   PanelLeft,
   Search,
   Settings,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -25,6 +27,9 @@ import { Input } from '@/components/ui/input';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useUser, useAuth, initiateAnonymousSignIn } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const navItems = [
   { href: '/dashboard', icon: Box, label: 'Supplies' },
@@ -36,6 +41,18 @@ const userAvatar = PlaceHolderImages.find(img => img.id === 'user-avatar');
 
 export function Header() {
   const pathname = usePathname();
+  const auth = useAuth();
+  const { user, isUserLoading } = useUser();
+
+  const handleLogin = () => {
+    initiateAnonymousSignIn(auth);
+  };
+
+  const handleLogout = () => {
+    if (auth) {
+      signOut(auth);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
@@ -93,23 +110,52 @@ export function Header() {
             size="icon"
             className="overflow-hidden rounded-full"
           >
-            {userAvatar && <Image
-              src={userAvatar.imageUrl}
-              width={36}
-              height={36}
-              alt="Avatar"
-              className="overflow-hidden rounded-full"
-              data-ai-hint={userAvatar.imageHint}
-            />}
+            <Avatar>
+              {user?.photoURL ? (
+                <AvatarImage src={user.photoURL} alt="User avatar" />
+              ) : userAvatar && (
+                <Image
+                  src={userAvatar.imageUrl}
+                  width={36}
+                  height={36}
+                  alt="Avatar"
+                  className="overflow-hidden rounded-full"
+                  data-ai-hint={userAvatar.imageHint}
+                />
+              )}
+              <AvatarFallback>
+                {user?.isAnonymous ? 'A' : user?.email?.charAt(0).toUpperCase() || '?'}
+              </AvatarFallback>
+            </Avatar>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem>Settings</DropdownMenuItem>
-          <DropdownMenuItem>Support</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem>Logout</DropdownMenuItem>
+          {isUserLoading ? (
+            <DropdownMenuLabel>Loading...</DropdownMenuLabel>
+          ) : user ? (
+            <>
+              <DropdownMenuLabel>
+                {user.isAnonymous ? 'Anonymous User' : user.email}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuItem>Support</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </DropdownMenuItem>
+            </>
+          ) : (
+            <>
+              <DropdownMenuLabel>Not Logged In</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogin}>
+                <LogIn className="mr-2 h-4 w-4" />
+                Login
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

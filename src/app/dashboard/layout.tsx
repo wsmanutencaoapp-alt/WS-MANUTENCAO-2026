@@ -1,8 +1,20 @@
+'use client';
 import type { ReactNode } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Header } from '@/components/header';
+import { useAuth, useUser, initiateAnonymousSignIn } from '@/firebase';
+import { useEffect } from 'react';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  const auth = useAuth();
+  const { user, isUserLoading } = useUser();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [auth, user, isUserLoading]);
+
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40 dark:bg-background">
       <AppSidebar />
