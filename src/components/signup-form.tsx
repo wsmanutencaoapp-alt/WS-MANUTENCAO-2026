@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, runTransaction } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -71,16 +71,30 @@ export function SignUpForm() {
       );
       const user = userCredential.user;
 
-      // 2. Save additional user info to Firestore
+      // 2. Get new sequential ID and save user info in a transaction
+      const counterRef = doc(firestore, 'counters', 'employees');
+      const newEmployeeId = await runTransaction(firestore, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        if (!counterDoc.exists()) {
+          throw new Error("Documento do contador não existe!");
+        }
+        const newId = counterDoc.data().lastId + 1;
+        transaction.update(counterRef, { lastId: newId });
+        return newId;
+      });
+
       const userDocRef = doc(firestore, 'employees', user.uid);
       const userData = {
-        id: user.uid,
+        id: newEmployeeId, // Use the new sequential ID
+        uid: user.uid, // Keep Firebase Auth UID for reference
         firstName: values.firstName,
         lastName: values.lastName,
         email: values.email,
         phone: '', // Phone is optional in this form
+        accessLevel: 'Técnico', // Default access level
       };
       
+      // We are not awaiting this promise to avoid blocking the UI
       setDoc(userDocRef, userData).catch((error) => {
         errorEmitter.emit(
           'permission-error',

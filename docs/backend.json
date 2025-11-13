@@ -193,8 +193,12 @@
       "description": "Represents an employee in the system.",
       "properties": {
         "id": {
+          "type": "number",
+          "description": "Unique sequential identifier for the Employee entity."
+        },
+        "uid": {
           "type": "string",
-          "description": "Unique identifier for the Employee entity."
+          "description": "Firebase Authentication user unique identifier."
         },
         "firstName": {
           "type": "string",
@@ -212,14 +216,19 @@
         "phone": {
           "type": "string",
           "description": "Phone number of the employee."
+        },
+        "accessLevel": {
+          "type": "string",
+          "description": "The access level of the employee (e.g., 'Admin', 'Técnico')."
         }
       },
       "required": [
         "id",
+        "uid",
         "firstName",
         "lastName",
         "email",
-        "phone"
+        "accessLevel"
       ]
     }
   },

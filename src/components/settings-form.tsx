@@ -23,6 +23,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 const formSchema = z.object({
+  id: z.number().optional(),
+  accessLevel: z.string().optional(),
   firstName: z.string().min(1, 'O nome é obrigatório'),
   lastName: z.string().min(1, 'O sobrenome é obrigatório'),
   email: z.string().email('Endereço de e-mail inválido').optional(),
@@ -43,6 +45,7 @@ export function SettingsForm() {
       lastName: '',
       email: '',
       phone: '',
+      accessLevel: '',
     },
   });
 
@@ -60,10 +63,12 @@ export function SettingsForm() {
           if (docSnap.exists()) {
             const data = docSnap.data();
             form.reset({
+              id: data.id || '',
               firstName: data.firstName || '',
               lastName: data.lastName || '',
               email: data.email || '',
               phone: data.phone || '',
+              accessLevel: data.accessLevel || '',
             });
           }
         })
@@ -125,6 +130,8 @@ export function SettingsForm() {
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
       </div>
     );
   }
@@ -133,6 +140,34 @@ export function SettingsForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ID do Funcionário</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly className="bg-muted/50 cursor-not-allowed" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="accessLevel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nível de Acesso</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly className="bg-muted/50 cursor-not-allowed" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             control={form.control}
