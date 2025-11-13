@@ -55,8 +55,11 @@ export function AppSidebar() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Link
-                href="#"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8"
+                href="/dashboard/settings"
+                className={cn(
+                  'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
+                   pathname === '/dashboard/settings' && 'bg-accent text-accent-foreground'
+                )}
               >
                 <Settings className="h-5 w-5" />
                 <span className="sr-only">Configurações</span>

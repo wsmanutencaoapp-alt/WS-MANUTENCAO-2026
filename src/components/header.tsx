@@ -85,8 +85,10 @@ export function Header() {
               </Link>
             ))}
              <Link
-                href="#"
-                className='flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground'
+                href="/dashboard/settings"
+                className={cn('flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground',
+                   pathname === '/dashboard/settings' && 'text-foreground'
+                )}
               >
                 <Settings className="h-5 w-5" />
                 Configurações
@@ -137,7 +139,12 @@ export function Header() {
                 {user.email}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Configurações</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                 <Link href="/dashboard/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurações
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem>Suporte</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
