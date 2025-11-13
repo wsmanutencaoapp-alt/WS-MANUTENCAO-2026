@@ -26,12 +26,12 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 const formSchema = z.object({
   id: z.number().optional().nullable(),
-  accessLevel: z.string().optional(),
+  accessLevel: z.string().optional().nullable(),
   firstName: z.string().min(1, 'O nome é obrigatório'),
   lastName: z.string().min(1, 'O sobrenome é obrigatório'),
   email: z.string().email('Endereço de e-mail inválido').optional(),
-  phone: z.string().optional(),
-  photoURL: z.string().optional(),
+  phone: z.string().optional().nullable(),
+  photoURL: z.string().optional().nullable(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -51,9 +51,9 @@ export function SettingsForm() {
       firstName: '',
       lastName: '',
       email: '',
-      phone: '',
-      accessLevel: '',
-      photoURL: '',
+      phone: null,
+      accessLevel: null,
+      photoURL: null,
     },
   });
 
@@ -133,7 +133,7 @@ export function SettingsForm() {
     };
     
     // Only admins can change the access level
-    if (isAdmin) {
+    if (isAdmin && values.accessLevel) {
         dataToUpdate.accessLevel = values.accessLevel;
     }
 
