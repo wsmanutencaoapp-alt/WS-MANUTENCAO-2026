@@ -41,6 +41,7 @@ export function SettingsForm() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      id: undefined, // Initialize as undefined explicitly
       firstName: '',
       lastName: '',
       email: '',
@@ -63,7 +64,7 @@ export function SettingsForm() {
           if (docSnap.exists()) {
             const data = docSnap.data();
             form.reset({
-              id: data.id || '',
+              id: data.id || undefined,
               firstName: data.firstName || '',
               lastName: data.lastName || '',
               email: data.email || '',
@@ -143,7 +144,7 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>ID do Funcionário</FormLabel>
                   <FormControl>
-                    <Input {...field} readOnly className="bg-muted/50 cursor-not-allowed" />
+                    <Input {...field} value={field.value ?? ''} readOnly className="bg-muted/50 cursor-not-allowed" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -156,7 +157,7 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>Nível de Acesso</FormLabel>
                   <FormControl>
-                    <Input {...field} readOnly className="bg-muted/50 cursor-not-allowed" />
+                    <Input {...field} value={field.value ?? ''} readOnly className="bg-muted/50 cursor-not-allowed" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -202,6 +203,7 @@ export function SettingsForm() {
                   type="email"
                   placeholder="seu@email.com"
                   {...field}
+                  value={field.value ?? ''}
                   readOnly
                   className="bg-muted/50 cursor-not-allowed"
                 />
@@ -217,7 +219,7 @@ export function SettingsForm() {
             <FormItem>
               <FormLabel>Telefone</FormLabel>
               <FormControl>
-                <Input placeholder="(99) 99999-9999" {...field} />
+                <Input placeholder="(99) 99999-9999" {...field} value={field.value ?? ''} />
               </FormControl>
               <FormMessage />
             </FormItem>
