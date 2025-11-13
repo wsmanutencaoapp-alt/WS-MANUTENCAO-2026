@@ -70,7 +70,7 @@ export function SettingsForm() {
   useEffect(() => {
     if (employeeData) {
       form.reset({
-        id: employeeData.id,
+        id: employeeData.id || null,
         firstName: employeeData.firstName || '',
         lastName: employeeData.lastName || '',
         email: user?.email || employeeData.email || '',
@@ -95,7 +95,6 @@ export function SettingsForm() {
     }
   };
 
-
   async function onSubmit(values: FormData) {
     if (!userDocRef || !user) {
       toast({
@@ -105,55 +104,60 @@ export function SettingsForm() {
       });
       return;
     }
-    
-    let photoURL = values.photoURL;
-
-    if (previewImage && previewImage !== values.photoURL) {
+  
+    form.formState.isSubmitting = true;
+  
+    try {
+      let photoURL = values.photoURL;
+  
+      if (previewImage && previewImage !== employeeData?.photoURL) {
         if (!storage) {
-            toast({ variant: "destructive", title: "Erro", description: "O serviço de armazenamento não está disponível." });
-            return;
+          toast({ variant: "destructive", title: "Erro", description: "O serviço de armazenamento não está disponível." });
+          return;
         }
         const imageRef = storageRef(storage, `profile_pictures/${user.uid}`);
-        try {
-            await uploadString(imageRef, previewImage, 'data_url');
-            photoURL = await getDownloadURL(imageRef);
-        } catch (error) {
-            console.error("Erro ao fazer upload da imagem:", error);
-            toast({ variant: "destructive", title: "Erro de Upload", description: "Não foi possível fazer upload da sua foto de perfil." });
-            return;
-        }
-    }
-
-    const dataToUpdate: Partial<FormData> = {
-      firstName: values.firstName,
-      lastName: values.lastName,
-      phone: values.phone,
-      photoURL: photoURL,
-    };
-    
-    // Only an admin can change the access level.
-    // This check is also enforced by security rules, but it's good practice
-    // to control the UI as well.
-    if (isAdmin && values.accessLevel) {
-      dataToUpdate.accessLevel = values.accessLevel;
-    }
-
-
-    updateDoc(userDocRef, dataToUpdate).then(() => {
+        await uploadString(imageRef, previewImage, 'data_url');
+        photoURL = await getDownloadURL(imageRef);
+      }
+  
+      const dataToUpdate: Partial<FormData> = {
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: values.phone,
+        photoURL: photoURL,
+      };
+  
+      if (isAdmin && values.accessLevel) {
+        dataToUpdate.accessLevel = values.accessLevel;
+      }
+  
+      await updateDoc(userDocRef, dataToUpdate);
+  
       toast({
         title: 'Sucesso!',
         description: 'Seu perfil foi atualizado.',
       });
-    }).catch((error) => {
+  
+    } catch (error) {
+      console.error("Erro ao atualizar perfil:", error);
+      // Emit a contextual error for permission issues
       errorEmitter.emit(
         'permission-error',
         new FirestorePermissionError({
           path: userDocRef.path,
           operation: 'update',
-          requestResourceData: dataToUpdate,
+          requestResourceData: values,
         })
       );
-    });
+      // Show a generic toast for other errors
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao Salvar',
+        description: 'Não foi possível salvar suas alterações. Verifique as permissões.',
+      });
+    } finally {
+       form.formState.isSubmitting = false;
+    }
   }
 
   if (isUserLoading || isEmployeeDataLoading) {
@@ -172,7 +176,7 @@ export function SettingsForm() {
     );
   }
 
-  const isSubmitting = form.formState.isSubmitting;
+  const { isSubmitting } = form.formState;
   const hasNumericId = typeof form.watch('id') === 'number';
 
   return (
