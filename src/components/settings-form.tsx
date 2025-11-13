@@ -51,9 +51,9 @@ export function SettingsForm() {
       firstName: '',
       lastName: '',
       email: '',
-      phone: null,
-      accessLevel: null,
-      photoURL: null,
+      phone: '',
+      accessLevel: '',
+      photoURL: '',
     },
   });
 
@@ -62,16 +62,14 @@ export function SettingsForm() {
     return doc(firestore, 'employees', user.uid);
   }, [firestore, user]);
 
-  // The 'id' field from useDoc is the document UID. We rename it to avoid conflict.
   const { data: employeeData, isLoading: isEmployeeDataLoading } = useDoc<FormData>(userDocRef);
 
   const isAdmin = employeeData?.accessLevel === 'Admin';
   
   useEffect(() => {
-    // Only reset the form if employeeData is available
     if (employeeData) {
       form.reset({
-        id: employeeData.id || null, // This is the numeric ID from the document data
+        id: employeeData.id || null,
         firstName: employeeData.firstName || '',
         lastName: employeeData.lastName || '',
         email: user?.email || employeeData.email || '',
@@ -154,7 +152,6 @@ export function SettingsForm() {
     });
   }
 
-  // Show skeleton loader while user or employee data is loading.
   if (isUserLoading || isEmployeeDataLoading) {
     return (
       <div className="space-y-4">
@@ -172,7 +169,7 @@ export function SettingsForm() {
   }
 
   const isSubmitting = form.formState.isSubmitting;
-  const hasNumericId = typeof form.getValues('id') === 'number';
+  const hasNumericId = typeof form.watch('id') === 'number';
 
   return (
     <Form {...form}>
@@ -204,7 +201,6 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>ID do Funcionário</FormLabel>
                   <FormControl>
-                    {/* Display 'Não atribuído' if ID is null/undefined */}
                     <Input {...field} value={field.value ?? 'Não atribuído'} readOnly className="bg-muted/50 cursor-not-allowed" />
                   </FormControl>
                   <FormMessage />
@@ -218,7 +214,6 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>Nível de Acesso</FormLabel>
                   <FormControl>
-                    {/* Ensure value is never undefined */}
                     <Input {...field} value={field.value ?? ''} readOnly={!isAdmin} className={!isAdmin ? "bg-muted/50 cursor-not-allowed" : ""}  />
                   </FormControl>
                   <FormMessage />
