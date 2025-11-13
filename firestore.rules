@@ -22,14 +22,20 @@ service cloud.firestore {
     }
     
     function isOwner(userId) {
+      // The employeeId in the path is the user's UID
       return request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      // Check the accessLevel of the user making the request
+      return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
     }
 
     /**
      * @description Manages access to the employee ID counter.
      * @path /counters/employees
      * @allow (read): Authenticated users can read the counter.
-     * @allow (write): Authenticated users can write to (increment) the counter.
+     * @allow (write): Only used in a transaction during user creation.
      * @principle Allows authenticated users to read and update the counter for new user registration.
      */
     match /counters/employees {
@@ -101,13 +107,18 @@ service cloud.firestore {
      * @path /employees/{employeeId}
      * @allow (read): Authenticated users can read any employee's profile.
      * @allow (create): A new employee document can be created if the UID in the document matches the authenticated user's UID.
-     * @allow (update): An employee can update their own document.
+     * @allow (update): An employee can update their own document, but an admin can update anyone's.
      * @allow (delete): Not allowed for safety.
      */
     match /employees/{employeeId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow update: if isOwner(employeeId);
+      allow update: if (isOwner(employeeId) && 
+                      request.resource.data.id == resource.data.id &&
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.email == resource.data.email &&
+                      request.resource.data.accessLevel == resource.data.accessLevel) 
+                    || isAdmin();
       allow delete: if false; 
     }
   }

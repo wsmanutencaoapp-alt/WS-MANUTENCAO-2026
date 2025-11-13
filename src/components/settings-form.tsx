@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
-import { doc, getDoc, updateDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { useEffect, useState, useRef } from 'react';
 import { Loader2, User as UserIcon } from 'lucide-react';
@@ -23,7 +23,6 @@ import { Skeleton } from './ui/skeleton';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 const formSchema = z.object({
   id: z.number().optional().nullable(),
@@ -65,8 +64,10 @@ export function SettingsForm() {
     if (!firestore || !user) return null;
     return doc(firestore, 'employees', user.uid);
   }, [firestore, user]);
+  
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const fetchUserData = async () => {
+  useEffect(() => {
     if (userDocRef) {
       getDoc(userDocRef)
         .then((docSnap) => {
@@ -84,9 +85,13 @@ export function SettingsForm() {
             if (data.photoURL) {
               setPreviewImage(data.photoURL);
             }
+            if(data.accessLevel === 'Admin') {
+                setIsAdmin(true);
+            }
           }
         })
         .catch((error) => {
+          console.error("Error fetching user data:", error);
           const permissionError = new FirestorePermissionError({
             path: userDocRef.path,
             operation: 'get',
@@ -94,11 +99,7 @@ export function SettingsForm() {
           errorEmitter.emit('permission-error', permissionError);
         });
     }
-  };
-
-  useEffect(() => {
-    fetchUserData();
-  }, [userDocRef, user]);
+  }, [userDocRef, user, form]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -111,47 +112,6 @@ export function SettingsForm() {
     }
   };
 
-  const assignId = async () => {
-    if (!firestore || !userDocRef || !user) return;
-    try {
-      const counterRef = doc(firestore, 'counters', 'employees');
-      const newEmployeeId = await runTransaction(firestore, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        
-        let newId = 1001; // Default starting ID
-        if (counterDoc.exists() && counterDoc.data()?.lastId) {
-            newId = counterDoc.data().lastId + 1;
-        }
-
-        // Special case for the first admin user
-        if (user.email === 'grupodallax@gmail.com' && (!counterDoc.exists() || counterDoc.data()?.lastId < 1001)) {
-            newId = 1001;
-            transaction.set(counterRef, { lastId: 1001 });
-        } else {
-             if (!counterDoc.exists()) {
-                throw new Error("Contador de funcionários não encontrado. O cadastro está desabilitado.");
-            }
-             transaction.update(counterRef, { lastId: newId });
-        }
-
-        transaction.update(userDocRef, { id: newId });
-        return newId;
-      });
-
-      toast({
-        title: 'Sucesso!',
-        description: `Seu ID de funcionário (${newEmployeeId}) foi atribuído.`,
-      });
-      // Re-busca os dados para atualizar o formulário
-      fetchUserData();
-    } catch (e: any) {
-       toast({
-        variant: "destructive",
-        title: 'Erro ao atribuir ID',
-        description: e.message || 'Não foi possível atribuir o ID. Verifique as permissões.',
-      });
-    }
-  };
 
   async function onSubmit(values: FormData) {
     if (!userDocRef || !user) {
@@ -181,13 +141,18 @@ export function SettingsForm() {
         }
     }
 
-    const dataToUpdate = {
+    const dataToUpdate: Partial<FormData> = {
       firstName: values.firstName,
       lastName: values.lastName,
       phone: values.phone,
       photoURL: photoURL,
-      accessLevel: values.accessLevel,
     };
+    
+    // Only admins can change the access level
+    if (isAdmin) {
+        dataToUpdate.accessLevel = values.accessLevel;
+    }
+
 
     updateDoc(userDocRef, dataToUpdate).then(() => {
       toast({
@@ -224,19 +189,6 @@ export function SettingsForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-
-        {!hasNumericId && (
-            <Alert>
-                <AlertTitle>Atribuir ID de Funcionário</AlertTitle>
-                <AlertDescription>
-                    Seu usuário ainda não tem um ID numérico. Clique no botão para atribuir o próximo ID disponível.
-                </AlertDescription>
-                <Button type="button" onClick={assignId} className="mt-4">
-                    Obter meu ID
-                </Button>
-            </Alert>
-        )}
-
         <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20">
               <AvatarImage src={previewImage || undefined} />
@@ -277,7 +229,7 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>Nível de Acesso</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value ?? ''}  />
+                    <Input {...field} value={field.value ?? ''} readOnly={!isAdmin} className={!isAdmin ? "bg-muted/50 cursor-not-allowed" : ""}  />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
