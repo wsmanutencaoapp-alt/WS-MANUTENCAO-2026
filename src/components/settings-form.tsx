@@ -73,12 +73,14 @@ export function SettingsForm() {
           }
         })
         .catch((error) => {
-          console.error('Erro ao buscar dados do usuário:', error);
-          toast({
-            variant: 'destructive',
-            title: 'Erro',
-            description: 'Não foi possível carregar os dados do perfil.',
-          });
+          // This could be a permission error on read.
+           errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+              path: userDocRef.path,
+              operation: 'get',
+            })
+          );
         });
     }
   }, [userDocRef, form, toast]);
@@ -92,35 +94,28 @@ export function SettingsForm() {
       });
       return;
     }
-    try {
-      const dataToUpdate = {
-        firstName: values.firstName,
-        lastName: values.lastName,
-        phone: values.phone,
-      };
+    
+    const dataToUpdate = {
+      firstName: values.firstName,
+      lastName: values.lastName,
+      phone: values.phone,
+    };
 
-      updateDoc(userDocRef, dataToUpdate).catch((error) => {
-        errorEmitter.emit(
-          'permission-error',
-          new FirestorePermissionError({
-            path: userDocRef.path,
-            operation: 'update',
-            requestResourceData: dataToUpdate,
-          })
-        );
-      });
+    updateDoc(userDocRef, dataToUpdate).catch((error) => {
+      errorEmitter.emit(
+        'permission-error',
+        new FirestorePermissionError({
+          path: userDocRef.path,
+          operation: 'update',
+          requestResourceData: dataToUpdate,
+        })
+      );
+    });
 
-      toast({
-        title: 'Sucesso!',
-        description: 'Seu perfil foi atualizado.',
-      });
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Ops! Algo deu errado.',
-        description: 'Não foi possível atualizar o seu perfil.',
-      });
-    }
+    toast({
+      title: 'Sucesso!',
+      description: 'Seu perfil foi atualizado.',
+    });
   }
 
   if (isUserLoading || !user) {
