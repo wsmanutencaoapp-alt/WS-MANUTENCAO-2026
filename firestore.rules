@@ -101,15 +101,13 @@ service cloud.firestore {
      * @path /employees/{employeeId}
      * @allow (read): Authenticated users can read any employee's profile.
      * @allow (create): A new employee document can be created if the UID in the document matches the authenticated user's UID.
-     * @allow (update): An employee can update their own document. Email and ID are immutable once set.
+     * @allow (update): An employee can update their own document.
      * @allow (delete): Not allowed for safety.
      */
     match /employees/{employeeId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow update: if isOwner(employeeId) && 
-                      (request.resource.data.id == resource.data.id || resource.data.id == null) &&
-                      request.resource.data.email == resource.data.email;
+      allow update: if isOwner(employeeId);
       allow delete: if false; 
     }
   }
