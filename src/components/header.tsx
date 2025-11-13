@@ -10,6 +10,7 @@ import {
   PanelLeft,
   Search,
   Settings,
+  LogIn,
   LogOut,
   UserPlus,
 } from 'lucide-react';
@@ -48,7 +49,7 @@ export function Header() {
   const handleLogout = async () => {
     if (auth) {
       await signOut(auth);
-      router.push('/signup');
+      router.push('/login');
     }
   };
 
@@ -122,7 +123,7 @@ export function Header() {
                 />
               )}
               <AvatarFallback>
-                {user?.isAnonymous ? 'A' : user?.email?.charAt(0).toUpperCase() || '?'}
+                {user?.email?.charAt(0).toUpperCase() || '?'}
               </AvatarFallback>
             </Avatar>
           </Button>
@@ -133,7 +134,7 @@ export function Header() {
           ) : user ? (
             <>
               <DropdownMenuLabel>
-                {user.isAnonymous ? 'Anonymous User' : user.email}
+                {user.email}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Settings</DropdownMenuItem>
@@ -149,9 +150,15 @@ export function Header() {
               <DropdownMenuLabel>Not Logged In</DropdownMenuLabel>
               <DropdownMenuSeparator />
                <DropdownMenuItem asChild>
+                <Link href="/login">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Login
+                </Link>
+              </DropdownMenuItem>
+               <DropdownMenuItem asChild>
                 <Link href="/signup">
                   <UserPlus className="mr-2 h-4 w-4" />
-                  Sign Up / Login
+                  Sign Up
                 </Link>
               </DropdownMenuItem>
             </>

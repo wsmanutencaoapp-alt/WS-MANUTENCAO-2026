@@ -27,6 +27,8 @@ import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const formSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -71,12 +73,23 @@ export function SignUpForm() {
 
       // 2. Save additional user info to Firestore
       const userDocRef = doc(firestore, 'employees', user.uid);
-      await setDoc(userDocRef, {
+      const userData = {
         id: user.uid,
         firstName: values.firstName,
         lastName: values.lastName,
         email: values.email,
         phone: '', // Phone is optional in this form
+      };
+      
+      setDoc(userDocRef, userData).catch((error) => {
+        errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'create',
+            requestResourceData: userData,
+          })
+        );
       });
 
       toast({
@@ -193,7 +206,7 @@ export function SignUpForm() {
             </Button>
              <p className="text-center text-sm text-muted-foreground">
               Already have an account?{' '}
-              <Link href="/dashboard" className="underline">
+              <Link href="/login" className="underline">
                 Login
               </Link>
             </p>
