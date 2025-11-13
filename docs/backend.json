@@ -1,0 +1,333 @@
+{
+  "entities": {
+    "Supply": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Supply",
+      "type": "object",
+      "description": "Represents an aircraft maintenance supply item.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Supply entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the supply item."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the supply item."
+        },
+        "quantityOnHand": {
+          "type": "number",
+          "description": "The number of supply items currently in stock."
+        },
+        "reorderPoint": {
+          "type": "number",
+          "description": "The quantity at which a reorder should be triggered."
+        },
+        "unitCost": {
+          "type": "number",
+          "description": "The cost of a single unit of the supply item."
+        },
+        "supplierId": {
+          "type": "string",
+          "description": "Reference to Supplier. (Relationship: Supplier 1:N Supply)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "quantityOnHand",
+        "reorderPoint",
+        "unitCost",
+        "supplierId"
+      ]
+    },
+    "Tool": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Tool",
+      "type": "object",
+      "description": "Represents a tool used in aircraft maintenance.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Tool entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the tool."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the tool."
+        },
+        "lastCalibrationDate": {
+          "type": "string",
+          "description": "The date when the tool was last calibrated.",
+          "format": "date-time"
+        },
+        "calibrationDueDate": {
+          "type": "string",
+          "description": "The date when the tool calibration is due.",
+          "format": "date-time"
+        },
+        "assignedEmployeeId": {
+          "type": "string",
+          "description": "Reference to Employee who is assigned to the tool. (Relationship: Employee 1:N Tool)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "lastCalibrationDate",
+        "calibrationDueDate",
+        "assignedEmployeeId"
+      ]
+    },
+    "Supplier": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Supplier",
+      "type": "object",
+      "description": "Represents a supplier of aircraft maintenance supplies.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Supplier entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the supplier."
+        },
+        "contactEmail": {
+          "type": "string",
+          "description": "Email address of the supplier's contact person.",
+          "format": "email"
+        },
+        "contactPhone": {
+          "type": "string",
+          "description": "Phone number of the supplier's contact person."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "contactEmail",
+        "contactPhone"
+      ]
+    },
+    "OperationRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "OperationRecord",
+      "type": "object",
+      "description": "Represents a record of an operation performed within the system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the OperationRecord entity."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the operation was performed.",
+          "format": "date-time"
+        },
+        "operationType": {
+          "type": "string",
+          "description": "Type of operation performed (e.g., 'Supply Reorder', 'Tool Calibration')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the operation."
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "Reference to Employee who performed the operation. (Relationship: Employee 1:N OperationRecord)"
+        }
+      },
+      "required": [
+        "id",
+        "timestamp",
+        "operationType",
+        "description",
+        "employeeId"
+      ]
+    },
+    "Image": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Image",
+      "type": "object",
+      "description": "Represents an image stored within the system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Image entity."
+        },
+        "filename": {
+          "type": "string",
+          "description": "Name of the image file."
+        },
+        "url": {
+          "type": "string",
+          "description": "URL where the image is stored.",
+          "format": "uri"
+        },
+        "uploadTimestamp": {
+          "type": "string",
+          "description": "Timestamp of when the image was uploaded.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "filename",
+        "url",
+        "uploadTimestamp"
+      ]
+    },
+    "Employee": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Employee",
+      "type": "object",
+      "description": "Represents an employee in the system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Employee entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the employee."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the employee."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the employee.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the employee."
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "phone"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/supplies/{supplyId}",
+        "definition": {
+          "entityName": "Supply",
+          "schema": {
+            "$ref": "#/backend/entities/Supply"
+          },
+          "description": "Stores aircraft maintenance supplies.  Includes supplierId for associating supplies with suppliers.",
+          "params": [
+            {
+              "name": "supplyId",
+              "description": "Unique identifier for the supply item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tools/{toolId}",
+        "definition": {
+          "entityName": "Tool",
+          "schema": {
+            "$ref": "#/backend/entities/Tool"
+          },
+          "description": "Stores aircraft maintenance tools and their calibration details. Includes assignedEmployeeId for tracking tool assignments.",
+          "params": [
+            {
+              "name": "toolId",
+              "description": "Unique identifier for the tool."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/suppliers/{supplierId}",
+        "definition": {
+          "entityName": "Supplier",
+          "schema": {
+            "$ref": "#/backend/entities/Supplier"
+          },
+          "description": "Stores information about suppliers of aircraft maintenance supplies.",
+          "params": [
+            {
+              "name": "supplierId",
+              "description": "Unique identifier for the supplier."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/operation_records/{operationRecordId}",
+        "definition": {
+          "entityName": "OperationRecord",
+          "schema": {
+            "$ref": "#/backend/entities/OperationRecord"
+          },
+          "description": "Stores records of operations performed in the system. Includes employeeId to track which employee performed the operation.",
+          "params": [
+            {
+              "name": "operationRecordId",
+              "description": "Unique identifier for the operation record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/images/{imageId}",
+        "definition": {
+          "entityName": "Image",
+          "schema": {
+            "$ref": "#/backend/entities/Image"
+          },
+          "description": "Stores images used within the system.",
+          "params": [
+            {
+              "name": "imageId",
+              "description": "Unique identifier for the image."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/employees/{employeeId}",
+        "definition": {
+          "entityName": "Employee",
+          "schema": {
+            "$ref": "#/backend/entities/Employee"
+          },
+          "description": "Stores employee information.",
+          "params": [
+            {
+              "name": "employeeId",
+              "description": "Unique identifier for the employee."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This Firestore data structure is designed to support AeroTrack's aircraft maintenance management features, focusing on supply and tool control, operation recording, and image storage. The structure prioritizes authorization independence through denormalization where needed and adheres to structural segregation principles to ensure consistent security postures within collections.  Path-based ownership is used for user-related data (none explicitly defined, but included for future expansion). Collaborative data patterns, utilizing membership maps, are employed where applicable. \n\nSpecifically, authorization independence is achieved by denormalizing necessary authorization data (like supplier or employee IDs) directly into subcollections when access needs to be controlled at the subcollection level without relying on `get()` calls to parent documents.  For example, the OperationRecord collection includes the employeeId to track which employee performed the operation and use it for authorization.  This denormalization is critical for atomic operations and simplifies security rule implementation. QAPs (Rules are not Filters) are supported through structural segregation. Each top-level collection is treated as having homogeneous security requirements. Additionally, the use of employeeId as a foreign key in relevant collections like OperationRecord allows for efficient querying and filtering based on employee-specific operations. This design facilitates secure list operations because rules can be written based on the contents of the document itself, not on related documents."
+  }
+}
