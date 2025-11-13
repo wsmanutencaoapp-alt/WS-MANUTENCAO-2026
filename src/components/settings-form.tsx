@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { useEffect, useState, useRef } from 'react';
 import { Loader2, User as UserIcon } from 'lucide-react';
@@ -23,6 +23,7 @@ import { Skeleton } from './ui/skeleton';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 const formSchema = z.object({
   id: z.number().optional(),
@@ -65,7 +66,7 @@ export function SettingsForm() {
     return doc(firestore, 'employees', user.uid);
   }, [firestore, user]);
 
-  useEffect(() => {
+  const fetchUserData = async () => {
     if (userDocRef) {
       getDoc(userDocRef)
         .then((docSnap) => {
@@ -93,7 +94,11 @@ export function SettingsForm() {
           errorEmitter.emit('permission-error', permissionError);
         });
     }
-  }, [userDocRef, form, user]);
+  };
+
+  useEffect(() => {
+    fetchUserData();
+  }, [userDocRef, user]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -103,6 +108,38 @@ export function SettingsForm() {
         setPreviewImage(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const assignId = async () => {
+    if (!firestore || !userDocRef) return;
+    try {
+      const counterRef = doc(firestore, 'counters', 'employees');
+      const newEmployeeId = await runTransaction(firestore, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        if (!counterDoc.exists() || !counterDoc.data()?.lastId) {
+            // Se o contador não existir ou não tiver lastId, inicializa
+            transaction.set(counterRef, { lastId: 1001 });
+            return 1001;
+        }
+        // Se já existe, apenas atualiza o usuário
+        return counterDoc.data().lastId; // Retorna o ID atual sem incrementar
+      });
+
+      // Atribui o ID ao usuário
+      await updateDoc(userDocRef, { id: newEmployeeId });
+      toast({
+        title: 'Sucesso!',
+        description: `Seu ID de funcionário (${newEmployeeId}) foi atribuído.`,
+      });
+      // Re-busca os dados para atualizar o formulário
+      fetchUserData();
+    } catch (e: any) {
+       toast({
+        variant: "destructive",
+        title: 'Erro ao atribuir ID',
+        description: e.message,
+      });
     }
   };
 
@@ -172,10 +209,24 @@ export function SettingsForm() {
     );
   }
 
+  const hasNumericId = typeof form.getValues('id') === 'number';
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+
+        {!hasNumericId && (
+            <Alert>
+                <AlertTitle>Atribuir ID de Funcionário</AlertTitle>
+                <AlertDescription>
+                    Seu usuário ainda não tem um ID numérico. Clique no botão para atribuir o próximo ID disponível.
+                </AlertDescription>
+                <Button type="button" onClick={assignId} className="mt-4">
+                    Obter meu ID (1001)
+                </Button>
+            </Alert>
+        )}
+
         <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20">
               <AvatarImage src={previewImage || undefined} />
@@ -203,7 +254,7 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>ID do Funcionário</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value ?? ''} readOnly className="bg-muted/50 cursor-not-allowed" />
+                    <Input {...field} value={field.value ?? 'Não atribuído'} readOnly className="bg-muted/50 cursor-not-allowed" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -285,7 +336,7 @@ export function SettingsForm() {
           )}
         />
         <div className="flex justify-end">
-          <Button type="submit" disabled={isFormLoading}>
+          <Button type="submit" disabled={isFormLoading || !hasNumericId}>
             {isFormLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Salvar Alterações
           </Button>
