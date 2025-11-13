@@ -14,8 +14,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useMemoFirebase, useStorage, useDoc } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { useEffect, useState, useRef } from 'react';
 import { Loader2, User as UserIcon } from 'lucide-react';
@@ -44,7 +44,6 @@ export function SettingsForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -64,43 +63,28 @@ export function SettingsForm() {
     if (!firestore || !user) return null;
     return doc(firestore, 'employees', user.uid);
   }, [firestore, user]);
+
+  const { data: employeeData, isLoading: isEmployeeDataLoading } = useDoc<FormData>(userDocRef);
+
+  const isAdmin = employeeData?.accessLevel === 'Admin';
   
-  const [isAdmin, setIsAdmin] = useState(false);
-
   useEffect(() => {
-    if (userDocRef) {
-      getDoc(userDocRef)
-        .then((docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            form.reset({
-              id: data.id || null,
-              firstName: data.firstName || '',
-              lastName: data.lastName || '',
-              email: data.email || user?.email || '',
-              phone: data.phone || '',
-              accessLevel: data.accessLevel || '',
-              photoURL: data.photoURL || '',
-            });
-            if (data.photoURL) {
-              setPreviewImage(data.photoURL);
-            }
-            if(data.accessLevel === 'Admin') {
-                setIsAdmin(true);
-            }
-          }
-        })
-        .catch((error) => {
-          console.error("Error fetching user data:", error);
-          const permissionError = new FirestorePermissionError({
-            path: userDocRef.path,
-            operation: 'get',
-          });
-          errorEmitter.emit('permission-error', permissionError);
-        });
+    if (employeeData) {
+      form.reset({
+        id: employeeData.id || null,
+        firstName: employeeData.firstName || '',
+        lastName: employeeData.lastName || '',
+        email: employeeData.email || user?.email || '',
+        phone: employeeData.phone || '',
+        accessLevel: employeeData.accessLevel || '',
+        photoURL: employeeData.photoURL || '',
+      });
+      if (employeeData.photoURL) {
+        setPreviewImage(employeeData.photoURL);
+      }
     }
-  }, [userDocRef, user, form]);
-
+  }, [employeeData, user, form]);
+  
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -171,10 +155,13 @@ export function SettingsForm() {
     });
   }
 
-  if (isUserLoading || !user) {
+  if (isUserLoading || isEmployeeDataLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-10 w-full" />
+        <div className="flex items-center gap-4">
+            <Skeleton className="h-20 w-20 rounded-full" />
+            <Skeleton className="h-10 w-28" />
+        </div>
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-full" />
