@@ -76,26 +76,21 @@ export function SignUpForm() {
       const newEmployeeId = await runTransaction(firestore, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         if (!counterDoc.exists()) {
-          // This transaction might fail if rules deny reading the counter.
-          // That's a potential source of the permission error.
-          throw new Error("Documento do contador não existe ou não pôde ser lido!");
+          throw new Error("Documento do contador não existe!");
         }
         const newId = counterDoc.data().lastId + 1;
         transaction.update(counterRef, { lastId: newId });
         return newId;
       }).catch(error => {
-          // Emit a contextual error if the transaction itself fails.
-          // This is common if the rules for the counter document are wrong.
-          errorEmitter.emit(
-            'permission-error',
-            new FirestorePermissionError({
-              path: counterRef.path,
-              operation: 'write', // A transaction is a write operation
-              requestResourceData: { lastId: 'newId' }
-            })
-          );
-          // Re-throw to stop execution
-          throw error;
+          // Emite um erro contextual se a transação falhar (ex: regras de segurança)
+          const permissionError = new FirestorePermissionError({
+            path: counterRef.path,
+            operation: 'write', 
+            requestResourceData: { lastId: 'newId' }
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          // Re-lança para interromper a execução e ser pego pelo catch principal
+          throw permissionError;
       });
 
       const userDocRef = doc(firestore, 'employees', user.uid);
@@ -128,7 +123,7 @@ export function SignUpForm() {
       router.push('/dashboard');
 
     } catch (error: any) {
-      // Don't show a toast for permission errors, as they are handled globally.
+      // Não exibe um toast para erros de permissão, pois são tratados globalmente
       if (error instanceof FirestorePermissionError) {
         return;
       }
@@ -148,11 +143,8 @@ export function SignUpForm() {
           case 'auth/weak-password':
             errorMessage = 'A senha é muito fraca.';
             break;
-          case 'permission-denied': // This can be thrown by the transaction
-             errorMessage = 'Falha ao criar o registro de funcionário devido a permissões.';
-             break;
           default:
-            errorMessage = error.message;
+            errorMessage = error.message || 'Falha ao criar conta.';
         }
       }
       toast({

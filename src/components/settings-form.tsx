@@ -41,7 +41,7 @@ export function SettingsForm() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      id: undefined, // Initialize as undefined explicitly
+      id: undefined,
       firstName: '',
       lastName: '',
       email: '',
@@ -64,27 +64,25 @@ export function SettingsForm() {
           if (docSnap.exists()) {
             const data = docSnap.data();
             form.reset({
-              id: data.id || undefined,
+              id: data.id,
               firstName: data.firstName || '',
               lastName: data.lastName || '',
-              email: data.email || '',
+              email: data.email || user?.email || '',
               phone: data.phone || '',
               accessLevel: data.accessLevel || '',
             });
           }
         })
         .catch((error) => {
-          // This could be a permission error on read.
-           errorEmitter.emit(
-            'permission-error',
-            new FirestorePermissionError({
-              path: userDocRef.path,
-              operation: 'get',
-            })
-          );
+          // Captura erros de permissão na leitura do documento do usuário
+          const permissionError = new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'get',
+          });
+          errorEmitter.emit('permission-error', permissionError);
         });
     }
-  }, [userDocRef, form, toast]);
+  }, [userDocRef, form, user, toast]);
 
   async function onSubmit(values: FormData) {
     if (!userDocRef) {
