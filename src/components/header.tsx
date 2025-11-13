@@ -12,6 +12,7 @@ import {
   Settings,
   LogIn,
   LogOut,
+  UserPlus,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -27,7 +28,8 @@ import { Input } from '@/components/ui/input';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { useUser, useAuth, initiateAnonymousSignIn } from '@/firebase';
+import { useUser, useAuth } from '@/firebase';
+import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { signOut } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -45,7 +47,9 @@ export function Header() {
   const { user, isUserLoading } = useUser();
 
   const handleLogin = () => {
-    initiateAnonymousSignIn(auth);
+    if (auth) {
+      initiateAnonymousSignIn(auth);
+    }
   };
 
   const handleLogout = () => {
@@ -152,7 +156,13 @@ export function Header() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogin}>
                 <LogIn className="mr-2 h-4 w-4" />
-                Login
+                Login (Anonymous)
+              </DropdownMenuItem>
+               <DropdownMenuItem asChild>
+                <Link href="/signup">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Sign Up
+                </Link>
               </DropdownMenuItem>
             </>
           )}

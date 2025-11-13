@@ -2,8 +2,9 @@
 import type { ReactNode } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Header } from '@/components/header';
-import { useAuth, useUser, initiateAnonymousSignIn } from '@/firebase';
+import { useAuth, useUser } from '@/firebase';
 import { useEffect } from 'react';
+import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const auth = useAuth();
