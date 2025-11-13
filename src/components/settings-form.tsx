@@ -68,9 +68,6 @@ export function SettingsForm() {
   
   useEffect(() => {
     if (employeeData) {
-      // The employeeData object from useDoc includes the document's ID from Firestore
-      // as `id`, which overwrites the `id` field from our actual data.
-      // We must explicitly use the `id` from the data payload.
       form.reset({
         id: employeeData.id,
         firstName: employeeData.firstName || '',
