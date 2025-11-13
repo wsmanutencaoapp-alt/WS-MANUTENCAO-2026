@@ -57,24 +57,24 @@ export function SettingsForm() {
     },
   });
 
-  const isFormLoading = form.formState.isSubmitting || isUserLoading;
-
   const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'employees', user.uid);
   }, [firestore, user]);
 
+  // The 'id' field from useDoc is the document UID. We rename it to avoid conflict.
   const { data: employeeData, isLoading: isEmployeeDataLoading } = useDoc<FormData>(userDocRef);
 
   const isAdmin = employeeData?.accessLevel === 'Admin';
   
   useEffect(() => {
+    // Only reset the form if employeeData is available
     if (employeeData) {
       form.reset({
-        id: employeeData.id || null,
+        id: employeeData.id || null, // This is the numeric ID from the document data
         firstName: employeeData.firstName || '',
         lastName: employeeData.lastName || '',
-        email: employeeData.email || user?.email || '',
+        email: user?.email || employeeData.email || '',
         phone: employeeData.phone || '',
         accessLevel: employeeData.accessLevel || '',
         photoURL: employeeData.photoURL || '',
@@ -132,9 +132,8 @@ export function SettingsForm() {
       photoURL: photoURL,
     };
     
-    // Only admins can change the access level
     if (isAdmin && values.accessLevel) {
-        dataToUpdate.accessLevel = values.accessLevel;
+      dataToUpdate.accessLevel = values.accessLevel;
     }
 
 
@@ -155,6 +154,7 @@ export function SettingsForm() {
     });
   }
 
+  // Show skeleton loader while user or employee data is loading.
   if (isUserLoading || isEmployeeDataLoading) {
     return (
       <div className="space-y-4">
@@ -171,6 +171,7 @@ export function SettingsForm() {
     );
   }
 
+  const isSubmitting = form.formState.isSubmitting;
   const hasNumericId = typeof form.getValues('id') === 'number';
 
   return (
@@ -203,6 +204,7 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>ID do Funcionário</FormLabel>
                   <FormControl>
+                    {/* Display 'Não atribuído' if ID is null/undefined */}
                     <Input {...field} value={field.value ?? 'Não atribuído'} readOnly className="bg-muted/50 cursor-not-allowed" />
                   </FormControl>
                   <FormMessage />
@@ -216,6 +218,7 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>Nível de Acesso</FormLabel>
                   <FormControl>
+                    {/* Ensure value is never undefined */}
                     <Input {...field} value={field.value ?? ''} readOnly={!isAdmin} className={!isAdmin ? "bg-muted/50 cursor-not-allowed" : ""}  />
                   </FormControl>
                   <FormMessage />
@@ -285,8 +288,8 @@ export function SettingsForm() {
           )}
         />
         <div className="flex justify-end">
-          <Button type="submit" disabled={isFormLoading || !hasNumericId}>
-            {isFormLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button type="submit" disabled={isSubmitting || !hasNumericId}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Salvar Alterações
           </Button>
         </div>
