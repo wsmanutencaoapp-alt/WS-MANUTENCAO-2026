@@ -18,11 +18,12 @@ import { useUser, useFirestore, useMemoFirebase, useStorage, useDoc } from '@/fi
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { useEffect, useState, useRef } from 'react';
-import { Loader2, User as UserIcon } from 'lucide-react';
+import { Loader2, User as UserIcon, ShieldCheck } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Badge } from './ui/badge';
 
 const formSchema = z.object({
   id: z.number().optional().nullable(),
@@ -184,9 +185,20 @@ export function SettingsForm() {
                 <UserIcon className="h-10 w-10" />
               </AvatarFallback>
             </Avatar>
-            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-              Trocar Foto
-            </Button>
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-semibold">{form.watch('firstName')} {form.watch('lastName')}</h2>
+                    {isAdmin && (
+                        <Badge variant="secondary" className="gap-1 pl-2">
+                           <ShieldCheck className="h-4 w-4 text-primary" />
+                           Admin
+                        </Badge>
+                    )}
+                </div>
+                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                Trocar Foto
+                </Button>
+            </div>
             <Input 
               type="file" 
               ref={fileInputRef}
