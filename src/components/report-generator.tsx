@@ -1,6 +1,6 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState, useFormStatus } from 'react';
 import { getSupplyUsageReport } from '@/app/actions';
 import { Button } from './ui/button';
 import { Calendar } from './ui/calendar';
@@ -29,7 +29,7 @@ function SubmitButton() {
 }
 
 export function ReportGenerator() {
-  const [state, formAction] = useFormState(getSupplyUsageReport, initialState);
+  const [state, formAction] = useActionState(getSupplyUsageReport, initialState);
 
   return (
     <div className="grid gap-6">
