@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 const formSchema = z.object({
-  id: z.number().optional(),
+  id: z.number().optional().nullable(),
   accessLevel: z.string().optional(),
   firstName: z.string().min(1, 'O nome é obrigatório'),
   lastName: z.string().min(1, 'O sobrenome é obrigatório'),
@@ -49,7 +49,7 @@ export function SettingsForm() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      id: undefined,
+      id: null,
       firstName: '',
       lastName: '',
       email: '',
@@ -73,7 +73,7 @@ export function SettingsForm() {
           if (docSnap.exists()) {
             const data = docSnap.data();
             form.reset({
-              id: data.id,
+              id: data.id || null,
               firstName: data.firstName || '',
               lastName: data.lastName || '',
               email: data.email || user?.email || '',
@@ -112,22 +112,32 @@ export function SettingsForm() {
   };
 
   const assignId = async () => {
-    if (!firestore || !userDocRef) return;
+    if (!firestore || !userDocRef || !user) return;
     try {
       const counterRef = doc(firestore, 'counters', 'employees');
       const newEmployeeId = await runTransaction(firestore, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
-        if (!counterDoc.exists() || !counterDoc.data()?.lastId) {
-            // Se o contador não existir ou não tiver lastId, inicializa
-            transaction.set(counterRef, { lastId: 1001 });
-            return 1001;
+        
+        let newId = 1001; // Default starting ID
+        if (counterDoc.exists() && counterDoc.data()?.lastId) {
+            newId = counterDoc.data().lastId + 1;
         }
-        // Se já existe, apenas atualiza o usuário
-        return counterDoc.data().lastId; // Retorna o ID atual sem incrementar
+
+        // Special case for the first admin user
+        if (user.email === 'grupodallax@gmail.com' && (!counterDoc.exists() || counterDoc.data()?.lastId < 1001)) {
+            newId = 1001;
+            transaction.set(counterRef, { lastId: 1001 });
+        } else {
+             if (!counterDoc.exists()) {
+                throw new Error("Contador de funcionários não encontrado. O cadastro está desabilitado.");
+            }
+             transaction.update(counterRef, { lastId: newId });
+        }
+
+        transaction.update(userDocRef, { id: newId });
+        return newId;
       });
 
-      // Atribui o ID ao usuário
-      await updateDoc(userDocRef, { id: newEmployeeId });
       toast({
         title: 'Sucesso!',
         description: `Seu ID de funcionário (${newEmployeeId}) foi atribuído.`,
@@ -138,7 +148,7 @@ export function SettingsForm() {
        toast({
         variant: "destructive",
         title: 'Erro ao atribuir ID',
-        description: e.message,
+        description: e.message || 'Não foi possível atribuir o ID. Verifique as permissões.',
       });
     }
   };
@@ -222,7 +232,7 @@ export function SettingsForm() {
                     Seu usuário ainda não tem um ID numérico. Clique no botão para atribuir o próximo ID disponível.
                 </AlertDescription>
                 <Button type="button" onClick={assignId} className="mt-4">
-                    Obter meu ID (1001)
+                    Obter meu ID
                 </Button>
             </Alert>
         )}
