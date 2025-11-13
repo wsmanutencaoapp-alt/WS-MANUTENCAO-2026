@@ -28,9 +28,11 @@ import { Input } from '@/components/ui/input';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { useUser, useAuth } from '@/firebase';
+import { useUser, useAuth, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { doc } from 'firebase/firestore';
+
 
 const navItems = [
   { href: '/dashboard', icon: Box, label: 'Suprimentos' },
@@ -38,13 +40,21 @@ const navItems = [
   { href: '/dashboard/reports', icon: BarChart3, label: 'Relatórios' },
 ];
 
-const userAvatar = PlaceHolderImages.find(img => img.id === 'user-avatar');
 
 export function Header() {
   const pathname = usePathname();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return doc(firestore, 'employees', user.uid);
+  }, [firestore, user?.uid]);
+
+  const { data: employeeData } = useDoc<{ photoURL?: string }>(userDocRef);
+
 
   const handleLogout = async () => {
     if (auth) {
@@ -52,6 +62,9 @@ export function Header() {
       router.push('/login');
     }
   };
+  
+  const userAvatarImage = employeeData?.photoURL;
+  const userAvatarFallback = user?.email?.charAt(0).toUpperCase() || '?';
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
@@ -112,20 +125,9 @@ export function Header() {
             className="overflow-hidden rounded-full"
           >
             <Avatar>
-              {user?.photoURL ? (
-                <AvatarImage src={user.photoURL} alt="Avatar do usuário" />
-              ) : userAvatar && (
-                <Image
-                  src={userAvatar.imageUrl}
-                  width={36}
-                  height={36}
-                  alt="Avatar"
-                  className="overflow-hidden rounded-full"
-                  data-ai-hint={userAvatar.imageHint}
-                />
-              )}
+              <AvatarImage src={userAvatarImage} alt="Avatar do usuário" />
               <AvatarFallback>
-                {user?.email?.charAt(0).toUpperCase() || '?'}
+                {userAvatarFallback}
               </AvatarFallback>
             </Avatar>
           </Button>

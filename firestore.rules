@@ -16,6 +16,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
     /**
      * @description Manages access to the employee ID counter.
@@ -35,5 +43,72 @@ service cloud.firestore {
      * @allow (create): Authenticated users can create supply items.
      * @allow (update): Authenticated users can update supply items.
      * @allow (delete): Authenticated users can delete supply items.
-     * @deny (create): Unauthenticated users cannot create supply items.
-     * @deny (update): Unauthenticated users cannot update supply items
+     */
+    match /supplies/{supplyId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+    
+    /**
+     * @description Manages access to aircraft maintenance tools.
+     * @path /tools/{toolId}
+     * @allow (read): Authenticated users can read any tool.
+     * @allow (create): Authenticated users can create tools.
+     * @allow (update): Authenticated users can update tools.
+     * @allow (delete): Authenticated users can delete tools.
+     */
+    match /tools/{toolId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Manages access to suppliers.
+     * @path /suppliers/{supplierId}
+     * @allow (read): Authenticated users can read any supplier.
+     * @allow (create): Authenticated users can create suppliers.
+     * @allow (update): Authenticated users can update suppliers.
+     * @allow (delete): Authenticated users can delete suppliers.
+     */
+    match /suppliers/{supplierId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Manages access to operation records.
+     * @path /operation_records/{operationRecordId}
+     * @allow (read): Authenticated users can read any operation record.
+     * @allow (create): Authenticated users can create operation records.
+     * @allow (update): Authenticated users can update operation records.
+     * @allow (delete): Authenticated users can delete operation records.
+     */
+    match /operation_records/{operationRecordId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Manages access to images.
+     * @path /images/{imageId}
+     * @allow (read): Authenticated users can read any image.
+     * @allow (create): Authenticated users can create images.
+     * @allow (update): Authenticated users can update images.
+     * @allow (delete): Authenticated users can delete images.
+     */
+    match /images/{imageId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Manages access to employee data.
+     * @path /employees/{employeeId}
+     * @allow (read): Authenticated users can read any employee's profile.
+     * @allow (create): A new employee document can be created if the UID in the document matches the authenticated user's UID.
+     * @allow (update): An employee can update their own document. Email and ID are immutable.
+     * @allow (delete): Not allowed for safety.
+     */
+    match /employees/{employeeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isOwner(employeeId) && request.resource.data.id == resource.data.id && request.resource.data.email == resource.data.email;
+      allow delete: if false; 
+    }
+  }
+}

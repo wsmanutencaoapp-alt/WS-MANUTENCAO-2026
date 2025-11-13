@@ -14,13 +14,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import { useEffect, useState, useRef } from 'react';
+import { Loader2, User as UserIcon } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 const formSchema = z.object({
   id: z.number().optional(),
@@ -29,6 +31,7 @@ const formSchema = z.object({
   lastName: z.string().min(1, 'O sobrenome é obrigatório'),
   email: z.string().email('Endereço de e-mail inválido').optional(),
   phone: z.string().optional(),
+  photoURL: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -37,6 +40,10 @@ export function SettingsForm() {
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const storage = useStorage();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -47,6 +54,7 @@ export function SettingsForm() {
       email: '',
       phone: '',
       accessLevel: '',
+      photoURL: '',
     },
   });
 
@@ -70,11 +78,14 @@ export function SettingsForm() {
               email: data.email || user?.email || '',
               phone: data.phone || '',
               accessLevel: data.accessLevel || '',
+              photoURL: data.photoURL || '',
             });
+            if (data.photoURL) {
+              setPreviewImage(data.photoURL);
+            }
           }
         })
         .catch((error) => {
-          // Captura erros de permissão na leitura do documento do usuário
           const permissionError = new FirestorePermissionError({
             path: userDocRef.path,
             operation: 'get',
@@ -82,10 +93,21 @@ export function SettingsForm() {
           errorEmitter.emit('permission-error', permissionError);
         });
     }
-  }, [userDocRef, form, user, toast]);
+  }, [userDocRef, form, user]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   async function onSubmit(values: FormData) {
-    if (!userDocRef) {
+    if (!userDocRef || !user) {
       toast({
         variant: 'destructive',
         title: 'Ops! Algo deu errado.',
@@ -94,13 +116,38 @@ export function SettingsForm() {
       return;
     }
     
+    let photoURL = values.photoURL;
+
+    if (previewImage && previewImage !== values.photoURL) {
+        if (!storage) {
+            toast({ variant: "destructive", title: "Erro", description: "O serviço de armazenamento não está disponível." });
+            return;
+        }
+        const imageRef = storageRef(storage, `profile_pictures/${user.uid}`);
+        try {
+            await uploadString(imageRef, previewImage, 'data_url');
+            photoURL = await getDownloadURL(imageRef);
+        } catch (error) {
+            console.error("Erro ao fazer upload da imagem:", error);
+            toast({ variant: "destructive", title: "Erro de Upload", description: "Não foi possível fazer upload da sua foto de perfil." });
+            return;
+        }
+    }
+
     const dataToUpdate = {
       firstName: values.firstName,
       lastName: values.lastName,
       phone: values.phone,
+      photoURL: photoURL,
+      accessLevel: values.accessLevel,
     };
 
-    updateDoc(userDocRef, dataToUpdate).catch((error) => {
+    updateDoc(userDocRef, dataToUpdate).then(() => {
+      toast({
+        title: 'Sucesso!',
+        description: 'Seu perfil foi atualizado.',
+      });
+    }).catch((error) => {
       errorEmitter.emit(
         'permission-error',
         new FirestorePermissionError({
@@ -109,11 +156,6 @@ export function SettingsForm() {
           requestResourceData: dataToUpdate,
         })
       );
-    });
-
-    toast({
-      title: 'Sucesso!',
-      description: 'Seu perfil foi atualizado.',
     });
   }
 
@@ -134,6 +176,25 @@ export function SettingsForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="flex items-center gap-4">
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={previewImage || undefined} />
+              <AvatarFallback>
+                <UserIcon className="h-10 w-10" />
+              </AvatarFallback>
+            </Avatar>
+            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+              Trocar Foto
+            </Button>
+            <Input 
+              type="file" 
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden" 
+              accept="image/png, image/jpeg"
+            />
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               control={form.control}
@@ -155,7 +216,7 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>Nível de Acesso</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value ?? ''} readOnly className="bg-muted/50 cursor-not-allowed" />
+                    <Input {...field} value={field.value ?? ''}  />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

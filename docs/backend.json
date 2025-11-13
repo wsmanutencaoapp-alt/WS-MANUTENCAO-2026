@@ -220,6 +220,11 @@
         "accessLevel": {
           "type": "string",
           "description": "The access level of the employee (e.g., 'Admin', 'Técnico')."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "URL of the employee's profile picture.",
+          "format": "uri"
         }
       },
       "required": [
@@ -234,8 +239,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
