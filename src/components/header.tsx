@@ -10,7 +10,6 @@ import {
   PanelLeft,
   Search,
   Settings,
-  LogIn,
   LogOut,
   UserPlus,
 } from 'lucide-react';
@@ -29,7 +28,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useUser, useAuth } from '@/firebase';
-import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { signOut } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -46,12 +44,6 @@ export function Header() {
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
-
-  const handleLogin = () => {
-    if (auth) {
-      initiateAnonymousSignIn(auth);
-    }
-  };
 
   const handleLogout = async () => {
     if (auth) {
@@ -156,14 +148,10 @@ export function Header() {
             <>
               <DropdownMenuLabel>Not Logged In</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogin}>
-                <LogIn className="mr-2 h-4 w-4" />
-                Login (Anonymous)
-              </DropdownMenuItem>
                <DropdownMenuItem asChild>
                 <Link href="/signup">
                   <UserPlus className="mr-2 h-4 w-4" />
-                  Sign Up
+                  Sign Up / Login
                 </Link>
               </DropdownMenuItem>
             </>
