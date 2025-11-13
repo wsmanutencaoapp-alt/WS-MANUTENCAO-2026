@@ -31,10 +31,10 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 const formSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().min(1, 'O nome é obrigatório'),
+  lastName: z.string().min(1, 'O sobrenome é obrigatório'),
+  email: z.string().email('Endereço de e-mail inválido'),
+  password: z.string().min(8, 'A senha deve ter pelo menos 8 caracteres'),
 });
 
 export function SignUpForm() {
@@ -57,8 +57,8 @@ export function SignUpForm() {
     if (!auth || !firestore) {
       toast({
         variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
-        description: 'Firebase is not initialized.',
+        title: 'Ops! Algo deu errado.',
+        description: 'O Firebase não foi inicializado.',
       });
       return;
     }
@@ -93,26 +93,26 @@ export function SignUpForm() {
       });
 
       toast({
-        title: 'Success!',
-        description: 'Your account has been created. Redirecting to dashboard...',
+        title: 'Sucesso!',
+        description: 'Sua conta foi criada. Redirecionando para o painel...',
       });
       router.push('/dashboard');
 
     } catch (error: any) {
-      let errorMessage = 'An unexpected error occurred.';
+      let errorMessage = 'Ocorreu um erro inesperado.';
       if (error.code) {
         switch (error.code) {
           case 'auth/email-already-in-use':
-            errorMessage = 'This email address is already in use.';
+            errorMessage = 'Este endereço de e-mail já está em uso.';
             break;
           case 'auth/invalid-email':
-            errorMessage = 'The email address is not valid.';
+            errorMessage = 'O endereço de e-mail não é válido.';
             break;
           case 'auth/operation-not-allowed':
-            errorMessage = 'Email/password accounts are not enabled.';
+            errorMessage = 'Contas de e-mail/senha não estão habilitadas.';
             break;
           case 'auth/weak-password':
-            errorMessage = 'The password is too weak.';
+            errorMessage = 'A senha é muito fraca.';
             break;
           default:
             errorMessage = error.message;
@@ -120,7 +120,7 @@ export function SignUpForm() {
       }
       toast({
         variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
+        title: 'Ops! Algo deu errado.',
         description: errorMessage,
       });
     }
@@ -129,9 +129,9 @@ export function SignUpForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Sign Up</CardTitle>
+        <CardTitle>Cadastre-se</CardTitle>
         <CardDescription>
-          Create an account to get started with AeroTrack.
+          Crie uma conta para começar a usar o AeroTrack.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -143,9 +143,9 @@ export function SignUpForm() {
                 name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name</FormLabel>
+                    <FormLabel>Nome</FormLabel>
                     <FormControl>
-                      <Input placeholder="John" {...field} />
+                      <Input placeholder="João" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -156,9 +156,9 @@ export function SignUpForm() {
                 name="lastName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name</FormLabel>
+                    <FormLabel>Sobrenome</FormLabel>
                     <FormControl>
-                      <Input placeholder="Doe" {...field} />
+                      <Input placeholder="Silva" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -170,11 +170,11 @@ export function SignUpForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>E-mail</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="john.doe@example.com"
+                      placeholder="joao.silva@exemplo.com"
                       {...field}
                     />
                   </FormControl>
@@ -187,7 +187,7 @@ export function SignUpForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Senha</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="********" {...field} />
                   </FormControl>
@@ -202,10 +202,10 @@ export function SignUpForm() {
               className="w-full"
               disabled={form.formState.isSubmitting}
             >
-              {form.formState.isSubmitting ? 'Creating Account...' : 'Sign Up'}
+              {form.formState.isSubmitting ? 'Criando Conta...' : 'Cadastre-se'}
             </Button>
              <p className="text-center text-sm text-muted-foreground">
-              Already have an account?{' '}
+              Já tem uma conta?{' '}
               <Link href="/login" className="underline">
                 Login
               </Link>

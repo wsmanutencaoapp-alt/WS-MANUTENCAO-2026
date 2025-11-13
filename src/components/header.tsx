@@ -33,9 +33,9 @@ import { signOut } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const navItems = [
-  { href: '/dashboard', icon: Box, label: 'Supplies' },
-  { href: '/dashboard/tools', icon: Wrench, label: 'Tools' },
-  { href: '/dashboard/reports', icon: BarChart3, label: 'Reports' },
+  { href: '/dashboard', icon: Box, label: 'Suprimentos' },
+  { href: '/dashboard/tools', icon: Wrench, label: 'Ferramentas' },
+  { href: '/dashboard/reports', icon: BarChart3, label: 'Relatórios' },
 ];
 
 const userAvatar = PlaceHolderImages.find(img => img.id === 'user-avatar');
@@ -59,7 +59,7 @@ export function Header() {
         <SheetTrigger asChild>
           <Button size="icon" variant="outline" className="sm:hidden">
             <PanelLeft className="h-5 w-5" />
-            <span className="sr-only">Toggle Menu</span>
+            <span className="sr-only">Alternar Menu</span>
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="sm:max-w-xs">
@@ -89,7 +89,7 @@ export function Header() {
                 className='flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground'
               >
                 <Settings className="h-5 w-5" />
-                Settings
+                Configurações
               </Link>
           </nav>
         </SheetContent>
@@ -98,7 +98,7 @@ export function Header() {
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Search..."
+          placeholder="Pesquisar..."
           className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
         />
       </div>
@@ -111,7 +111,7 @@ export function Header() {
           >
             <Avatar>
               {user?.photoURL ? (
-                <AvatarImage src={user.photoURL} alt="User avatar" />
+                <AvatarImage src={user.photoURL} alt="Avatar do usuário" />
               ) : userAvatar && (
                 <Image
                   src={userAvatar.imageUrl}
@@ -130,24 +130,24 @@ export function Header() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {isUserLoading ? (
-            <DropdownMenuLabel>Loading...</DropdownMenuLabel>
+            <DropdownMenuLabel>Carregando...</DropdownMenuLabel>
           ) : user ? (
             <>
               <DropdownMenuLabel>
                 {user.email}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuItem>Support</DropdownMenuItem>
+              <DropdownMenuItem>Configurações</DropdownMenuItem>
+              <DropdownMenuItem>Suporte</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
-                Logout
+                Sair
               </DropdownMenuItem>
             </>
           ) : (
             <>
-              <DropdownMenuLabel>Not Logged In</DropdownMenuLabel>
+              <DropdownMenuLabel>Não Conectado</DropdownMenuLabel>
               <DropdownMenuSeparator />
                <DropdownMenuItem asChild>
                 <Link href="/login">
@@ -158,7 +158,7 @@ export function Header() {
                <DropdownMenuItem asChild>
                 <Link href="/signup">
                   <UserPlus className="mr-2 h-4 w-4" />
-                  Sign Up
+                  Cadastre-se
                 </Link>
               </DropdownMenuItem>
             </>

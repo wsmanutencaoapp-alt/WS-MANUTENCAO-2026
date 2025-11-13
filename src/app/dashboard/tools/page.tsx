@@ -13,17 +13,17 @@ export default function ToolsPage() {
   return (
     <div>
        <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Tool Management</h1>
+        <h1 className="text-2xl font-bold">Gerenciamento de Ferramentas</h1>
         <Button>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Add New Tool
+          Adicionar Nova Ferramenta
         </Button>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Tool Inventory</CardTitle>
+          <CardTitle>Inventário de Ferramentas</CardTitle>
           <CardDescription>
-            Track and manage all your maintenance tools.
+            Rastreie e gerencie todas as suas ferramentas de manutenção.
           </CardDescription>
         </CardHeader>
         <CardContent>

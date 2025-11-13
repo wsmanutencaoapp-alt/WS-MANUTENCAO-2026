@@ -10,18 +10,31 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 
+const statusTranslations: Record<string, string> = {
+  'In Stock': 'Em Estoque',
+  'Low Stock': 'Estoque Baixo',
+  'Out of Stock': 'Sem Estoque',
+};
+
+const categoryTranslations: Record<string, string> = {
+  'Structural': 'Estrutural',
+  'Consumables': 'Consumíveis',
+  'Avionics': 'Aviônicos',
+  'Mechanical': 'Mecânica',
+}
+
 export function SuppliesTable() {
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead className="hidden w-[100px] sm:table-cell">
-            <span className="sr-only">Image</span>
+            <span className="sr-only">Imagem</span>
           </TableHead>
-          <TableHead>Name</TableHead>
+          <TableHead>Nome</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Category</TableHead>
-          <TableHead className="hidden md:table-cell">Quantity</TableHead>
+          <TableHead>Categoria</TableHead>
+          <TableHead className="hidden md:table-cell">Quantidade</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -48,10 +61,10 @@ export function SuppliesTable() {
                     : 'destructive'
                 }
               >
-                {supply.status}
+                {statusTranslations[supply.status] || supply.status}
               </Badge>
             </TableCell>
-            <TableCell>{supply.category}</TableCell>
+            <TableCell>{categoryTranslations[supply.category] || supply.category}</TableCell>
             <TableCell className="hidden md:table-cell">
               {supply.quantity} {supply.unit}
             </TableCell>

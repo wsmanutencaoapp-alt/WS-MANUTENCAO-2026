@@ -13,9 +13,9 @@ import {
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/dashboard', icon: Box, label: 'Supplies' },
-  { href: '/dashboard/tools', icon: Wrench, label: 'Tools' },
-  { href: '/dashboard/reports', icon: BarChart3, label: 'Reports' },
+  { href: '/dashboard', icon: Box, label: 'Suprimentos' },
+  { href: '/dashboard/tools', icon: Wrench, label: 'Ferramentas' },
+  { href: '/dashboard/reports', icon: BarChart3, label: 'Relatórios' },
 ];
 
 export function AppSidebar() {
@@ -59,10 +59,10 @@ export function AppSidebar() {
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8"
               >
                 <Settings className="h-5 w-5" />
-                <span className="sr-only">Settings</span>
+                <span className="sr-only">Configurações</span>
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="right">Settings</TooltipContent>
+            <TooltipContent side="right">Configurações</TooltipContent>
           </Tooltip>
         </nav>
       </TooltipProvider>

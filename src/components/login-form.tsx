@@ -28,8 +28,8 @@ import { useAuth } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 const formSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email('Endereço de e-mail inválido'),
+  password: z.string().min(1, 'A senha é obrigatória'),
 });
 
 export function LoginForm() {
@@ -49,37 +49,37 @@ export function LoginForm() {
     if (!auth) {
       toast({
         variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
-        description: 'Firebase is not initialized.',
+        title: 'Ops! Algo deu errado.',
+        description: 'O Firebase não foi inicializado.',
       });
       return;
     }
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({
-        title: 'Success!',
-        description: 'Logged in successfully. Redirecting to dashboard...',
+        title: 'Sucesso!',
+        description: 'Login realizado com sucesso. Redirecionando para o painel...',
       });
       router.push('/dashboard');
     } catch (error: any) {
-      let errorMessage = 'An unexpected error occurred.';
+      let errorMessage = 'Ocorreu um erro inesperado.';
       if (error.code) {
         switch (error.code) {
           case 'auth/user-not-found':
           case 'auth/wrong-password':
           case 'auth/invalid-credential':
-            errorMessage = 'Invalid email or password.';
+            errorMessage = 'E-mail ou senha inválidos.';
             break;
           case 'auth/invalid-email':
-            errorMessage = 'The email address is not valid.';
+            errorMessage = 'O endereço de e-mail não é válido.';
             break;
           default:
-            errorMessage = 'Failed to login. Please try again.';
+            errorMessage = 'Falha ao fazer login. Por favor, tente novamente.';
         }
       }
       toast({
         variant: 'destructive',
-        title: 'Login Failed',
+        title: 'Falha no Login',
         description: errorMessage,
       });
     }
@@ -90,7 +90,7 @@ export function LoginForm() {
       <CardHeader>
         <CardTitle>Login</CardTitle>
         <CardDescription>
-          Access your AeroTrack dashboard.
+          Acesse seu painel AeroTrack.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -101,11 +101,11 @@ export function LoginForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>E-mail</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="john.doe@example.com"
+                      placeholder="joao.silva@example.com"
                       {...field}
                     />
                   </FormControl>
@@ -118,7 +118,7 @@ export function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Senha</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="********" {...field} />
                   </FormControl>
@@ -133,12 +133,12 @@ export function LoginForm() {
               className="w-full"
               disabled={form.formState.isSubmitting}
             >
-              {form.formState.isSubmitting ? 'Logging in...' : 'Login'}
+              {form.formState.isSubmitting ? 'Entrando...' : 'Login'}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
-              Don't have an account?{' '}
+              Não tem uma conta?{' '}
               <Link href="/signup" className="underline">
-                Sign up
+                Cadastre-se
               </Link>
             </p>
           </CardFooter>

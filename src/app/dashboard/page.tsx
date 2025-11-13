@@ -13,9 +13,9 @@ export default function Dashboard() {
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
       <Card className="col-span-1 lg:col-span-4">
         <CardHeader>
-          <CardTitle>Supplies</CardTitle>
+          <CardTitle>Suprimentos</CardTitle>
           <CardDescription>
-            Manage your aircraft maintenance supplies.
+            Gerencie seus suprimentos de manutenção de aeronaves.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -26,7 +26,7 @@ export function ReorderSuggestions() {
     if (result.success && result.notifications) {
       setSuggestions(result.notifications);
     } else {
-      setError(result.error || 'An unknown error occurred.');
+      setError(result.error || 'Ocorreu um erro desconhecido.');
       setSuggestions([]);
     }
     setIsLoading(false);
@@ -40,14 +40,14 @@ export function ReorderSuggestions() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div className="space-y-1">
-          <CardTitle>Reorder Suggestions</CardTitle>
+          <CardTitle>Sugestões de Reabastecimento</CardTitle>
           <CardDescription>
-            AI-powered suggestions for stock replenishment.
+            Sugestões de IA para reposição de estoque.
           </CardDescription>
         </div>
         <Button variant="ghost" size="icon" onClick={fetchSuggestions} disabled={isLoading}>
           <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-          <span className="sr-only">Refresh suggestions</span>
+          <span className="sr-only">Atualizar sugestões</span>
         </Button>
       </CardHeader>
       <CardContent>
@@ -69,11 +69,11 @@ export function ReorderSuggestions() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">No reorder suggestions at this time.</p>
+          <p className="text-sm text-muted-foreground">Nenhuma sugestão de reabastecimento no momento.</p>
         )}
       </CardContent>
       <CardFooter>
-        <Button className="w-full">Create Purchase Orders</Button>
+        <Button className="w-full">Criar Ordens de Compra</Button>
       </CardFooter>
     </Card>
   );

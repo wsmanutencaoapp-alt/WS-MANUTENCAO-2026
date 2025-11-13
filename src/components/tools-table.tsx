@@ -11,18 +11,24 @@ import {
 import { Badge } from '@/components/ui/badge';
 import type { Tool } from '@/lib/types';
 
+const statusTranslations: Record<string, string> = {
+  'Available': 'Disponível',
+  'In Use': 'Em Uso',
+  'In Calibration': 'Em Calibração',
+};
+
 export function ToolsTable() {
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead className="hidden w-[100px] sm:table-cell">
-            <span className="sr-only">Image</span>
+            <span className="sr-only">Imagem</span>
           </TableHead>
-          <TableHead>Name</TableHead>
+          <TableHead>Nome</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead className="hidden md:table-cell">Last Calibration</TableHead>
-          <TableHead className="hidden md:table-cell">Calibrated By</TableHead>
+          <TableHead className="hidden md:table-cell">Última Calibração</TableHead>
+          <TableHead className="hidden md:table-cell">Calibrado Por</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -49,7 +55,7 @@ export function ToolsTable() {
                     : 'destructive'
                 }
               >
-                {tool.status}
+                {statusTranslations[tool.status] || tool.status}
               </Badge>
             </TableCell>
             <TableCell className="hidden md:table-cell">{tool.lastCalibration}</TableCell>

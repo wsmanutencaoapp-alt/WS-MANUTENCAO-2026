@@ -24,7 +24,7 @@ function SubmitButton() {
   return (
     <Button type="submit" className="w-full" disabled={pending}>
       {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      Generate Report
+      Gerar Relatório
     </Button>
   );
 }
@@ -37,18 +37,18 @@ export function ReportGenerator() {
       <Card>
         <form action={formAction}>
           <CardHeader>
-            <CardTitle>Generate Supply Usage Report</CardTitle>
-            <CardDescription>Select a date range and category to generate a new report.</CardDescription>
+            <CardTitle>Gerar Relatório de Uso de Suprimentos</CardTitle>
+            <CardDescription>Selecione um período e uma categoria para gerar um novo relatório.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="startDate">Start Date</Label>
+                <Label htmlFor="startDate">Data de Início</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" id="startDate" name="startDate" >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      <span>Pick a date</span>
+                      <span>Escolha uma data</span>
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -66,12 +66,12 @@ export function ReportGenerator() {
                 <input type="hidden" id="startDate-input" name="startDate" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="endDate">End Date</Label>
+                <Label htmlFor="endDate">Data de Fim</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" id="endDate" name="endDate">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      <span>Pick a date</span>
+                      <span>Escolha uma data</span>
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -90,16 +90,16 @@ export function ReportGenerator() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="supplyCategory">Supply Category (Optional)</Label>
+              <Label htmlFor="supplyCategory">Categoria de Suprimento (Opcional)</Label>
               <Select name="supplyCategory">
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Avionics">Avionics</SelectItem>
-                  <SelectItem value="Mechanical">Mechanical</SelectItem>
-                  <SelectItem value="Consumables">Consumables</SelectItem>
-                  <SelectItem value="Structural">Structural</SelectItem>
+                  <SelectItem value="Avionics">Aviônicos</SelectItem>
+                  <SelectItem value="Mechanical">Mecânica</SelectItem>
+                  <SelectItem value="Consumables">Consumíveis</SelectItem>
+                  <SelectItem value="Structural">Estrutural</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -112,7 +112,7 @@ export function ReportGenerator() {
       {state.report && (
         <Card>
           <CardHeader>
-            <CardTitle>Generated Report</CardTitle>
+            <CardTitle>Relatório Gerado</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea readOnly value={state.report} className="h-64 resize-none" />
