@@ -37,7 +37,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon, MoreHorizontal, ZoomIn } from 'lucide-react';
 import SectorBudgetStatus from '@/components/SectorBudgetStatus';
 import { Checkbox } from '@/components/ui/checkbox';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
@@ -93,6 +93,10 @@ const Equipamentos = () => {
   // Estados para Detalhes
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedTool, setSelectedTool] = useState<Ferramenta | null>(null);
+  
+  // Estado para o preview da imagem
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
 
   const [newFerramenta, setNewFerramenta] = useState({
@@ -256,6 +260,11 @@ const Equipamentos = () => {
         description: "As informações da ferramenta foram atualizadas."
     });
   };
+  
+  const openImagePreview = (imageUrl: string) => {
+    setPreviewImageUrl(imageUrl);
+    setIsPreviewDialogOpen(true);
+  };
 
 
   return (
@@ -399,13 +408,21 @@ const Equipamentos = () => {
                 ferramentas.map((ferramenta) => (
                   <TableRow key={ferramenta.id}>
                     <TableCell className="hidden sm:table-cell">
-                        <Image
-                            alt={ferramenta.name}
-                            className="aspect-square rounded-md object-cover"
-                            height="64"
-                            src={ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64"}
-                            width="64"
-                        />
+                        <button
+                          onClick={() => openImagePreview(ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64")}
+                          className="relative group focus:outline-none"
+                        >
+                          <Image
+                              alt={ferramenta.name}
+                              className="aspect-square rounded-md object-cover"
+                              height="64"
+                              src={ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64"}
+                              width="64"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity rounded-md">
+                            <ZoomIn className="h-6 w-6 text-white" />
+                          </div>
+                        </button>
                     </TableCell>
                     <TableCell className="font-medium">{ferramenta.codigo}</TableCell>
                     <TableCell>{ferramenta.name}</TableCell>
@@ -485,10 +502,29 @@ const Equipamentos = () => {
         onToolDeleted={handleToolDeleted}
         onToolUpdated={handleToolUpdated}
       />
+
+      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Visualização da Imagem</DialogTitle>
+          </DialogHeader>
+          {previewImageUrl && (
+            <div className="relative mt-4" style={{ paddingBottom: '75%' }}>
+              <Image
+                src={previewImageUrl}
+                alt="Visualização ampliada da ferramenta"
+                layout="fill"
+                className="object-contain"
+              />
+            </div>
+          )}
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setIsPreviewDialogOpen(false)}>Fechar</Button>
+           </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 export default Equipamentos;
-
-    
