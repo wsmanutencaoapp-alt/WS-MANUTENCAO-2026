@@ -49,39 +49,41 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
         JsBarcode(svgContainer, uniqueBarcodeValue, {
             format: "CODE128",
             displayValue: false, // Hide text value under the barcode
-            width: 1.5,
-            height: 35,
+            width: 2, // Bar width
+            height: 60, // Bar height
             margin: 0,
         });
     } catch(e) {
         console.error("JsBarcode error:", e);
         // Return a fallback SVG on error
-        return `<svg width="50mm" height="25mm"><text x="10" y="10" fill="red">Barcode Error</text></svg>`;
+        return `<svg width="100mm" height="60mm"><text x="10" y="10" fill="red">Barcode Error</text></svg>`;
     }
     
     // Extract the generated barcode content
     const barcodeSvgContent = svgContainer.innerHTML;
-    const barcodeWidth = svgContainer.getAttribute('width');
-    const barcodeHeight = 35; // Corresponde à altura definida em JsBarcode
+    const barcodeWidth = parseFloat(svgContainer.getAttribute('width') || '0');
+    const barcodeHeight = 60; // Corresponds to the height set in JsBarcode
 
-    // Construct the full label SVG with the new layout
-    // A etiqueta tem 189 unidades de largura e 94.5 de altura (50mm x 25mm)
+    // Label dimensions: 100mm x 60mm. (378 x 227 viewBox units)
+    const labelWidth = 378;
+    const labelHeight = 227;
+
     return `
-        <svg width="50mm" height="25mm" viewBox="0 0 189 94.5" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc;">
+        <svg width="100mm" height="60mm" viewBox="0 0 ${labelWidth} ${labelHeight}" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc;">
             <style>
-                .name { font: bold 9px sans-serif; text-anchor: middle; }
-                .details { font: 8px sans-serif; text-anchor: middle; }
+                .name { font: bold 16px sans-serif; text-anchor: middle; }
+                .details { font: 14px sans-serif; text-anchor: middle; }
             </style>
             
             <!-- Top Information -->
-            <text x="94.5" y="11" class="name">${name.length > 35 ? name.substring(0, 32) + '...' : name}</text>
-            <text x="94.5" y="21" class="details">Código: ${codigo}</text>
-            <text x="94.5" y="31" class="details">
+            <text x="${labelWidth / 2}" y="25" class="name">${name.length > 40 ? name.substring(0, 37) + '...' : name}</text>
+            <text x="${labelWidth / 2}" y="45" class="details">Código: ${codigo}</text>
+            <text x="${labelWidth / 2}" y="65" class="details">
                 Lote/Unid.: ${unitCode} ${enderecamento ? `| Local: ${enderecamento}` : ''}
             </text>
 
             <!-- Barcode, centered in the remaining space -->
-            <g transform="translate(${(189 - Number(barcodeWidth)) / 2}, ${(94.5 - barcodeHeight + 31) / 2})">
+            <g transform="translate(${(labelWidth - barcodeWidth) / 2}, ${(labelHeight - barcodeHeight + 65) / 2})">
                 ${barcodeSvgContent}
             </g>
         </svg>
@@ -151,7 +153,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
     const printableContent = printableAreaRef.current;
     if (!printableContent) return;
 
-    const printWindow = window.open('', '', 'height=600,width=800');
+    const printWindow = window.open('', '', 'height=800,width=1000');
     if (!printWindow) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível abrir a janela de impressão. Verifique o bloqueador de pop-ups.' });
       return;
@@ -161,7 +163,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
     const styles = `
       @media print {
         @page { 
-          size: 50mm 25mm; 
+          size: 100mm 60mm; 
           margin: 0; 
         }
         body { 
