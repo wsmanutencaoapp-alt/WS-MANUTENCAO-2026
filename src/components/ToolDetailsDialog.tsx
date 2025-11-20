@@ -59,11 +59,11 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose }: ToolDetails
             </div>
              <div>
               <p className="font-semibold text-muted-foreground">Status</p>
-              <p>
+              <div>
                  <Badge variant={tool.status === 'Available' ? 'secondary' : 'default'}>
                     {tool.status || 'N/A'}
                  </Badge>
-              </p>
+              </div>
             </div>
             <div className="col-span-2">
               <p className="font-semibold text-muted-foreground">Nome</p>
