@@ -32,24 +32,19 @@ interface LabelPrintDialogProps {
   onClose: () => void;
 }
 
-/**
- * Generates the complete SVG for the tool label locally.
- * This function creates an SVG element in memory to generate the barcode.
- * @param tool The tool data for the specific label to generate.
- * @returns An SVG string for the label.
- */
 const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     const { codigo = 'N/A', name = 'N/A', unitCode = 'N/A', enderecamento = '' } = tool;
     const uniqueBarcodeValue = `${codigo}-${unitCode}`;
 
-    const svgContainer = document.createElement('svg');
+    const svgContainer = document.createElement('div');
+    const barcodeSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     
     try {
-        JsBarcode(svgContainer, uniqueBarcodeValue, {
+        JsBarcode(barcodeSvg, uniqueBarcodeValue, {
             format: "CODE128",
             displayValue: false, // Do not display text value under the barcode
-            width: 1.5, // Bar width
-            height: 40, // Bar height
+            width: 1.5, 
+            height: 40,
             margin: 0,
         });
     } catch(e) {
@@ -57,29 +52,34 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
         return `<svg width="100mm" height="60mm"><text x="10" y="10" fill="red">Barcode Error</text></svg>`;
     }
     
-    const barcodeSvgContent = svgContainer.innerHTML;
-    const barcodeWidth = parseFloat(svgContainer.getAttribute('width') || '0');
-    const barcodeHeight = 40; 
+    const barcodeSvgContent = barcodeSvg.innerHTML;
+    const barcodeWidth = parseFloat(barcodeSvg.getAttribute('width') || '0');
 
     // Label dimensions: 100mm x 60mm. (378 x 227 viewBox units)
     const labelWidth = 378;
     const labelHeight = 227;
     
-    const topTextYPosition = 25;
-    const barcodeGroupYPosition = topTextYPosition + 65; // Position barcode group below text
+    // Position text at the top
+    const textBlockY = 30; 
+    
+    // Calculate barcode position to center it in the remaining space
+    const textBlockHeight = 60; // Estimated height for the text block
+    const remainingHeight = labelHeight - textBlockHeight;
+    const barcodeGroupYPosition = textBlockHeight + (remainingHeight / 2) - 20; // Center barcode vertically
 
     return `
         <svg width="100mm" height="60mm" viewBox="0 0 ${labelWidth} ${labelHeight}" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc;">
             <style>
                 .name { font: bold 16px sans-serif; text-anchor: middle; }
                 .details { font: 14px sans-serif; text-anchor: middle; }
+                .barcode-text { font: 12px sans-serif; text-anchor: middle; }
             </style>
             
-            <text x="${labelWidth / 2}" y="${topTextYPosition}" class="name">${name.length > 40 ? name.substring(0, 37) + '...' : name}</text>
-            <text x="${labelWidth / 2}" y="${topTextYPosition + 20}" class="details">Código: ${codigo}</text>
-            <text x="${labelWidth / 2}" y="${topTextYPosition + 40}" class="details">
+            <text x="${labelWidth / 2}" y="${textBlockY}" class="name">${name.length > 40 ? name.substring(0, 37) + '...' : name}</text>
+            <text x="${labelWidth / 2}" y="${textBlockY + 20}" class="details">
                 Lote/Unid.: ${unitCode} ${enderecamento ? `| Local: ${enderecamento}` : ''}
             </text>
+             <text x="${labelWidth / 2}" y="${textBlockY + 40}" class="details">Código: ${codigo}</text>
 
             <g transform="translate(${(labelWidth - barcodeWidth) / 2}, ${barcodeGroupYPosition})">
                 ${barcodeSvgContent}
@@ -111,15 +111,12 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           if (!tool.id || !tool.codigo) continue;
 
           try {
-            // FIX: Pass the current 'tool' to the generation function
             const svgContent = generateLabelSvgLocally(tool);
 
-            // Upload SVG to Firebase Storage
             const svgRef = storageRef(storage, `tool-labels/${tool.id}.svg`);
             await uploadString(svgRef, svgContent, 'raw', { contentType: 'image/svg+xml' });
             const downloadURL = await getDownloadURL(svgRef);
 
-            // Update Firestore document with the new label URL
             const toolDocRef = doc(firestore, 'tools', tool.id);
             await updateDoc(toolDocRef, { label_url: downloadURL });
             
@@ -157,7 +154,6 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
       return;
     }
     
-    // Applying styles for better printing results
     const styles = `
       @media print {
         @page { 
@@ -199,7 +195,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
   };
 
   const handleClose = () => {
-    setGeneratedLabels(new Map()); // Limpa as etiquetas ao fechar
+    setGeneratedLabels(new Map());
     onClose();
   }
 

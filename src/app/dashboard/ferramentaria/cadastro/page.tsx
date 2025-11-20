@@ -38,12 +38,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon, MoreHorizontal, ZoomIn, Search } from 'lucide-react';
+import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon, MoreHorizontal, ZoomIn, Search, PlusSquare } from 'lucide-react';
 import SectorBudgetStatus from '@/components/SectorBudgetStatus';
 import { Checkbox } from '@/components/ui/checkbox';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
 import ReprintDialog from '@/components/ReprintDialog';
 import LabelConfirmationDialog from '@/components/LabelConfirmationDialog';
+import AddQuantityDialog from '@/components/AddQuantityDialog';
 import type { Tool } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -81,7 +82,8 @@ const Equipamentos = () => {
   
   const { data: ferramentas, isLoading, error: firestoreError, setData: setFerramentas } = useCollection<Ferramenta>(ferramentasCollectionRef);
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isNewToolDialogOpen, setIsNewToolDialogOpen] = useState(false);
+  const [isAddQuantityDialogOpen, setIsAddQuantityDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -147,7 +149,7 @@ const Equipamentos = () => {
     }
   };
   
-  const handleSave = async () => {
+  const handleSaveNewTool = async () => {
     if (!newFerramenta.name) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Nome é um campo obrigatório.' });
       return;
@@ -171,7 +173,8 @@ const Equipamentos = () => {
         } catch (storageError) {
           console.error("Erro no upload da imagem:", storageError);
           toast({ variant: 'destructive', title: 'Erro de Upload', description: 'Não foi possível salvar a imagem. Verifique as permissões do Storage.' });
-          throw storageError; // Interrompe a execução
+          setIsSaving(false);
+          return;
         }
       }
   
@@ -179,7 +182,6 @@ const Equipamentos = () => {
       const mainToolCode = await runTransaction(firestore, async (transaction) => {
           const counterDoc = await transaction.get(counterRef);
           if (!counterDoc.exists()) {
-              // Se o contador não existe, cria com valor inicial
               transaction.set(counterRef, { lastId: 1 });
               return 1;
           }
@@ -217,13 +219,13 @@ const Equipamentos = () => {
           unitCode: unitCode,
         };
   
-        // Não aguardamos, mas tratamos o erro de permissão
-        setDoc(toolDocRef, toolData).catch(error => {
+        await setDoc(toolDocRef, toolData).catch(error => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: toolDocRef.path,
             operation: 'create',
             requestResourceData: toolData
           }));
+          throw error; // Re-throw to be caught by outer try-catch
         });
         insertedTools.push({ ...toolData, id: toolDocRef.id } as Ferramenta);
       }
@@ -231,9 +233,14 @@ const Equipamentos = () => {
       toast({ title: "Sucesso!", description: `${newFerramenta.quantidade_estoque} unidade(s) de ${newFerramenta.name} cadastrada(s).` });
       
       resetForm();
+      if (ferramentas) {
+        setFerramentas([...insertedTools, ...ferramentas]);
+      } else {
+        setFerramentas(insertedTools);
+      }
       setToolsToConfirm(insertedTools);
       setIsConfirmationDialogOpen(true);
-      setIsDialogOpen(false);
+      setIsNewToolDialogOpen(false);
   
     } catch (error) {
       if (!(error instanceof FirestorePermissionError)) {
@@ -245,15 +252,24 @@ const Equipamentos = () => {
     }
   };
 
+  const handleAddQuantitySuccess = (newTools: ToolLabelData[]) => {
+    setIsAddQuantityDialogOpen(false);
+    if (ferramentas) {
+        setFerramentas([...(newTools as Ferramenta[]), ...ferramentas]);
+    } else {
+        setFerramentas(newTools as Ferramenta[]);
+    }
+    setToolsToLabel(newTools); // Directly trigger printing
+  };
+
   const handleFinalizeCadastro = () => {
-    // Aciona a impressão
     setToolsToLabel(toolsToConfirm);
     setIsConfirmationDialogOpen(false);
     setToolsToConfirm([]);
   };
 
   const handleOpenReprintDialog = (tool: Ferramenta) => {
-    setToolToReprint({ id: tool.id, codigo: tool.codigo, nome: tool.name, label_url: tool.label_url, unitCode: tool.unitCode, enderecamento: tool.enderecamento });
+    setToolToReprint({ id: tool.id, codigo: tool.codigo, name: tool.name, label_url: tool.label_url, unitCode: tool.unitCode, enderecamento: tool.enderecamento });
     setIsReprintDialogOpen(true);
   };
   
@@ -313,17 +329,21 @@ const Equipamentos = () => {
     return status === 'Available' ? 'Disponível' : status;
   };
 
-
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Cadastro de Ferramentas</h1>
 
       <SectorBudgetStatus />
 
-      <div className="flex items-center justify-end">
-        <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+      <div className="flex items-center justify-end gap-2">
+         <Button variant="outline" onClick={() => setIsAddQuantityDialogOpen(true)}>
+            <PlusSquare className="mr-2 h-4 w-4" />
+            Adicionar Quantidade
+         </Button>
+
+        <Dialog open={isNewToolDialogOpen} onOpenChange={(isOpen) => {
             if (!isOpen) resetForm();
-            setIsDialogOpen(isOpen);
+            setIsNewToolDialogOpen(isOpen);
         }}>
           <DialogTrigger asChild>
             <Button>
@@ -413,8 +433,8 @@ const Equipamentos = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={handleSave} disabled={isSaving}>
+              <Button variant="outline" onClick={() => setIsNewToolDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSaveNewTool} disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar
               </Button>
@@ -460,7 +480,7 @@ const Equipamentos = () => {
               ) : firestoreError ? (
                  <TableRow>
                   <TableCell colSpan={7} className="text-center text-destructive">
-                    Erro ao carregar ferramentas: Você não tem permissão para ver estes dados.
+                    Erro ao carregar ferramentas: {firestoreError.message}
                   </TableCell>
                 </TableRow>
               ) : filteredFerramentas && filteredFerramentas.length > 0 ? (
@@ -532,6 +552,12 @@ const Equipamentos = () => {
           </Table>
         </CardContent>
       </Card>
+      
+      <AddQuantityDialog
+        isOpen={isAddQuantityDialogOpen}
+        onClose={() => setIsAddQuantityDialogOpen(false)}
+        onSuccess={handleAddQuantitySuccess}
+      />
       
       <LabelPrintDialog 
         tools={toolsToLabel} 
