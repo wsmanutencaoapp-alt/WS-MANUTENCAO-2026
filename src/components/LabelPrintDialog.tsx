@@ -35,38 +35,38 @@ interface LabelPrintDialogProps {
 /**
  * Generates the complete SVG for the tool label locally.
  * This function creates an SVG element in memory to generate the barcode.
- * @param tool The tool data.
+ * @param tool The tool data for the specific label to generate.
  * @returns An SVG string for the label.
  */
 const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     const { codigo = 'N/A', name = 'N/A', unitCode = 'N/A', enderecamento = '' } = tool;
     const uniqueBarcodeValue = `${codigo}-${unitCode}`;
 
-    // Create a dummy SVG element in memory to run JsBarcode
     const svgContainer = document.createElement('svg');
     
     try {
         JsBarcode(svgContainer, uniqueBarcodeValue, {
             format: "CODE128",
-            displayValue: false, // Hide text value under the barcode
-            width: 2, // Bar width
-            height: 60, // Bar height
+            displayValue: false, // Do not display text value under the barcode
+            width: 1.5, // Bar width
+            height: 40, // Bar height
             margin: 0,
         });
     } catch(e) {
         console.error("JsBarcode error:", e);
-        // Return a fallback SVG on error
         return `<svg width="100mm" height="60mm"><text x="10" y="10" fill="red">Barcode Error</text></svg>`;
     }
     
-    // Extract the generated barcode content
     const barcodeSvgContent = svgContainer.innerHTML;
     const barcodeWidth = parseFloat(svgContainer.getAttribute('width') || '0');
-    const barcodeHeight = 60; // Corresponds to the height set in JsBarcode
+    const barcodeHeight = 40; 
 
     // Label dimensions: 100mm x 60mm. (378 x 227 viewBox units)
     const labelWidth = 378;
     const labelHeight = 227;
+    
+    const topTextYPosition = 25;
+    const barcodeGroupYPosition = topTextYPosition + 65; // Position barcode group below text
 
     return `
         <svg width="100mm" height="60mm" viewBox="0 0 ${labelWidth} ${labelHeight}" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc;">
@@ -75,15 +75,13 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
                 .details { font: 14px sans-serif; text-anchor: middle; }
             </style>
             
-            <!-- Top Information -->
-            <text x="${labelWidth / 2}" y="25" class="name">${name.length > 40 ? name.substring(0, 37) + '...' : name}</text>
-            <text x="${labelWidth / 2}" y="45" class="details">Código: ${codigo}</text>
-            <text x="${labelWidth / 2}" y="65" class="details">
+            <text x="${labelWidth / 2}" y="${topTextYPosition}" class="name">${name.length > 40 ? name.substring(0, 37) + '...' : name}</text>
+            <text x="${labelWidth / 2}" y="${topTextYPosition + 20}" class="details">Código: ${codigo}</text>
+            <text x="${labelWidth / 2}" y="${topTextYPosition + 40}" class="details">
                 Lote/Unid.: ${unitCode} ${enderecamento ? `| Local: ${enderecamento}` : ''}
             </text>
 
-            <!-- Barcode, centered in the remaining space -->
-            <g transform="translate(${(labelWidth - barcodeWidth) / 2}, ${(labelHeight - barcodeHeight + 65) / 2})">
+            <g transform="translate(${(labelWidth - barcodeWidth) / 2}, ${barcodeGroupYPosition})">
                 ${barcodeSvgContent}
             </g>
         </svg>
@@ -113,7 +111,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           if (!tool.id || !tool.codigo) continue;
 
           try {
-            // Generate SVG locally using JsBarcode
+            // FIX: Pass the current 'tool' to the generation function
             const svgContent = generateLabelSvgLocally(tool);
 
             // Upload SVG to Firebase Storage
@@ -176,6 +174,12 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           border: none !important;
           margin: 0;
           padding: 0;
+          width: 100mm;
+          height: 60mm;
+          display: block;
+        }
+        .label-container:last-child {
+          page-break-after: auto;
         }
       }
     `;
