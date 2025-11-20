@@ -208,6 +208,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                 <p className="font-semibold text-muted-foreground">Código</p>
                 <p>{tool.codigo || 'N/A'}</p>
                 </div>
+                 <div>
+                  <p className="font-semibold text-muted-foreground">Lote/Unidade</p>
+                  <p className="font-mono text-xs">{tool.unitCode || 'N/A'}</p>
+                </div>
                 <div>
                 <p className="font-semibold text-muted-foreground">Status</p>
                 <div>

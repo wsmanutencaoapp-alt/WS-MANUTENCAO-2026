@@ -12,6 +12,7 @@ import {
   updateDoc,
   setDoc,
   deleteDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
@@ -54,6 +55,7 @@ interface Ferramenta extends Tool {
   id: string; // Já existe em Tool (como 'id')
   nome: string; // Mapeia para 'name'
   codigo: string; // Adicionado
+  unitCode: string; // Adicionado
   enderecamento: string; // Adicionado
   status: string; // Já existe
   quantidade_estoque: number; // Adicionado
@@ -145,82 +147,95 @@ const Equipamentos = () => {
   
   const handleSave = async () => {
     if (!newFerramenta.name) {
-      toast({ variant: "destructive", title: "Erro", description: "Nome é um campo obrigatório." });
+      toast({ variant: 'destructive', title: 'Erro', description: 'Nome é um campo obrigatório.' });
       return;
     }
     if (!user || !firestore || !storage) {
-      toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado ou falha na conexão com os serviços. Tente novamente." });
+      toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado ou falha na conexão.' });
       return;
     }
-  
+
     setIsSaving(true);
-    const numUnits = newFerramenta.quantidade_estoque;
+    let imageUrl = "https://picsum.photos/seed/tool/200/200"; // Placeholder
+    const imageHint = "tool";
     const insertedTools: Ferramenta[] = [];
-  
+
     try {
-      // 1. Fazer o upload da imagem primeiro (se existir)
-      let imageUrl = "https://picsum.photos/seed/tool/200/200"; // Placeholder
-      let imageHint = "tool";
+      // 1. Upload da imagem (se houver)
       if (previewImage) {
-        const tempId = doc(collection(firestore, 'temp')).id; // ID temporário para a imagem
-        const imageRef = storageRef(storage, `tool_images/${tempId}`);
-        const snapshot = await uploadString(imageRef, previewImage, 'data_url');
-        imageUrl = await getDownloadURL(snapshot.ref);
+        try {
+          const tempId = doc(collection(firestore, 'temp')).id; // ID temporário para a imagem
+          const imageRef = storageRef(storage, `tool_images/${tempId}`);
+          const snapshot = await uploadString(imageRef, previewImage, 'data_url');
+          imageUrl = await getDownloadURL(snapshot.ref);
+        } catch (storageError) {
+          console.error("Erro no upload da imagem:", storageError);
+          toast({ variant: 'destructive', title: 'Erro de Upload', description: 'Não foi possível salvar a imagem. Verifique as permissões do Storage.' });
+          throw storageError; // Interrompe a execução
+        }
       }
-  
-      // 2. Loop para criar os documentos no Firestore
-      for (let i = 0; i < numUnits; i++) {
+
+      // 2. Transação para obter o código sequencial principal e criar ferramentas
+      const mainToolCode = await runTransaction(firestore, async (transaction) => {
+        const counterRef = doc(firestore, 'counters', 'tools');
+        const counterDoc = await transaction.get(counterRef);
+        if (!counterDoc.exists()) {
+          // Se o contador não existe, cria com valor inicial
+          transaction.set(counterRef, { lastId: 1 });
+          return 1;
+        }
+        const newId = counterDoc.data().lastId + 1;
+        transaction.update(counterRef, { lastId: newId });
+        return newId;
+      });
+
+      const codigo = `FE${mainToolCode.toString().padStart(6, '0')}`;
+
+      // 3. Loop para criar os documentos no Firestore
+      for (let i = 0; i < newFerramenta.quantidade_estoque; i++) {
         const toolDocRef = doc(collection(firestore, 'tools'));
-        const codigo = `TOOL-${toolDocRef.id.substring(0, 4).toUpperCase()}`;
-  
+        const unitCode = `A${(i + 1).toString().padStart(4, '0')}`; // Lote/Unidade
+
         const toolData = {
           name: newFerramenta.name,
           enderecamento: newFerramenta.enderecamento,
           aeronave_principal: newFerramenta.aeronave_principal || null,
           is_calibrable: newFerramenta.is_calibrable,
           status: 'Available',
-          lastCalibration: 'N/A', // Campo placeholder
-          calibratedBy: 'N/A', // Campo placeholder
-          serialNumber: `SN-${Date.now()}-${i}`, // Campo placeholder
+          lastCalibration: 'N/A',
+          calibratedBy: 'N/A',
+          serialNumber: `SN-${Date.now()}-${i}`,
           imageUrl: imageUrl,
           imageHint: imageHint,
           codigo: codigo,
+          unitCode: unitCode,
         };
-  
-        // Salva o documento no Firestore
-        await setDoc(toolDocRef, toolData).catch(error => {
-          errorEmitter.emit(
-            'permission-error',
-            new FirestorePermissionError({
-              path: toolDocRef.path,
-              operation: 'create',
-              requestResourceData: toolData,
-            })
-          );
-          throw error; // Interrompe o loop em caso de erro
-        });
-        
-        insertedTools.push({ ...newFerramenta, id: toolDocRef.id, codigo, imageUrl: toolData.imageUrl } as Ferramenta);
+
+        await setDoc(toolDocRef, toolData);
+        insertedTools.push({ ...toolData, id: toolDocRef.id } as Ferramenta);
       }
-  
-      toast({ title: "Sucesso!", description: `${numUnits} equipamento(s) sendo processado(s).` });
+
+      toast({ title: "Sucesso!", description: `${newFerramenta.quantidade_estoque} unidade(s) de ${newFerramenta.name} cadastrada(s).` });
       
       resetForm();
-      setToolsToConfirm(insertedTools);
+      setToolsToConfirm(insertedTools); // Passa todas as ferramentas criadas
       setIsConfirmationDialogOpen(true);
       setIsDialogOpen(false);
-  
+
     } catch (error) {
+      // O erro já foi tratado (toast) ou é um erro de permissão do Firestore que será tratado globalmente.
       if (!(error instanceof FirestorePermissionError)) {
         console.error("Erro ao salvar ferramenta:", error);
-        toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões do Firebase.` });
+        toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões.` });
       }
     } finally {
-        setIsSaving(false);
+      setIsSaving(false);
     }
   };
 
   const handleFinalizeCadastro = () => {
+    // Aqui você pode acionar a impressão
+    setToolsToLabel(toolsToConfirm);
     setIsConfirmationDialogOpen(false);
     setToolsToConfirm([]);
   };
@@ -288,7 +303,7 @@ const Equipamentos = () => {
             <DialogHeader>
               <DialogTitle>Cadastrar Nova Ferramenta</DialogTitle>
               <DialogDescription>
-                O código da ferramenta será gerado automaticamente.
+                O código da ferramenta e o lote serão gerados automaticamente.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -386,10 +401,10 @@ const Equipamentos = () => {
               <TableRow>
                 <TableHead className="w-[64px] sm:table-cell">Imagem</TableHead>
                 <TableHead>Código</TableHead>
+                <TableHead>Lote/Unid.</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Endereçamento</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Calibrável</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -425,10 +440,10 @@ const Equipamentos = () => {
                         </button>
                     </TableCell>
                     <TableCell className="font-medium">{ferramenta.codigo}</TableCell>
+                    <TableCell className="font-mono text-xs">{ferramenta.unitCode}</TableCell>
                     <TableCell>{ferramenta.name}</TableCell>
                     <TableCell>{ferramenta.enderecamento}</TableCell>
                     <TableCell>{ferramenta.status}</TableCell>
-                    <TableCell>{ferramenta.is_calibrable ? 'Sim' : 'Não'}</TableCell>
                     <TableCell className="text-right">
                        <Button
                         variant="ghost"

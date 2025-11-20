@@ -21,6 +21,7 @@ export type Tool = {
   imageHint: string;
   // Campos adicionados do app do usuário
   codigo?: string;
+  unitCode?: string; // Lote sequencial por unidade
   enderecamento?: string;
   is_calibrable?: boolean;
   aeronave_principal?: string | null;
