@@ -62,8 +62,10 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     // Extract the generated barcode content
     const barcodeSvgContent = svgContainer.innerHTML;
     const barcodeWidth = svgContainer.getAttribute('width');
+    const barcodeHeight = 35; // Corresponde à altura definida em JsBarcode
 
     // Construct the full label SVG with the new layout
+    // A etiqueta tem 189 unidades de largura e 94.5 de altura (50mm x 25mm)
     return `
         <svg width="50mm" height="25mm" viewBox="0 0 189 94.5" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc;">
             <style>
@@ -79,10 +81,8 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
             </text>
 
             <!-- Barcode, centered in the remaining space -->
-            <g transform="translate(94.5, 63)">
-                <g transform="translate(-${Number(barcodeWidth) / 2}, -17.5)">
-                    ${barcodeSvgContent}
-                </g>
+            <g transform="translate(${(189 - Number(barcodeWidth)) / 2}, ${(94.5 - barcodeHeight + 31) / 2})">
+                ${barcodeSvgContent}
             </g>
         </svg>
     `;
