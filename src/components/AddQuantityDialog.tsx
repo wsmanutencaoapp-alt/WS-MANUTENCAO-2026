@@ -25,7 +25,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, PlusSquare } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import type { Tool } from '@/lib/types';
 import Image from 'next/image';
 
@@ -61,43 +61,51 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       setLastUnitCode(null);
     }
   }, [isOpen]);
-
-  const handleSearch = async () => {
-    if (!firestore || !searchCodigo) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Digite um código para pesquisar.' });
-      return;
-    }
-    setIsSearching(true);
-    setFoundTool(null);
-    setLastUnitCode(null);
-
-    try {
-      const toolsRef = collection(firestore, 'tools');
-      const q = query(
-        toolsRef,
-        where('codigo', '==', searchCodigo.toUpperCase()),
-        orderBy('unitCode', 'desc'),
-        limit(1)
-      );
-
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        toast({ variant: 'destructive', title: 'Não Encontrado', description: 'Nenhuma ferramenta encontrada com este código.' });
+  
+  useEffect(() => {
+    const handleSearch = async () => {
+      if (!firestore || searchCodigo.length < 5) { // Busca apenas com código mais completo
         setFoundTool(null);
-      } else {
-        const doc = querySnapshot.docs[0];
-        setFoundTool({ id: doc.id, ...doc.data() } as FoundTool);
-        setLastUnitCode(doc.data().unitCode || 'A0000');
-        toast({ title: 'Ferramenta Encontrada', description: doc.data().name });
+        return;
       }
-    } catch (error) {
-      console.error('Erro ao pesquisar ferramenta:', error);
-      toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível realizar a busca. Verifique se o índice necessário foi criado no Firestore.' });
-    } finally {
-      setIsSearching(false);
-    }
-  };
+      setIsSearching(true);
+      setFoundTool(null);
+      setLastUnitCode(null);
+  
+      try {
+        const toolsRef = collection(firestore, 'tools');
+        // Consulta corrigida: where em 'codigo' e orderBy em 'unitCode'
+        const q = query(
+          toolsRef,
+          where('codigo', '==', searchCodigo.toUpperCase()),
+          orderBy('unitCode', 'desc'), 
+          limit(1)
+        );
+  
+        const querySnapshot = await getDocs(q);
+  
+        if (querySnapshot.empty) {
+          setFoundTool(null);
+        } else {
+          const doc = querySnapshot.docs[0];
+          setFoundTool({ id: doc.id, ...doc.data() } as FoundTool);
+          setLastUnitCode(doc.data().unitCode || 'A0000');
+        }
+      } catch (error) {
+        console.error('Erro ao pesquisar ferramenta:', error);
+        toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível realizar a busca. Verifique as permissões ou se o índice do Firestore foi criado.' });
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    const debounceSearch = setTimeout(() => {
+      handleSearch();
+    }, 300); // Aguarda 300ms após o usuário parar de digitar
+
+    return () => clearTimeout(debounceSearch);
+  }, [searchCodigo, firestore, toast]);
+
 
   const handleSave = async () => {
     if (!firestore || !foundTool || !lastUnitCode) {
@@ -114,8 +122,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     const mainToolCode = foundTool.codigo;
 
     try {
-      const counterRef = doc(firestore, 'counters', 'tools');
-
       await runTransaction(firestore, async (transaction) => {
         const lastToolQuery = query(
             collection(firestore, 'tools'), 
@@ -123,6 +129,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
             orderBy('unitCode', 'desc'), 
             limit(1)
         );
+        // A busca é feita dentro da transação para garantir consistência
         const lastToolSnapshot = await getDocs(lastToolQuery);
         let lastUnitNumber = 0;
         if (!lastToolSnapshot.empty) {
@@ -136,7 +143,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           
           const newToolDocRef = doc(collection(firestore, 'tools'));
           
-          // Clonando o foundTool e removendo o 'id' que não deve ser copiado
           const { id, ...baseData } = foundTool;
 
           const newToolData = {
@@ -174,21 +180,21 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         </DialogHeader>
         
         <div className="space-y-4 py-4">
-          <div className="flex w-full items-center space-x-2">
+          <div className="relative">
+            <Label htmlFor="searchCodigo">Pesquisar por Código</Label>
+            <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               id="searchCodigo"
-              placeholder="Pesquisar por Código (ex: FE000001)"
+              placeholder="Digite o código (ex: FE000001)"
               value={searchCodigo}
               onChange={(e) => setSearchCodigo(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="pl-8"
             />
-            <Button type="button" size="icon" onClick={handleSearch} disabled={isSearching}>
-              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            </Button>
+             {isSearching && <Loader2 className="absolute right-2.5 bottom-2.5 h-4 w-4 animate-spin" />}
           </div>
 
-          {foundTool && (
-            <div className="p-4 border rounded-lg bg-muted/50 space-y-3">
+          {!isSearching && foundTool && (
+            <div className="p-4 border rounded-lg bg-muted/50 space-y-3 animate-in fade-in-50">
               <h4 className="font-semibold text-center">Ferramenta Encontrada</h4>
                <div className="flex items-start gap-4">
                  <Image
@@ -211,9 +217,15 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                     type="number"
                     min="1"
                     value={quantityToAdd}
-                    onChange={(e) => setQuantityToAdd(parseInt(e.target.value, 10))}
+                    onChange={(e) => setQuantityToAdd(parseInt(e.target.value, 10) || 1)}
                   />
               </div>
+            </div>
+          )}
+
+          {!isSearching && !foundTool && searchCodigo.length > 4 && (
+             <div className="p-4 text-center text-sm text-muted-foreground">
+                <p>Nenhuma ferramenta encontrada com este código.</p>
             </div>
           )}
 
