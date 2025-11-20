@@ -23,10 +23,11 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import type { Tool } from '@/lib/types';
-import { Edit, ZoomIn, Save, Trash2, X, Loader2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { useFirestore } from '@/firebase';
+import { Edit, ZoomIn, Save, Trash2, X, Loader2, Upload } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useFirestore, useStorage } from '@/firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -45,12 +46,17 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editableTool, setEditableTool] = useState<Partial<Tool>>(tool || {});
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
 
   useEffect(() => {
     if (tool) {
       setEditableTool(tool);
+      setPreviewImage(tool.imageUrl || null);
     }
     // Reset edit mode when dialog is closed or tool changes
     setIsEditing(false);
@@ -71,17 +77,42 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     }
   };
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveChanges = async () => {
-    if (!firestore) {
+    if (!firestore || !storage) {
       toast({ variant: "destructive", title: "Erro", description: "Serviço indisponível." });
       return;
     }
     setIsSaving(true);
     try {
       const toolRef = doc(firestore, 'tools', tool.id);
-      const { id, ...dataToUpdate } = editableTool;
+      
+      let imageUrl = tool.imageUrl;
+      // Se a imagem de preview foi alterada, faz o upload da nova imagem
+      if (previewImage && previewImage !== tool.imageUrl) {
+        const imageRef = storageRef(storage, `tool_images/${tool.id}`);
+        const snapshot = await uploadString(imageRef, previewImage, 'data_url');
+        imageUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      const { id, ...baseData } = editableTool;
+      const dataToUpdate = {
+        ...baseData,
+        imageUrl: imageUrl, // usa a nova URL ou a antiga
+      };
+
       await updateDoc(toolRef, dataToUpdate);
-      onToolUpdated(editableTool);
+      onToolUpdated({ ...editableTool, imageUrl: imageUrl });
       setIsEditing(false);
     } catch (error) {
       console.error("Erro ao atualizar ferramenta:", error);
@@ -124,21 +155,36 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
               alt={tool.name}
               className="aspect-video w-full rounded-md object-cover"
               height="250"
-              src={tool.imageUrl || "https://picsum.photos/seed/tool/400/250"}
+              src={previewImage || tool.imageUrl || "https://picsum.photos/seed/tool/400/250"}
               width="400"
             />
-             <a 
-                href={tool.imageUrl || "#"} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
-            >
-                <ZoomIn className="h-8 w-8 text-white" />
-            </a>
+            {!isEditing && (
+              <a 
+                  href={tool.imageUrl || "#"} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
+              >
+                  <ZoomIn className="h-8 w-8 text-white" />
+              </a>
+            )}
           </div>
 
           {isEditing ? (
              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="col-span-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Trocar Imagem
+                    </Button>
+                    <Input 
+                        type="file" 
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        className="hidden" 
+                        accept="image/png, image/jpeg"
+                    />
+                </div>
                 <div className="col-span-2 space-y-1">
                     <Label htmlFor="name">Nome</Label>
                     <Input id="name" value={editableTool.name} onChange={handleInputChange} />
@@ -249,5 +295,3 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     </Dialog>
   );
 }
-
-    
