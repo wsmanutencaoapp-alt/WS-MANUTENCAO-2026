@@ -213,12 +213,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                   <p className="font-mono text-xs">{tool.unitCode || 'N/A'}</p>
                 </div>
                 <div>
-                <p className="font-semibold text-muted-foreground">Status</p>
-                <div>
-                    <Badge variant={tool.status === 'Available' ? 'secondary' : 'default'}>
-                        {tool.status || 'N/A'}
-                    </Badge>
-                </div>
+                  <p className="font-semibold text-muted-foreground">Status</p>
+                  <Badge variant={tool.status === 'Disponível' ? 'success' : 'default'}>
+                      {tool.status || 'N/A'}
+                  </Badge>
                 </div>
                 <div className="col-span-2">
                 <p className="font-semibold text-muted-foreground">Nome</p>
@@ -299,3 +297,5 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     </Dialog>
   );
 }
+
+    

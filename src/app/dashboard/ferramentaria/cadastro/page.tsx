@@ -49,6 +49,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import Image from 'next/image';
 import ToolDetailsDialog from '@/components/ToolDetailsDialog';
+import { Badge } from '@/components/ui/badge';
 
 // A interface foi adaptada para corresponder ao que é usado no componente
 interface Ferramenta extends Tool {
@@ -206,7 +207,7 @@ const Equipamentos = () => {
           enderecamento: newFerramenta.enderecamento,
           aeronave_principal: newFerramenta.aeronave_principal || null,
           is_calibrable: newFerramenta.is_calibrable,
-          status: 'Available',
+          status: 'Disponível',
           lastCalibration: 'N/A',
           calibratedBy: 'N/A',
           serialNumber: `SN-${Date.now()}-${i}`,
@@ -477,7 +478,11 @@ const Equipamentos = () => {
                     <TableCell className="font-mono text-xs">{ferramenta.unitCode}</TableCell>
                     <TableCell>{ferramenta.name}</TableCell>
                     <TableCell>{ferramenta.enderecamento}</TableCell>
-                    <TableCell>{ferramenta.status}</TableCell>
+                    <TableCell>
+                      <Badge variant={ferramenta.status === 'Disponível' ? 'success' : 'default'}>
+                          {ferramenta.status}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
                        <Button
                         variant="ghost"
@@ -577,3 +582,5 @@ const Equipamentos = () => {
 };
 
 export default Equipamentos;
+
+    
