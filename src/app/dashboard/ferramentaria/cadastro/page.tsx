@@ -154,17 +154,15 @@ const Equipamentos = () => {
       toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado ou falha na conexão.' });
       return;
     }
-
+  
     setIsSaving(true);
-    let imageUrl = "https://picsum.photos/seed/tool/200/200"; // Placeholder
-    const imageHint = "tool";
     const insertedTools: Ferramenta[] = [];
-
+  
     try {
-      // 1. Upload da imagem (se houver)
+      let imageUrl = "https://picsum.photos/seed/tool/200/200"; // Placeholder
       if (previewImage) {
         try {
-          const tempId = doc(collection(firestore, 'temp')).id; // ID temporário para a imagem
+          const tempId = doc(collection(firestore, 'temp')).id;
           const imageRef = storageRef(storage, `tool_images/${tempId}`);
           const snapshot = await uploadString(imageRef, previewImage, 'data_url');
           imageUrl = await getDownloadURL(snapshot.ref);
@@ -174,28 +172,34 @@ const Equipamentos = () => {
           throw storageError; // Interrompe a execução
         }
       }
-
-      // 2. Transação para obter o código sequencial principal e criar ferramentas
+  
+      const counterRef = doc(firestore, 'counters', 'tools');
       const mainToolCode = await runTransaction(firestore, async (transaction) => {
-        const counterRef = doc(firestore, 'counters', 'tools');
-        const counterDoc = await transaction.get(counterRef);
-        if (!counterDoc.exists()) {
-          // Se o contador não existe, cria com valor inicial
-          transaction.set(counterRef, { lastId: 1 });
-          return 1;
-        }
-        const newId = counterDoc.data().lastId + 1;
-        transaction.update(counterRef, { lastId: newId });
-        return newId;
+          const counterDoc = await transaction.get(counterRef);
+          if (!counterDoc.exists()) {
+              // Se o contador não existe, cria com valor inicial
+              transaction.set(counterRef, { lastId: 1 });
+              return 1;
+          }
+          const newId = counterDoc.data().lastId + 1;
+          transaction.update(counterRef, { lastId: newId });
+          return newId;
+      }).catch(error => {
+          const permissionError = new FirestorePermissionError({
+            path: counterRef.path,
+            operation: 'write', 
+            requestResourceData: { lastId: 'newId' }
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          throw permissionError;
       });
-
+  
       const codigo = `FE${mainToolCode.toString().padStart(6, '0')}`;
-
-      // 3. Loop para criar os documentos no Firestore
+  
       for (let i = 0; i < newFerramenta.quantidade_estoque; i++) {
         const toolDocRef = doc(collection(firestore, 'tools'));
-        const unitCode = `A${(i + 1).toString().padStart(4, '0')}`; // Lote/Unidade
-
+        const unitCode = `A${(i + 1).toString().padStart(4, '0')}`;
+  
         const toolData = {
           name: newFerramenta.name,
           enderecamento: newFerramenta.enderecamento,
@@ -206,27 +210,33 @@ const Equipamentos = () => {
           calibratedBy: 'N/A',
           serialNumber: `SN-${Date.now()}-${i}`,
           imageUrl: imageUrl,
-          imageHint: imageHint,
+          imageHint: "tool",
           codigo: codigo,
           unitCode: unitCode,
         };
-
-        await setDoc(toolDocRef, toolData);
+  
+        // Não aguardamos, mas tratamos o erro de permissão
+        setDoc(toolDocRef, toolData).catch(error => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: toolDocRef.path,
+            operation: 'create',
+            requestResourceData: toolData
+          }));
+        });
         insertedTools.push({ ...toolData, id: toolDocRef.id } as Ferramenta);
       }
-
+  
       toast({ title: "Sucesso!", description: `${newFerramenta.quantidade_estoque} unidade(s) de ${newFerramenta.name} cadastrada(s).` });
       
       resetForm();
-      setToolsToConfirm(insertedTools); // Passa todas as ferramentas criadas
+      setToolsToConfirm(insertedTools);
       setIsConfirmationDialogOpen(true);
       setIsDialogOpen(false);
-
+  
     } catch (error) {
-      // O erro já foi tratado (toast) ou é um erro de permissão do Firestore que será tratado globalmente.
       if (!(error instanceof FirestorePermissionError)) {
-        console.error("Erro ao salvar ferramenta:", error);
-        toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões.` });
+          console.error("Erro ao salvar ferramenta:", error);
+          toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões.` });
       }
     } finally {
       setIsSaving(false);
