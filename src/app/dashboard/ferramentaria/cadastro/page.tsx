@@ -166,7 +166,7 @@ const Equipamentos = () => {
           codigo: codigo,
         };
 
-        // Salva o documento no Firestore imediatamente com a imagem de placeholder
+        // Salva o documento no Firestore
         await setDoc(toolDocRef, toolData).catch(error => {
           errorEmitter.emit(
             'permission-error',
@@ -176,7 +176,8 @@ const Equipamentos = () => {
               requestResourceData: toolData,
             })
           );
-          throw error; // Propaga o erro para o bloco catch principal
+          // Re-lança o erro para que ele seja pego pelo catch principal e pare a execução.
+          throw error;
         });
 
         // Se houver uma imagem para upload, faz o upload em segundo plano
@@ -210,6 +211,8 @@ const Equipamentos = () => {
       setIsDialogOpen(false);
 
     } catch (error) {
+      // Se o erro for de permissão, ele já foi emitido, então não mostramos outro toast.
+      // Apenas garantimos que o estado de 'saving' seja resetado.
       if (!(error instanceof FirestorePermissionError)) {
         console.error("Erro ao salvar ferramenta:", error);
         toast({ variant: "destructive", title: "Erro ao Salvar", description: "Não foi possível cadastrar o equipamento." });
