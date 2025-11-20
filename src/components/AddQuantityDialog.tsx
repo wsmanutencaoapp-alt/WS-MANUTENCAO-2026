@@ -11,6 +11,7 @@ import {
   limit,
   doc,
   setDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import {
   Dialog,
@@ -24,7 +25,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, PlusSquare } from 'lucide-react';
 import type { Tool } from '@/lib/types';
 import Image from 'next/image';
 
@@ -92,7 +93,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       }
     } catch (error) {
       console.error('Erro ao pesquisar ferramenta:', error);
-      toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível realizar a busca.' });
+      toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível realizar a busca. Verifique se o índice necessário foi criado no Firestore.' });
     } finally {
       setIsSearching(false);
     }
@@ -109,34 +110,53 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     }
 
     setIsSaving(true);
-    const newTools = [];
+    const newTools: FoundTool[] = [];
+    const mainToolCode = foundTool.codigo;
 
     try {
-      const lastUnitNumber = parseInt(lastUnitCode.replace('A', ''), 10);
-      
-      for (let i = 0; i < quantityToAdd; i++) {
-        const newUnitNumber = lastUnitNumber + 1 + i;
-        const newUnitCode = `A${newUnitNumber.toString().padStart(4, '0')}`;
-        
-        const newToolDocRef = doc(collection(firestore, 'tools'));
-        
-        const newToolData = {
-          ...foundTool, // Spread all properties from the found tool
-          id: newToolDocRef.id, // Set the new unique ID
-          unitCode: newUnitCode, // Set the new sequential unit code
-          status: 'Disponível', // New units should be available
-        };
+      const counterRef = doc(firestore, 'counters', 'tools');
 
-        await setDoc(newToolDocRef, newToolData);
-        newTools.push(newToolData);
-      }
+      await runTransaction(firestore, async (transaction) => {
+        const lastToolQuery = query(
+            collection(firestore, 'tools'), 
+            where('codigo', '==', mainToolCode), 
+            orderBy('unitCode', 'desc'), 
+            limit(1)
+        );
+        const lastToolSnapshot = await getDocs(lastToolQuery);
+        let lastUnitNumber = 0;
+        if (!lastToolSnapshot.empty) {
+            const lastTool = lastToolSnapshot.docs[0].data();
+            lastUnitNumber = parseInt(lastTool.unitCode.replace('A', ''), 10);
+        }
+
+        for (let i = 0; i < quantityToAdd; i++) {
+          const newUnitNumber = lastUnitNumber + 1 + i;
+          const newUnitCode = `A${newUnitNumber.toString().padStart(4, '0')}`;
+          
+          const newToolDocRef = doc(collection(firestore, 'tools'));
+          
+          // Clonando o foundTool e removendo o 'id' que não deve ser copiado
+          const { id, ...baseData } = foundTool;
+
+          const newToolData = {
+            ...baseData,
+            unitCode: newUnitCode,
+            status: 'Disponível',
+          };
+          
+          transaction.set(newToolDocRef, newToolData);
+          newTools.push({ ...newToolData, id: newToolDocRef.id });
+        }
+      });
+      
 
       toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${foundTool.name} foram adicionadas.` });
       onSuccess(newTools);
 
     } catch (error) {
       console.error('Erro ao adicionar unidades:', error);
-      toast({ variant: 'destructive', title: 'Erro ao Salvar', description: 'Não foi possível adicionar as novas unidades.' });
+      toast({ variant: 'destructive', title: 'Erro ao Salvar', description: 'Não foi possível adicionar as novas unidades. Verifique as permissões.' });
     } finally {
       setIsSaving(false);
     }
