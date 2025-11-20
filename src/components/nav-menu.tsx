@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { useSidebar } from '@/components/ui/sidebar';
+import { cva } from 'class-variance-authority';
 
 
 export interface NavItem {
