@@ -138,7 +138,7 @@ const Equipamentos = () => {
       return;
     }
     if (!user || !firestore || !storage) {
-      toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado ou falha na conexão com os serviços." });
+      toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado ou falha na conexão com os serviços. Tente novamente." });
       return;
     }
 
@@ -194,7 +194,7 @@ const Equipamentos = () => {
               toast({
                 variant: 'destructive',
                 title: 'Erro de Upload',
-                description: `A ferramenta ${codigo} foi salva, mas o upload da imagem falhou.`,
+                description: `A ferramenta ${codigo} foi salva, mas o upload da imagem falhou: ${error.message}`,
               });
             });
         }
@@ -453,3 +453,5 @@ const Equipamentos = () => {
 };
 
 export default Equipamentos;
+
+    
