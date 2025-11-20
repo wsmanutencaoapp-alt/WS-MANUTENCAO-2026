@@ -34,17 +34,64 @@ import { useUser, useAuth, useDoc, useFirestore, useMemoFirebase } from '@/fireb
 import { signOut } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { doc } from 'firebase/firestore';
+import { NavMenu, NavItem } from '@/components/nav-menu';
 
 
-const navItems = [
-    { href: '/dashboard', icon: Box, label: 'Suprimentos' },
-    { href: '/dashboard/ferramentaria', icon: Wrench, label: 'Ferramentaria' },
-    { href: '/dashboard/calibracao', icon: Thermometer, label: 'Calibração' },
-    { href: '/dashboard/compras', icon: ShoppingCart, label: 'Compras' },
-    { href: '/dashboard/financeiro', icon: Landmark, label: 'Financeiro' },
-    { href: '/dashboard/user-management', icon: Users, label: 'Usuários' },
-    { href: '/dashboard/configurador', icon: SlidersHorizontal, label: 'Configurador' },
-    { href: '/dashboard/settings', icon: Settings, label: 'Seu Perfil' },
+const navItems: NavItem[] = [
+  { 
+    href: '/dashboard/suprimentos', 
+    icon: Box, 
+    label: 'Suprimentos',
+    subItems: [
+        { href: '/dashboard/suprimentos/movimentacao', label: 'Movimentação' },
+    ]
+  },
+  { 
+    href: '/dashboard/ferramentaria', 
+    icon: Wrench, 
+    label: 'Ferramentaria',
+    subItems: [
+        { href: '/dashboard/ferramentaria/cadastro', label: 'Cadastro de Equipamentos' },
+        { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída' },
+    ]
+  },
+  { href: '/dashboard/calibracao', icon: Thermometer, label: 'Calibração' },
+  { 
+    href: '/dashboard/compras', 
+    icon: ShoppingCart, 
+    label: 'Compras',
+    subItems: [
+        { href: '/dashboard/compras/aprovacoes', label: 'Aprovações' },
+        { href: '/dashboard/compras/controle', label: 'Controle' },
+    ]
+  },
+  { 
+    href: '/dashboard/financeiro', 
+    icon: Landmark, 
+    label: 'Financeiro',
+    subItems: [
+        { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral' },
+        { href: '/dashboard/financeiro/orcamento', label: 'Orçamento' },
+    ]
+  },
+  { 
+    href: '/dashboard/user-management', 
+    icon: Users, 
+    label: 'Usuários' 
+  },
+  { 
+    href: '/dashboard/configurador', 
+    icon: SlidersHorizontal, 
+    label: 'Configurador',
+    subItems: [
+        { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação' }
+    ]
+  },
+  { 
+    href: '/dashboard/settings', 
+    icon: Settings, 
+    label: 'Seu Perfil' 
+  },
 ];
 
 
@@ -91,19 +138,7 @@ export function Header() {
               <Send className="h-5 w-5 transition-all group-hover:scale-110" />
               <span className="sr-only">AeroTrack</span>
             </Link>
-            {navItems.map((item) => (
-               <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground',
-                   pathname.startsWith(item.href) && 'text-foreground'
-                )}
-              >
-                <item.icon className="h-5 w-5" />
-                {item.label}
-              </Link>
-            ))}
+            <NavMenu items={navItems} pathname={pathname} isMobile={true} />
           </nav>
         </SheetContent>
       </Sheet>

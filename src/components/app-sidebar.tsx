@@ -12,27 +12,61 @@ import {
   Landmark,
   Users,
   SlidersHorizontal,
+  ChevronDown,
 } from 'lucide-react';
-
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { href: '/dashboard', icon: Box, label: 'Suprimentos' },
-  { href: '/dashboard/ferramentaria', icon: Wrench, label: 'Ferramentaria' },
+
+const navItems: NavItem[] = [
+  { 
+    href: '/dashboard/suprimentos', 
+    icon: Box, 
+    label: 'Suprimentos',
+    subItems: [
+        { href: '/dashboard/suprimentos/movimentacao', label: 'Movimentação' },
+    ]
+  },
+  { 
+    href: '/dashboard/ferramentaria', 
+    icon: Wrench, 
+    label: 'Ferramentaria',
+    subItems: [
+        { href: '/dashboard/ferramentaria/cadastro', label: 'Cadastro de Equipamentos' },
+        { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída' },
+    ]
+  },
   { href: '/dashboard/calibracao', icon: Thermometer, label: 'Calibração' },
-  { href: '/dashboard/compras', icon: ShoppingCart, label: 'Compras' },
-  { href: '/dashboard/financeiro', icon: Landmark, label: 'Financeiro' },
+  { 
+    href: '/dashboard/compras', 
+    icon: ShoppingCart, 
+    label: 'Compras',
+    subItems: [
+        { href: '/dashboard/compras/aprovacoes', label: 'Aprovações' },
+        { href: '/dashboard/compras/controle', label: 'Controle' },
+    ]
+  },
+  { 
+    href: '/dashboard/financeiro', 
+    icon: Landmark, 
+    label: 'Financeiro',
+    subItems: [
+        { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral' },
+        { href: '/dashboard/financeiro/orcamento', label: 'Orçamento' },
+    ]
+  },
 ];
 
-const bottomNavItems = [
+const bottomNavItems: NavItem[] = [
     { href: '/dashboard/user-management', icon: Users, label: 'Usuários' },
-    { href: '/dashboard/configurador', icon: SlidersHorizontal, label: 'Configurador' },
+    { 
+        href: '/dashboard/configurador', 
+        icon: SlidersHorizontal, 
+        label: 'Configurador',
+        subItems: [
+            { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação' }
+        ]
+    },
     { href: '/dashboard/settings', icon: Settings, label: 'Seu Perfil' },
 ]
 
@@ -41,7 +75,6 @@ export function AppSidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
-      <TooltipProvider>
         <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
           <Link
             href="/dashboard"
@@ -50,45 +83,11 @@ export function AppSidebar() {
             <Send className="h-4 w-4 transition-all group-hover:scale-110" />
             <span className="sr-only">AeroTrack</span>
           </Link>
-          {navItems.map((item) => (
-            <Tooltip key={item.href}>
-              <TooltipTrigger asChild>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
-                    (pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/dashboard')) &&
-                      'bg-accent text-accent-foreground'
-                  )}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span className="sr-only">{item.label}</span>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">{item.label}</TooltipContent>
-            </Tooltip>
-          ))}
+          <NavMenu items={navItems} pathname={pathname} />
         </nav>
         <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
-          {bottomNavItems.map(item => (
-            <Tooltip key={item.href}>
-                <TooltipTrigger asChild>
-                <Link
-                    href={item.href}
-                    className={cn(
-                    'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
-                    pathname.startsWith(item.href) && 'bg-accent text-accent-foreground'
-                    )}
-                >
-                    <item.icon className="h-5 w-5" />
-                    <span className="sr-only">{item.label}</span>
-                </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
-            </Tooltip>
-          ))}
+          <NavMenu items={bottomNavItems} pathname={pathname} />
         </nav>
-      </TooltipProvider>
     </aside>
   );
 }

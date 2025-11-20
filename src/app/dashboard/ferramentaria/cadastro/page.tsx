@@ -1,0 +1,371 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+  where,
+  doc,
+  updateDoc,
+} from 'firebase/firestore';
+import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { PlusCircle, Repeat2, FileText, Loader2 } from 'lucide-react';
+import SectorBudgetStatus from '@/components/SectorBudgetStatus';
+import { Checkbox } from '@/components/ui/checkbox';
+import LabelPrintDialog from '@/components/LabelPrintDialog';
+import ReprintDialog from '@/components/ReprintDialog';
+import LabelConfirmationDialog from '@/components/LabelConfirmationDialog';
+import type { Tool } from '@/lib/types';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
+// A interface foi adaptada para corresponder ao que é usado no componente
+interface Ferramenta extends Tool {
+  id: string; // Já existe em Tool (como 'id')
+  nome: string; // Mapeia para 'name'
+  codigo: string; // Adicionado
+  enderecamento: string; // Adicionado
+  status: string; // Já existe
+  quantidade_estoque: number; // Adicionado
+  is_calibrable: boolean; // Adicionado
+  aeronave_principal: string | null; // Adicionado
+  label_url: string | null; // Adicionado
+}
+
+type ToolLabelData = Partial<Ferramenta>;
+
+const Equipamentos = () => {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const ferramentasCollectionRef = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'tools') : null),
+    [firestore]
+  );
+  
+  const { data: ferramentas, isLoading, error: firestoreError } = useCollection<Ferramenta>(ferramentasCollectionRef);
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Estados para Impressão
+  const [toolsToLabel, setToolsToLabel] = useState<ToolLabelData[]>([]);
+  const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] = useState(false);
+  const [toolsToConfirm, setToolsToConfirm] = useState<ToolLabelData[]>([]);
+
+  // Estados para Reimpressão
+  const [isReprintDialogOpen, setIsReprintDialogOpen] = useState(false);
+  const [toolToReprint, setToolToReprint] = useState<ToolLabelData | null>(null);
+
+  const [newFerramenta, setNewFerramenta] = useState({
+    name: '',
+    enderecamento: '',
+    aeronave_principal: '',
+    quantidade_estoque: 1,
+    is_calibrable: true,
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    if (id === 'quantidade_estoque') {
+      const num = parseInt(value) || 0;
+      setNewFerramenta((prev) => ({ ...prev, [id]: num > 0 ? num : 1 }));
+    } else {
+      setNewFerramenta((prev) => ({ ...prev, [id]: value }));
+    }
+  };
+
+  const handleCheckboxChange = (checked: boolean | 'indeterminate') => {
+    if (typeof checked === 'boolean') {
+      setNewFerramenta((prev) => ({ ...prev, is_calibrable: checked }));
+    }
+  };
+  
+  const handleSave = async () => {
+    if (!newFerramenta.name) {
+      toast({ variant: "destructive", title: "Erro", description: "Nome é um campo obrigatório." });
+      return;
+    }
+    if (!user || !firestore) {
+      toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado ou falha na conexão." });
+      return;
+    }
+  
+    setIsSaving(true);
+    const numUnits = newFerramenta.quantidade_estoque;
+  
+    try {
+      const insertedTools: Ferramenta[] = [];
+  
+      for (let i = 0; i < numUnits; i++) {
+        // O código será adicionado após a criação para simular o trigger
+        const docRef = await addDoc(collection(firestore, 'tools'), {
+          name: newFerramenta.name,
+          enderecamento: newFerramenta.enderecamento,
+          aeronave_principal: newFerramenta.aeronave_principal || null,
+          is_calibrable: newFerramenta.is_calibrable,
+          status: 'Available',
+          lastCalibration: 'N/A',
+          calibratedBy: 'N/A',
+          // Campos do tipo original que precisam de valor
+          serialNumber: `SN-${Date.now()}-${i}`,
+          imageUrl: "https://picsum.photos/seed/tool/200/200",
+          imageHint: "tool"
+        }).catch(error => {
+          errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+              path: 'tools',
+              operation: 'create',
+              requestResourceData: newFerramenta,
+            })
+          );
+          throw error;
+        });
+        
+        const codigo = `TOOL-${docRef.id.substring(0, 4).toUpperCase()}`;
+        await updateDoc(docRef, { codigo: codigo });
+
+        insertedTools.push({ ...newFerramenta, id: docRef.id, codigo } as Ferramenta);
+      }
+      
+      toast({ title: "Sucesso!", description: `${numUnits} equipamento(s) cadastrado(s).` });
+      
+      setToolsToConfirm(insertedTools);
+      setIsConfirmationDialogOpen(true);
+      setIsDialogOpen(false);
+  
+    } catch (error) {
+      // O erro de permissão já foi emitido, não precisa de toast aqui.
+      if (!(error instanceof FirestorePermissionError)) {
+        toast({ variant: "destructive", title: "Erro ao Salvar", description: "Não foi possível cadastrar o equipamento." });
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleFinalizeCadastro = () => {
+    setNewFerramenta({ name: '', enderecamento: '', aeronave_principal: '', quantidade_estoque: 1, is_calibrable: true });
+    setIsConfirmationDialogOpen(false);
+    setToolsToConfirm([]);
+    // A lista será atualizada automaticamente pelo useCollection
+  };
+
+  const handleOpenReprintDialog = (tool: Ferramenta) => {
+    setToolToReprint({ id: tool.id, codigo: tool.codigo, nome: tool.name, label_url: tool.label_url });
+    setIsReprintDialogOpen(true);
+  };
+  
+  const handleReprintConfirmed = async (tool: ToolLabelData) => {
+    setIsReprintDialogOpen(false);
+    toast({ title: "Reimpressão", description: `Etiqueta para ${tool.codigo} será gerada.` });
+    // Lógica de reimpressão pode ser adicionada aqui
+  };
+
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Cadastro de Ferramentas</h1>
+
+      <SectorBudgetStatus />
+
+      <div className="flex items-center justify-end">
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Adicionar Ferramenta
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Cadastrar Nova Ferramenta</DialogTitle>
+              <DialogDescription>
+                O código da ferramenta será gerado automaticamente.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Nome
+                </Label>
+                <Input id="name" value={newFerramenta.name} onChange={handleInputChange} className="col-span-3" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="enderecamento" className="text-right">
+                  Endereçamento
+                </Label>
+                <Input id="enderecamento" value={newFerramenta.enderecamento} onChange={handleInputChange} className="col-span-3" placeholder="Ex: Gaveta 1A" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="aeronave_principal" className="text-right">
+                  Aeronave Principal
+                </Label>
+                <Input id="aeronave_principal" value={newFerramenta.aeronave_principal} onChange={handleInputChange} className="col-span-3" placeholder="Ex: PR-ABC" />
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="quantidade_estoque" className="text-right">
+                  Qtd. Unidades
+                </Label>
+                <Input 
+                    id="quantidade_estoque" 
+                    type="number" 
+                    step="1"
+                    min="1"
+                    value={newFerramenta.quantidade_estoque} 
+                    onChange={handleInputChange} 
+                    className="col-span-3" 
+                    required 
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="is_calibrable" className="text-right">
+                  Calibrável?
+                </Label>
+                <div className="col-span-3 flex items-center space-x-2">
+                  <Checkbox
+                    id="is_calibrable"
+                    checked={newFerramenta.is_calibrable}
+                    onCheckedChange={handleCheckboxChange}
+                  />
+                  <Label htmlFor="is_calibrable" className="text-sm font-normal">
+                    Requer controle de calibração.
+                  </Label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista de Ferramentas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Código</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Endereçamento</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Calibrável</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">Carregando...</TableCell>
+                </TableRow>
+              ) : firestoreError ? (
+                 <TableRow>
+                  <TableCell colSpan={6} className="text-center text-destructive">
+                    Erro ao carregar ferramentas: Você não tem permissão para ver estes dados.
+                  </TableCell>
+                </TableRow>
+              ) : ferramentas && ferramentas.length > 0 ? (
+                ferramentas.map((ferramenta) => (
+                  <TableRow key={ferramenta.id}>
+                    <TableCell className="font-medium">{ferramenta.codigo}</TableCell>
+                    <TableCell>{ferramenta.name}</TableCell>
+                    <TableCell>{ferramenta.enderecamento}</TableCell>
+                    <TableCell>{ferramenta.status}</TableCell>
+                    <TableCell>{ferramenta.is_calibrable ? 'Sim' : 'Não'}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenReprintDialog(ferramenta)}
+                        title="Reimprimir Etiqueta"
+                      >
+                        <Repeat2 className="h-4 w-4" />
+                      </Button>
+                      {ferramenta.label_url && (
+                        <a
+                          href={ferramenta.label_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 inline-flex items-center text-primary hover:text-primary/80"
+                          title="Ver Etiqueta Salva"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </a>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">Nenhuma ferramenta cadastrada.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      
+      <LabelPrintDialog 
+        tools={toolsToLabel} 
+        isOpen={toolsToLabel.length > 0} 
+        onClose={() => setToolsToLabel([])} 
+      />
+      
+      {toolsToConfirm.length > 0 && (
+          <LabelConfirmationDialog
+              tool={toolsToConfirm[0]}
+              isOpen={isConfirmationDialogOpen}
+              onConfirm={handleFinalizeCadastro}
+              onCancel={() => {
+                  setIsConfirmationDialogOpen(false);
+                  setToolsToConfirm([]);
+              }}
+          />
+      )}
+      
+      <ReprintDialog
+        tool={toolToReprint}
+        isOpen={isReprintDialogOpen}
+        onClose={() => setIsReprintDialogOpen(false)}
+        onReprintConfirmed={handleReprintConfirmed}
+      />
+    </div>
+  );
+};
+
+export default Equipamentos;
