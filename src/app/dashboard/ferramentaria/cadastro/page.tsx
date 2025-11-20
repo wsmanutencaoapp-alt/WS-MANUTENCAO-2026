@@ -304,6 +304,14 @@ const Equipamentos = () => {
     );
   }, [ferramentas, searchTerm]);
 
+  const getStatusVariant = (status: string) => {
+    return status === 'Disponível' || status === 'Available' ? 'success' : 'default';
+  };
+
+  const translateStatus = (status: string) => {
+    return status === 'Available' ? 'Disponível' : status;
+  };
+
 
   return (
     <div className="space-y-6">
@@ -479,8 +487,8 @@ const Equipamentos = () => {
                     <TableCell>{ferramenta.name}</TableCell>
                     <TableCell>{ferramenta.enderecamento}</TableCell>
                     <TableCell>
-                      <Badge variant={ferramenta.status === 'Disponível' ? 'success' : 'default'}>
-                          {ferramenta.status}
+                      <Badge variant={getStatusVariant(ferramenta.status)}>
+                        {translateStatus(ferramenta.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -582,5 +590,3 @@ const Equipamentos = () => {
 };
 
 export default Equipamentos;
-
-    

@@ -66,6 +66,14 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     return null;
   }
 
+  const getStatusVariant = (status: string) => {
+    return status === 'Disponível' || status === 'Available' ? 'success' : 'default';
+  };
+
+  const translateStatus = (status: string) => {
+    return status === 'Available' ? 'Disponível' : status;
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setEditableTool(prev => ({...prev, [id]: value}));
@@ -214,8 +222,8 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                 </div>
                 <div>
                   <p className="font-semibold text-muted-foreground">Status</p>
-                  <Badge variant={tool.status === 'Disponível' ? 'success' : 'default'}>
-                      {tool.status || 'N/A'}
+                  <Badge variant={getStatusVariant(tool.status || '')}>
+                    {translateStatus(tool.status || 'N/A')}
                   </Badge>
                 </div>
                 <div className="col-span-2">
@@ -297,5 +305,3 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     </Dialog>
   );
 }
-
-    

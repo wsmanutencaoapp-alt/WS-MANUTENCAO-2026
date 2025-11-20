@@ -14,7 +14,7 @@ export type Tool = {
   id: string;
   name: string;
   serialNumber: string;
-  status: 'Available' | 'In Use' | 'In Calibration';
+  status: 'Available' | 'In Use' | 'In Calibration' | 'Disponível';
   lastCalibration: string;
   calibratedBy: string;
   imageUrl: string;
