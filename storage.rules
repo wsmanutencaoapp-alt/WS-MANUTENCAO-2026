@@ -2,12 +2,9 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // AVISO: Regra pública para desenvolvimento.
-    // Permite que qualquer pessoa (autenticada ou não) leia e escreva arquivos.
-    // Isso é útil para contornar problemas de CORS/autenticação durante o desenvolvimento,
-    // mas deve ser substituído por regras seguras antes da produção.
     match /{allPaths=**} {
-      allow read, write: if true;
+      // Allow read and write access for all authenticated users
+      allow read, write: if request.auth != null;
     }
   }
 }
