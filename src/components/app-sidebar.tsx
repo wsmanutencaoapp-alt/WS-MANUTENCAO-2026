@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
-import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, useSidebar } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, useSidebar, SidebarTrigger } from '@/components/ui/sidebar';
 
 const navItems: NavItem[] = [
   { 
@@ -74,15 +74,16 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="group-[[data-variant=sidebar]]:border-r group-[[data-variant=sidebar]]:bg-background">
-      <SidebarHeader>
+      <SidebarHeader className="flex h-14 shrink-0 items-center justify-between rounded-none border-b bg-background px-4 sm:px-6">
         <Link
           href="/dashboard"
-          className="flex h-14 shrink-0 items-center justify-center gap-2 rounded-none border-b bg-background px-4 text-lg font-semibold text-primary sm:justify-start sm:px-6"
+          className="flex items-center gap-2 text-lg font-semibold text-primary"
         >
           <Send className="h-5 w-5 transition-all group-hover:scale-110" />
           <span className={cn("font-bold", state === 'collapsed' && "hidden")}>AeroTrack</span>
           <span className="sr-only">AeroTrack</span>
         </Link>
+        <SidebarTrigger className="hidden md:flex" />
       </SidebarHeader>
       <SidebarContent className="flex flex-col gap-2 p-2 sm:p-4">
         <SidebarMenu className='flex-1'>

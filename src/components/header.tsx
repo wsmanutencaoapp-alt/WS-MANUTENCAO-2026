@@ -143,7 +143,6 @@ export function Header() {
           </nav>
         </SheetContent>
       </Sheet>
-       <SidebarTrigger className="hidden md:flex" />
       <div className="relative ml-auto flex-1 md:grow-0">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
