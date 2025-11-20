@@ -40,12 +40,13 @@ interface LabelPrintDialogProps {
  */
 const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     const { codigo = 'N/A', name = 'N/A', unitCode = 'N/A', enderecamento = '' } = tool;
+    const uniqueBarcodeValue = `${codigo}-${unitCode}`;
 
     // Create a dummy SVG element in memory to run JsBarcode
     const svgContainer = document.createElement('svg');
     
     try {
-        JsBarcode(svgContainer, codigo, {
+        JsBarcode(svgContainer, uniqueBarcodeValue, {
             format: "CODE128",
             displayValue: false, // Hide text value under the barcode
             width: 1.5,
@@ -75,7 +76,7 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
                 <g transform="translate(-${svgContainer.getAttribute('width')! / 2}, -20)">
                     ${barcodeSvgContent}
                 </g>
-                <text x="0" y="25" class="barcode-text">${codigo}</text>
+                <text x="0" y="25" class="barcode-text">${uniqueBarcodeValue}</text>
             </g>
 
             <text x="5" y="85" class="details">Lote/Unid.: ${unitCode}</text>
@@ -142,7 +143,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
 
       generateAndSaveLabels();
     }
-  }, [isOpen, tools, toast, firestore, storage, error]);
+  }, [isOpen, tools, toast, firestore, storage]);
 
   const handlePrint = () => {
     const printableContent = printableAreaRef.current;
