@@ -64,7 +64,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
   
   useEffect(() => {
     const handleSearch = async () => {
-      if (!firestore || searchCodigo.length < 5) { // Busca apenas com código mais completo
+      if (!firestore || searchCodigo.length < 5) {
         setFoundTool(null);
         return;
       }
@@ -74,12 +74,10 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
   
       try {
         const toolsRef = collection(firestore, 'tools');
-        // Consulta corrigida: where em 'codigo' e orderBy em 'unitCode'
+        // Consulta simplificada para evitar erro de índice: filtra apenas por código.
         const q = query(
           toolsRef,
-          where('codigo', '==', searchCodigo.toUpperCase()),
-          orderBy('unitCode', 'desc'), 
-          limit(1)
+          where('codigo', '==', searchCodigo.toUpperCase())
         );
   
         const querySnapshot = await getDocs(q);
@@ -87,13 +85,17 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         if (querySnapshot.empty) {
           setFoundTool(null);
         } else {
-          const doc = querySnapshot.docs[0];
-          setFoundTool({ id: doc.id, ...doc.data() } as FoundTool);
-          setLastUnitCode(doc.data().unitCode || 'A0000');
+          // Ordena os resultados no lado do cliente para encontrar a última unidade.
+          const tools = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoundTool));
+          tools.sort((a, b) => (b.unitCode || '').localeCompare(a.unitCode || ''));
+          
+          const lastTool = tools[0];
+          setFoundTool(lastTool);
+          setLastUnitCode(lastTool.unitCode || 'A0000');
         }
       } catch (error) {
         console.error('Erro ao pesquisar ferramenta:', error);
-        toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível realizar a busca. Verifique as permissões ou se o índice do Firestore foi criado.' });
+        toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível realizar a busca.' });
       } finally {
         setIsSearching(false);
       }
@@ -101,7 +103,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
     const debounceSearch = setTimeout(() => {
       handleSearch();
-    }, 300); // Aguarda 300ms após o usuário parar de digitar
+    }, 300);
 
     return () => clearTimeout(debounceSearch);
   }, [searchCodigo, firestore, toast]);
@@ -129,7 +131,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
             orderBy('unitCode', 'desc'), 
             limit(1)
         );
-        // A busca é feita dentro da transação para garantir consistência
         const lastToolSnapshot = await getDocs(lastToolQuery);
         let lastUnitNumber = 0;
         if (!lastToolSnapshot.empty) {
