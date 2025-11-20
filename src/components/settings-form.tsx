@@ -125,33 +125,38 @@ export function SettingsForm() {
         photoURL: photoURL,
       };
   
+      // Add accessLevel to the update object only if the user is an admin
       if (isAdmin && values.accessLevel) {
         dataToUpdate.accessLevel = values.accessLevel;
       }
   
-      await updateDoc(userDocRef, dataToUpdate);
-  
-      toast({
-        title: 'Sucesso!',
-        description: 'Seu perfil foi atualizado.',
-      });
+      // The update operation is wrapped in a .catch() to handle permission errors
+      updateDoc(userDocRef, dataToUpdate)
+        .then(() => {
+          toast({
+            title: 'Sucesso!',
+            description: 'Seu perfil foi atualizado.',
+          });
+        })
+        .catch((error) => {
+          // Emit a detailed, contextual error for permission issues
+          errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+              path: userDocRef.path,
+              operation: 'update',
+              requestResourceData: dataToUpdate, // Pass the actual data being sent
+            })
+          );
+        });
   
     } catch (error) {
-      console.error("Erro ao atualizar perfil:", error);
-      // Emit a contextual error for permission issues
-      errorEmitter.emit(
-        'permission-error',
-        new FirestorePermissionError({
-          path: userDocRef.path,
-          operation: 'update',
-          requestResourceData: values,
-        })
-      );
-      // Show a generic toast for other errors
+      // This outer catch handles other errors, e.g., from storage
+      console.error("Erro ao atualizar perfil (fora da atualização do documento):", error);
       toast({
         variant: 'destructive',
-        title: 'Erro ao Salvar',
-        description: 'Não foi possível salvar suas alterações. Verifique as permissões.',
+        title: 'Erro Inesperado',
+        description: 'Não foi possível salvar suas alterações. Tente novamente.',
       });
     }
   }
