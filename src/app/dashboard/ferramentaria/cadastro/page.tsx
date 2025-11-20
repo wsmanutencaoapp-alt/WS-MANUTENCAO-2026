@@ -11,6 +11,7 @@ import {
   doc,
   updateDoc,
   setDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
@@ -75,7 +76,7 @@ const Equipamentos = () => {
     [firestore]
   );
   
-  const { data: ferramentas, isLoading, error: firestoreError } = useCollection<Ferramenta>(ferramentasCollectionRef);
+  const { data: ferramentas, isLoading, error: firestoreError, setData: setFerramentas } = useCollection<Ferramenta>(ferramentasCollectionRef);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -208,7 +209,7 @@ const Equipamentos = () => {
     } catch (error) {
       if (!(error instanceof FirestorePermissionError)) {
         console.error("Erro ao salvar ferramenta:", error);
-        toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões do Firebase Storage.` });
+        toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões do Firebase.` });
       }
     } finally {
         setIsSaving(false);
@@ -233,6 +234,27 @@ const Equipamentos = () => {
   const handleOpenDetails = (tool: Ferramenta) => {
     setSelectedTool(tool);
     setIsDetailsDialogOpen(true);
+  };
+
+  const handleToolDeleted = (toolId: string) => {
+    if (ferramentas) {
+        setFerramentas(ferramentas.filter(t => t.id !== toolId));
+    }
+    setIsDetailsDialogOpen(false);
+    toast({
+        title: "Sucesso!",
+        description: "A ferramenta foi excluída."
+    });
+  };
+
+  const handleToolUpdated = (updatedTool: Ferramenta) => {
+    if (ferramentas) {
+        setFerramentas(ferramentas.map(t => t.id === updatedTool.id ? updatedTool : t));
+    }
+    toast({
+        title: "Sucesso!",
+        description: "As informações da ferramenta foram atualizadas."
+    });
   };
 
 
@@ -460,9 +482,13 @@ const Equipamentos = () => {
         tool={selectedTool}
         isOpen={isDetailsDialogOpen}
         onClose={() => setIsDetailsDialogOpen(false)}
+        onToolDeleted={handleToolDeleted}
+        onToolUpdated={handleToolUpdated}
       />
     </div>
   );
 };
 
 export default Equipamentos;
+
+    

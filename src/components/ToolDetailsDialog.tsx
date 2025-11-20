@@ -9,29 +9,113 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import type { Tool } from '@/lib/types';
-import { Edit, ZoomIn } from 'lucide-react';
+import { Edit, ZoomIn, Save, Trash2, X, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useFirestore } from '@/firebase';
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Checkbox } from './ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
 
 interface ToolDetailsDialogProps {
   tool: Tool | null;
   isOpen: boolean;
   onClose: () => void;
+  onToolUpdated: (updatedTool: any) => void;
+  onToolDeleted: (toolId: string) => void;
 }
 
-export default function ToolDetailsDialog({ tool, isOpen, onClose }: ToolDetailsDialogProps) {
+export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated, onToolDeleted }: ToolDetailsDialogProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editableTool, setEditableTool] = useState<Partial<Tool>>(tool || {});
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (tool) {
+      setEditableTool(tool);
+    }
+    // Reset edit mode when dialog is closed or tool changes
+    setIsEditing(false);
+  }, [tool, isOpen]);
+
   if (!tool) {
     return null;
   }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setEditableTool(prev => ({...prev, [id]: value}));
+  };
+
+  const handleCheckboxChange = (checked: boolean | 'indeterminate') => {
+     if (typeof checked === 'boolean') {
+      setEditableTool(prev => ({ ...prev, is_calibrable: checked }));
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!firestore) {
+      toast({ variant: "destructive", title: "Erro", description: "Serviço indisponível." });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const toolRef = doc(firestore, 'tools', tool.id);
+      const { id, ...dataToUpdate } = editableTool;
+      await updateDoc(toolRef, dataToUpdate);
+      onToolUpdated(editableTool);
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Erro ao atualizar ferramenta:", error);
+      toast({ variant: "destructive", title: "Erro", description: "Não foi possível salvar as alterações." });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleDeleteTool = async () => {
+     if (!firestore) {
+      toast({ variant: "destructive", title: "Erro", description: "Serviço indisponível." });
+      return;
+    }
+    setIsDeleting(true);
+     try {
+      const toolRef = doc(firestore, 'tools', tool.id);
+      await deleteDoc(toolRef);
+      onToolDeleted(tool.id);
+    } catch (error) {
+      console.error("Erro ao excluir ferramenta:", error);
+      toast({ variant: "destructive", title: "Erro", description: "Não foi possível excluir a ferramenta." });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Detalhes da Ferramenta</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar Ferramenta" : "Detalhes da Ferramenta"}</DialogTitle>
           <DialogDescription>
-            Informações completas sobre {tool.name}.
+            {isEditing ? `Modifique as informações de ${tool.name}.` : `Informações completas sobre ${tool.name}.`}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -52,49 +136,118 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose }: ToolDetails
                 <ZoomIn className="h-8 w-8 text-white" />
             </a>
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <div>
-              <p className="font-semibold text-muted-foreground">Código</p>
-              <p>{tool.codigo || 'N/A'}</p>
+
+          {isEditing ? (
+             <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="col-span-2 space-y-1">
+                    <Label htmlFor="name">Nome</Label>
+                    <Input id="name" value={editableTool.name} onChange={handleInputChange} />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor="enderecamento">Endereçamento</Label>
+                    <Input id="enderecamento" value={editableTool.enderecamento || ''} onChange={handleInputChange} />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor="aeronave_principal">Aeronave Principal</Label>
+                    <Input id="aeronave_principal" value={editableTool.aeronave_principal || ''} onChange={handleInputChange} />
+                </div>
+                <div className="col-span-2 flex items-center space-x-2 pt-2">
+                    <Checkbox id="is_calibrable" checked={editableTool.is_calibrable} onCheckedChange={handleCheckboxChange} />
+                    <Label htmlFor="is_calibrable" className="font-normal">Requer controle de calibração</Label>
+                </div>
             </div>
-             <div>
-              <p className="font-semibold text-muted-foreground">Status</p>
-              <div>
-                 <Badge variant={tool.status === 'Available' ? 'secondary' : 'default'}>
-                    {tool.status || 'N/A'}
-                 </Badge>
-              </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div>
+                <p className="font-semibold text-muted-foreground">Código</p>
+                <p>{tool.codigo || 'N/A'}</p>
+                </div>
+                <div>
+                <p className="font-semibold text-muted-foreground">Status</p>
+                <div>
+                    <Badge variant={tool.status === 'Available' ? 'secondary' : 'default'}>
+                        {tool.status || 'N/A'}
+                    </Badge>
+                </div>
+                </div>
+                <div className="col-span-2">
+                <p className="font-semibold text-muted-foreground">Nome</p>
+                <p>{tool.name}</p>
+                </div>
+                <div>
+                <p className="font-semibold text-muted-foreground">Endereçamento</p>
+                <p>{tool.enderecamento || 'N/A'}</p>
+                </div>
+                <div>
+                <p className="font-semibold text-muted-foreground">Aeronave Principal</p>
+                <p>{tool.aeronave_principal || 'N/A'}</p>
+                </div>
+                <div>
+                <p className="font-semibold text-muted-foreground">Calibrável</p>
+                <p>{tool.is_calibrable ? 'Sim' : 'Não'}</p>
+                </div>
+                <div>
+                <p className="font-semibold text-muted-foreground">Última Calibração</p>
+                <p>{tool.lastCalibration || 'N/A'}</p>
+                </div>
             </div>
-            <div className="col-span-2">
-              <p className="font-semibold text-muted-foreground">Nome</p>
-              <p>{tool.name}</p>
-            </div>
-            <div>
-              <p className="font-semibold text-muted-foreground">Endereçamento</p>
-              <p>{tool.enderecamento || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="font-semibold text-muted-foreground">Aeronave Principal</p>
-              <p>{tool.aeronave_principal || 'N/A'}</p>
-            </div>
-             <div>
-              <p className="font-semibold text-muted-foreground">Calibrável</p>
-              <p>{tool.is_calibrable ? 'Sim' : 'Não'}</p>
-            </div>
-            <div>
-              <p className="font-semibold text-muted-foreground">Última Calibração</p>
-              <p>{tool.lastCalibration || 'N/A'}</p>
-            </div>
-          </div>
+          )}
         </div>
-        <DialogFooter className="sm:justify-between">
-            <Button variant="outline" onClick={() => { /* Lógica de edição aqui */ }}>
-                <Edit className="mr-2 h-4 w-4" />
-                Editar
-            </Button>
-            <Button onClick={onClose}>Fechar</Button>
+        <DialogFooter className="sm:justify-between flex-wrap gap-2">
+            {isEditing ? (
+                 <div className="flex w-full justify-between">
+                    <Button variant="ghost" onClick={() => setIsEditing(false)} disabled={isSaving}>
+                        <X className="mr-2 h-4 w-4" />
+                        Cancelar
+                    </Button>
+                    <Button onClick={handleSaveChanges} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Salvar
+                    </Button>
+                 </div>
+            ) : (
+                <>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta ação não pode ser desfeita. Isso irá excluir permanentemente a ferramenta
+                            <span className="font-bold"> {tool.codigo} ({tool.name})</span>.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteTool}
+                            disabled={isDeleting}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Sim, Excluir
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                 <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsEditing(true)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Editar
+                    </Button>
+                    <Button onClick={onClose}>Fechar</Button>
+                </div>
+                </>
+            )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
+    
