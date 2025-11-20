@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon } from 'lucide-react';
+import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon, MoreHorizontal } from 'lucide-react';
 import SectorBudgetStatus from '@/components/SectorBudgetStatus';
 import { Checkbox } from '@/components/ui/checkbox';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
@@ -46,6 +46,7 @@ import type { Tool } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import Image from 'next/image';
+import ToolDetailsDialog from '@/components/ToolDetailsDialog';
 
 // A interface foi adaptada para corresponder ao que é usado no componente
 interface Ferramenta extends Tool {
@@ -87,6 +88,11 @@ const Equipamentos = () => {
   // Estados para Reimpressão
   const [isReprintDialogOpen, setIsReprintDialogOpen] = useState(false);
   const [toolToReprint, setToolToReprint] = useState<ToolLabelData | null>(null);
+
+  // Estados para Detalhes
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedTool, setSelectedTool] = useState<Ferramenta | null>(null);
+
 
   const [newFerramenta, setNewFerramenta] = useState({
     name: '',
@@ -141,30 +147,41 @@ const Equipamentos = () => {
       toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado ou falha na conexão com os serviços. Tente novamente." });
       return;
     }
-
+  
     setIsSaving(true);
     const numUnits = newFerramenta.quantidade_estoque;
     const insertedTools: Ferramenta[] = [];
-
+  
     try {
+      // 1. Fazer o upload da imagem primeiro (se existir)
+      let imageUrl = "https://picsum.photos/seed/tool/200/200"; // Placeholder
+      let imageHint = "tool";
+      if (previewImage) {
+        const tempId = doc(collection(firestore, 'temp')).id; // ID temporário para a imagem
+        const imageRef = storageRef(storage, `tool_images/${tempId}`);
+        const snapshot = await uploadString(imageRef, previewImage, 'data_url');
+        imageUrl = await getDownloadURL(snapshot.ref);
+      }
+  
+      // 2. Loop para criar os documentos no Firestore
       for (let i = 0; i < numUnits; i++) {
         const toolDocRef = doc(collection(firestore, 'tools'));
         const codigo = `TOOL-${toolDocRef.id.substring(0, 4).toUpperCase()}`;
-
+  
         const toolData = {
           name: newFerramenta.name,
           enderecamento: newFerramenta.enderecamento,
           aeronave_principal: newFerramenta.aeronave_principal || null,
           is_calibrable: newFerramenta.is_calibrable,
           status: 'Available',
-          lastCalibration: 'N/A',
-          calibratedBy: 'N/A',
-          serialNumber: `SN-${Date.now()}-${i}`,
-          imageUrl: "https://picsum.photos/seed/tool/200/200",
-          imageHint: "tool",
+          lastCalibration: 'N/A', // Campo placeholder
+          calibratedBy: 'N/A', // Campo placeholder
+          serialNumber: `SN-${Date.now()}-${i}`, // Campo placeholder
+          imageUrl: imageUrl,
+          imageHint: imageHint,
           codigo: codigo,
         };
-
+  
         // Salva o documento no Firestore
         await setDoc(toolDocRef, toolData).catch(error => {
           errorEmitter.emit(
@@ -175,43 +192,26 @@ const Equipamentos = () => {
               requestResourceData: toolData,
             })
           );
-          throw error;
+          throw error; // Interrompe o loop em caso de erro
         });
-
-        if (previewImage) {
-          const imageRef = storageRef(storage, `tool_images/${toolDocRef.id}`);
-          uploadString(imageRef, previewImage, 'data_url')
-            .then(snapshot => getDownloadURL(snapshot.ref))
-            .then(downloadURL => {
-              updateDoc(toolDocRef, { imageUrl: downloadURL });
-            })
-            .catch(error => {
-              console.error("Erro no upload da imagem:", error);
-              toast({
-                variant: 'destructive',
-                title: 'Erro de Upload',
-                description: `A ferramenta ${codigo} foi salva, mas o upload da imagem falhou: ${error.message}`,
-              });
-            });
-        }
         
         insertedTools.push({ ...newFerramenta, id: toolDocRef.id, codigo, imageUrl: toolData.imageUrl } as Ferramenta);
       }
-
+  
       toast({ title: "Sucesso!", description: `${numUnits} equipamento(s) sendo processado(s).` });
       
       resetForm();
       setToolsToConfirm(insertedTools);
       setIsConfirmationDialogOpen(true);
       setIsDialogOpen(false);
-
+  
     } catch (error) {
       if (!(error instanceof FirestorePermissionError)) {
         console.error("Erro ao salvar ferramenta:", error);
-        toast({ variant: "destructive", title: "Erro ao Salvar", description: "Não foi possível cadastrar o equipamento." });
+        toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões do Firebase Storage.` });
       }
     } finally {
-      setIsSaving(false);
+        setIsSaving(false);
     }
   };
 
@@ -228,6 +228,11 @@ const Equipamentos = () => {
   const handleReprintConfirmed = async (tool: ToolLabelData) => {
     setIsReprintDialogOpen(false);
     toast({ title: "Reimpressão", description: `Etiqueta para ${tool.codigo} será gerada.` });
+  };
+  
+  const handleOpenDetails = (tool: Ferramenta) => {
+    setSelectedTool(tool);
+    setIsDetailsDialogOpen(true);
   };
 
 
@@ -386,9 +391,17 @@ const Equipamentos = () => {
                     <TableCell>{ferramenta.status}</TableCell>
                     <TableCell>{ferramenta.is_calibrable ? 'Sim' : 'Não'}</TableCell>
                     <TableCell className="text-right">
+                       <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenDetails(ferramenta)}
+                        title="Detalhes"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleOpenReprintDialog(ferramenta)}
                         title="Reimprimir Etiqueta"
                       >
@@ -442,10 +455,14 @@ const Equipamentos = () => {
         onClose={() => setIsReprintDialogOpen(false)}
         onReprintConfirmed={handleReprintConfirmed}
       />
+
+      <ToolDetailsDialog
+        tool={selectedTool}
+        isOpen={isDetailsDialogOpen}
+        onClose={() => setIsDetailsDialogOpen(false)}
+      />
     </div>
   );
 };
 
 export default Equipamentos;
-
-    
