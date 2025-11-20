@@ -148,7 +148,6 @@ const Equipamentos = () => {
 
     try {
       for (let i = 0; i < numUnits; i++) {
-        // Gerar um ID de documento primeiro
         const toolDocRef = doc(collection(firestore, 'tools'));
         const codigo = `TOOL-${toolDocRef.id.substring(0, 4).toUpperCase()}`;
 
@@ -161,7 +160,7 @@ const Equipamentos = () => {
           lastCalibration: 'N/A',
           calibratedBy: 'N/A',
           serialNumber: `SN-${Date.now()}-${i}`,
-          imageUrl: "https://picsum.photos/seed/tool/200/200", // Placeholder inicial
+          imageUrl: "https://picsum.photos/seed/tool/200/200",
           imageHint: "tool",
           codigo: codigo,
         };
@@ -176,22 +175,18 @@ const Equipamentos = () => {
               requestResourceData: toolData,
             })
           );
-          // Re-lança o erro para que ele seja pego pelo catch principal e pare a execução.
           throw error;
         });
 
-        // Se houver uma imagem para upload, faz o upload em segundo plano
         if (previewImage) {
           const imageRef = storageRef(storage, `tool_images/${toolDocRef.id}`);
           uploadString(imageRef, previewImage, 'data_url')
             .then(snapshot => getDownloadURL(snapshot.ref))
             .then(downloadURL => {
-              // Atualiza o documento com a URL da imagem real
               updateDoc(toolDocRef, { imageUrl: downloadURL });
             })
             .catch(error => {
               console.error("Erro no upload da imagem:", error);
-              // O erro é registrado, mas o cadastro da ferramenta não é interrompido
               toast({
                 variant: 'destructive',
                 title: 'Erro de Upload',
@@ -211,8 +206,6 @@ const Equipamentos = () => {
       setIsDialogOpen(false);
 
     } catch (error) {
-      // Se o erro for de permissão, ele já foi emitido, então não mostramos outro toast.
-      // Apenas garantimos que o estado de 'saving' seja resetado.
       if (!(error instanceof FirestorePermissionError)) {
         console.error("Erro ao salvar ferramenta:", error);
         toast({ variant: "destructive", title: "Erro ao Salvar", description: "Não foi possível cadastrar o equipamento." });
@@ -225,7 +218,6 @@ const Equipamentos = () => {
   const handleFinalizeCadastro = () => {
     setIsConfirmationDialogOpen(false);
     setToolsToConfirm([]);
-    // A lista será atualizada automaticamente pelo useCollection
   };
 
   const handleOpenReprintDialog = (tool: Ferramenta) => {
@@ -236,7 +228,6 @@ const Equipamentos = () => {
   const handleReprintConfirmed = async (tool: ToolLabelData) => {
     setIsReprintDialogOpen(false);
     toast({ title: "Reimpressão", description: `Etiqueta para ${tool.codigo} será gerada.` });
-    // Lógica de reimpressão pode ser adicionada aqui
   };
 
 
