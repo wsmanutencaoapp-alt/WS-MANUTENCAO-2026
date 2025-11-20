@@ -137,8 +137,8 @@ const Equipamentos = () => {
       toast({ variant: "destructive", title: "Erro", description: "Nome é um campo obrigatório." });
       return;
     }
-    if (!user || !firestore) {
-      toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado ou falha na conexão." });
+    if (!user || !firestore || !storage) {
+      toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado ou falha na conexão com os serviços." });
       return;
     }
   
@@ -154,7 +154,7 @@ const Equipamentos = () => {
         // Gerar um ID de documento primeiro para usar no nome da imagem
         const tempDocRef = doc(collection(firestore, 'tools'));
 
-        if (previewImage && storage) {
+        if (previewImage) {
             const imageRef = storageRef(storage, `tool_images/${tempDocRef.id}`);
             await uploadString(imageRef, previewImage, 'data_url');
             imageUrl = await getDownloadURL(imageRef);
@@ -444,5 +444,3 @@ const Equipamentos = () => {
 };
 
 export default Equipamentos;
-
-    
