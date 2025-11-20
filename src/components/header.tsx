@@ -51,11 +51,11 @@ const navItems: NavItem[] = [
     icon: Wrench, 
     label: 'Ferramentaria',
     subItems: [
-        { href: '/dashboard/ferramentaria/cadastro', label: 'Cadastro de Equipamentos' },
+        { href: '/dashboard/ferramentaria/cadastro', label: 'Cadastro' },
         { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída' },
+        { href: '/dashboard/calibracao', label: 'Calibração' },
     ]
   },
-  { href: '/dashboard/calibracao', icon: Thermometer, label: 'Calibração' },
   { 
     href: '/dashboard/compras', 
     icon: ShoppingCart, 
