@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   collection,
   addDoc,
@@ -36,9 +36,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon, MoreHorizontal, ZoomIn } from 'lucide-react';
+import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon, MoreHorizontal, ZoomIn, Search } from 'lucide-react';
 import SectorBudgetStatus from '@/components/SectorBudgetStatus';
 import { Checkbox } from '@/components/ui/checkbox';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
@@ -74,7 +74,7 @@ const Equipamentos = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const ferramentasCollectionRef = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'tools') : null),
+    () => (firestore ? query(collection(firestore, 'tools'), orderBy('codigo', 'desc')) : null),
     [firestore]
   );
   
@@ -82,6 +82,7 @@ const Equipamentos = () => {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Estados para Impressão
   const [toolsToLabel, setToolsToLabel] = useState<ToolLabelData[]>([]);
@@ -291,6 +292,17 @@ const Equipamentos = () => {
     setIsPreviewDialogOpen(true);
   };
 
+  const filteredFerramentas = useMemo(() => {
+    if (!ferramentas) return [];
+    if (!searchTerm) return ferramentas;
+
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return ferramentas.filter(ferramenta => 
+        ferramenta.name.toLowerCase().includes(lowercasedTerm) ||
+        ferramenta.codigo?.toLowerCase().includes(lowercasedTerm)
+    );
+  }, [ferramentas, searchTerm]);
+
 
   return (
     <div className="space-y-6">
@@ -404,6 +416,18 @@ const Equipamentos = () => {
       <Card>
         <CardHeader>
           <CardTitle>Lista de Ferramentas</CardTitle>
+          <CardDescription>
+            Pesquise e gerencie os equipamentos cadastrados.
+          </CardDescription>
+            <div className="relative pt-4">
+               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+               <Input
+                   placeholder="Pesquisar por nome ou código..."
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+               />
+            </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -429,8 +453,8 @@ const Equipamentos = () => {
                     Erro ao carregar ferramentas: Você não tem permissão para ver estes dados.
                   </TableCell>
                 </TableRow>
-              ) : ferramentas && ferramentas.length > 0 ? (
-                ferramentas.map((ferramenta) => (
+              ) : filteredFerramentas && filteredFerramentas.length > 0 ? (
+                filteredFerramentas.map((ferramenta) => (
                   <TableRow key={ferramenta.id}>
                     <TableCell className="hidden sm:table-cell">
                         <button
@@ -487,7 +511,7 @@ const Equipamentos = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center">Nenhuma ferramenta cadastrada.</TableCell>
+                  <TableCell colSpan={7} className="text-center">Nenhuma ferramenta encontrada.</TableCell>
                 </TableRow>
               )}
             </TableBody>
