@@ -15,6 +15,7 @@ import { Loader2, Printer, FileText } from 'lucide-react';
 import { useFirestore, useStorage } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import JsBarcode from 'jsbarcode';
 
 type ToolLabelData = {
   id: string;
@@ -32,49 +33,54 @@ interface LabelPrintDialogProps {
 }
 
 /**
- * Generates a simple, non-scannable placeholder barcode SVG.
- * @param text The text to "encode".
- * @returns An SVG string representing a placeholder barcode.
- */
-const generatePlaceholderBarcode = (text: string): string => {
-  let x = 0;
-  const bars = text.split('').map((char, i) => {
-    const width = (char.charCodeAt(0) % 2) + 1; // Simple pseudo-random width
-    const bar = `<rect x="${x}" y="0" width="${width}" height="20" fill="#000" />`;
-    x += width + 1; // width + space
-    return bar;
-  }).join('');
-  return `<svg x="5" y="25" width="80" height="20" viewbox="0 0 ${x} 20">${bars}</svg>`;
-};
-
-
-/**
  * Generates the complete SVG for the tool label locally.
+ * This function creates an SVG element in memory to generate the barcode.
  * @param tool The tool data.
  * @returns An SVG string for the label.
  */
 const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     const { codigo = 'N/A', name = 'N/A', unitCode = 'N/A', enderecamento = '' } = tool;
-    const barcodeSvg = generatePlaceholderBarcode(codigo);
 
+    // Create a dummy SVG element in memory to run JsBarcode
+    const svgContainer = document.createElement('svg');
+    
+    try {
+        JsBarcode(svgContainer, codigo, {
+            format: "CODE128",
+            displayValue: false, // Hide text value under the barcode
+            width: 1.5,
+            height: 40,
+            margin: 0,
+        });
+    } catch(e) {
+        console.error("JsBarcode error:", e);
+        // Return a fallback SVG on error
+        return `<svg width="50mm" height="25mm"><text x="10" y="10" fill="red">Barcode Error</text></svg>`;
+    }
+    
+    // Extract the generated barcode content
+    const barcodeSvgContent = svgContainer.innerHTML;
+
+    // Construct the full label SVG
     return `
         <svg width="50mm" height="25mm" viewBox="0 0 189 94.5" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc;">
             <style>
                 .name { font: bold 12px sans-serif; }
                 .details { font: 10px sans-serif; }
-                .barcode-text { font: 10px sans-serif; }
+                .barcode-text { font: 10px sans-serif; text-anchor: middle; }
             </style>
             <text x="5" y="15" class="name">${name.length > 25 ? name.substring(0, 22) + '...' : name}</text>
             
-            <g transform="translate(0, 50)">
-                ${barcodeSvg}
-                <text x="5" y="30" class="barcode-text">${codigo}</text>
+            <g transform="translate(94.5, 55)">
+                <g transform="translate(-${svgContainer.getAttribute('width')! / 2}, -20)">
+                    ${barcodeSvgContent}
+                </g>
+                <text x="0" y="25" class="barcode-text">${codigo}</text>
             </g>
 
-            <text x="120" y="45" class="details">Lote/Unid.:</text>
-            <text x="120" y="60" class="details" style="font-weight:bold;">${unitCode}</text>
+            <text x="5" y="85" class="details">Lote/Unid.: ${unitCode}</text>
             
-            ${enderecamento ? `<text x="120" y="75" class="details">Local: ${enderecamento}</text>` : ''}
+            ${enderecamento ? `<text x="110" y="85" class="details" text-anchor="start">Local: ${enderecamento}</text>` : ''}
         </svg>
     `;
 };
@@ -102,7 +108,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           if (!tool.id || !tool.codigo) continue;
 
           try {
-            // Generate SVG locally instead of calling AI
+            // Generate SVG locally using JsBarcode
             const svgContent = generateLabelSvgLocally(tool);
 
             // Upload SVG to Firebase Storage
