@@ -74,7 +74,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
   
       try {
         const toolsRef = collection(firestore, 'tools');
-        // Consulta simplificada para evitar erro de índice: filtra apenas por código.
+        // Simplified query to avoid index error: filter only by code.
         const q = query(
           toolsRef,
           where('codigo', '==', searchCodigo.toUpperCase())
@@ -85,7 +85,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         if (querySnapshot.empty) {
           setFoundTool(null);
         } else {
-          // Ordena os resultados no lado do cliente para encontrar a última unidade.
+          // Sort the results on the client side to find the last unit.
           const tools = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoundTool));
           tools.sort((a, b) => (b.unitCode || '').localeCompare(a.unitCode || ''));
           
@@ -122,22 +122,12 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     setIsSaving(true);
     const newTools: FoundTool[] = [];
     const mainToolCode = foundTool.codigo;
+    // Get the last unit number directly from the state that was set during search
+    const lastUnitNumber = parseInt(lastUnitCode.replace('A', ''), 10);
 
     try {
+      // The transaction now only performs writes, no complex queries
       await runTransaction(firestore, async (transaction) => {
-        const lastToolQuery = query(
-            collection(firestore, 'tools'), 
-            where('codigo', '==', mainToolCode), 
-            orderBy('unitCode', 'desc'), 
-            limit(1)
-        );
-        const lastToolSnapshot = await getDocs(lastToolQuery);
-        let lastUnitNumber = 0;
-        if (!lastToolSnapshot.empty) {
-            const lastTool = lastToolSnapshot.docs[0].data();
-            lastUnitNumber = parseInt(lastTool.unitCode.replace('A', ''), 10);
-        }
-
         for (let i = 0; i < quantityToAdd; i++) {
           const newUnitNumber = lastUnitNumber + 1 + i;
           const newUnitCode = `A${newUnitNumber.toString().padStart(4, '0')}`;
