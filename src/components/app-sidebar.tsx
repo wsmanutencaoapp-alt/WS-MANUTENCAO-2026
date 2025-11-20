@@ -74,7 +74,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="group-[[data-variant=sidebar]]:border-r group-[[data-variant=sidebar]]:bg-background">
-      <SidebarHeader asChild>
+      <SidebarHeader>
         <Link
           href="/dashboard"
           className="flex h-14 shrink-0 items-center justify-center gap-2 rounded-none border-b bg-background px-4 text-lg font-semibold text-primary sm:justify-start sm:px-6"
