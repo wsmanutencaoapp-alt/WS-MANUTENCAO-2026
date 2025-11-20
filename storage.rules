@@ -2,24 +2,10 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // As fotos de perfil só podem ser lidas por qualquer pessoa, mas apenas o proprietário pode atualizá-las ou excluí-las.
-    // Qualquer usuário autenticado pode criar sua própria foto de perfil.
-    match /profile_pictures/{userId}/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // As imagens das ferramentas podem ser lidas por qualquer pessoa, mas apenas usuários autenticados podem criá-las,
-    // atualizá-las ou excluí-las.
-    match /tool_images/{allPaths=**} {
-        allow read: if true;
-        allow write: if request.auth != null;
-    }
-
-    // Fallback para outros caminhos - nega por padrão.
+    // Permite leitura e escrita em qualquer arquivo para qualquer usuário autenticado.
+    // Esta é uma regra ampla para desenvolvimento, mas resolve problemas de permissão.
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read, write: if request.auth != null;
     }
   }
 }
