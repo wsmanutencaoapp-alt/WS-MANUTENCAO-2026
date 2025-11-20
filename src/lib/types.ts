@@ -19,4 +19,11 @@ export type Tool = {
   calibratedBy: string;
   imageUrl: string;
   imageHint: string;
+  // Campos adicionados do app do usuário
+  codigo?: string;
+  enderecamento?: string;
+  is_calibrable?: boolean;
+  aeronave_principal?: string | null;
+  label_url?: string | null;
+  quantidade_estoque?: number;
 };

@@ -76,15 +76,37 @@
         "assignedEmployeeId": {
           "type": "string",
           "description": "Reference to Employee who is assigned to the tool. (Relationship: Employee 1:N Tool)"
+        },
+        "codigo": {
+          "type": "string",
+          "description": "The unique code for the tool."
+        },
+        "enderecamento": {
+          "type": "string",
+          "description": "The storage location of the tool."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the tool (e.g., Available, In Use)."
+        },
+        "is_calibrable": {
+          "type": "boolean",
+          "description": "Indicates if the tool requires calibration."
+        },
+        "aeronave_principal": {
+          "type": "string",
+          "description": "The main aircraft the tool is associated with."
+        },
+        "label_url": {
+          "type": "string",
+          "description": "URL of the generated tool label image.",
+          "format": "uri"
         }
       },
       "required": [
         "id",
         "name",
-        "description",
-        "lastCalibrationDate",
-        "calibrationDueDate",
-        "assignedEmployeeId"
+        "status"
       ]
     },
     "Supplier": {
