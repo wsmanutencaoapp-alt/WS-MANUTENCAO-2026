@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import Link from 'next/link';
 import {
@@ -116,14 +116,14 @@ export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
 
         return (
         <AccordionItem value={item.href} key={item.href} className="border-b-0">
-            <AccordionTrigger asChild>
+            <AccordionTrigger>
                 <SidebarMenuButton 
                     isActive={isActive}
-                    className="[&>svg:last-child]:data-[state=open]:-rotate-90"
+                    className="[&[data-state=open]>svg:last-child]:-rotate-90 w-full"
                     tooltip={{children: item.label}}
                 >
                     <item.icon />
-                    <span className={cn(state === 'collapsed' && "hidden")}>{item.label}</span>
+                    <span className={cn("flex-1 text-left", state === 'collapsed' && "hidden")}>{item.label}</span>
                 </SidebarMenuButton>
             </AccordionTrigger>
             <AccordionContent asChild>
