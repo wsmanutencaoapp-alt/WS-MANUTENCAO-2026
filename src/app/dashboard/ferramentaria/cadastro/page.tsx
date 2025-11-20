@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   collection,
   addDoc,
@@ -10,8 +10,10 @@ import {
   where,
   doc,
   updateDoc,
+  setDoc,
 } from 'firebase/firestore';
-import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -27,14 +29,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Repeat2, FileText, Loader2 } from 'lucide-react';
+import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon } from 'lucide-react';
 import SectorBudgetStatus from '@/components/SectorBudgetStatus';
 import { Checkbox } from '@/components/ui/checkbox';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
@@ -43,6 +44,7 @@ import LabelConfirmationDialog from '@/components/LabelConfirmationDialog';
 import type { Tool } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import Image from 'next/image';
 
 // A interface foi adaptada para corresponder ao que é usado no componente
 interface Ferramenta extends Tool {
@@ -62,7 +64,9 @@ type ToolLabelData = Partial<Ferramenta>;
 const Equipamentos = () => {
   const { user } = useUser();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const ferramentasCollectionRef = useMemoFirebase(
     () => (firestore ? collection(firestore, 'tools') : null),
@@ -90,6 +94,7 @@ const Equipamentos = () => {
     quantidade_estoque: 1,
     is_calibrable: true,
   });
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -98,6 +103,25 @@ const Equipamentos = () => {
       setNewFerramenta((prev) => ({ ...prev, [id]: num > 0 ? num : 1 }));
     } else {
       setNewFerramenta((prev) => ({ ...prev, [id]: value }));
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const resetForm = () => {
+    setNewFerramenta({ name: '', enderecamento: '', aeronave_principal: '', quantidade_estoque: 1, is_calibrable: true });
+    setPreviewImage(null);
+    if(fileInputRef.current) {
+        fileInputRef.current.value = '';
     }
   };
 
@@ -124,8 +148,18 @@ const Equipamentos = () => {
       const insertedTools: Ferramenta[] = [];
   
       for (let i = 0; i < numUnits; i++) {
-        // O código será adicionado após a criação para simular o trigger
-        const docRef = await addDoc(collection(firestore, 'tools'), {
+        let imageUrl = "https://picsum.photos/seed/tool/200/200";
+
+        // Gerar um ID de documento primeiro para usar no nome da imagem
+        const tempDocRef = doc(collection(firestore, 'tools'));
+
+        if (previewImage && storage) {
+            const imageRef = storageRef(storage, `tool_images/${tempDocRef.id}`);
+            await uploadString(imageRef, previewImage, 'data_url');
+            imageUrl = await getDownloadURL(imageRef);
+        }
+
+        const toolData = {
           name: newFerramenta.name,
           enderecamento: newFerramenta.enderecamento,
           aeronave_principal: newFerramenta.aeronave_principal || null,
@@ -133,30 +167,33 @@ const Equipamentos = () => {
           status: 'Available',
           lastCalibration: 'N/A',
           calibratedBy: 'N/A',
-          // Campos do tipo original que precisam de valor
           serialNumber: `SN-${Date.now()}-${i}`,
-          imageUrl: "https://picsum.photos/seed/tool/200/200",
-          imageHint: "tool"
-        }).catch(error => {
+          imageUrl: imageUrl,
+          imageHint: "tool",
+        };
+
+        // Agora, em vez de `addDoc`, usamos `setDoc` com a referência que já temos
+        await setDoc(tempDocRef, toolData).catch(error => {
           errorEmitter.emit(
             'permission-error',
             new FirestorePermissionError({
-              path: 'tools',
+              path: `tools/${tempDocRef.id}`,
               operation: 'create',
-              requestResourceData: newFerramenta,
+              requestResourceData: toolData,
             })
           );
           throw error;
         });
         
-        const codigo = `TOOL-${docRef.id.substring(0, 4).toUpperCase()}`;
-        await updateDoc(docRef, { codigo: codigo });
+        const codigo = `TOOL-${tempDocRef.id.substring(0, 4).toUpperCase()}`;
+        await updateDoc(tempDocRef, { codigo: codigo });
 
-        insertedTools.push({ ...newFerramenta, id: docRef.id, codigo } as Ferramenta);
+        insertedTools.push({ ...newFerramenta, id: tempDocRef.id, codigo, imageUrl } as Ferramenta);
       }
       
       toast({ title: "Sucesso!", description: `${numUnits} equipamento(s) cadastrado(s).` });
       
+      resetForm();
       setToolsToConfirm(insertedTools);
       setIsConfirmationDialogOpen(true);
       setIsDialogOpen(false);
@@ -164,6 +201,7 @@ const Equipamentos = () => {
     } catch (error) {
       // O erro de permissão já foi emitido, não precisa de toast aqui.
       if (!(error instanceof FirestorePermissionError)) {
+        console.error("Erro ao salvar ferramenta:", error);
         toast({ variant: "destructive", title: "Erro ao Salvar", description: "Não foi possível cadastrar o equipamento." });
       }
     } finally {
@@ -172,7 +210,6 @@ const Equipamentos = () => {
   };
 
   const handleFinalizeCadastro = () => {
-    setNewFerramenta({ name: '', enderecamento: '', aeronave_principal: '', quantidade_estoque: 1, is_calibrable: true });
     setIsConfirmationDialogOpen(false);
     setToolsToConfirm([]);
     // A lista será atualizada automaticamente pelo useCollection
@@ -197,7 +234,10 @@ const Equipamentos = () => {
       <SectorBudgetStatus />
 
       <div className="flex items-center justify-end">
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+            if (!isOpen) resetForm();
+            setIsDialogOpen(isOpen);
+        }}>
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -245,7 +285,7 @@ const Equipamentos = () => {
                     required 
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="is_calibrable" className="text-right">
                   Calibrável?
                 </Label>
@@ -258,6 +298,30 @@ const Equipamentos = () => {
                   <Label htmlFor="is_calibrable" className="text-sm font-normal">
                     Requer controle de calibração.
                   </Label>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">
+                  Imagem
+                </Label>
+                <div className="col-span-3 flex items-center gap-4">
+                    {previewImage ? (
+                        <Image src={previewImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" />
+                    ) : (
+                        <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md">
+                           <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                    )}
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                        Anexar Imagem
+                    </Button>
+                    <Input 
+                        type="file" 
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        className="hidden" 
+                        accept="image/png, image/jpeg"
+                    />
                 </div>
               </div>
             </div>
@@ -280,6 +344,7 @@ const Equipamentos = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[64px] sm:table-cell">Imagem</TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Endereçamento</TableHead>
@@ -291,17 +356,26 @@ const Equipamentos = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">Carregando...</TableCell>
+                  <TableCell colSpan={7} className="text-center">Carregando...</TableCell>
                 </TableRow>
               ) : firestoreError ? (
                  <TableRow>
-                  <TableCell colSpan={6} className="text-center text-destructive">
+                  <TableCell colSpan={7} className="text-center text-destructive">
                     Erro ao carregar ferramentas: Você não tem permissão para ver estes dados.
                   </TableCell>
                 </TableRow>
               ) : ferramentas && ferramentas.length > 0 ? (
                 ferramentas.map((ferramenta) => (
                   <TableRow key={ferramenta.id}>
+                    <TableCell className="hidden sm:table-cell">
+                        <Image
+                            alt={ferramenta.name}
+                            className="aspect-square rounded-md object-cover"
+                            height="64"
+                            src={ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64"}
+                            width="64"
+                        />
+                    </TableCell>
                     <TableCell className="font-medium">{ferramenta.codigo}</TableCell>
                     <TableCell>{ferramenta.name}</TableCell>
                     <TableCell>{ferramenta.enderecamento}</TableCell>
@@ -332,7 +406,7 @@ const Equipamentos = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">Nenhuma ferramenta cadastrada.</TableCell>
+                  <TableCell colSpan={7} className="text-center">Nenhuma ferramenta cadastrada.</TableCell>
                 </TableRow>
               )}
             </TableBody>
