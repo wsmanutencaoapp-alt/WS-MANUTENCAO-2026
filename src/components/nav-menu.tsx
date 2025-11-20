@@ -8,6 +8,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -15,6 +21,7 @@ import {
 } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
+import { Button } from './ui/button';
 
 export interface NavItem {
   href: string;
@@ -95,44 +102,59 @@ export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
 
   return (
     <TooltipProvider>
-      {items.map((item) => (
-        <Tooltip key={item.href}>
-          <TooltipTrigger asChild>
-            <Link
-              href={item.subItems ? item.subItems[0].href : item.href}
-              className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
-                (pathname.startsWith(item.href)) &&
-                  'bg-accent text-accent-foreground'
-              )}
-            >
-              <item.icon className="h-5 w-5" />
-              <span className="sr-only">{item.label}</span>
-            </Link>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            <div className="flex flex-col gap-2 p-1">
-                <p className="font-semibold">{item.label}</p>
-                {item.subItems && (
-                    <div className="flex flex-col gap-1 items-start">
-                        {item.subItems.map(sub => (
-                             <Link
-                                key={sub.href}
-                                href={sub.href}
-                                className={cn(
-                                    'text-muted-foreground hover:text-foreground text-xs rounded-sm px-2 py-1',
-                                     pathname === sub.href && 'bg-primary/10 text-primary font-bold'
-                                )}
-                            >
-                                {sub.label}
-                            </Link>
-                        ))}
-                    </div>
-                )}
-            </div>
-            </TooltipContent>
-        </Tooltip>
-      ))}
+      {items.map((item) => {
+        const isActive = pathname.startsWith(item.href);
+
+        if (!item.subItems || item.subItems.length === 0) {
+          return (
+            <Tooltip key={item.href}>
+              <TooltipTrigger asChild>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
+                    isActive && 'bg-accent text-accent-foreground'
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span className="sr-only">{item.label}</span>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">{item.label}</TooltipContent>
+            </Tooltip>
+          );
+        }
+
+        return (
+          <DropdownMenu key={item.href}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={isActive ? 'secondary' : 'ghost'}
+                    size="icon"
+                    className={cn(
+                        'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
+                        isActive && 'bg-accent text-accent-foreground'
+                    )}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span className="sr-only">{item.label}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right">{item.label}</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent side="right" align="start">
+              {item.subItems.map((subItem) => (
+                <DropdownMenuItem key={subItem.href} asChild>
+                  <Link href={subItem.href}>{subItem.label}</Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      })}
     </TooltipProvider>
   );
 }
