@@ -35,6 +35,7 @@ import { signOut } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { doc } from 'firebase/firestore';
 import { NavMenu, NavItem } from '@/components/nav-menu';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 
 const navItems: NavItem[] = [
@@ -142,6 +143,7 @@ export function Header() {
           </nav>
         </SheetContent>
       </Sheet>
+       <SidebarTrigger className="hidden md:flex" />
       <div className="relative ml-auto flex-1 md:grow-0">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input

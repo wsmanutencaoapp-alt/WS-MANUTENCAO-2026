@@ -2,12 +2,6 @@
 
 import Link from 'next/link';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -15,6 +9,9 @@ import {
 } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
+import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { useSidebar } from '@/components/ui/sidebar';
+
 
 export interface NavItem {
   href: string;
@@ -33,6 +30,8 @@ interface NavMenuProps {
 }
 
 export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
+    const { state } = useSidebar();
+    
     if (isMobile) {
     return (
       <Accordion type="multiple" className="w-full">
@@ -95,74 +94,57 @@ export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
 
   // Desktop Version uses Accordion now.
   return (
-    <TooltipProvider>
-      <Accordion type="multiple" className="w-full flex flex-col items-center gap-1">
-        {items.map((item) => {
-          const isActive = item.subItems
-            ? pathname.startsWith(item.href)
-            : pathname === item.href;
+    <Accordion type="multiple" className="w-full space-y-1">
+    {items.map((item) => {
+        const isActive = item.subItems ? pathname.startsWith(item.href) : pathname === item.href;
 
-          if (!item.subItems || item.subItems.length === 0) {
-            return (
-              <Tooltip key={item.href}>
-                <TooltipTrigger asChild>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
-                      isActive && 'bg-accent text-accent-foreground'
-                    )}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    <span className="sr-only">{item.label}</span>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
-              </Tooltip>
-            );
-          }
+        if (!item.subItems || item.subItems.length === 0) {
+        return (
+            <SidebarMenuItem key={item.href}>
+            <Link href={item.href}>
+                <SidebarMenuButton 
+                    isActive={isActive}
+                    tooltip={{children: item.label}}
+                >
+                <item.icon />
+                <span className={cn(state === 'collapsed' && "hidden")}>{item.label}</span>
+                </SidebarMenuButton>
+            </Link>
+            </SidebarMenuItem>
+        );
+        }
 
-          return (
-            <AccordionItem value={item.href} key={item.href} className="border-b-0 w-full">
-               <Tooltip>
-                <TooltipTrigger asChild>
-                    <AccordionTrigger 
-                        showChevron={false} 
+        return (
+        <AccordionItem value={item.href} key={item.href} className="border-b-0">
+            <AccordionTrigger asChild>
+                <SidebarMenuButton 
+                    isActive={isActive}
+                    className="[&>svg:last-child]:data-[state=open]:-rotate-90"
+                    tooltip={{children: item.label}}
+                >
+                    <item.icon />
+                    <span className={cn(state === 'collapsed' && "hidden")}>{item.label}</span>
+                </SidebarMenuButton>
+            </AccordionTrigger>
+            <AccordionContent asChild>
+                <div className={cn("pt-1 pl-6 space-y-1", state === 'collapsed' && "hidden")}>
+                    {item.subItems.map((subItem) => (
+                    <Link
+                        key={subItem.href}
+                        href={subItem.href}
                         className={cn(
-                            'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8 hover:no-underline',
-                            isActive && 'bg-accent text-accent-foreground'
+                        'block rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground',
+                        pathname === subItem.href && 'bg-accent text-accent-foreground font-medium'
                         )}
                     >
-                        <item.icon className="h-5 w-5" />
-                        <span className="sr-only">{item.label}</span>
-                    </AccordionTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
-              </Tooltip>
-              <AccordionContent className="pt-2 flex flex-col gap-1 items-center">
-                 {item.subItems.map((subItem) => (
-                   <Tooltip key={subItem.href}>
-                        <TooltipTrigger asChild>
-                            <Link
-                                href={subItem.href}
-                                className={cn(
-                                    'flex h-8 w-8 items-center justify-center rounded-md text-xs text-muted-foreground transition-colors hover:text-foreground',
-                                    pathname === subItem.href && 'bg-accent/70 text-accent-foreground'
-                                )}
-                            >
-                               {/* Mostra as duas primeiras letras do label */}
-                               {subItem.label.substring(0, 2)}
-                               <span className="sr-only">{subItem.label}</span>
-                            </Link>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">{subItem.label}</TooltipContent>
-                   </Tooltip>
-                ))}
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
-    </TooltipProvider>
+                        {subItem.label}
+                    </Link>
+                    ))}
+                </div>
+            </AccordionContent>
+        </AccordionItem>
+        );
+    })}
+    </Accordion>
   );
 }
