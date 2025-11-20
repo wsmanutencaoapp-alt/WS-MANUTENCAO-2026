@@ -1,18 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   Send,
   Box,
   Wrench,
-  BarChart3,
   PanelLeft,
   Search,
   Settings,
   LogIn,
   LogOut,
   UserPlus,
+  Thermometer,
+  ShoppingCart,
+  Landmark,
+  Users,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -27,7 +30,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useUser, useAuth, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,9 +37,14 @@ import { doc } from 'firebase/firestore';
 
 
 const navItems = [
-  { href: '/dashboard', icon: Box, label: 'Suprimentos' },
-  { href: '/dashboard/tools', icon: Wrench, label: 'Ferramentas' },
-  { href: '/dashboard/reports', icon: BarChart3, label: 'Relatórios' },
+    { href: '/dashboard', icon: Box, label: 'Suprimentos' },
+    { href: '/dashboard/ferramentaria', icon: Wrench, label: 'Ferramentaria' },
+    { href: '/dashboard/calibracao', icon: Thermometer, label: 'Calibração' },
+    { href: '/dashboard/compras', icon: ShoppingCart, label: 'Compras' },
+    { href: '/dashboard/financeiro', icon: Landmark, label: 'Financeiro' },
+    { href: '/dashboard/user-management', icon: Users, label: 'Usuários' },
+    { href: '/dashboard/configurador', icon: SlidersHorizontal, label: 'Configurador' },
+    { href: '/dashboard/settings', icon: Settings, label: 'Seu Perfil' },
 ];
 
 
@@ -90,22 +97,13 @@ export function Header() {
                 href={item.href}
                 className={cn(
                   'flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground',
-                   pathname === item.href && 'text-foreground'
+                   pathname.startsWith(item.href) && 'text-foreground'
                 )}
               >
                 <item.icon className="h-5 w-5" />
                 {item.label}
               </Link>
             ))}
-             <Link
-                href="/dashboard/settings"
-                className={cn('flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground',
-                   pathname === '/dashboard/settings' && 'text-foreground'
-                )}
-              >
-                <Settings className="h-5 w-5" />
-                Configurações
-              </Link>
           </nav>
         </SheetContent>
       </Sheet>

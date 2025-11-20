@@ -2,7 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Send, Box, Wrench, BarChart3, Settings } from 'lucide-react';
+import {
+  Send,
+  Box,
+  Wrench,
+  Thermometer,
+  Settings,
+  ShoppingCart,
+  Landmark,
+  Users,
+  SlidersHorizontal,
+} from 'lucide-react';
 
 import {
   Tooltip,
@@ -14,9 +24,17 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', icon: Box, label: 'Suprimentos' },
-  { href: '/dashboard/tools', icon: Wrench, label: 'Ferramentas' },
-  { href: '/dashboard/reports', icon: BarChart3, label: 'Relatórios' },
+  { href: '/dashboard/ferramentaria', icon: Wrench, label: 'Ferramentaria' },
+  { href: '/dashboard/calibracao', icon: Thermometer, label: 'Calibração' },
+  { href: '/dashboard/compras', icon: ShoppingCart, label: 'Compras' },
+  { href: '/dashboard/financeiro', icon: Landmark, label: 'Financeiro' },
 ];
+
+const bottomNavItems = [
+    { href: '/dashboard/user-management', icon: Users, label: 'Usuários' },
+    { href: '/dashboard/configurador', icon: SlidersHorizontal, label: 'Configurador' },
+    { href: '/dashboard/settings', icon: Settings, label: 'Seu Perfil' },
+]
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -39,8 +57,8 @@ export function AppSidebar() {
                   href={item.href}
                   className={cn(
                     'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
-                    pathname.startsWith(item.href) && item.href !== '/dashboard' && 'bg-accent text-accent-foreground',
-                    pathname === '/dashboard' && item.href === '/dashboard' && 'bg-accent text-accent-foreground'
+                    (pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/dashboard')) &&
+                      'bg-accent text-accent-foreground'
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -52,21 +70,23 @@ export function AppSidebar() {
           ))}
         </nav>
         <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link
-                href="/dashboard/settings"
-                className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
-                   pathname === '/dashboard/settings' && 'bg-accent text-accent-foreground'
-                )}
-              >
-                <Settings className="h-5 w-5" />
-                <span className="sr-only">Configurações</span>
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right">Configurações</TooltipContent>
-          </Tooltip>
+          {bottomNavItems.map(item => (
+            <Tooltip key={item.href}>
+                <TooltipTrigger asChild>
+                <Link
+                    href={item.href}
+                    className={cn(
+                    'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
+                    pathname.startsWith(item.href) && 'bg-accent text-accent-foreground'
+                    )}
+                >
+                    <item.icon className="h-5 w-5" />
+                    <span className="sr-only">{item.label}</span>
+                </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+            </Tooltip>
+          ))}
         </nav>
       </TooltipProvider>
     </aside>
