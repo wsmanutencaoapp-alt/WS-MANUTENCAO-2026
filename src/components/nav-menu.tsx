@@ -111,7 +111,7 @@ export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right">
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 p-1">
                 <p className="font-semibold">{item.label}</p>
                 {item.subItems && (
                     <div className="flex flex-col gap-1 items-start">
@@ -120,8 +120,8 @@ export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
                                 key={sub.href}
                                 href={sub.href}
                                 className={cn(
-                                    'text-muted-foreground hover:text-foreground text-xs',
-                                     pathname === sub.href && 'text-foreground font-bold'
+                                    'text-muted-foreground hover:text-foreground text-xs rounded-sm px-2 py-1',
+                                     pathname === sub.href && 'bg-primary/10 text-primary font-bold'
                                 )}
                             >
                                 {sub.label}
