@@ -8,12 +8,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -21,7 +15,6 @@ import {
 } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
-import { Button } from './ui/button';
 
 export interface NavItem {
   href: string;
@@ -40,7 +33,7 @@ interface NavMenuProps {
 }
 
 export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
-  if (isMobile) {
+    if (isMobile) {
     return (
       <Accordion type="multiple" className="w-full">
         {items.map((item) => {
@@ -48,7 +41,7 @@ export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
             ? pathname.startsWith(item.href)
             : pathname === item.href;
           
-          if (!item.subItems) {
+          if (!item.subItems || item.subItems.length === 0) {
             return (
               <Link
                 key={item.href}
@@ -100,61 +93,76 @@ export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
     );
   }
 
+  // Desktop Version uses Accordion now.
   return (
     <TooltipProvider>
-      {items.map((item) => {
-        const isActive = pathname.startsWith(item.href);
+      <Accordion type="multiple" className="w-full flex flex-col items-center gap-1">
+        {items.map((item) => {
+          const isActive = item.subItems
+            ? pathname.startsWith(item.href)
+            : pathname === item.href;
 
-        if (!item.subItems || item.subItems.length === 0) {
-          return (
-            <Tooltip key={item.href}>
-              <TooltipTrigger asChild>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
-                    isActive && 'bg-accent text-accent-foreground'
-                  )}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span className="sr-only">{item.label}</span>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">{item.label}</TooltipContent>
-            </Tooltip>
-          );
-        }
-
-        return (
-          <DropdownMenu key={item.href}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant={isActive ? 'secondary' : 'ghost'}
-                    size="icon"
+          if (!item.subItems || item.subItems.length === 0) {
+            return (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={item.href}
                     className={cn(
-                        'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
-                        isActive && 'bg-accent text-accent-foreground'
+                      'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8',
+                      isActive && 'bg-accent text-accent-foreground'
                     )}
                   >
                     <item.icon className="h-5 w-5" />
                     <span className="sr-only">{item.label}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right">{item.label}</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent side="right" align="start">
-              {item.subItems.map((subItem) => (
-                <DropdownMenuItem key={subItem.href} asChild>
-                  <Link href={subItem.href}>{subItem.label}</Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      })}
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+            );
+          }
+
+          return (
+            <AccordionItem value={item.href} key={item.href} className="border-b-0 w-full">
+               <Tooltip>
+                <TooltipTrigger asChild>
+                    <AccordionTrigger 
+                        showChevron={false} 
+                        className={cn(
+                            'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8 hover:no-underline',
+                            isActive && 'bg-accent text-accent-foreground'
+                        )}
+                    >
+                        <item.icon className="h-5 w-5" />
+                        <span className="sr-only">{item.label}</span>
+                    </AccordionTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+              <AccordionContent className="pt-2 flex flex-col gap-1 items-center">
+                 {item.subItems.map((subItem) => (
+                   <Tooltip key={subItem.href}>
+                        <TooltipTrigger asChild>
+                            <Link
+                                href={subItem.href}
+                                className={cn(
+                                    'flex h-8 w-8 items-center justify-center rounded-md text-xs text-muted-foreground transition-colors hover:text-foreground',
+                                    pathname === subItem.href && 'bg-accent/70 text-accent-foreground'
+                                )}
+                            >
+                               {/* Mostra as duas primeiras letras do label */}
+                               {subItem.label.substring(0, 2)}
+                               <span className="sr-only">{subItem.label}</span>
+                            </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{subItem.label}</TooltipContent>
+                   </Tooltip>
+                ))}
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
     </TooltipProvider>
   );
 }

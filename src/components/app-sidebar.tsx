@@ -75,7 +75,7 @@ export function AppSidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
-        <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
+        <div className="flex flex-col items-center gap-4 px-2 sm:py-5">
           <Link
             href="/dashboard"
             className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
@@ -84,7 +84,7 @@ export function AppSidebar() {
             <span className="sr-only">AeroTrack</span>
           </Link>
           <NavMenu items={navItems} pathname={pathname} />
-        </nav>
+        </div>
         <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
           <NavMenu items={bottomNavItems} pathname={pathname} />
         </nav>
