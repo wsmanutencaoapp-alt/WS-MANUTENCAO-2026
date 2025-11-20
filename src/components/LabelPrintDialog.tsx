@@ -50,7 +50,7 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
             format: "CODE128",
             displayValue: false, // Hide text value under the barcode
             width: 1.5,
-            height: 40,
+            height: 35,
             margin: 0,
         });
     } catch(e) {
@@ -61,27 +61,32 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     
     // Extract the generated barcode content
     const barcodeSvgContent = svgContainer.innerHTML;
+    const barcodeWidth = svgContainer.getAttribute('width');
 
-    // Construct the full label SVG
+    // Construct the full label SVG with the new layout
     return `
         <svg width="50mm" height="25mm" viewBox="0 0 189 94.5" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc;">
             <style>
-                .name { font: bold 12px sans-serif; }
-                .details { font: 10px sans-serif; }
+                .name { font: bold 12px sans-serif; text-anchor: middle; }
+                .details { font: 9px sans-serif; text-anchor: middle; }
                 .barcode-text { font: 10px sans-serif; text-anchor: middle; }
             </style>
-            <text x="5" y="15" class="name">${name.length > 25 ? name.substring(0, 22) + '...' : name}</text>
             
-            <g transform="translate(94.5, 55)">
-                <g transform="translate(-${svgContainer.getAttribute('width')! / 2}, -20)">
+            <!-- Tool Name (Description) -->
+            <text x="94.5" y="15" class="name">${name.length > 28 ? name.substring(0, 25) + '...' : name}</text>
+            
+            <!-- Barcode and its text value -->
+            <g transform="translate(94.5, 45)">
+                <g transform="translate(-${Number(barcodeWidth) / 2}, -17.5)">
                     ${barcodeSvgContent}
                 </g>
-                <text x="0" y="25" class="barcode-text">${uniqueBarcodeValue}</text>
+                <text x="0" y="28" class="barcode-text">${uniqueBarcodeValue}</text>
             </g>
 
-            <text x="5" y="85" class="details">Lote/Unid.: ${unitCode}</text>
-            
-            ${enderecamento ? `<text x="110" y="85" class="details" text-anchor="start">Local: ${enderecamento}</text>` : ''}
+            <!-- Bottom details: Lote and Endereçamento -->
+            <text x="94.5" y="88" class="details">
+                Lote/Unid.: ${unitCode} ${enderecamento ? `| Local: ${enderecamento}` : ''}
+            </text>
         </svg>
     `;
 };
