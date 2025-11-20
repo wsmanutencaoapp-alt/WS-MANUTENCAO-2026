@@ -141,24 +141,16 @@ const Equipamentos = () => {
       toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado ou falha na conexão com os serviços." });
       return;
     }
-  
+
     setIsSaving(true);
     const numUnits = newFerramenta.quantidade_estoque;
-  
+    const insertedTools: Ferramenta[] = [];
+
     try {
-      const insertedTools: Ferramenta[] = [];
-  
       for (let i = 0; i < numUnits; i++) {
-        let imageUrl = "https://picsum.photos/seed/tool/200/200";
-
-        // Gerar um ID de documento primeiro para usar no nome da imagem
-        const tempDocRef = doc(collection(firestore, 'tools'));
-
-        if (previewImage) {
-            const imageRef = storageRef(storage, `tool_images/${tempDocRef.id}`);
-            await uploadString(imageRef, previewImage, 'data_url');
-            imageUrl = await getDownloadURL(imageRef);
-        }
+        // Gerar um ID de documento primeiro
+        const toolDocRef = doc(collection(firestore, 'tools'));
+        const codigo = `TOOL-${toolDocRef.id.substring(0, 4).toUpperCase()}`;
 
         const toolData = {
           name: newFerramenta.name,
@@ -169,38 +161,55 @@ const Equipamentos = () => {
           lastCalibration: 'N/A',
           calibratedBy: 'N/A',
           serialNumber: `SN-${Date.now()}-${i}`,
-          imageUrl: imageUrl,
+          imageUrl: "https://picsum.photos/seed/tool/200/200", // Placeholder inicial
           imageHint: "tool",
+          codigo: codigo,
         };
 
-        // Agora, em vez de `addDoc`, usamos `setDoc` com a referência que já temos
-        await setDoc(tempDocRef, toolData).catch(error => {
+        // Salva o documento no Firestore imediatamente com a imagem de placeholder
+        await setDoc(toolDocRef, toolData).catch(error => {
           errorEmitter.emit(
             'permission-error',
             new FirestorePermissionError({
-              path: `tools/${tempDocRef.id}`,
+              path: toolDocRef.path,
               operation: 'create',
               requestResourceData: toolData,
             })
           );
-          throw error;
+          throw error; // Propaga o erro para o bloco catch principal
         });
-        
-        const codigo = `TOOL-${tempDocRef.id.substring(0, 4).toUpperCase()}`;
-        await updateDoc(tempDocRef, { codigo: codigo });
 
-        insertedTools.push({ ...newFerramenta, id: tempDocRef.id, codigo, imageUrl } as Ferramenta);
+        // Se houver uma imagem para upload, faz o upload em segundo plano
+        if (previewImage) {
+          const imageRef = storageRef(storage, `tool_images/${toolDocRef.id}`);
+          uploadString(imageRef, previewImage, 'data_url')
+            .then(snapshot => getDownloadURL(snapshot.ref))
+            .then(downloadURL => {
+              // Atualiza o documento com a URL da imagem real
+              updateDoc(toolDocRef, { imageUrl: downloadURL });
+            })
+            .catch(error => {
+              console.error("Erro no upload da imagem:", error);
+              // O erro é registrado, mas o cadastro da ferramenta não é interrompido
+              toast({
+                variant: 'destructive',
+                title: 'Erro de Upload',
+                description: `A ferramenta ${codigo} foi salva, mas o upload da imagem falhou.`,
+              });
+            });
+        }
+        
+        insertedTools.push({ ...newFerramenta, id: toolDocRef.id, codigo, imageUrl: toolData.imageUrl } as Ferramenta);
       }
-      
-      toast({ title: "Sucesso!", description: `${numUnits} equipamento(s) cadastrado(s).` });
+
+      toast({ title: "Sucesso!", description: `${numUnits} equipamento(s) sendo processado(s).` });
       
       resetForm();
       setToolsToConfirm(insertedTools);
       setIsConfirmationDialogOpen(true);
       setIsDialogOpen(false);
-  
+
     } catch (error) {
-      // O erro de permissão já foi emitido, não precisa de toast aqui.
       if (!(error instanceof FirestorePermissionError)) {
         console.error("Erro ao salvar ferramenta:", error);
         toast({ variant: "destructive", title: "Erro ao Salvar", description: "Não foi possível cadastrar o equipamento." });
