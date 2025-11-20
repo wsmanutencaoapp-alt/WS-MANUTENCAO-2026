@@ -32,13 +32,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages access to the employee ID counter.
-     * @path /counters/employees
-     * @allow (read): Authenticated users can read the counter.
-     * @allow (write): Only used in a transaction during user creation.
-     * @principle Allows authenticated users to read and update the counter for new user registration.
+     * @description Manages access to counters used for sequential IDs.
+     * @path /counters/{counterId}
+     * @allow (read, write): Authenticated users can read and update counters.
+     * @principle Allows for transactional updates to generate sequential IDs.
      */
-    match /counters/employees {
+    match /counters/{counterId} {
       allow read, write: if isSignedIn();
     }
 
