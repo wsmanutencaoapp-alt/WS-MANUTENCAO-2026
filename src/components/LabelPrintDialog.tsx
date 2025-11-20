@@ -67,19 +67,20 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     return `
         <svg width="50mm" height="25mm" viewBox="0 0 189 94.5" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc;">
             <style>
-                .name { font: bold 10px sans-serif; text-anchor: middle; }
+                .name { font: bold 9px sans-serif; text-anchor: middle; }
                 .details { font: 8px sans-serif; text-anchor: middle; }
-                .barcode-text { font: 10px sans-serif; text-anchor: middle; }
+                .barcode-text { font: 9px sans-serif; text-anchor: middle; }
             </style>
             
-            <!-- Top Information: Name and Details -->
-            <text x="94.5" y="12" class="name">${name.length > 35 ? name.substring(0, 32) + '...' : name}</text>
-            <text x="94.5" y="24" class="details">
+            <!-- Top Information -->
+            <text x="94.5" y="11" class="name">${name.length > 35 ? name.substring(0, 32) + '...' : name}</text>
+            <text x="94.5" y="21" class="details">Código: ${codigo}</text>
+            <text x="94.5" y="31" class="details">
                 Lote/Unid.: ${unitCode} ${enderecamento ? `| Local: ${enderecamento}` : ''}
             </text>
 
             <!-- Barcode and its text value, centered in the remaining space -->
-            <g transform="translate(94.5, 60)">
+            <g transform="translate(94.5, 63)">
                 <g transform="translate(-${Number(barcodeWidth) / 2}, -17.5)">
                     ${barcodeSvgContent}
                 </g>
