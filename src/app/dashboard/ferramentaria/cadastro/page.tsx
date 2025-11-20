@@ -246,20 +246,21 @@ const Equipamentos = () => {
   };
 
   const handleFinalizeCadastro = () => {
-    // Aqui você pode acionar a impressão
+    // Aciona a impressão
     setToolsToLabel(toolsToConfirm);
     setIsConfirmationDialogOpen(false);
     setToolsToConfirm([]);
   };
 
   const handleOpenReprintDialog = (tool: Ferramenta) => {
-    setToolToReprint({ id: tool.id, codigo: tool.codigo, nome: tool.name, label_url: tool.label_url });
+    setToolToReprint({ id: tool.id, codigo: tool.codigo, nome: tool.name, label_url: tool.label_url, unitCode: tool.unitCode, enderecamento: tool.enderecamento });
     setIsReprintDialogOpen(true);
   };
   
-  const handleReprintConfirmed = async (tool: ToolLabelData) => {
+  const handleReprintConfirmed = (tools: ToolLabelData[]) => {
+    setToolsToLabel(tools);
     setIsReprintDialogOpen(false);
-    toast({ title: "Reimpressão", description: `Etiqueta para ${tool.codigo} será gerada.` });
+    setToolToReprint(null);
   };
   
   const handleOpenDetails = (tool: Ferramenta) => {
