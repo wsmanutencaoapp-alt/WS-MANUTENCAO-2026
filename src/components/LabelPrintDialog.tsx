@@ -42,46 +42,46 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     try {
         JsBarcode(barcodeSvg, uniqueBarcodeValue, {
             format: "CODE128",
-            displayValue: false, // Do not display text value under the barcode
-            width: 1.5, 
-            height: 40,
+            displayValue: false,
+            width: 1,      // Largura da barra reduzida
+            height: 20,    // Altura do código de barras reduzida
             margin: 0,
         });
     } catch(e) {
         console.error("JsBarcode error:", e);
-        return `<svg width="100mm" height="60mm"><text x="10" y="10" fill="red">Barcode Error</text></svg>`;
+        // Retorna um SVG com as dimensões corretas em caso de erro
+        return `<svg width="55mm" height="25mm"><text x="5" y="10" fill="red" font-size="8">Barcode Error</text></svg>`;
     }
     
     const barcodeSvgContent = barcodeSvg.innerHTML;
     const barcodeWidth = parseFloat(barcodeSvg.getAttribute('width') || '0');
 
-    // Label dimensions: 100mm x 60mm. (378 x 227 viewBox units)
-    const labelWidth = 378;
-    const labelHeight = 227;
+    // Novas dimensões: 55mm x 25mm. (ViewBox aproximado: 208 x 95)
+    const labelWidth = 208;
+    const labelHeight = 95;
     
-    // Position text at the top
-    const textBlockY = 30; 
-    
-    // Calculate barcode position to center it in the remaining space
-    const textBlockHeight = 60; // Estimated height for the text block
-    const remainingHeight = labelHeight - textBlockHeight;
-    const barcodeGroupYPosition = textBlockHeight + (remainingHeight / 2) - 20; // Center barcode vertically
+    // Posições e tamanhos ajustados
+    const textY = 18;
+    const barcodeGroupY = 32;
+
+    const barcodeX = (labelWidth - barcodeWidth) / 2;
+
+    // Trunca o nome da ferramenta se for muito longo
+    const truncatedName = name.length > 35 ? name.substring(0, 32) + '...' : name;
 
     return `
-        <svg width="100mm" height="60mm" viewBox="0 0 ${labelWidth} ${labelHeight}" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc;">
+        <svg width="55mm" height="25mm" viewBox="0 0 ${labelWidth} ${labelHeight}" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc; font-family: sans-serif;">
             <style>
-                .name { font: bold 16px sans-serif; text-anchor: middle; }
-                .details { font: 14px sans-serif; text-anchor: middle; }
-                .barcode-text { font: 12px sans-serif; text-anchor: middle; }
+                .name { font-size: 10px; font-weight: bold; text-anchor: middle; }
+                .details { font-size: 9px; text-anchor: middle; }
             </style>
             
-            <text x="${labelWidth / 2}" y="${textBlockY}" class="name">${name.length > 40 ? name.substring(0, 37) + '...' : name}</text>
-            <text x="${labelWidth / 2}" y="${textBlockY + 20}" class="details">
-                Lote/Unid.: ${unitCode} ${enderecamento ? `| Local: ${enderecamento}` : ''}
+            <text x="${labelWidth / 2}" y="${textY}" class="name">${truncatedName}</text>
+            <text x="${labelWidth / 2}" y="${textY + 12}" class="details">
+                Cód: ${codigo} | Lote: ${unitCode} ${enderecamento ? `| Loc: ${enderecamento}` : ''}
             </text>
-             <text x="${labelWidth / 2}" y="${textBlockY + 40}" class="details">Código: ${codigo}</text>
 
-            <g transform="translate(${(labelWidth - barcodeWidth) / 2}, ${barcodeGroupYPosition})">
+            <g transform="translate(${barcodeX}, ${barcodeGroupY})">
                 ${barcodeSvgContent}
             </g>
         </svg>
@@ -142,7 +142,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
 
       generateAndSaveLabels();
     }
-  }, [isOpen, tools, toast, firestore, storage]);
+  }, [isOpen, tools, toast, firestore, storage, error]);
 
   const handlePrint = () => {
     const printableContent = printableAreaRef.current;
@@ -157,7 +157,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
     const styles = `
       @media print {
         @page { 
-          size: 100mm 60mm; 
+          size: 55mm 25mm; 
           margin: 0; 
         }
         body { 
@@ -170,8 +170,8 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           border: none !important;
           margin: 0;
           padding: 0;
-          width: 100mm;
-          height: 60mm;
+          width: 55mm;
+          height: 25mm;
           display: block;
         }
         .label-container:last-child {
