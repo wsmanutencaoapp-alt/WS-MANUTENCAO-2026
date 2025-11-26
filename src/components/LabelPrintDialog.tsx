@@ -62,7 +62,7 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     
     // Posições e tamanhos ajustados
     const textY = 18;
-    const barcodeGroupY = 32;
+    const barcodeGroupY = 45; // Ajustado para descer o código de barras
 
     const barcodeX = (labelWidth - barcodeWidth) / 2;
 
@@ -84,6 +84,7 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
             <g transform="translate(${barcodeX}, ${barcodeGroupY})">
                 ${barcodeSvgContent}
             </g>
+             <text x="${labelWidth / 2}" y="${barcodeGroupY + 30}" class="details">${uniqueBarcodeValue}</text>
         </svg>
     `;
 };
@@ -165,8 +166,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           -webkit-print-color-adjust: exact;
         }
         .label-container {
-          page-break-inside: avoid;
-          page-break-after: always;
+          page-break-before: always;
           border: none !important;
           margin: 0;
           padding: 0;
@@ -174,8 +174,8 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           height: 25mm;
           display: block;
         }
-        .label-container:last-child {
-          page-break-after: auto;
+        .label-container:first-child {
+          page-break-before: auto;
         }
       }
     `;
