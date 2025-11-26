@@ -43,48 +43,44 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
         JsBarcode(barcodeSvg, uniqueBarcodeValue, {
             format: "CODE128",
             displayValue: false,
-            width: 1,      // Largura da barra reduzida
-            height: 20,    // Altura do código de barras reduzida
+            width: 1,
+            height: 18, // Altura reduzida
             margin: 0,
         });
     } catch(e) {
         console.error("JsBarcode error:", e);
-        // Retorna um SVG com as dimensões corretas em caso de erro
         return `<svg width="55mm" height="25mm"><text x="5" y="10" fill="red" font-size="8">Barcode Error</text></svg>`;
     }
     
     const barcodeSvgContent = barcodeSvg.innerHTML;
     const barcodeWidth = parseFloat(barcodeSvg.getAttribute('width') || '0');
 
-    // Novas dimensões: 55mm x 25mm. (ViewBox aproximado: 208 x 95)
+    // Dimensões: 55mm x 25mm. (ViewBox aproximado: 208 x 95)
     const labelWidth = 208;
     const labelHeight = 95;
     
-    // Posições e tamanhos ajustados
-    const textY = 18;
-    const barcodeGroupY = 45; // Ajustado para descer o código de barras
-
     const barcodeX = (labelWidth - barcodeWidth) / 2;
 
     // Trunca o nome da ferramenta se for muito longo
-    const truncatedName = name.length > 35 ? name.substring(0, 32) + '...' : name;
+    const truncatedName = name.length > 38 ? name.substring(0, 35) + '...' : name;
 
     return `
         <svg width="55mm" height="25mm" viewBox="0 0 ${labelWidth} ${labelHeight}" xmlns="http://www.w3.org/2000/svg" style="background-color:white; border: 1px solid #ccc; font-family: sans-serif;">
             <style>
-                .name { font-size: 10px; font-weight: bold; text-anchor: middle; }
-                .details { font-size: 9px; text-anchor: middle; }
+                .name { font-size: 9.5px; font-weight: bold; text-anchor: middle; }
+                .details { font-size: 8.5px; text-anchor: middle; }
+                .barcode-text { font-size: 8px; text-anchor: middle; }
             </style>
             
-            <text x="${labelWidth / 2}" y="${textY}" class="name">${truncatedName}</text>
-            <text x="${labelWidth / 2}" y="${textY + 12}" class="details">
+            <text x="${labelWidth / 2}" y="15" class="name">${truncatedName}</text>
+            <text x="${labelWidth / 2}" y="30" class="details">
                 Cód: ${codigo} | Lote: ${unitCode} ${enderecamento ? `| Loc: ${enderecamento}` : ''}
             </text>
 
-            <g transform="translate(${barcodeX}, ${barcodeGroupY})">
+            <g transform="translate(${barcodeX}, 42)">
                 ${barcodeSvgContent}
             </g>
-             <text x="${labelWidth / 2}" y="${barcodeGroupY + 30}" class="details">${uniqueBarcodeValue}</text>
+             <text x="${labelWidth / 2}" y="78" class="barcode-text">${uniqueBarcodeValue}</text>
         </svg>
     `;
 };
