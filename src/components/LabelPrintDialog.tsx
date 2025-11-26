@@ -153,10 +153,6 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
     
     const styles = `
       @media print {
-        @page { 
-          size: 55mm 25mm; 
-          margin: 0; 
-        }
         body { 
           margin: 0;
           -webkit-print-color-adjust: exact;
