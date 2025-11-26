@@ -42,9 +42,9 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     try {
         JsBarcode(barcodeSvg, uniqueBarcodeValue, {
             format: "CODE128",
-            displayValue: false,
-            width: 1.2,
-            height: 20,
+            displayValue: false, // O texto abaixo do código de barras foi removido.
+            width: 1,      // Largura da barra diminuída (era 1.2)
+            height: 18,    // Altura diminuída (era 20)
             margin: 0,
         });
     } catch(e) {
@@ -61,25 +61,23 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     
     const barcodeX = (labelWidth - barcodeWidth) / 2;
 
-    const truncatedName = name.length > 35 ? name.substring(0, 32) + '...' : name;
+    const truncatedName = name.length > 40 ? name.substring(0, 37) + '...' : name;
 
     return `
         <svg width="55mm" height="25mm" viewBox="0 0 ${labelWidth} ${labelHeight}" xmlns="http://www.w3.org/2000/svg" style="background-color:white; font-family: sans-serif;">
             <style>
-                .name { font-size: 10px; font-weight: bold; text-anchor: middle; }
-                .details { font-size: 9px; text-anchor: middle; }
-                .barcode-text { font-size: 8px; text-anchor: middle; }
+                .name { font-size: 9px; font-weight: bold; text-anchor: middle; }
+                .details { font-size: 8px; text-anchor: middle; }
             </style>
             
-            <text x="${labelWidth / 2}" y="16" class="name">${truncatedName}</text>
-            <text x="${labelWidth / 2}" y="32" class="details">
+            <text x="${labelWidth / 2}" y="18" class="name">${truncatedName}</text>
+            <text x="${labelWidth / 2}" y="36" class="details">
                 Cód: ${codigo} | Lote: ${unitCode} ${enderecamento ? `| Loc: ${enderecamento}` : ''}
             </text>
 
-            <g transform="translate(${barcodeX}, 40)">
+            <g transform="translate(${barcodeX}, 45)">
                 ${barcodeSvgContent}
             </g>
-             <text x="${labelWidth / 2}" y="78" class="barcode-text">${uniqueBarcodeValue}</text>
         </svg>
     `;
 };
@@ -169,8 +167,6 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
         width: 55mm;
         height: 25mm;
         display: block;
-        page-break-before: auto;
-        page-break-after: avoid;
         page-break-inside: avoid;
       }
     `;
