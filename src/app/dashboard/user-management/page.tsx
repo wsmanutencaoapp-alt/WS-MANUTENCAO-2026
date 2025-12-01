@@ -46,7 +46,7 @@ function UserRow({ employee }: { employee: Employee }) {
         </div>
       </TableCell>
       <TableCell>{employee.id}</TableCell>
-      <TableCell></TableCell> {/* Célula em branco para a nova coluna ID */}
+      <TableCell>&nbsp;</TableCell>
       <TableCell>
         <Badge variant={employee.accessLevel === 'Admin' ? 'default' : 'secondary'}>
           {employee.accessLevel === 'Admin' && <ShieldCheck className="mr-1 h-3.5 w-3.5" />}
@@ -81,7 +81,7 @@ function UserListSkeleton() {
               </div>
             </TableCell>
             <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
-            <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell> {/* Skeleton para a nova coluna ID */}
+            <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
             <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
           </TableRow>
         ))}
@@ -191,7 +191,7 @@ export default function UserManagementPage() {
                         </div>
                       </TableCell>
                       <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell> {/* Skeleton para a nova coluna ID */}
+                      <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
                     </TableRow>
                   ))
