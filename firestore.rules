@@ -82,45 +82,4 @@ service cloud.firestore {
      * @path /operation_records/{operationRecordId}
      * @allow (read): Authenticated users can read any operation record.
      * @allow (create): Authenticated users can create operation records.
-     * @allow (update): Authenticated users can update operation records.
-     * @allow (delete): Authenticated users can delete operation records.
-     */
-    match /operation_records/{operationRecordId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Manages access to images.
-     * @path /images/{imageId}
-     * @allow (read): Authenticated users can read any image.
-     * @allow (create): Authenticated users can create images.
-     * @allow (update): Authenticated users can update images.
-     * @allow (delete): Authenticated users can delete images.
-     */
-    match /images/{imageId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Manages access to employee data.
-     * @path /employees/{employeeId}
-     * @allow (list): Only administrators can list all employees.
-     * @allow (get): Authenticated users can read any single employee's profile.
-     * @allow (create): A new employee document can be created if the UID in the document matches the authenticated user's UID.
-     * @allow (update): An employee can update their own document (but not protected fields), or an admin can update anyone's.
-     * @allow (delete): Not allowed for safety.
-     */
-    match /employees/{employeeId} {
-      allow list: if isAdmin();
-      allow get: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow update: if (isOwner(employeeId) && 
-                      request.resource.data.id == resource.data.id &&
-                      request.resource.data.uid == resource.data.uid &&
-                      request.resource.data.email == resource.data.email &&
-                      request.resource.data.accessLevel == resource.data.accessLevel) 
-                    || isAdmin();
-      allow delete: if false; 
-    }
-  }
-}
+     * @allow (update): Authenticated users can update operation records
