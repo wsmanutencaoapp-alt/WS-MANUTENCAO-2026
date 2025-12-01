@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, query, orderBy } from 'firebase/firestore';
+import { collection, doc, query, orderBy, updateDoc } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -21,9 +21,23 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, ShieldCheck } from 'lucide-react';
-import type { Employee } from '@/lib/types';
+import { AlertTriangle, ShieldCheck, Check } from 'lucide-react';
+import type { Employee, Permissions } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
+
+const availableScreens = [
+    { id: 'ferramentaria', label: 'Ferramentaria (Módulo)' },
+    { id: 'suprimentos', label: 'Suprimentos (Módulo)' },
+    { id: 'compras', label: 'Compras (Módulo)' },
+    { id: 'financeiro', label: 'Financeiro (Módulo)' },
+    { id: 'configurador', label: 'Configurador (Módulo)' },
+    { id: 'userManagement', label: 'Gerenciar Usuários' },
+];
 
 
 function getInitials(firstName?: string, lastName?: string) {
@@ -33,6 +47,39 @@ function getInitials(firstName?: string, lastName?: string) {
 }
 
 function UserRow({ employee }: { employee: WithDocId<Employee> }) {
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  
+  const handlePermissionChange = async (screenId: string, checked: boolean | 'indeterminate') => {
+    if (typeof checked !== 'boolean' || !firestore) return;
+
+    const employeeRef = doc(firestore, 'employees', employee.docId);
+    const newPermissions = {
+      ...employee.permissions,
+      [screenId]: checked,
+    };
+    
+    try {
+        await updateDoc(employeeRef, {
+            permissions: newPermissions
+        });
+        toast({
+            title: "Permissão atualizada!",
+            description: `Acesso à tela de ${screenId} foi ${checked ? 'concedido' : 'revogado'}.`,
+        });
+    } catch (error) {
+       errorEmitter.emit(
+        'permission-error',
+        new FirestorePermissionError({
+          path: employeeRef.path,
+          operation: 'update',
+          requestResourceData: { permissions: newPermissions },
+        })
+      );
+    }
+  };
+
+
   return (
     <TableRow>
       <TableCell>
@@ -47,13 +94,31 @@ function UserRow({ employee }: { employee: WithDocId<Employee> }) {
           </div>
         </div>
       </TableCell>
-      <TableCell>{employee.docId}</TableCell>
-      <TableCell>{employee.id}</TableCell>
-      <TableCell>
+       <TableCell>
         <Badge variant={employee.accessLevel === 'Admin' ? 'default' : 'secondary'}>
           {employee.accessLevel === 'Admin' && <ShieldCheck className="mr-1 h-3.5 w-3.5" />}
           {employee.accessLevel}
         </Badge>
+      </TableCell>
+      <TableCell>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            {availableScreens.map(screen => (
+                 <div key={screen.id} className="flex items-center space-x-2">
+                    <Checkbox
+                        id={`${employee.docId}-${screen.id}`}
+                        checked={employee.permissions?.[screen.id] || false}
+                        onCheckedChange={(checked) => handlePermissionChange(screen.id, checked)}
+                        disabled={employee.accessLevel === 'Admin'}
+                    />
+                    <label
+                        htmlFor={`${employee.docId}-${screen.id}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                       {screen.label}
+                    </label>
+                </div>
+            ))}
+          </div>
       </TableCell>
     </TableRow>
   );
@@ -65,9 +130,8 @@ function UserListSkeleton() {
       <TableHeader>
         <TableRow>
           <TableHead>Usuário</TableHead>
-          <TableHead>EMPLOYEE</TableHead>
-          <TableHead>ID do usuário</TableHead>
           <TableHead>Nível de Acesso</TableHead>
+          <TableHead>Acesso às Telas</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -82,9 +146,17 @@ function UserListSkeleton() {
                 </div>
               </div>
             </TableCell>
-            <TableCell><Skeleton className="h-4 w-[250px]" /></TableCell>
-            <TableCell><Skeleton className="h-4 w-[70px]" /></TableCell>
             <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
+             <TableCell>
+                <div className="grid grid-cols-2 gap-4">
+                    {[...Array(6)].map((_, j) => (
+                        <div key={j} className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-4" />
+                            <Skeleton className="h-4 w-24" />
+                        </div>
+                    ))}
+                </div>
+             </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -174,27 +246,34 @@ export default function UserManagementPage() {
             <TableHeader>
                 <TableRow>
                   <TableHead>Usuário</TableHead>
-                  <TableHead>EMPLOYEE</TableHead>
-                  <TableHead>ID do usuário</TableHead>
                   <TableHead>Nível de Acesso</TableHead>
+                  <TableHead className="w-1/2">Acesso às Telas</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {(areEmployeesLoading || !employees) && !error && (
-                  [...Array(3)].map((_, i) => (
+                   [...Array(3)].map((_, i) => (
                      <TableRow key={`skeleton-row-${i}`}>
-                      <TableCell>
-                        <div className="flex items-center gap-4">
-                          <Skeleton className="h-10 w-10 rounded-full" />
-                          <div className="space-y-2">
-                            <Skeleton className="h-4 w-[150px]" />
-                            <Skeleton className="h-3 w-[200px]" />
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell><Skeleton className="h-4 w-[250px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[70px]" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
+                        <TableCell>
+                            <div className="flex items-center gap-4">
+                                <Skeleton className="h-10 w-10 rounded-full" />
+                                <div className="space-y-2">
+                                <Skeleton className="h-4 w-[150px]" />
+                                <Skeleton className="h-3 w-[200px]" />
+                                </div>
+                            </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
+                        <TableCell>
+                            <div className="grid grid-cols-2 gap-4">
+                                {[...Array(6)].map((_, j) => (
+                                    <div key={j} className="flex items-center gap-2">
+                                        <Skeleton className="h-4 w-4" />
+                                        <Skeleton className="h-4 w-24" />
+                                    </div>
+                                ))}
+                            </div>
+                        </TableCell>
                     </TableRow>
                   ))
                 )}

@@ -29,6 +29,10 @@ export type Tool = {
   quantidade_estoque?: number;
 };
 
+export type Permissions = {
+  [key: string]: boolean;
+};
+
 export type Employee = {
   id: number;
   uid: string;
@@ -38,4 +42,5 @@ export type Employee = {
   phone?: string | null;
   accessLevel: 'Admin' | 'Técnico' | string;
   photoURL?: string | null;
+  permissions?: Permissions;
 };
