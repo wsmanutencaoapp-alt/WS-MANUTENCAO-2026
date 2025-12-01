@@ -32,9 +32,12 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import type { WithDocId } from '@/firebase/firestore/use-collection';
+
+type DialogTool = Tool & Partial<WithDocId<Tool>>;
 
 interface ToolDetailsDialogProps {
-  tool: Tool | null;
+  tool: DialogTool | null;
   isOpen: boolean;
   onClose: () => void;
   onToolUpdated: (updatedTool: any) => void;
@@ -45,7 +48,7 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [editableTool, setEditableTool] = useState<Partial<Tool>>(tool || {});
+  const [editableTool, setEditableTool] = useState<Partial<DialogTool>>(tool || {});
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,23 +100,23 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   };
 
   const handleSaveChanges = async () => {
-    if (!firestore || !storage) {
-      toast({ variant: "destructive", title: "Erro", description: "Serviço indisponível." });
+    if (!firestore || !storage || !tool.docId) {
+      toast({ variant: "destructive", title: "Erro", description: "Serviço indisponível ou ID da ferramenta ausente." });
       return;
     }
     setIsSaving(true);
     try {
-      const toolRef = doc(firestore, 'tools', tool.id);
+      const toolRef = doc(firestore, 'tools', tool.docId);
       
       let imageUrl = tool.imageUrl;
       // Se a imagem de preview foi alterada, faz o upload da nova imagem
       if (previewImage && previewImage !== tool.imageUrl) {
-        const imageRef = storageRef(storage, `tool_images/${tool.id}`);
+        const imageRef = storageRef(storage, `tool_images/${tool.docId}`);
         const snapshot = await uploadString(imageRef, previewImage, 'data_url');
         imageUrl = await getDownloadURL(snapshot.ref);
       }
 
-      const { id, ...baseData } = editableTool;
+      const { docId, ...baseData } = editableTool;
       const dataToUpdate = {
         ...baseData,
         imageUrl: imageUrl, // usa a nova URL ou a antiga
@@ -131,15 +134,15 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   };
   
   const handleDeleteTool = async () => {
-     if (!firestore) {
-      toast({ variant: "destructive", title: "Erro", description: "Serviço indisponível." });
+     if (!firestore || !tool.docId) {
+      toast({ variant: "destructive", title: "Erro", description: "Serviço indisponível ou ID da ferramenta ausente." });
       return;
     }
     setIsDeleting(true);
      try {
-      const toolRef = doc(firestore, 'tools', tool.id);
+      const toolRef = doc(firestore, 'tools', tool.docId);
       await deleteDoc(toolRef);
-      onToolDeleted(tool.id);
+      onToolDeleted(tool.docId);
     } catch (error) {
       console.error("Erro ao excluir ferramenta:", error);
       toast({ variant: "destructive", title: "Erro", description: "Não foi possível excluir a ferramenta." });
@@ -305,3 +308,5 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     </Dialog>
   );
 }
+
+    

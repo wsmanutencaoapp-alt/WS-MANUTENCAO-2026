@@ -52,9 +52,11 @@ import Image from 'next/image';
 import ToolDetailsDialog from '@/components/ToolDetailsDialog';
 import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
+import type { WithDocId } from '@/firebase/firestore/use-collection';
+
 
 interface Ferramenta extends Tool {
-  id: string; 
+  docId: string; 
   nome: string; 
   codigo: string; 
   unitCode: string; 
@@ -66,7 +68,7 @@ interface Ferramenta extends Tool {
   label_url: string | null;
 }
 
-type ToolLabelData = Partial<Ferramenta>;
+type ToolLabelData = Partial<Ferramenta> & { id?: string };
 
 const Equipamentos = () => {
   const { user } = useUser();
@@ -205,7 +207,7 @@ const Equipamentos = () => {
         const toolDocRef = doc(collection(firestore, 'tools'));
         const unitCode = `A${(i + 1).toString().padStart(4, '0')}`;
   
-        const toolData = {
+        const toolData: Omit<Tool, 'id'> = {
           name: newFerramenta.name,
           enderecamento: newFerramenta.enderecamento,
           aeronave_principal: newFerramenta.aeronave_principal || null,
@@ -262,7 +264,7 @@ const Equipamentos = () => {
   };
 
   const handleOpenReprintDialog = (tool: Ferramenta) => {
-    setToolToReprint({ id: tool.id, codigo: tool.codigo, name: tool.name, label_url: tool.label_url, unitCode: tool.unitCode, enderecamento: tool.enderecamento });
+    setToolToReprint({ id: tool.docId, codigo: tool.codigo, name: tool.name, label_url: tool.label_url, unitCode: tool.unitCode, enderecamento: tool.enderecamento });
     setIsReprintDialogOpen(true);
   };
   
@@ -474,7 +476,7 @@ const Equipamentos = () => {
                 </TableRow>
               ) : filteredFerramentas && filteredFerramentas.length > 0 ? (
                 filteredFerramentas.map((ferramenta) => (
-                  <TableRow key={ferramenta.id}>
+                  <TableRow key={ferramenta.docId}>
                     <TableCell className="hidden sm:table-cell">
                         <button
                           onClick={() => openImagePreview(ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64")}
@@ -606,3 +608,5 @@ const Equipamentos = () => {
 };
 
 export default Equipamentos;
+
+    

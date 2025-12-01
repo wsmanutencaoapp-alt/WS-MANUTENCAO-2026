@@ -11,7 +11,7 @@ export type Supply = {
 };
 
 export type Tool = {
-  id: string;
+  id: string; // This is the Firestore document ID for new tools from forms.
   name: string;
   serialNumber: string;
   status: 'Available' | 'In Use' | 'In Calibration' | 'Disponível';
@@ -44,3 +44,5 @@ export type Employee = {
   photoURL?: string | null;
   permissions?: Permissions;
 };
+
+    
