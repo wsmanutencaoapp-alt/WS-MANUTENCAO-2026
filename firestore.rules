@@ -113,13 +113,8 @@ service cloud.firestore {
     match /employees/{employeeId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if (
-        // Condition 1: An admin can update any document.
-        isAdmin()
-      ) || (
-        // Condition 2: A user can edit their own profile...
+      allow update: if isAdmin() || (
         isOwner(employeeId) &&
-        // ...but they cannot change protected fields.
         request.resource.data.id == resource.data.id &&
         request.resource.data.uid == resource.data.uid &&
         request.resource.data.email == resource.data.email &&
