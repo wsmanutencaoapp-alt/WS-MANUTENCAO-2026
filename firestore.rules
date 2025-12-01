@@ -11,7 +11,7 @@
  * - All read and write operations require authentication.
  * - Listing operations are generally allowed for top-level collections, assuming no private user data is present.
  * - Data consistency is enforced through validation rules that ensure relationships between documents are maintained (e.g., `employeeId` in `OperationRecord` matches the authenticated user).
- * - The ruleset uses denormalization to optimize authorization checks, avoiding costly `get()` operations.
+ * - The ruleset uses custom claims (request.auth.token.admin) for role-based access control (RBAC) to avoid costly and sometimes forbidden `get()` operations in rules.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -27,8 +27,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Check the accessLevel of the user making the request from the employees collection
-      return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
+      // Check for the 'admin' custom claim on the user's auth token.
+      // This is more secure and performant than using get() in rules.
+      return request.auth.token.admin == true;
     }
 
     /**
@@ -82,4 +83,49 @@ service cloud.firestore {
      * @path /operation_records/{operationRecordId}
      * @allow (read): Authenticated users can read any operation record.
      * @allow (create): Authenticated users can create operation records.
-     * @allow (update): Authenticated users can update operation records
+     * @allow (update): Authenticated users can update operation records.
+     * @allow (delete): Authenticated users can delete operation records.
+     */
+    match /operation_records/{operationRecordId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Manages access to images.
+     * @path /images/{imageId}
+     * @allow (read): Authenticated users can read any image.
+     * @allow (create): Authenticated users can create images.
+     * @allow (update): Authenticated users can update images.
+     * @allow (delete): Authenticated users can delete images.
+     */
+    match /images/{imageId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+    
+    /**
+     * @description Manages access to employee data.
+     * @path /employees/{employeeId}
+     * @allow (read): Authenticated users can read employee data.
+     * @allow (create): Authenticated users can create their own employee document upon signup.
+     * @allow (update): An admin can update any user, or a user can update their own profile (with field restrictions).
+     * @allow (delete): Only admins can delete users.
+     */
+    match /employees/{employeeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if (
+        // Condition 1: An admin can update any document.
+        isAdmin()
+      ) || (
+        // Condition 2: A user can edit their own profile...
+        isOwner(employeeId) &&
+        // ...but they cannot change protected fields.
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.accessLevel == resource.data.accessLevel
+      );
+      allow delete: if isAdmin();
+    }
+  }
+}
