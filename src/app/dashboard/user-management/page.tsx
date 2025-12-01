@@ -168,9 +168,9 @@ export default function UserManagementPage() {
          <Table>
             <TableHeader>
                 <TableRow>
-                <TableHead>Usuário</TableHead>
-                <TableHead>ID do Funcionário</TableHead>
-                <TableHead>Nível de Acesso</TableHead>
+                  <TableHead>Usuário</TableHead>
+                  <TableHead>ID do Funcionário</TableHead>
+                  <TableHead>Nível de Acesso</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
