@@ -52,7 +52,7 @@ function UserRow({ employee }: { employee: Employee }) {
           {employee.accessLevel}
         </Badge>
       </TableCell>
-      <TableCell>&nbsp;</TableCell>
+      <TableCell>{employee.id}</TableCell>
     </TableRow>
   );
 }
