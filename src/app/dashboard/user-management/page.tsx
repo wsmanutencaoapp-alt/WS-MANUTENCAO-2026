@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, doc, query, orderBy } from 'firebase/firestore';
 import {
@@ -106,19 +106,57 @@ function AccessDeniedCard() {
     );
 }
 
-function UserManagementContent({ isAdmin }: { isAdmin: boolean }) {
+export default function UserManagementPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
 
-  const employeesCollectionRef = useMemoFirebase(
-    () => (firestore && isAdmin ? query(collection(firestore, 'employees'), orderBy('id')) : null),
-    [firestore, isAdmin]
+  // 1. Load current user's profile first to determine admin status
+  const currentUserDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
   );
+  const { data: currentUserData, isLoading: isCurrentUserLoading } = useDoc<Employee>(currentUserDocRef);
+
+  const isAdmin = currentUserData?.accessLevel === 'Admin';
+  
+  // 2. Only build the query for all employees if the current user is an admin
+  const employeesCollectionRef = useMemoFirebase(
+    () => {
+      // Do not attempt to query if the current user is still loading or is not an admin
+      if (isCurrentUserLoading || !isAdmin) {
+        return null;
+      }
+      return query(collection(firestore, 'employees'), orderBy('id'));
+    },
+    [firestore, isCurrentUserLoading, isAdmin]
+  );
+
+  // 3. Fetch all employees, this will only run if the ref is not null
   const { data: employees, isLoading: areEmployeesLoading, error } = useCollection<Employee>(employeesCollectionRef);
 
+  // Show skeleton while checking for admin permission
+  if (isCurrentUserLoading) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Gerenciamento de Usuários</CardTitle>
+                <CardDescription>
+                Visualize e gerencie os usuários do sistema.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <UserListSkeleton />
+            </CardContent>
+        </Card>
+    );
+  }
+  
+  // If not an admin after checking, show access denied
   if (!isAdmin) {
       return <AccessDeniedCard />;
   }
 
+  // If admin, show the user management table
   return (
     <Card>
       <CardHeader>
@@ -138,7 +176,7 @@ function UserManagementContent({ isAdmin }: { isAdmin: boolean }) {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {areEmployeesLoading && !employees && (
+                {areEmployeesLoading && (
                   [...Array(3)].map((_, i) => (
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
@@ -176,36 +214,4 @@ function UserManagementContent({ isAdmin }: { isAdmin: boolean }) {
       </CardContent>
     </Card>
   );
-}
-
-
-export default function UserManagementPage() {
-  const firestore = useFirestore();
-  const { user } = useUser();
-
-  const currentUserDocRef = useMemoFirebase(
-    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
-    [firestore, user]
-  );
-  const { data: currentUserData, isLoading: isCurrentUserLoading } = useDoc<Employee>(currentUserDocRef);
-  
-  if (isCurrentUserLoading) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Gerenciamento de Usuários</CardTitle>
-                <CardDescription>
-                Visualize e gerencie os usuários do sistema.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <UserListSkeleton />
-            </CardContent>
-        </Card>
-    );
-  }
-  
-  const isAdmin = currentUserData?.accessLevel === 'Admin';
-
-  return <UserManagementContent isAdmin={isAdmin} />;
 }
