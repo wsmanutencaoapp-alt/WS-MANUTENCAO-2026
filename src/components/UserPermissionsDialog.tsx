@@ -82,7 +82,7 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee }: Use
         }
     };
 
-    const handleParentPermissionChange = async (moduleId: string, checked: boolean) => {
+    const handleParentPermissionChange = (moduleId: string, checked: boolean) => {
         const newPermissions = { ...currentPermissions, [moduleId]: checked };
         const subModules = availableScreens.filter(s => s.parentId === moduleId);
         subModules.forEach(sub => {
@@ -91,11 +91,25 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee }: Use
         setCurrentPermissions(newPermissions);
     };
 
-    const handleChildPermissionChange = async (childId: string, parentId: string, checked: boolean) => {
+    const handleChildPermissionChange = (childId: string, parentId: string, checked: boolean) => {
         const newPermissions = { ...currentPermissions, [childId]: checked };
-        const subModules = availableScreens.filter(s => s.parentId === parentId);
-        const allChildrenChecked = subModules.every(sub => newPermissions[sub.id]);
-        newPermissions[parentId] = allChildrenChecked;
+        
+        if (checked) {
+            // Se um filho é marcado, garante que o pai também esteja marcado.
+            newPermissions[parentId] = true;
+        } else {
+            // Se um filho é desmarcado, verifica se algum outro filho ainda está marcado.
+            // Se nenhum outro filho estiver marcado, desmarca o pai.
+            const subModules = availableScreens.filter(s => s.parentId === parentId);
+            const anyOtherChildChecked = subModules.some(sub => newPermissions[sub.id] && sub.id !== childId);
+            
+            // Se nenhum outro filho estiver selecionado, e o que estamos desmarcando é o ultimo, desmarcamos o pai também
+            const allChildrenWillBeUnchecked = subModules.every(sub => !newPermissions[sub.id]);
+            if (allChildrenWillBeUnchecked) {
+                newPermissions[parentId] = false;
+            }
+        }
+    
         setCurrentPermissions(newPermissions);
     };
     
