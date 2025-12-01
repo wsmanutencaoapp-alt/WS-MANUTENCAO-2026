@@ -113,13 +113,7 @@ service cloud.firestore {
     match /employees/{employeeId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isAdmin() || (
-        isOwner(employeeId) &&
-        request.resource.data.id == resource.data.id &&
-        request.resource.data.uid == resource.data.uid &&
-        request.resource.data.email == resource.data.email &&
-        request.resource.data.accessLevel == resource.data.accessLevel
-      );
+      allow update: if isSignedIn();
       allow delete: if isAdmin();
     }
   }
