@@ -474,11 +474,11 @@ const Equipamentos = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
+                <TableRow key="loading">
                   <TableCell colSpan={7} className="text-center">Carregando...</TableCell>
                 </TableRow>
               ) : firestoreError ? (
-                 <TableRow>
+                 <TableRow key="error">
                   <TableCell colSpan={7} className="text-center text-destructive">
                     Erro ao carregar ferramentas: {firestoreError.message}
                   </TableCell>
@@ -544,7 +544,7 @@ const Equipamentos = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow>
+                <TableRow key="no-results">
                   <TableCell colSpan={7} className="text-center">Nenhuma ferramenta encontrada.</TableCell>
                 </TableRow>
               )}
