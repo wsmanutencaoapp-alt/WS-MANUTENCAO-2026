@@ -1,0 +1,26 @@
+export const allUserPermissions: { id: string; path: string }[] = [
+    { id: 'suprimentos', path: '/dashboard/suprimentos' },
+    { id: 'suprimentos_movimentacao', path: '/dashboard/suprimentos/movimentacao' },
+    { id: 'ferramentaria', path: '/dashboard/ferramentaria' },
+    { id: 'ferramentaria_cadastro', path: '/dashboard/ferramentaria/cadastro' },
+    { id: 'ferramentaria_movimentacao', path: '/dashboard/ferramentaria/movimentacao' },
+    { id: 'calibracao', path: '/dashboard/calibracao' },
+    { id: 'compras', path: '/dashboard/compras' },
+    { id: 'compras_aprovacoes', path: '/dashboard/compras/aprovacoes' },
+    { id: 'compras_controle', path: '/dashboard/compras/controle' },
+    { id: 'financeiro', path: '/dashboard/financeiro' },
+    { id: 'financeiro_visao-geral', path: '/dashboard/financeiro/visao-geral' },
+    { id: 'financeiro_orcamento', path: '/dashboard/financeiro/orcamento' },
+    { id: 'userManagement', path: '/dashboard/user-management' },
+    { id: 'configurador', path: '/dashboard/configurador' },
+    { id: 'configurador_alcada-aprovacao', path: '/dashboard/configurador/alcada-aprovacao' },
+];
+
+export const getRequiredPermissionForPath = (path: string): string | null => {
+    // A rota /dashboard/ferramentaria é um alias, então tratamos como /cadastro
+    if (path === '/dashboard/ferramentaria') {
+        path = '/dashboard/ferramentaria/cadastro';
+    }
+    const permission = allUserPermissions.find(p => p.path === path);
+    return permission ? permission.id : null;
+};

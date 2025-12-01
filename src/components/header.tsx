@@ -36,56 +36,63 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { doc } from 'firebase/firestore';
 import { NavMenu, NavItem } from '@/components/nav-menu';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import type { Employee } from '@/lib/types';
+import { useMemo } from 'react';
 
-
-const navItems: NavItem[] = [
+const allNavItems: NavItem[] = [
   { 
     href: '/dashboard/suprimentos', 
     icon: Box, 
     label: 'Suprimentos',
+    permission: 'suprimentos',
     subItems: [
-        { href: '/dashboard/suprimentos/movimentacao', label: 'Movimentação' },
+        { href: '/dashboard/suprimentos/movimentacao', label: 'Movimentação', permission: 'suprimentos_movimentacao' },
     ]
   },
   { 
     href: '/dashboard/ferramentaria', 
     icon: Wrench, 
     label: 'Ferramentaria',
+    permission: 'ferramentaria',
     subItems: [
-        { href: '/dashboard/ferramentaria/cadastro', label: 'Cadastro' },
-        { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída' },
-        { href: '/dashboard/calibracao', label: 'Calibração' },
+        { href: '/dashboard/ferramentaria/cadastro', label: 'Cadastro', permission: 'ferramentaria_cadastro' },
+        { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
+        { href: '/dashboard/calibracao', label: 'Calibração', permission: 'calibracao' },
     ]
   },
   { 
     href: '/dashboard/compras',
     icon: ShoppingCart, 
     label: 'Compras',
+    permission: 'compras',
     subItems: [
-        { href: '/dashboard/compras/aprovacoes', label: 'Aprovações' },
-        { href: '/dashboard/compras/controle', label: 'Controle' },
+        { href: '/dashboard/compras/aprovacoes', label: 'Aprovações', permission: 'compras_aprovacoes' },
+        { href: '/dashboard/compras/controle', label: 'Controle', permission: 'compras_controle' },
     ]
   },
   { 
     href: '/dashboard/financeiro', 
     icon: Landmark, 
     label: 'Financeiro',
+    permission: 'financeiro',
     subItems: [
-        { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral' },
-        { href: '/dashboard/financeiro/orcamento', label: 'Orçamento' },
+        { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral', permission: 'financeiro_visao-geral' },
+        { href: '/dashboard/financeiro/orcamento', label: 'Orçamento', permission: 'financeiro_orcamento' },
     ]
   },
   { 
     href: '/dashboard/user-management', 
     icon: Users, 
-    label: 'Usuários' 
+    label: 'Usuários',
+    permission: 'userManagement',
   },
   { 
     href: '/dashboard/configurador', 
     icon: SlidersHorizontal, 
     label: 'Configurador',
+    permission: 'configurador',
     subItems: [
-        { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação' }
+        { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação', permission: 'configurador_alcada-aprovacao' }
     ]
   },
   { 
@@ -94,6 +101,28 @@ const navItems: NavItem[] = [
     label: 'Seu Perfil' 
   },
 ];
+
+
+const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permissions'], isAdmin: boolean): NavItem[] => {
+    if (isAdmin) return items;
+    if (!permissions) return [];
+
+    return items.reduce((acc, item) => {
+        // Items sem 'permission' são sempre visíveis (ex: 'Seu Perfil')
+        if (!item.permission || permissions[item.permission]) {
+            const newItem = { ...item };
+            if (item.subItems) {
+                newItem.subItems = item.subItems.filter(subItem => !subItem.permission || permissions[subItem.permission]);
+                 if (newItem.subItems.length > 0) {
+                   acc.push(newItem);
+                }
+            } else {
+              acc.push(newItem);
+            }
+        }
+        return acc;
+    }, [] as NavItem[]);
+};
 
 
 export function Header() {
@@ -108,7 +137,12 @@ export function Header() {
     return doc(firestore, 'employees', user.uid);
   }, [firestore, user?.uid]);
 
-  const { data: employeeData } = useDoc<{ photoURL?: string }>(userDocRef);
+  const { data: employeeData } = useDoc<Employee>(userDocRef);
+  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
+
+  const navItems = useMemo(() => {
+    return filterItemsByPermissions(allNavItems, employeeData?.permissions, isAdmin);
+  }, [employeeData, isAdmin]);
 
 
   const handleLogout = async () => {

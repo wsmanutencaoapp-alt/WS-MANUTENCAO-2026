@@ -12,15 +12,18 @@ import type { LucideIcon } from 'lucide-react';
 import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { useSidebar } from '@/components/ui/sidebar';
 import { cva } from 'class-variance-authority';
+import type { Employee } from '@/lib/types';
 
 
 export interface NavItem {
   href: string;
   icon: LucideIcon;
   label: string;
+  permission?: keyof Employee['permissions'];
   subItems?: {
     href: string;
     label: string;
+    permission?: keyof Employee['permissions'];
   }[];
 }
 

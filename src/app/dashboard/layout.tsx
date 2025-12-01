@@ -2,23 +2,60 @@
 import type { ReactNode } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Header } from '@/components/header';
-import { useUser } from '@/firebase';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useEffect, useMemo } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { doc } from 'firebase/firestore';
+import type { Employee } from '@/lib/types';
+import { allUserPermissions, getRequiredPermissionForPath } from '@/lib/permissions';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const pathname = usePathname();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData, isLoading: isEmployeeLoading } = useDoc<Employee>(userDocRef);
+
+  const isLoading = isUserLoading || isEmployeeLoading;
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (!isLoading && !user) {
       router.push('/login');
+      return;
     }
-  }, [user, isUserLoading, router]);
 
-  if (isUserLoading || !user) {
+    if (!isLoading && user && employeeData) {
+      const requiredPermission = getRequiredPermissionForPath(pathname);
+      const isAdmin = employeeData.accessLevel === 'Admin';
+      
+      // Se não há permissão requerida, todos podem acessar
+      if (!requiredPermission) {
+        return;
+      }
+      
+      // Admins podem acessar tudo
+      if (isAdmin) {
+        return;
+      }
+
+      // Se o usuário não é admin e não tem a permissão, redireciona
+      if (!employeeData.permissions || !employeeData.permissions[requiredPermission]) {
+        // Redireciona para a primeira página que o usuário tiver permissão, ou dashboard
+        const firstAllowedPage = allUserPermissions.find(p => employeeData.permissions?.[p.id])?.path || '/dashboard/suprimentos';
+        router.push(firstAllowedPage);
+      }
+    }
+
+  }, [user, employeeData, isLoading, router, pathname]);
+
+  if (isLoading || !user) {
     return (
        <div className="flex min-h-screen w-full flex-col">
         <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">

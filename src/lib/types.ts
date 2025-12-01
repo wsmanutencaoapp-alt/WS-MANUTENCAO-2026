@@ -30,8 +30,24 @@ export type Tool = {
 };
 
 export type Permissions = {
-  [key: string]: boolean;
+  ferramentaria?: boolean;
+  suprimentos?: boolean;
+  compras?: boolean;
+  financeiro?: boolean;
+  configurador?: boolean;
+  userManagement?: boolean;
+  suprimentos_movimentacao?: boolean;
+  ferramentaria_cadastro?: boolean;
+  ferramentaria_movimentacao?: boolean;
+  calibracao?: boolean;
+  compras_aprovacoes?: boolean;
+  compras_controle?: boolean;
+  financeiro_visao-geral?: boolean;
+  financeiro_orcamento?: boolean;
+  'configurador_alcada-aprovacao'?: boolean;
+  [key: string]: boolean | undefined;
 };
+
 
 export type Employee = {
   id: number;
