@@ -61,7 +61,7 @@ function UserListSkeleton() {
         <TableRow>
           <TableHead className="w-[64px]">Avatar</TableHead>
           <TableHead>Usuário</TableHead>
-          <TableHead className="hidden sm:table-cell">ID</TableHead>
+          <TableHead className="hidden sm:table-cell">ID do Funcionário</TableHead>
           <TableHead>Nível de Acesso</TableHead>
         </TableRow>
       </TableHeader>
@@ -120,7 +120,6 @@ export default function UserManagementPage() {
 
   const employeesCollectionRef = useMemoFirebase(
     () => {
-      // Don't try to fetch if we are still checking the current user's admin status or if they are not an admin.
       if (isCurrentUserLoading || !isAdmin) {
         return null;
       }
@@ -165,7 +164,7 @@ export default function UserManagementPage() {
                 <TableRow>
                 <TableHead className="w-[64px]">Avatar</TableHead>
                 <TableHead>Usuário</TableHead>
-                <TableHead className="hidden sm:table-cell">ID</TableHead>
+                <TableHead className="hidden sm:table-cell">ID do Funcionário</TableHead>
                 <TableHead>Nível de Acesso</TableHead>
                 </TableRow>
             </TableHeader>
