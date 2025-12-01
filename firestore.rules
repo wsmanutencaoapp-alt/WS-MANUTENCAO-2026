@@ -108,8 +108,10 @@ service cloud.firestore {
      * @allow (read, write): Authenticated users can read and write employee data.
      * This is a temporary permissive rule to unblock development.
      */
+    /*
     match /employees/{employeeId} {
       allow read, write: if isSignedIn();
     }
+    */
   }
 }
