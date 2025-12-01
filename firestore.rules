@@ -107,7 +107,7 @@ service cloud.firestore {
      * @allow (list): Only administrators can list all employees.
      * @allow (get): Authenticated users can read any single employee's profile.
      * @allow (create): A new employee document can be created if the UID in the document matches the authenticated user's UID.
-     * @allow (update): An employee can update their own document, but an admin can update anyone's.
+     * @allow (update): An employee can update their own document (but not protected fields), or an admin can update anyone's.
      * @allow (delete): Not allowed for safety.
      */
     match /employees/{employeeId} {
