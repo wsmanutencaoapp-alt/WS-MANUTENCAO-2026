@@ -54,7 +54,7 @@ function UserRow({ employee, onEditPermissions }: { employee: WithDocId<Employee
   }
 
   return (
-    <TableRow key={employee.docId}>
+    <TableRow>
       <TableCell>
         <div className="flex items-center gap-4">
           <Avatar>
@@ -245,7 +245,7 @@ export default function UserManagementPage() {
                   ))
                 )}
                 {error && (
-                <TableRow>
+                <TableRow key="error-row">
                     <TableCell colSpan={5} className="text-center text-destructive">
                     <p>Ocorreu um erro ao carregar os usuários.</p>
                     <p className="text-xs">{error.message}</p>
@@ -253,7 +253,7 @@ export default function UserManagementPage() {
                 </TableRow>
                 )}
                 {!areEmployeesLoading && !error && employees?.length === 0 && (
-                <TableRow>
+                <TableRow key="no-results-row">
                     <TableCell colSpan={5} className="text-center">
                     Nenhum usuário encontrado.
                     </TableCell>
