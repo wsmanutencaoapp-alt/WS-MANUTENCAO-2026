@@ -106,12 +106,10 @@ service cloud.firestore {
      * @description Manages access to employee data.
      * @path /employees/{employeeId}
      * @allow (read, write): Authenticated users can read and write employee data.
-     * This is a temporary permissive rule to unblock development.
+     * This is a permissive rule to unblock development.
      */
-    /*
     match /employees/{employeeId} {
       allow read, write: if isSignedIn();
     }
-    */
   }
 }
