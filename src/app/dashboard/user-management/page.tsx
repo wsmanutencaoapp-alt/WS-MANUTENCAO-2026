@@ -21,23 +21,12 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, ShieldCheck, Check } from 'lucide-react';
-import type { Employee, Permissions } from '@/lib/types';
+import { AlertTriangle, ShieldCheck, Settings } from 'lucide-react';
+import type { Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
-
-
-const availableScreens = [
-    { id: 'ferramentaria', label: 'Ferramentaria (Módulo)' },
-    { id: 'suprimentos', label: 'Suprimentos (Módulo)' },
-    { id: 'compras', label: 'Compras (Módulo)' },
-    { id: 'financeiro', label: 'Financeiro (Módulo)' },
-    { id: 'configurador', label: 'Configurador (Módulo)' },
-    { id: 'userManagement', label: 'Gerenciar Usuários' },
-];
+import { Button } from '@/components/ui/button';
+import UserPermissionsDialog from '@/components/UserPermissionsDialog';
 
 
 function getInitials(firstName?: string, lastName?: string) {
@@ -46,42 +35,26 @@ function getInitials(firstName?: string, lastName?: string) {
   return `${first}${last}`.toUpperCase();
 }
 
-function UserRow({ employee }: { employee: WithDocId<Employee> }) {
-  const firestore = useFirestore();
-  const { toast } = useToast();
+function UserRow({ employee, onEditPermissions }: { employee: WithDocId<Employee>, onEditPermissions: (employee: WithDocId<Employee>) => void }) {
   
-  const handlePermissionChange = async (screenId: string, checked: boolean | 'indeterminate') => {
-    if (typeof checked !== 'boolean' || !firestore) return;
-
-    const employeeRef = doc(firestore, 'employees', employee.docId);
-    const newPermissions = {
-      ...employee.permissions,
-      [screenId]: checked,
-    };
-    
-    try {
-        await updateDoc(employeeRef, {
-            permissions: newPermissions
-        });
-        toast({
-            title: "Permissão atualizada!",
-            description: `Acesso à tela de ${screenId} foi ${checked ? 'concedido' : 'revogado'}.`,
-        });
-    } catch (error) {
-       errorEmitter.emit(
-        'permission-error',
-        new FirestorePermissionError({
-          path: employeeRef.path,
-          operation: 'update',
-          requestResourceData: { permissions: newPermissions },
-        })
-      );
+  const getAccessLevelBadge = () => {
+    if (employee.id === 1001) {
+       return (
+        <Badge variant={'default'}>
+          <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+          Admin
+        </Badge>
+       )
     }
-  };
-
+     return (
+        <Badge variant={'secondary'}>
+          Técnico
+        </Badge>
+       )
+  }
 
   return (
-    <TableRow>
+    <TableRow key={employee.docId}>
       <TableCell>
         <div className="flex items-center gap-4">
           <Avatar>
@@ -94,31 +67,13 @@ function UserRow({ employee }: { employee: WithDocId<Employee> }) {
           </div>
         </div>
       </TableCell>
-       <TableCell>
-        <Badge variant={employee.accessLevel === 'Admin' ? 'default' : 'secondary'}>
-          {employee.accessLevel === 'Admin' && <ShieldCheck className="mr-1 h-3.5 w-3.5" />}
-          {employee.accessLevel}
-        </Badge>
-      </TableCell>
-      <TableCell>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            {availableScreens.map(screen => (
-                 <div key={screen.id} className="flex items-center space-x-2">
-                    <Checkbox
-                        id={`${employee.docId}-${screen.id}`}
-                        checked={employee.permissions?.[screen.id] || false}
-                        onCheckedChange={(checked) => handlePermissionChange(screen.id, checked)}
-                        disabled={employee.accessLevel === 'Admin'}
-                    />
-                    <label
-                        htmlFor={`${employee.docId}-${screen.id}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                       {screen.label}
-                    </label>
-                </div>
-            ))}
-          </div>
+      <TableCell>{getAccessLevelBadge()}</TableCell>
+      <TableCell className="hidden md:table-cell">{employee.docId}</TableCell>
+      <TableCell className="hidden md:table-cell">{employee.id}</TableCell>
+       <TableCell className="text-right">
+        <Button variant="ghost" size="icon" onClick={() => onEditPermissions(employee)} title="Gerenciar permissões">
+          <Settings className="h-4 w-4" />
+        </Button>
       </TableCell>
     </TableRow>
   );
@@ -131,7 +86,11 @@ function UserListSkeleton() {
         <TableRow>
           <TableHead>Usuário</TableHead>
           <TableHead>Nível de Acesso</TableHead>
-          <TableHead>Acesso às Telas</TableHead>
+          <TableHead className="hidden md:table-cell">EMPLOYEE</TableHead>
+          <TableHead className="hidden md:table-cell">ID do usuário</TableHead>
+           <TableHead>
+            <span className="sr-only">Ações</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -147,16 +106,9 @@ function UserListSkeleton() {
               </div>
             </TableCell>
             <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
-             <TableCell>
-                <div className="grid grid-cols-2 gap-4">
-                    {[...Array(6)].map((_, j) => (
-                        <div key={j} className="flex items-center gap-2">
-                            <Skeleton className="h-4 w-4" />
-                            <Skeleton className="h-4 w-24" />
-                        </div>
-                    ))}
-                </div>
-             </TableCell>
+            <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[120px]" /></TableCell>
+            <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[60px]" /></TableCell>
+            <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -189,6 +141,8 @@ function AccessDeniedCard() {
 export default function UserManagementPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const [selectedEmployee, setSelectedEmployee] = useState<WithDocId<Employee> | null>(null);
+  const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
 
   const currentUserDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -200,18 +154,34 @@ export default function UserManagementPage() {
 
   const employeesCollectionRef = useMemoFirebase(
     () => {
-      // Only return a query if the user is confirmed to be an admin
       if (!isCurrentUserLoading && isAdmin && firestore) {
         return query(collection(firestore, 'employees'), orderBy('id'));
       }
-      return null; // Return null if not admin or still loading
+      return null;
     },
     [firestore, isCurrentUserLoading, isAdmin]
   );
 
-  const { data: employees, isLoading: areEmployeesLoading, error } = useCollection<Employee>(employeesCollectionRef);
+  const { data: employees, isLoading: areEmployeesLoading, error, setData: setEmployees } = useCollection<Employee>(employeesCollectionRef);
+  
+  const handleEditPermissions = (employee: WithDocId<Employee>) => {
+    setSelectedEmployee(employee);
+    setIsPermissionsDialogOpen(true);
+  };
+  
+  const handlePermissionsChange = (employeeId: string, updatedPermissions: any) => {
+    if (employees) {
+      setEmployees(
+        employees.map(emp =>
+          emp.docId === employeeId
+            ? { ...emp, permissions: updatedPermissions }
+            : emp
+        )
+      );
+    }
+  };
 
-  // Show skeleton while checking current user's permission
+
   if (isCurrentUserLoading) {
     return (
         <Card>
@@ -228,12 +198,12 @@ export default function UserManagementPage() {
     );
   }
   
-  // Show access denied if not an admin
   if (!isAdmin) {
       return <AccessDeniedCard />;
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Gerenciamento de Usuários</CardTitle>
@@ -247,7 +217,11 @@ export default function UserManagementPage() {
                 <TableRow>
                   <TableHead>Usuário</TableHead>
                   <TableHead>Nível de Acesso</TableHead>
-                  <TableHead className="w-1/2">Acesso às Telas</TableHead>
+                  <TableHead className="hidden md:table-cell">EMPLOYEE</TableHead>
+                  <TableHead className="hidden md:table-cell">ID do usuário</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Ações</span>
+                  </TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -264,22 +238,15 @@ export default function UserManagementPage() {
                             </div>
                         </TableCell>
                         <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
-                        <TableCell>
-                            <div className="grid grid-cols-2 gap-4">
-                                {[...Array(6)].map((_, j) => (
-                                    <div key={j} className="flex items-center gap-2">
-                                        <Skeleton className="h-4 w-4" />
-                                        <Skeleton className="h-4 w-24" />
-                                    </div>
-                                ))}
-                            </div>
-                        </TableCell>
+                        <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[120px]" /></TableCell>
+                        <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[60px]" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
                     </TableRow>
                   ))
                 )}
                 {error && (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center text-destructive">
+                    <TableCell colSpan={5} className="text-center text-destructive">
                     <p>Ocorreu um erro ao carregar os usuários.</p>
                     <p className="text-xs">{error.message}</p>
                     </TableCell>
@@ -287,17 +254,25 @@ export default function UserManagementPage() {
                 )}
                 {!areEmployeesLoading && !error && employees?.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center">
+                    <TableCell colSpan={5} className="text-center">
                     Nenhum usuário encontrado.
                     </TableCell>
                 </TableRow>
                 )}
                 {employees?.map((employee) => (
-                    <UserRow key={employee.docId} employee={employee} />
+                    <UserRow key={employee.docId} employee={employee} onEditPermissions={handleEditPermissions} />
                 ))}
             </TableBody>
         </Table>
       </CardContent>
     </Card>
+    
+    <UserPermissionsDialog 
+        isOpen={isPermissionsDialogOpen}
+        onClose={() => setIsPermissionsDialogOpen(false)}
+        employee={selectedEmployee}
+        onPermissionsChange={handlePermissionsChange}
+    />
+    </>
   );
 }
