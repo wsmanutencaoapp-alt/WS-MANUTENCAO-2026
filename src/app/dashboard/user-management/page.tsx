@@ -62,7 +62,7 @@ function UserListSkeleton() {
       <TableHeader>
         <TableRow>
           <TableHead>Usuário</TableHead>
-          <TableHead>ID do Funcionário</TableHead>
+          <TableHead>ID</TableHead>
           <TableHead>Nível de Acesso</TableHead>
         </TableRow>
       </TableHeader>
@@ -169,7 +169,7 @@ export default function UserManagementPage() {
             <TableHeader>
                 <TableRow>
                   <TableHead>Usuário</TableHead>
-                  <TableHead>ID do Funcionário</TableHead>
+                  <TableHead>ID</TableHead>
                   <TableHead>Nível de Acesso</TableHead>
                 </TableRow>
             </TableHeader>
