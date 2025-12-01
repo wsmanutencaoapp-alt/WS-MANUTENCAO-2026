@@ -46,7 +46,6 @@ function UserRow({ employee }: { employee: Employee }) {
         </div>
       </TableCell>
       <TableCell>{employee.id}</TableCell>
-      <TableCell>&nbsp;</TableCell>
       <TableCell>
         <Badge variant={employee.accessLevel === 'Admin' ? 'default' : 'secondary'}>
           {employee.accessLevel === 'Admin' && <ShieldCheck className="mr-1 h-3.5 w-3.5" />}
@@ -64,7 +63,6 @@ function UserListSkeleton() {
         <TableRow>
           <TableHead>Usuário</TableHead>
           <TableHead>ID do Funcionário</TableHead>
-          <TableHead>ID</TableHead>
           <TableHead>Nível de Acesso</TableHead>
         </TableRow>
       </TableHeader>
@@ -80,7 +78,6 @@ function UserListSkeleton() {
                 </div>
               </div>
             </TableCell>
-            <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
             <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
             <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
           </TableRow>
@@ -173,7 +170,6 @@ export default function UserManagementPage() {
                 <TableRow>
                 <TableHead>Usuário</TableHead>
                 <TableHead>ID do Funcionário</TableHead>
-                <TableHead>ID</TableHead>
                 <TableHead>Nível de Acesso</TableHead>
                 </TableRow>
             </TableHeader>
@@ -191,14 +187,13 @@ export default function UserManagementPage() {
                         </div>
                       </TableCell>
                       <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
                     </TableRow>
                   ))
                 )}
                 {error && (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center text-destructive">
+                    <TableCell colSpan={3} className="text-center text-destructive">
                     <p>Ocorreu um erro ao carregar os usuários.</p>
                     <p className="text-xs">{error.message}</p>
                     </TableCell>
@@ -206,7 +201,7 @@ export default function UserManagementPage() {
                 )}
                 {!areEmployeesLoading && !error && employees?.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center">
+                    <TableCell colSpan={3} className="text-center">
                     Nenhum usuário encontrado.
                     </TableCell>
                 </TableRow>
