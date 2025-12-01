@@ -38,6 +38,7 @@ import { NavMenu, NavItem } from '@/components/nav-menu';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { Employee } from '@/lib/types';
 import { useMemo } from 'react';
+import { ThemeToggle } from './theme-toggle';
 
 const allNavItems: NavItem[] = [
   { 
@@ -103,7 +104,7 @@ const allNavItems: NavItem[] = [
 ];
 
 
-const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permissions'], isAdmin: boolean): NavItem[] => {
+const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permissions'] | undefined, isAdmin: boolean): NavItem[] => {
     if (isAdmin) return items;
     if (!permissions) return [];
 
@@ -141,6 +142,7 @@ export function Header() {
   const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
 
   const navItems = useMemo(() => {
+    if (!employeeData) return [];
     return filterItemsByPermissions(allNavItems, employeeData?.permissions, isAdmin);
   }, [employeeData, isAdmin]);
 
@@ -177,66 +179,66 @@ export function Header() {
           </nav>
         </SheetContent>
       </Sheet>
-      <div className="relative ml-auto flex-1 md:grow-0">
-        {/* Search bar removed */}
+      <div className="relative ml-auto flex items-center gap-2 md:grow-0">
+        <ThemeToggle />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="overflow-hidden rounded-full"
+            >
+              <Avatar>
+                <AvatarImage src={userAvatarImage} alt="Avatar do usuário" />
+                <AvatarFallback>
+                  {userAvatarFallback}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {isUserLoading ? (
+              <DropdownMenuLabel>Carregando...</DropdownMenuLabel>
+            ) : user ? (
+              <>
+                <DropdownMenuLabel>
+                  {user.email}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                   <Link href="/dashboard/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Configurações
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>Suporte</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sair
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuLabel>Não Conectado</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                 <DropdownMenuItem asChild>
+                  <Link href="/login">
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Login
+                  </Link>
+                </DropdownMenuItem>
+                 <DropdownMenuItem asChild>
+                  <Link href="/signup">
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Cadastre-se
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="icon"
-            className="overflow-hidden rounded-full"
-          >
-            <Avatar>
-              <AvatarImage src={userAvatarImage} alt="Avatar do usuário" />
-              <AvatarFallback>
-                {userAvatarFallback}
-              </AvatarFallback>
-            </Avatar>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {isUserLoading ? (
-            <DropdownMenuLabel>Carregando...</DropdownMenuLabel>
-          ) : user ? (
-            <>
-              <DropdownMenuLabel>
-                {user.email}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                 <Link href="/dashboard/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Configurações
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem>Suporte</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Sair
-              </DropdownMenuItem>
-            </>
-          ) : (
-            <>
-              <DropdownMenuLabel>Não Conectado</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-               <DropdownMenuItem asChild>
-                <Link href="/login">
-                  <LogIn className="mr-2 h-4 w-4" />
-                  Login
-                </Link>
-              </DropdownMenuItem>
-               <DropdownMenuItem asChild>
-                <Link href="/signup">
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Cadastre-se
-                </Link>
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
     </header>
   );
 }
