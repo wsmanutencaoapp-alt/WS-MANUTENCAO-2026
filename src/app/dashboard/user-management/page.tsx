@@ -34,14 +34,16 @@ function UserRow({ employee }: { employee: Employee }) {
   return (
     <TableRow>
       <TableCell>
-        <Avatar>
-          <AvatarImage src={employee.photoURL || undefined} alt={`${employee.firstName} ${employee.lastName}`} />
-          <AvatarFallback>{getInitials(employee.firstName, employee.lastName)}</AvatarFallback>
-        </Avatar>
-      </TableCell>
-      <TableCell>
-        <div className="font-medium">{`${employee.firstName} ${employee.lastName}`}</div>
-        <div className="text-sm text-muted-foreground">{employee.email}</div>
+        <div className="flex items-center gap-4">
+          <Avatar>
+            <AvatarImage src={employee.photoURL || undefined} alt={`${employee.firstName} ${employee.lastName}`} />
+            <AvatarFallback>{getInitials(employee.firstName, employee.lastName)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <div className="font-medium">{`${employee.firstName} ${employee.lastName}`}</div>
+            <div className="text-sm text-muted-foreground">{employee.email}</div>
+          </div>
+        </div>
       </TableCell>
       <TableCell className="hidden sm:table-cell">{employee.id}</TableCell>
       <TableCell>
@@ -59,7 +61,6 @@ function UserListSkeleton() {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[64px]">Avatar</TableHead>
           <TableHead>Usuário</TableHead>
           <TableHead className="hidden sm:table-cell">ID do Funcionário</TableHead>
           <TableHead>Nível de Acesso</TableHead>
@@ -68,11 +69,13 @@ function UserListSkeleton() {
       <TableBody>
         {[...Array(3)].map((_, i) => (
           <TableRow key={i}>
-            <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
             <TableCell>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-[150px]" />
-                <Skeleton className="h-3 w-[200px]" />
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-[150px]" />
+                  <Skeleton className="h-3 w-[200px]" />
+                </div>
               </div>
             </TableCell>
             <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
@@ -120,16 +123,18 @@ export default function UserManagementPage() {
 
   const employeesCollectionRef = useMemoFirebase(
     () => {
-      if (isCurrentUserLoading || !isAdmin) {
-        return null;
+      // Only return a query if the user is confirmed to be an admin
+      if (!isCurrentUserLoading && isAdmin && firestore) {
+        return query(collection(firestore, 'employees'), orderBy('id'));
       }
-      return query(collection(firestore, 'employees'), orderBy('id'));
+      return null; // Return null if not admin or still loading
     },
     [firestore, isCurrentUserLoading, isAdmin]
   );
 
   const { data: employees, isLoading: areEmployeesLoading, error } = useCollection<Employee>(employeesCollectionRef);
 
+  // Show skeleton while checking current user's permission
   if (isCurrentUserLoading) {
     return (
         <Card>
@@ -146,6 +151,7 @@ export default function UserManagementPage() {
     );
   }
   
+  // Show access denied if not an admin
   if (!isAdmin) {
       return <AccessDeniedCard />;
   }
@@ -162,21 +168,22 @@ export default function UserManagementPage() {
          <Table>
             <TableHeader>
                 <TableRow>
-                <TableHead className="w-[64px]">Avatar</TableHead>
                 <TableHead>Usuário</TableHead>
                 <TableHead className="hidden sm:table-cell">ID do Funcionário</TableHead>
                 <TableHead>Nível de Acesso</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {areEmployeesLoading && (
+                {(areEmployeesLoading || !employees) && !error && (
                   [...Array(3)].map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
                       <TableCell>
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-[150px]" />
-                          <Skeleton className="h-3 w-[200px]" />
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="h-10 w-10 rounded-full" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-[150px]" />
+                            <Skeleton className="h-3 w-[200px]" />
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
@@ -186,7 +193,7 @@ export default function UserManagementPage() {
                 )}
                 {error && (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center text-destructive">
+                    <TableCell colSpan={3} className="text-center text-destructive">
                     <p>Ocorreu um erro ao carregar os usuários.</p>
                     <p className="text-xs">{error.message}</p>
                     </TableCell>
@@ -194,7 +201,7 @@ export default function UserManagementPage() {
                 )}
                 {!areEmployeesLoading && !error && employees?.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center">
+                    <TableCell colSpan={3} className="text-center">
                     Nenhum usuário encontrado.
                     </TableCell>
                 </TableRow>
