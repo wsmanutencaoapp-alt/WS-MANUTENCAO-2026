@@ -28,6 +28,9 @@ import { Loader2, Search } from 'lucide-react';
 import type { Tool } from '@/lib/types';
 import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
 
 interface AddQuantityDialogProps {
   isOpen: boolean;
@@ -113,8 +116,8 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
         const aggregatedGroups: ToolGroup[] = [];
         groups.forEach((toolsInGroup, codigo) => {
-            toolsInGroup.sort((a, b) => (b.unitCode || '').localeCompare(a.unitCode || ''));
-            const representative = toolsInGroup[0];
+            toolsInGroup.sort((a, b) => (a.unitCode || '').localeCompare(b.unitCode || ''));
+            const representative = toolsInGroup[toolsInGroup.length - 1]; // Get the last one
             aggregatedGroups.push({
                 ...representative,
                 unitCount: toolsInGroup.length,
@@ -180,8 +183,19 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       onSuccess(newTools);
 
     } catch (error) {
-      console.error('Erro ao adicionar unidades:', error);
-      toast({ variant: 'destructive', title: 'Erro ao Salvar', description: 'Não foi possível adicionar as novas unidades. Verifique as permissões.' });
+      if (error instanceof FirestorePermissionError) {
+        // If it's already a contextual error, just re-throw it for the listener
+        throw error;
+      }
+       // Create and emit a contextual error for permission issues
+      const permissionError = new FirestorePermissionError({
+        path: `tools`, // Path for the collection where the transaction runs
+        operation: 'write', 
+        requestResourceData: { info: `Transaction to add ${quantityToAdd} tools.` }
+      });
+      errorEmitter.emit('permission-error', permissionError);
+
+      // We don't show a toast here, as the global listener will handle it.
     } finally {
       setIsSaving(false);
     }
