@@ -120,6 +120,7 @@ export default function UserManagementPage() {
 
   const employeesCollectionRef = useMemoFirebase(
     () => {
+      // Don't try to fetch if we are still checking the current user's admin status or if they are not an admin.
       if (isCurrentUserLoading || !isAdmin) {
         return null;
       }
@@ -169,7 +170,7 @@ export default function UserManagementPage() {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {(areEmployeesLoading || isCurrentUserLoading) && (
+                {areEmployeesLoading && (
                   [...Array(3)].map((_, i) => (
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
@@ -192,7 +193,7 @@ export default function UserManagementPage() {
                     </TableCell>
                 </TableRow>
                 )}
-                {!areEmployeesLoading && !isCurrentUserLoading && !error && employees?.length === 0 && (
+                {!areEmployeesLoading && !error && employees?.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={4} className="text-center">
                     Nenhum usuário encontrado.
