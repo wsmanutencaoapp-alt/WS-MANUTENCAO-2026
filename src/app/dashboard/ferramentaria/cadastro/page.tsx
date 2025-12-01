@@ -51,19 +51,19 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import Image from 'next/image';
 import ToolDetailsDialog from '@/components/ToolDetailsDialog';
 import { Badge } from '@/components/ui/badge';
+import { useQueryClient } from '@tanstack/react-query';
 
-// A interface foi adaptada para corresponder ao que é usado no componente
 interface Ferramenta extends Tool {
-  id: string; // Já existe em Tool (como 'id')
-  nome: string; // Mapeia para 'name'
-  codigo: string; // Adicionado
-  unitCode: string; // Adicionado
-  enderecamento: string; // Adicionado
-  status: string; // Já existe
-  quantidade_estoque: number; // Adicionado
-  is_calibrable: boolean; // Adicionado
-  aeronave_principal: string | null; // Adicionado
-  label_url: string | null; // Adicionado
+  id: string; 
+  nome: string; 
+  codigo: string; 
+  unitCode: string; 
+  enderecamento: string; 
+  status: string; 
+  quantidade_estoque: number;
+  is_calibrable: boolean; 
+  aeronave_principal: string | null;
+  label_url: string | null;
 }
 
 type ToolLabelData = Partial<Ferramenta>;
@@ -74,33 +74,34 @@ const Equipamentos = () => {
   const storage = useStorage();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+
+  const ferramentasQueryKey = 'ferramentas';
 
   const ferramentasCollectionRef = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), orderBy('codigo', 'desc')) : null),
     [firestore]
   );
   
-  const { data: ferramentas, isLoading, error: firestoreError, setData: setFerramentas } = useCollection<Ferramenta>(ferramentasCollectionRef);
+  const { data: ferramentas, isLoading, error: firestoreError } = useCollection<Ferramenta>(ferramentasCollectionRef, {
+    queryKey: [ferramentasQueryKey]
+  });
 
   const [isNewToolDialogOpen, setIsNewToolDialogOpen] = useState(false);
   const [isAddQuantityDialogOpen, setIsAddQuantityDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Estados para Impressão
   const [toolsToLabel, setToolsToLabel] = useState<ToolLabelData[]>([]);
   const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] = useState(false);
   const [toolsToConfirm, setToolsToConfirm] = useState<ToolLabelData[]>([]);
 
-  // Estados para Reimpressão
   const [isReprintDialogOpen, setIsReprintDialogOpen] = useState(false);
   const [toolToReprint, setToolToReprint] = useState<ToolLabelData | null>(null);
 
-  // Estados para Detalhes
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedTool, setSelectedTool] = useState<Ferramenta | null>(null);
   
-  // Estado para o preview da imagem
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
@@ -160,7 +161,7 @@ const Equipamentos = () => {
     }
   
     setIsSaving(true);
-    const insertedTools: Ferramenta[] = [];
+    const insertedTools: ToolLabelData[] = [];
   
     try {
       let imageUrl = "https://picsum.photos/seed/tool/200/200"; // Placeholder
@@ -225,19 +226,15 @@ const Equipamentos = () => {
             operation: 'create',
             requestResourceData: toolData
           }));
-          throw error; // Re-throw to be caught by outer try-catch
+          throw error; 
         });
-        insertedTools.push({ ...toolData, id: toolDocRef.id } as Ferramenta);
+        insertedTools.push({ ...toolData, id: toolDocRef.id });
       }
   
       toast({ title: "Sucesso!", description: `${newFerramenta.quantidade_estoque} unidade(s) de ${newFerramenta.name} cadastrada(s).` });
       
       resetForm();
-      if (ferramentas) {
-        setFerramentas([...insertedTools, ...ferramentas]);
-      } else {
-        setFerramentas(insertedTools);
-      }
+      queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
       setToolsToConfirm(insertedTools);
       setIsConfirmationDialogOpen(true);
       setIsNewToolDialogOpen(false);
@@ -254,12 +251,8 @@ const Equipamentos = () => {
 
   const handleAddQuantitySuccess = (newTools: ToolLabelData[]) => {
     setIsAddQuantityDialogOpen(false);
-    if (ferramentas) {
-        setFerramentas([...(newTools as Ferramenta[]), ...ferramentas]);
-    } else {
-        setFerramentas(newTools as Ferramenta[]);
-    }
-    setToolsToLabel(newTools); // Directly trigger printing
+    queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
+    setToolsToLabel(newTools); 
   };
 
   const handleFinalizeCadastro = () => {
@@ -285,9 +278,7 @@ const Equipamentos = () => {
   };
 
   const handleToolDeleted = (toolId: string) => {
-    if (ferramentas) {
-        setFerramentas(ferramentas.filter(t => t.id !== toolId));
-    }
+    queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
     setIsDetailsDialogOpen(false);
     toast({
         title: "Sucesso!",
@@ -296,9 +287,7 @@ const Equipamentos = () => {
   };
 
   const handleToolUpdated = (updatedTool: Ferramenta) => {
-    if (ferramentas) {
-        setFerramentas(ferramentas.map(t => t.id === updatedTool.id ? updatedTool : t));
-    }
+    queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
     toast({
         title: "Sucesso!",
         description: "As informações da ferramenta foram atualizadas."
@@ -316,8 +305,8 @@ const Equipamentos = () => {
 
     const lowercasedTerm = searchTerm.toLowerCase();
     return ferramentas.filter(ferramenta => 
-        ferramenta.name.toLowerCase().includes(lowercasedTerm) ||
-        ferramenta.codigo?.toLowerCase().includes(lowercasedTerm)
+        (ferramenta.name && ferramenta.name.toLowerCase().includes(lowercasedTerm)) ||
+        (ferramenta.codigo && ferramenta.codigo.toLowerCase().includes(lowercasedTerm))
     );
   }, [ferramentas, searchTerm]);
 

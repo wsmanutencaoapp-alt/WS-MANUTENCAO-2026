@@ -8,27 +8,24 @@ import {
   FirestoreError,
   QuerySnapshot,
   CollectionReference,
+  getDocs,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-/** Utility type to add a 'docId' field to a given type T. */
 export type WithDocId<T> = T & { docId: string };
 
-/**
- * Interface for the return value of the useCollection hook.
- * @template T Type of the document data.
- */
-export interface UseCollectionResult<T> {
-  data: WithDocId<T>[] | null; // Document data with docId, or null.
-  isLoading: boolean;       // True if loading.
-  error: FirestoreError | Error | null; // Error object, or null.
-  setData: React.Dispatch<React.SetStateAction<WithDocId<T>[] | null>>; // Function to manually update data
+export interface UseCollectionOptions {
+  queryKey?: any[];
 }
 
-/* Internal implementation of Query:
-  https://github.com/firebase/firebase-js-sdk/blob/c5f08a9bc5da0d2b0207802c972d53724ccef055/packages/firestore/src/lite-api/reference.ts#L143
-*/
+export interface UseCollectionResult<T> {
+  data: WithDocId<T>[] | undefined; 
+  isLoading: boolean;       
+  error: FirestoreError | Error | null; 
+}
+
 export interface InternalQuery extends Query<DocumentData> {
   _query: {
     path: {
@@ -38,79 +35,78 @@ export interface InternalQuery extends Query<DocumentData> {
   }
 }
 
-/**
- * React hook to subscribe to a Firestore collection or query in real-time.
- * Handles nullable references/queries.
- * 
- *
- * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
- * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
- * references
- *  
- * @template T Optional type for document data. Defaults to any.
- * @param {CollectionReference<DocumentData> | Query<DocumentData> | null | undefined} targetRefOrQuery -
- * The Firestore CollectionReference or Query. Waits if null/undefined.
- * @returns {UseCollectionResult<T>} Object with data, isLoading, error.
- */
+async function fetchCollection<T>(query: CollectionReference<DocumentData> | Query<DocumentData>): Promise<WithDocId<T>[]> {
+  try {
+    const snapshot = await getDocs(query);
+    const results: WithDocId<T>[] = [];
+    snapshot.forEach(doc => {
+      results.push({ ...(doc.data() as T), docId: doc.id });
+    });
+    return results;
+  } catch (error) {
+    if (error instanceof FirestoreError) {
+      const path = query.type === 'collection' ? (query as CollectionReference).path : (query as unknown as InternalQuery)._query.path.canonicalString();
+      const contextualError = new FirestorePermissionError({
+        operation: 'list',
+        path,
+      });
+      errorEmitter.emit('permission-error', contextualError);
+      throw contextualError; // Re-throw the rich error for react-query
+    }
+    throw error; // Re-throw other errors
+  }
+}
+
+
 export function useCollection<T = any>(
     memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
+    options: UseCollectionOptions = {}
 ): UseCollectionResult<T> {
-  type ResultItemType = WithDocId<T>;
-  type StateDataType = ResultItemType[] | null;
+  const queryClient = useQueryClient();
+  const queryKey = options.queryKey || (memoizedTargetRefOrQuery ? [(memoizedTargetRefOrQuery as any)._query?.path.toString()] : []);
 
-  const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<FirestoreError | Error | null>(null);
+  const { data, isLoading, error } = useQuery<WithDocId<T>[], Error>({
+    queryKey,
+    queryFn: () => {
+      if (!memoizedTargetRefOrQuery) {
+        return Promise.resolve([]);
+      }
+      return fetchCollection<T>(memoizedTargetRefOrQuery);
+    },
+    enabled: !!memoizedTargetRefOrQuery,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true,
+  });
 
   useEffect(() => {
     if (!memoizedTargetRefOrQuery) {
-      setData(null);
-      setIsLoading(false);
-      setError(null);
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-
-    // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
-        const results: ResultItemType[] = [];
-        for (const doc of snapshot.docs) {
-           // Use 'docId' to store the document ID to avoid conflicts with data fields named 'id'
-          results.push({ ...(doc.data() as T), docId: doc.id });
-        }
-        setData(results);
-        setError(null);
-        setIsLoading(false);
+        // When a real-time update comes in, invalidate the query
+        // to trigger a refetch, or update the cache directly.
+        queryClient.invalidateQueries({ queryKey });
       },
-      (error: FirestoreError) => {
-        // This logic extracts the path from either a ref or a query
-        const path: string =
-          memoizedTargetRefOrQuery.type === 'collection'
+      (err: FirestoreError) => {
+        const path = memoizedTargetRefOrQuery.type === 'collection'
             ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
-
-        const contextualError = new FirestorePermissionError({
-          operation: 'list',
-          path,
-        })
-
-        setError(contextualError)
-        setData(null)
-        setIsLoading(false)
-
-        // trigger global error propagation
+            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
+        const contextualError = new FirestorePermissionError({ operation: 'list', path });
         errorEmitter.emit('permission-error', contextualError);
+        // Optionally, you can also update the query's error state in react-query
+        queryClient.setQueryData(queryKey, (oldData: any) => ({ ...oldData, error: contextualError }));
       }
     );
 
     return () => unsubscribe();
-  }, [memoizedTargetRefOrQuery]); // Re-run if the target query/reference changes.
-  if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    throw new Error(memoizedTargetRefOrQuery + ' was not properly memoized using useMemoFirebase');
+  }, [memoizedTargetRefOrQuery, queryClient, queryKey]);
+
+  if (memoizedTargetRefOrQuery && !(memoizedTargetRefOrQuery as any).__memo) {
+      console.warn('useCollection was called without a memoized query. This can lead to infinite loops. Use useMemoFirebase to memoize your query.', memoizedTargetRefOrQuery);
   }
-  return { data, isLoading, error, setData };
+
+  return { data, isLoading, error: error as FirestoreError | Error | null };
 }

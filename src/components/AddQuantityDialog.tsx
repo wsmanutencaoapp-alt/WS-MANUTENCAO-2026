@@ -30,6 +30,7 @@ import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useQueryClient } from '@tanstack/react-query';
 
 
 interface AddQuantityDialogProps {
@@ -59,6 +60,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
   const firestore = useFirestore();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -160,7 +162,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
     try {
       await runTransaction(firestore, async (transaction) => {
-        // This transaction now only writes, it does not read.
         for (let i = 0; i < quantityToAdd; i++) {
           const newUnitNumber = lastUnitNumber + 1 + i;
           const newUnitCode = `A${newUnitNumber.toString().padStart(4, '0')}`;
@@ -181,19 +182,18 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       });
       
       toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.name} foram adicionadas.` });
+      
+      queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
+      
       onSuccess(newTools);
 
     } catch (error) {
-       // Create and emit a contextual error for permission issues
       const permissionError = new FirestorePermissionError({
-        path: 'tools/{newToolId}', // Path for the collection where the transaction runs
+        path: 'tools/{newToolId}',
         operation: 'write', 
         requestResourceData: { info: `Transaction to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
       });
       errorEmitter.emit('permission-error', permissionError);
-
-      // We don't show a toast here, as the global listener will handle it.
-      // But we need to stop the loading spinner.
     } finally {
       setIsSaving(false);
     }
