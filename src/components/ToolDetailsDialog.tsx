@@ -33,6 +33,7 @@ import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 type DialogTool = Tool & Partial<WithDocId<Tool>>;
 
@@ -80,6 +81,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setEditableTool(prev => ({...prev, [id]: value}));
+  };
+
+  const handleSelectChange = (value: string) => {
+    setEditableTool((prev) => ({ ...prev, tipos: value }));
   };
 
   const handleCheckboxChange = (checked: boolean | 'indeterminate') => {
@@ -212,6 +217,19 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                     <Label htmlFor="aeronave_principal">Aeronave Principal</Label>
                     <Input id="aeronave_principal" value={editableTool.aeronave_principal || ''} onChange={handleInputChange} />
                 </div>
+                <div className="col-span-2 space-y-1">
+                  <Label htmlFor="tipos">Tipos</Label>
+                  <Select onValueChange={handleSelectChange} defaultValue={editableTool.tipos}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Comuns">Comuns</SelectItem>
+                      <SelectItem value="Especiais">Especiais</SelectItem>
+                      <SelectItem value="GSEs">GSEs</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="col-span-2 flex items-center space-x-2 pt-2">
                     <Checkbox id="is_calibrable" checked={editableTool.is_calibrable} onCheckedChange={handleCheckboxChange} />
                     <Label htmlFor="is_calibrable" className="font-normal">Requer controle de calibração</Label>
@@ -240,6 +258,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                 <div className="col-span-2">
                 <p className="font-semibold text-muted-foreground">Nome</p>
                 <p>{tool.name}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-muted-foreground">Tipo</p>
+                  <p>{tool.tipos || 'N/A'}</p>
                 </div>
                 <div>
                 <p className="font-semibold text-muted-foreground">Endereçamento</p>
@@ -316,5 +338,3 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     </Dialog>
   );
 }
-
-    

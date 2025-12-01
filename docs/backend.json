@@ -105,6 +105,15 @@
           "type": "string",
           "description": "URL of the generated tool label image.",
           "format": "uri"
+        },
+        "tipos": {
+          "type": "string",
+          "description": "The type of the tool.",
+          "enum": [
+            "Comuns",
+            "Especiais",
+            "GSEs"
+          ]
         }
       },
       "required": [

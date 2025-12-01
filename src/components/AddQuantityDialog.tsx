@@ -276,6 +276,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                       <p className="font-bold">{selectedToolGroup.name}</p>
                       <p><strong>Código:</strong> {selectedToolGroup.codigo}</p>
                       <p><strong>Marca:</strong> {selectedToolGroup.marca || 'N/A'}</p>
+                      <p><strong>Tipo:</strong> {selectedToolGroup.tipos || 'N/A'}</p>
                       <p><strong>Último Lote:</strong> {selectedToolGroup.lastUnitCode}</p>
                   </div>
               </div>

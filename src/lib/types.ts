@@ -25,6 +25,7 @@ export type Tool = {
   unitCode?: string; // Lote sequencial por unidade
   enderecamento?: string;
   is_calibrable?: boolean;
+  tipos?: 'Comuns' | 'Especiais' | 'GSEs' | string;
   aeronave_principal?: string | null;
   label_url?: string | null;
   quantidade_estoque?: number;
@@ -61,5 +62,3 @@ export type Employee = {
   photoURL?: string | null;
   permissions?: Permissions;
 };
-
-    

@@ -53,6 +53,7 @@ import ToolDetailsDialog from '@/components/ToolDetailsDialog';
 import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 interface Ferramenta extends Tool {
@@ -115,6 +116,7 @@ const Equipamentos = () => {
     aeronave_principal: '',
     quantidade_estoque: 1,
     is_calibrable: true,
+    tipos: 'Comuns',
   });
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -126,6 +128,10 @@ const Equipamentos = () => {
     } else {
       setNewFerramenta((prev) => ({ ...prev, [id]: value }));
     }
+  };
+
+  const handleSelectChange = (value: string) => {
+    setNewFerramenta((prev) => ({ ...prev, tipos: value }));
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,7 +146,7 @@ const Equipamentos = () => {
   };
 
   const resetForm = () => {
-    setNewFerramenta({ name: '', marca: '', enderecamento: '', aeronave_principal: '', quantidade_estoque: 1, is_calibrable: true });
+    setNewFerramenta({ name: '', marca: '', enderecamento: '', aeronave_principal: '', quantidade_estoque: 1, is_calibrable: true, tipos: 'Comuns' });
     setPreviewImage(null);
     if(fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -214,6 +220,7 @@ const Equipamentos = () => {
           enderecamento: newFerramenta.enderecamento,
           aeronave_principal: newFerramenta.aeronave_principal || null,
           is_calibrable: newFerramenta.is_calibrable,
+          tipos: newFerramenta.tipos,
           status: 'Disponível',
           lastCalibration: 'N/A',
           calibratedBy: 'N/A',
@@ -390,6 +397,21 @@ const Equipamentos = () => {
                     className="col-span-3" 
                     required 
                 />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="tipos" className="text-right">
+                  Tipos
+                </Label>
+                <Select onValueChange={handleSelectChange} defaultValue={newFerramenta.tipos}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Selecione um tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Comuns">Comuns</SelectItem>
+                    <SelectItem value="Especiais">Especiais</SelectItem>
+                    <SelectItem value="GSEs">GSEs</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
                <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="is_calibrable" className="text-right">
@@ -616,5 +638,3 @@ const Equipamentos = () => {
 };
 
 export default Equipamentos;
-
-    
