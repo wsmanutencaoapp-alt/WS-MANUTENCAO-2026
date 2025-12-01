@@ -20,6 +20,7 @@ export type Tool = {
   imageUrl: string;
   imageHint: string;
   // Campos adicionados do app do usuário
+  marca?: string;
   codigo?: string;
   unitCode?: string; // Lote sequencial por unidade
   enderecamento?: string;

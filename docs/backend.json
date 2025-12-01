@@ -59,6 +59,10 @@
           "type": "string",
           "description": "Name of the tool."
         },
+        "marca": {
+          "type": "string",
+          "description": "Brand of the tool."
+        },
         "description": {
           "type": "string",
           "description": "Detailed description of the tool."

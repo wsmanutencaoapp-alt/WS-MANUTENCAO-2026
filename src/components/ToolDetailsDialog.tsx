@@ -200,6 +200,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                     <Label htmlFor="name">Nome</Label>
                     <Input id="name" value={editableTool.name} onChange={handleInputChange} />
                 </div>
+                <div className="col-span-2 space-y-1">
+                    <Label htmlFor="marca">Marca</Label>
+                    <Input id="marca" value={editableTool.marca || ''} onChange={handleInputChange} />
+                </div>
                 <div className="space-y-1">
                     <Label htmlFor="enderecamento">Endereçamento</Label>
                     <Input id="enderecamento" value={editableTool.enderecamento || ''} onChange={handleInputChange} />
@@ -228,6 +232,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                   <Badge variant={getStatusVariant(tool.status || '')}>
                     {translateStatus(tool.status || 'N/A')}
                   </Badge>
+                </div>
+                <div>
+                  <p className="font-semibold text-muted-foreground">Marca</p>
+                  <p>{tool.marca || 'N/A'}</p>
                 </div>
                 <div className="col-span-2">
                 <p className="font-semibold text-muted-foreground">Nome</p>

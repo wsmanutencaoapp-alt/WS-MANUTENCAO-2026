@@ -110,6 +110,7 @@ const Equipamentos = () => {
 
   const [newFerramenta, setNewFerramenta] = useState({
     name: '',
+    marca: '',
     enderecamento: '',
     aeronave_principal: '',
     quantidade_estoque: 1,
@@ -139,7 +140,7 @@ const Equipamentos = () => {
   };
 
   const resetForm = () => {
-    setNewFerramenta({ name: '', enderecamento: '', aeronave_principal: '', quantidade_estoque: 1, is_calibrable: true });
+    setNewFerramenta({ name: '', marca: '', enderecamento: '', aeronave_principal: '', quantidade_estoque: 1, is_calibrable: true });
     setPreviewImage(null);
     if(fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -209,6 +210,7 @@ const Equipamentos = () => {
   
         const toolData: Omit<Tool, 'id'> = {
           name: newFerramenta.name,
+          marca: newFerramenta.marca,
           enderecamento: newFerramenta.enderecamento,
           aeronave_principal: newFerramenta.aeronave_principal || null,
           is_calibrable: newFerramenta.is_calibrable,
@@ -355,6 +357,12 @@ const Equipamentos = () => {
                   Nome
                 </Label>
                 <Input id="name" value={newFerramenta.name} onChange={handleInputChange} className="col-span-3" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="marca" className="text-right">
+                  Marca
+                </Label>
+                <Input id="marca" value={newFerramenta.marca} onChange={handleInputChange} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="enderecamento" className="text-right">
