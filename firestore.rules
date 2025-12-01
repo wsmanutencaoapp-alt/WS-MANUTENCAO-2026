@@ -1,115 +1,13 @@
-/**
- * @fileoverview Firestore Security Rules for AeroTrack's aircraft maintenance management system.
- *
- * Core Philosophy:
- * This ruleset enforces a data-centric security model, focusing on securing access to individual documents based on their content and relationships. It ensures that only authenticated users can access and modify data, with access often tied to the document's `employeeId` or other ownership-related fields.
- *
- * Data Structure:
- * The database consists of top-level collections for supplies, tools, suppliers, operation records, images, and employees.
- *
- * Key Security Decisions:
- * - All read and write operations require authentication.
- * - Listing operations are generally allowed for top-level collections, assuming no private user data is present.
- * - Data consistency is enforced through validation rules that ensure relationships between documents are maintained (e.g., `employeeId` in `OperationRecord` matches the authenticated user).
- * - The ruleset uses custom claims (request.auth.token.admin) for role-based access control (RBAC) to avoid costly and sometimes forbidden `get()` operations in rules.
- */
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      // The employeeId in the path is the user's UID
-      return request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-      // Check for the 'admin' custom claim on the user's auth token.
-      // This is more secure and performant than using get() in rules.
-      return request.auth.token.admin == true;
-    }
-
-    /**
-     * @description Manages access to counters used for sequential IDs.
-     * @path /counters/{counterId}
-     * @allow (read, write): Authenticated users can read and update counters.
-     * @principle Allows for transactional updates to generate sequential IDs.
-     */
-    match /counters/{counterId} {
-      allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Manages access to aircraft maintenance supply items.
-     * @path /supplies/{supplyId}
-     * @allow (read): Authenticated users can read any supply item.
-     * @allow (create): Authenticated users can create supply items.
-     * @allow (update): Authenticated users can update supply items.
-     * @allow (delete): Authenticated users can delete supply items.
-     */
-    match /supplies/{supplyId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-    
-    /**
-     * @description Manages access to aircraft maintenance tools.
-     * @path /tools/{toolId}
-     * @allow (read): Authenticated users can read any tool.
-     * @allow (create): Authenticated users can create tools.
-     * @allow (update): Authenticated users can update tools.
-     * @allow (delete): Authenticated users can delete tools.
-     */
-    match /tools/{toolId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Manages access to suppliers.
-     * @path /suppliers/{supplierId}
-     * @allow (read): Authenticated users can read any supplier.
-     * @allow (create): Authenticated users can create suppliers.
-     * @allow (update): Authenticated users can update suppliers.
-     * @allow (delete): Authenticated users can delete suppliers.
-     */
-    match /suppliers/{supplierId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Manages access to operation records.
-     * @path /operation_records/{operationRecordId}
-     * @allow (read): Authenticated users can read any operation record.
-     * @allow (create): Authenticated users can create operation records.
-     * @allow (update): Authenticated users can update operation records.
-     * @allow (delete): Authenticated users can delete operation records.
-     */
-    match /operation_records/{operationRecordId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Manages access to images.
-     * @path /images/{imageId}
-     * @allow (read): Authenticated users can read any image.
-     * @allow (create): Authenticated users can create images.
-     * @allow (update): Authenticated users can update images.
-     * @allow (delete): Authenticated users can delete images.
-     */
-    match /images/{imageId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-    
-    /**
-     * @description Manages access to employee data.
-     * @path /employees/{employeeId}
-     * @allow (read, write): Authenticated users can read and write employee data.
-     * This is a permissive rule to unblock development.
-     */
-    match /employees/{employeeId} {
-      allow read, write: if isSignedIn();
+    // WARNING: This is a completely permissive rule set.
+    // It allows anyone to read, write, and delete any data in your database.
+    // This is intended for initial development and MUST be replaced with
+    // secure rules before deploying to a production environment.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
