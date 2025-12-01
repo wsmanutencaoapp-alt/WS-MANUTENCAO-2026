@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, doc, query, orderBy } from 'firebase/firestore';
 import {
@@ -110,19 +110,16 @@ export default function UserManagementPage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  // 1. Load current user's profile first to determine admin status
   const currentUserDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
     [firestore, user]
   );
   const { data: currentUserData, isLoading: isCurrentUserLoading } = useDoc<Employee>(currentUserDocRef);
-
-  const isAdmin = currentUserData?.accessLevel === 'Admin';
   
-  // 2. Only build the query for all employees if the current user is an admin
+  const isAdmin = useMemo(() => currentUserData?.accessLevel === 'Admin', [currentUserData]);
+
   const employeesCollectionRef = useMemoFirebase(
     () => {
-      // Do not attempt to query if the current user is still loading or is not an admin
       if (isCurrentUserLoading || !isAdmin) {
         return null;
       }
@@ -131,10 +128,8 @@ export default function UserManagementPage() {
     [firestore, isCurrentUserLoading, isAdmin]
   );
 
-  // 3. Fetch all employees, this will only run if the ref is not null
   const { data: employees, isLoading: areEmployeesLoading, error } = useCollection<Employee>(employeesCollectionRef);
 
-  // Show skeleton while checking for admin permission
   if (isCurrentUserLoading) {
     return (
         <Card>
@@ -151,12 +146,10 @@ export default function UserManagementPage() {
     );
   }
   
-  // If not an admin after checking, show access denied
   if (!isAdmin) {
       return <AccessDeniedCard />;
   }
 
-  // If admin, show the user management table
   return (
     <Card>
       <CardHeader>
@@ -176,7 +169,7 @@ export default function UserManagementPage() {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {areEmployeesLoading && (
+                {(areEmployeesLoading || isCurrentUserLoading) && (
                   [...Array(3)].map((_, i) => (
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
@@ -199,7 +192,7 @@ export default function UserManagementPage() {
                     </TableCell>
                 </TableRow>
                 )}
-                {!areEmployeesLoading && !error && employees?.length === 0 && (
+                {!areEmployeesLoading && !isCurrentUserLoading && !error && employees?.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={4} className="text-center">
                     Nenhum usuário encontrado.
