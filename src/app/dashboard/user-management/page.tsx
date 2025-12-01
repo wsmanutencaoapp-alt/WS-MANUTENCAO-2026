@@ -84,25 +84,7 @@ function UserListSkeleton() {
   );
 }
 
-export default function UserManagementPage() {
-  const firestore = useFirestore();
-  const { user } = useUser();
-
-  const currentUserDocRef = useMemoFirebase(
-    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
-    [firestore, user]
-  );
-  const { data: currentUserData, isLoading: isCurrentUserLoading } = useDoc<Employee>(currentUserDocRef);
-  
-  const isAdmin = useMemo(() => currentUserData?.accessLevel === 'Admin', [currentUserData]);
-
-  const employeesCollectionRef = useMemoFirebase(
-    () => (firestore && isAdmin ? query(collection(firestore, 'employees'), orderBy('id')) : null),
-    [firestore, isAdmin]
-  );
-  const { data: employees, isLoading: areEmployeesLoading, error } = useCollection<Employee>(employeesCollectionRef);
-
-  if (isCurrentUserLoading) {
+function AccessDeniedCard() {
     return (
         <Card>
             <CardHeader>
@@ -112,32 +94,29 @@ export default function UserManagementPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <UserListSkeleton />
+                <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-8 text-center">
+                    <AlertTriangle className="h-12 w-12 text-destructive" />
+                    <h3 className="text-xl font-semibold">Acesso Negado</h3>
+                    <p className="text-muted-foreground">
+                    Você não tem permissão para visualizar esta página. Apenas administradores podem gerenciar usuários.
+                    </p>
+                </div>
             </CardContent>
         </Card>
     );
-  }
+}
+
+function UserManagementContent({ isAdmin }: { isAdmin: boolean }) {
+  const firestore = useFirestore();
+
+  const employeesCollectionRef = useMemoFirebase(
+    () => (firestore && isAdmin ? query(collection(firestore, 'employees'), orderBy('id')) : null),
+    [firestore, isAdmin]
+  );
+  const { data: employees, isLoading: areEmployeesLoading, error } = useCollection<Employee>(employeesCollectionRef);
 
   if (!isAdmin) {
-    return (
-      <Card>
-        <CardHeader>
-            <CardTitle>Gerenciamento de Usuários</CardTitle>
-            <CardDescription>
-            Visualize e gerencie os usuários do sistema.
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-             <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-8 text-center">
-                <AlertTriangle className="h-12 w-12 text-destructive" />
-                <h3 className="text-xl font-semibold">Acesso Negado</h3>
-                <p className="text-muted-foreground">
-                Você não tem permissão para visualizar esta página. Apenas administradores podem gerenciar usuários.
-                </p>
-            </div>
-        </CardContent>
-      </Card>
-    );
+      return <AccessDeniedCard />;
   }
 
   return (
@@ -160,11 +139,19 @@ export default function UserManagementPage() {
             </TableHeader>
             <TableBody>
                 {areEmployeesLoading && !employees && (
-                    <TableRow>
-                        <TableCell colSpan={4}>
-                            <UserListSkeleton />
-                        </TableCell>
+                  [...Array(3)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-[150px]" />
+                          <Skeleton className="h-3 w-[200px]" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
                     </TableRow>
+                  ))
                 )}
                 {error && (
                 <TableRow>
@@ -189,4 +176,36 @@ export default function UserManagementPage() {
       </CardContent>
     </Card>
   );
+}
+
+
+export default function UserManagementPage() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+
+  const currentUserDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: currentUserData, isLoading: isCurrentUserLoading } = useDoc<Employee>(currentUserDocRef);
+  
+  if (isCurrentUserLoading) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Gerenciamento de Usuários</CardTitle>
+                <CardDescription>
+                Visualize e gerencie os usuários do sistema.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <UserListSkeleton />
+            </CardContent>
+        </Card>
+    );
+  }
+  
+  const isAdmin = currentUserData?.accessLevel === 'Admin';
+
+  return <UserManagementContent isAdmin={isAdmin} />;
 }
