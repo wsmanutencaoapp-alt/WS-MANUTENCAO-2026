@@ -176,7 +176,7 @@ export default function UserManagementPage() {
             <TableBody>
                 {(areEmployeesLoading || !employees) && !error && (
                   [...Array(3)].map((_, i) => (
-                    <TableRow key={i}>
+                     <TableRow key={i}>
                       <TableCell>
                         <div className="flex items-center gap-4">
                           <Skeleton className="h-10 w-10 rounded-full" />
