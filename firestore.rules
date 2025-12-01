@@ -105,16 +105,11 @@ service cloud.firestore {
     /**
      * @description Manages access to employee data.
      * @path /employees/{employeeId}
-     * @allow (read): Authenticated users can read employee data.
-     * @allow (create): Authenticated users can create their own employee document upon signup.
-     * @allow (update): An admin can update any user, or a user can update their own profile (with field restrictions).
-     * @allow (delete): Only admins can delete users.
+     * @allow (read, write): Authenticated users can read and write employee data.
+     * This is a temporary permissive rule to unblock development.
      */
     match /employees/{employeeId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow read, write: if isSignedIn();
     }
   }
 }
