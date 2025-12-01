@@ -69,13 +69,19 @@ export function SettingsForm() {
   
   useEffect(() => {
     if (employeeData) {
+      // Logic to auto-correct the admin user's access level if it's missing
+      let accessLevel = employeeData.accessLevel || '';
+      if (employeeData.id === 1001 && !accessLevel) {
+        accessLevel = 'Admin';
+      }
+
       form.reset({
         id: employeeData.id || null,
         firstName: employeeData.firstName || '',
         lastName: employeeData.lastName || '',
         email: user?.email || employeeData.email || '',
         phone: employeeData.phone || '',
-        accessLevel: employeeData.accessLevel || '',
+        accessLevel: accessLevel,
         photoURL: employeeData.photoURL || '',
       });
       if (employeeData.photoURL) {
@@ -123,12 +129,8 @@ export function SettingsForm() {
         lastName: values.lastName,
         phone: values.phone,
         photoURL: photoURL,
+        accessLevel: values.accessLevel, // Always include accessLevel in the update
       };
-  
-      // Add accessLevel to the update object only if the user is an admin
-      if (isAdmin && values.accessLevel) {
-        dataToUpdate.accessLevel = values.accessLevel;
-      }
   
       // The update operation is wrapped in a .catch() to handle permission errors
       updateDoc(userDocRef, dataToUpdate)
@@ -234,7 +236,12 @@ export function SettingsForm() {
                 <FormItem>
                   <FormLabel>Nível de Acesso</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value ?? ''} readOnly={!isAdmin} className={!isAdmin ? "bg-muted/50 cursor-not-allowed" : ""}  />
+                    <Input 
+                      {...field} 
+                      value={field.value ?? ''} 
+                      readOnly={!isAdmin && employeeData?.id !== 1001}
+                      className={!isAdmin && employeeData?.id !== 1001 ? "bg-muted/50 cursor-not-allowed" : ""} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
