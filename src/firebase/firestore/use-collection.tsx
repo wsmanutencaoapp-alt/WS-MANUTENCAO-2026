@@ -12,18 +12,18 @@ import {
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-/** Utility type to add an 'id' field to a given type T. */
-export type WithId<T> = T & { id: string };
+/** Utility type to add a 'docId' field to a given type T. */
+export type WithDocId<T> = T & { docId: string };
 
 /**
  * Interface for the return value of the useCollection hook.
  * @template T Type of the document data.
  */
 export interface UseCollectionResult<T> {
-  data: WithId<T>[] | null; // Document data with ID, or null.
+  data: WithDocId<T>[] | null; // Document data with docId, or null.
   isLoading: boolean;       // True if loading.
   error: FirestoreError | Error | null; // Error object, or null.
-  setData: React.Dispatch<React.SetStateAction<WithId<T>[] | null>>; // Function to manually update data
+  setData: React.Dispatch<React.SetStateAction<WithDocId<T>[] | null>>; // Function to manually update data
 }
 
 /* Internal implementation of Query:
@@ -55,7 +55,7 @@ export interface InternalQuery extends Query<DocumentData> {
 export function useCollection<T = any>(
     memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
 ): UseCollectionResult<T> {
-  type ResultItemType = WithId<T>;
+  type ResultItemType = WithDocId<T>;
   type StateDataType = ResultItemType[] | null;
 
   const [data, setData] = useState<StateDataType>(null);
@@ -79,7 +79,8 @@ export function useCollection<T = any>(
       (snapshot: QuerySnapshot<DocumentData>) => {
         const results: ResultItemType[] = [];
         for (const doc of snapshot.docs) {
-          results.push({ ...(doc.data() as T), id: doc.id });
+           // Use 'docId' to store the document ID to avoid conflicts with data fields named 'id'
+          results.push({ ...(doc.data() as T), docId: doc.id });
         }
         setData(results);
         setError(null);
@@ -113,5 +114,3 @@ export function useCollection<T = any>(
   }
   return { data, isLoading, error, setData };
 }
-
-    

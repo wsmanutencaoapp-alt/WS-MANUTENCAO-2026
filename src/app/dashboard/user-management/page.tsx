@@ -30,7 +30,7 @@ function getInitials(firstName?: string, lastName?: string) {
   return `${first}${last}`.toUpperCase();
 }
 
-function UserRow({ employee }: { employee: Employee }) {
+function UserRow({ employee }: { employee: Employee & { docId: string } }) {
   return (
     <TableRow>
       <TableCell>
@@ -212,7 +212,7 @@ export default function UserManagementPage() {
                 </TableRow>
                 )}
                 {employees?.map((employee) => (
-                    <UserRow key={employee.id} employee={employee} />
+                    <UserRow key={employee.docId} employee={employee} />
                 ))}
             </TableBody>
         </Table>
