@@ -94,6 +94,10 @@ export function SignUpForm() {
       });
 
       const userDocRef = doc(firestore, 'employees', user.uid);
+      
+      // Determine access level: first user is Admin
+      const accessLevel = newEmployeeId === 1001 ? 'Admin' : 'Técnico';
+
       const userData = {
         id: newEmployeeId, // Use the new sequential ID
         uid: user.uid, // Keep Firebase Auth UID for reference
@@ -101,7 +105,7 @@ export function SignUpForm() {
         lastName: values.lastName,
         email: values.email,
         phone: '', // Phone is optional in this form
-        accessLevel: 'Técnico', // Default access level
+        accessLevel: accessLevel, // Set access level based on logic
       };
       
       // We are not awaiting this promise to avoid blocking the UI
