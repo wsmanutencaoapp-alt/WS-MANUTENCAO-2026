@@ -23,6 +23,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import type { Employee } from '@/lib/types';
+import type { WithDocId } from '@/firebase/firestore/use-collection';
+
 
 function getInitials(firstName?: string, lastName?: string) {
   const first = firstName?.charAt(0) || '';
@@ -30,7 +32,7 @@ function getInitials(firstName?: string, lastName?: string) {
   return `${first}${last}`.toUpperCase();
 }
 
-function UserRow({ employee }: { employee: Employee & { docId: string } }) {
+function UserRow({ employee }: { employee: WithDocId<Employee> }) {
   return (
     <TableRow>
       <TableCell>
@@ -45,7 +47,7 @@ function UserRow({ employee }: { employee: Employee & { docId: string } }) {
           </div>
         </div>
       </TableCell>
-      <TableCell>{employee.id}</TableCell>
+      <TableCell>{employee.docId}</TableCell>
       <TableCell>{employee.id}</TableCell>
       <TableCell>
         <Badge variant={employee.accessLevel === 'Admin' ? 'default' : 'secondary'}>
@@ -80,7 +82,7 @@ function UserListSkeleton() {
                 </div>
               </div>
             </TableCell>
-            <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-[250px]" /></TableCell>
             <TableCell><Skeleton className="h-4 w-[70px]" /></TableCell>
             <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
           </TableRow>
@@ -190,7 +192,7 @@ export default function UserManagementPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[250px]" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-[70px]" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
                     </TableRow>
