@@ -212,7 +212,7 @@ export default function UserManagementPage() {
                 </TableRow>
                 )}
                 {employees?.map((employee) => (
-                    <UserRow key={employee.id} employee={employee} />
+                    <UserRow key={employee.uid} employee={employee} />
                 ))}
             </TableBody>
         </Table>
