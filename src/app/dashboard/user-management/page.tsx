@@ -45,7 +45,7 @@ function UserRow({ employee }: { employee: Employee }) {
           </div>
         </div>
       </TableCell>
-      <TableCell className="hidden sm:table-cell">{employee.id}</TableCell>
+      <TableCell>{employee.id}</TableCell>
       <TableCell>
         <Badge variant={employee.accessLevel === 'Admin' ? 'default' : 'secondary'}>
           {employee.accessLevel === 'Admin' && <ShieldCheck className="mr-1 h-3.5 w-3.5" />}
@@ -62,7 +62,7 @@ function UserListSkeleton() {
       <TableHeader>
         <TableRow>
           <TableHead>Usuário</TableHead>
-          <TableHead className="hidden sm:table-cell">ID do Funcionário</TableHead>
+          <TableHead>ID do Funcionário</TableHead>
           <TableHead>Nível de Acesso</TableHead>
         </TableRow>
       </TableHeader>
@@ -78,7 +78,7 @@ function UserListSkeleton() {
                 </div>
               </div>
             </TableCell>
-            <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
             <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
           </TableRow>
         ))}
@@ -169,7 +169,7 @@ export default function UserManagementPage() {
             <TableHeader>
                 <TableRow>
                 <TableHead>Usuário</TableHead>
-                <TableHead className="hidden sm:table-cell">ID do Funcionário</TableHead>
+                <TableHead>ID do Funcionário</TableHead>
                 <TableHead>Nível de Acesso</TableHead>
                 </TableRow>
             </TableHeader>
@@ -186,7 +186,7 @@ export default function UserManagementPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-[50px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[50px]" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
                     </TableRow>
                   ))
