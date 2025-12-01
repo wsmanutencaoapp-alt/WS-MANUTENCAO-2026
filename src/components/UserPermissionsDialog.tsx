@@ -41,8 +41,6 @@ interface UserPermissionsDialogProps {
 }
 
 export default function UserPermissionsDialog({ isOpen, onClose, employee, onPermissionsChange }: UserPermissionsDialogProps) {
-    const firestore = useFirestore();
-    const { toast } = useToast();
     const [currentPermissions, setCurrentPermissions] = useState<{[key: string]: boolean}>({});
 
     useEffect(() => {
@@ -53,63 +51,7 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
 
     if (!employee) return null;
 
-    const handleParentPermissionChange = async (screenId: string, checked: boolean) => {
-        if (!firestore) return;
-
-        let newPermissions = { ...currentPermissions, [screenId]: checked };
-
-        // If parent is unchecked, uncheck all children. If checked, check all children.
-        availableScreens.forEach(s => {
-            if (s.parentId === screenId) {
-                newPermissions[s.id] = checked;
-            }
-        });
-        
-        await updatePermissionsInFirestore(newPermissions);
-    };
-
-    const handleChildPermissionChange = async (screenId: string, parentId: string, checked: boolean) => {
-        if (!firestore) return;
-
-        let newPermissions = { ...currentPermissions, [screenId]: checked };
-
-        // If a child is checked, ensure the parent is checked
-        if (checked) {
-            newPermissions[parentId] = true;
-        }
-
-        await updatePermissionsInFirestore(newPermissions);
-    };
-
-    const updatePermissionsInFirestore = async (newPermissions: {[key: string]: boolean}) => {
-        setCurrentPermissions(newPermissions); // Optimistic UI update
-        const employeeRef = doc(firestore, 'employees', employee.docId);
-
-        try {
-            await updateDoc(employeeRef, {
-                permissions: newPermissions
-            });
-            onPermissionsChange(employee.docId, newPermissions); // Notify parent component
-            toast({
-                title: "Permissões atualizadas!",
-                description: `As permissões de ${employee.firstName} foram salvas.`,
-            });
-        } catch (error) {
-            errorEmitter.emit(
-                'permission-error',
-                new FirestorePermissionError({
-                    path: employeeRef.path,
-                    operation: 'update',
-                    requestResourceData: { permissions: newPermissions },
-                })
-            );
-            // Revert optimistic UI update on error
-            setCurrentPermissions(employee.permissions || {});
-        }
-    };
-    
     const isUserAdmin = employee.accessLevel === 'Admin' || employee.id === 1001;
-
     const moduleGroups = availableScreens.filter(s => s.isParent);
 
     return (
@@ -136,8 +78,7 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
                                         <Checkbox
                                             id={`${employee.docId}-${module.id}`}
                                             checked={isModuleChecked}
-                                            onCheckedChange={(checked) => handleParentPermissionChange(module.id, !!checked)}
-                                            disabled={isUserAdmin}
+                                            disabled={true} // Campo desabilitado
                                             aria-label={`Permissão para ${module.label}`}
                                         />
                                         <Label
@@ -147,15 +88,14 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
                                             {module.label}
                                         </Label>
                                     </div>
-                                    {isModuleChecked && !isUserAdmin && subModules.length > 0 && (
+                                    {isModuleChecked && subModules.length > 0 && (
                                        <div className="pl-8 space-y-3 animate-in fade-in-0 duration-300">
                                             {subModules.map(sub => (
                                                 <div key={sub.id} className="flex items-center space-x-3">
                                                     <Checkbox
                                                         id={`${employee.docId}-${sub.id}`}
                                                         checked={currentPermissions?.[sub.id] || false}
-                                                        onCheckedChange={(checked) => handleChildPermissionChange(sub.id, module.id, !!checked)}
-                                                        disabled={isUserAdmin}
+                                                        disabled={true} // Campo desabilitado
                                                         aria-label={`Permissão para ${sub.label}`}
                                                     />
                                                     <Label htmlFor={`${employee.docId}-${sub.id}`} className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">

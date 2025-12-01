@@ -169,16 +169,9 @@ export default function UserManagementPage() {
     setIsPermissionsDialogOpen(true);
   };
   
+  // This function is no longer needed as updates are disabled.
   const handlePermissionsChange = (employeeId: string, updatedPermissions: any) => {
-    if (employees) {
-      setEmployees(
-        employees.map(emp =>
-          emp.docId === employeeId
-            ? { ...emp, permissions: updatedPermissions }
-            : emp
-        )
-      );
-    }
+    // No-op
   };
 
 
