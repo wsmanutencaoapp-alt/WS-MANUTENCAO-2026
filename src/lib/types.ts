@@ -28,3 +28,14 @@ export type Tool = {
   label_url?: string | null;
   quantidade_estoque?: number;
 };
+
+export type Employee = {
+  id: number;
+  uid: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  accessLevel: 'Admin' | 'Técnico' | string;
+  photoURL?: string | null;
+};

@@ -27,7 +27,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Check the accessLevel of the user making the request
+      // Check the accessLevel of the user making the request from the employees collection
       return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
     }
 
@@ -104,13 +104,15 @@ service cloud.firestore {
     /**
      * @description Manages access to employee data.
      * @path /employees/{employeeId}
-     * @allow (read): Authenticated users can read any employee's profile.
+     * @allow (list): Only administrators can list all employees.
+     * @allow (get): Authenticated users can read any single employee's profile.
      * @allow (create): A new employee document can be created if the UID in the document matches the authenticated user's UID.
      * @allow (update): An employee can update their own document, but an admin can update anyone's.
      * @allow (delete): Not allowed for safety.
      */
     match /employees/{employeeId} {
-      allow read: if isSignedIn();
+      allow list: if isAdmin();
+      allow get: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
       allow update: if (isOwner(employeeId) && 
                       request.resource.data.id == resource.data.id &&
