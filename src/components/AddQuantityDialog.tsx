@@ -160,13 +160,14 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
     try {
       await runTransaction(firestore, async (transaction) => {
+        // This transaction now only writes, it does not read.
         for (let i = 0; i < quantityToAdd; i++) {
           const newUnitNumber = lastUnitNumber + 1 + i;
           const newUnitCode = `A${newUnitNumber.toString().padStart(4, '0')}`;
           
           const newToolDocRef = doc(collection(firestore, 'tools'));
           
-          const { id, unitCount, lastUnitCode, ...baseData } = selectedToolGroup;
+          const { id, unitCount, lastUnitCode: lUC, ...baseData } = selectedToolGroup;
 
           const newToolData: Omit<FoundTool, 'id'> = {
             ...baseData,
@@ -183,19 +184,16 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       onSuccess(newTools);
 
     } catch (error) {
-      if (error instanceof FirestorePermissionError) {
-        // If it's already a contextual error, just re-throw it for the listener
-        throw error;
-      }
        // Create and emit a contextual error for permission issues
       const permissionError = new FirestorePermissionError({
-        path: `tools`, // Path for the collection where the transaction runs
+        path: 'tools/{newToolId}', // Path for the collection where the transaction runs
         operation: 'write', 
-        requestResourceData: { info: `Transaction to add ${quantityToAdd} tools.` }
+        requestResourceData: { info: `Transaction to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
       });
       errorEmitter.emit('permission-error', permissionError);
 
       // We don't show a toast here, as the global listener will handle it.
+      // But we need to stop the loading spinner.
     } finally {
       setIsSaving(false);
     }
