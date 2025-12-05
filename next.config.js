@@ -32,7 +32,7 @@ const nextConfig = {
         hostname: 'firebasestorage.googleapis.com',
         port: '',
         pathname: '/**',
-      },
+      }
     ],
   },
 };
