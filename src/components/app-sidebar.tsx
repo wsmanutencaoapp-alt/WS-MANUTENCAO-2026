@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   Send,
@@ -130,9 +131,9 @@ export function AppSidebar() {
           href="/dashboard"
           className="flex items-center gap-2 text-lg font-semibold text-primary"
         >
-          <Send className="h-5 w-5 transition-all group-hover:scale-110" />
-          <span className={cn("font-bold", state === 'collapsed' && "hidden")}>AeroTrack</span>
-          <span className="sr-only">AeroTrack</span>
+          <Image src="/logo.png" alt="APP WS Logo" width={32} height={32} />
+          <span className={cn("font-bold", state === 'collapsed' && "hidden")}>APP WS</span>
+          <span className="sr-only">APP WS</span>
         </Link>
         <SidebarTrigger className="hidden md:flex" />
       </SidebarHeader>

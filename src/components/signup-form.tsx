@@ -164,7 +164,7 @@ export function SignUpForm() {
       <CardHeader>
         <CardTitle>Cadastre-se</CardTitle>
         <CardDescription>
-          Crie uma conta para começar a usar o AeroTrack.
+          Crie uma conta para começar a usar o APP WS.
         </CardDescription>
       </CardHeader>
       <Form {...form}>

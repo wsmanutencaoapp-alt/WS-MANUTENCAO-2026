@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   Send,
   Box,
@@ -173,8 +174,8 @@ export function Header() {
               href="/dashboard"
               className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
             >
-              <Send className="h-5 w-5 transition-all group-hover:scale-110" />
-              <span className="sr-only">AeroTrack</span>
+              <Image src="/logo.png" alt="APP WS Logo" width={32} height={32} />
+              <span className="sr-only">APP WS</span>
             </Link>
             <NavMenu items={navItems} pathname={pathname} isMobile={true} />
           </nav>

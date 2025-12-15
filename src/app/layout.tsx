@@ -7,7 +7,7 @@ import { Providers } from '@/lib/providers';
 import { ThemeProvider } from '@/components/theme-toggle';
 
 export const metadata: Metadata = {
-  title: 'AeroTrack',
+  title: 'APP WS',
   description: 'Sistema de gerenciamento de manutenção de aeronaves inspirado no SAP',
 };
 

@@ -90,7 +90,7 @@ export function LoginForm() {
       <CardHeader>
         <CardTitle>Login</CardTitle>
         <CardDescription>
-          Acesse seu painel AeroTrack.
+          Acesse seu painel APP WS.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
