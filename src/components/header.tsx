@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   Send,
   Box,
@@ -40,6 +39,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { Employee } from '@/lib/types';
 import { useMemo } from 'react';
 import { ThemeToggle } from './theme-toggle';
+import { Logo } from '@/components/logo';
 
 const allNavItems: NavItem[] = [
   { 
@@ -174,7 +174,7 @@ export function Header() {
               href="/dashboard"
               className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
             >
-              <Image src="/logo.png" alt="APP WS Logo" width={32} height={32} />
+              <Logo className="h-6 w-6 text-primary-foreground" />
               <span className="sr-only">APP WS</span>
             </Link>
             <NavMenu items={navItems} pathname={pathname} isMobile={true} />
