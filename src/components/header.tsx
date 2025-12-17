@@ -184,9 +184,9 @@ export function Header() {
           <nav className="grid gap-6 text-lg font-medium">
             <Link
               href="/dashboard"
-              className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
+              className="flex h-10 items-center gap-2 text-lg font-semibold"
             >
-              <img src="/logo.png" alt="APP WS Logo" className="h-6 w-6" />
+              <img src="/logo.png" alt="APP WS Logo" className="h-8 w-auto" />
               <span className="sr-only">APP WS</span>
             </Link>
             <NavMenu items={navItems} pathname={pathname} isMobile={true} />
