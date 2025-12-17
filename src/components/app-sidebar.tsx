@@ -143,7 +143,7 @@ export function AppSidebar() {
           href="/dashboard"
           className="flex items-center gap-2 text-lg font-semibold text-primary"
         >
-          <Image src="/logo.png" alt="APP WS Logo" width={32} height={32} className="h-8 w-8" />
+          <img src="/logo.png" alt="APP WS Logo" className="h-8 w-8" />
           <span className={cn("font-bold", state === 'collapsed' && "hidden")}>APP WS</span>
           <span className="sr-only">APP WS</span>
         </Link>
