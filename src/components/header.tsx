@@ -75,13 +75,23 @@ const allNavItems: NavItem[] = [
   },
   { 
     href: '/dashboard/financeiro', 
-    icon: Landmark, 
+    icon: Wallet, 
     label: 'Financeiro',
     permission: 'financeiro',
     subItems: [
         { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral', permission: 'financeiro_visao-geral' },
         { href: '/dashboard/financeiro/orcamento', label: 'Orçamento', permission: 'financeiro_orcamento' },
         { href: '/dashboard/financeiro/despesas', label: 'Despesas', permission: 'financeiro_despesas' },
+    ]
+  },
+   { 
+    href: '/dashboard/contabilidade', 
+    icon: Landmark, 
+    label: 'Contabilidade',
+    permission: 'contabilidade',
+    subItems: [
+        { href: '/dashboard/contabilidade/balancete', label: 'Balancete', permission: 'contabilidade_balancete' },
+        { href: '/dashboard/contabilidade/relatorios', label: 'Relatórios', permission: 'contabilidade_relatorios' },
     ]
   },
   { 

@@ -47,6 +47,9 @@ export type Permissions = {
   financeiro_visao-geral?: boolean;
   financeiro_orcamento?: boolean;
   financeiro_despesas?: boolean;
+  contabilidade?: boolean;
+  contabilidade_balancete?: boolean;
+  contabilidade_relatorios?: boolean;
   'configurador_alcada-aprovacao'?: boolean;
   [key: string]: boolean | undefined;
 };
