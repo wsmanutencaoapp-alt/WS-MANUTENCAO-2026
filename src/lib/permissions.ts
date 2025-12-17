@@ -20,6 +20,8 @@ export const allUserPermissions: { id: string; path: string }[] = [
     { id: 'configurador_alcada-aprovacao', path: '/dashboard/configurador/alcada-aprovacao' },
     { id: 'cadastros', path: '/dashboard/cadastros' },
     { id: 'cadastros_ferramentas', path: '/dashboard/cadastros/ferramentas' },
+    { id: 'engenharia', path: '/dashboard/engenharia' },
+    { id: 'engenharia_aprovacoes', path: '/dashboard/engenharia/aprovacoes' },
 ];
 
 export const getRequiredPermissionForPath = (path: string): string | null => {

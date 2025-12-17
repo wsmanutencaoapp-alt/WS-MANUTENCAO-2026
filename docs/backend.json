@@ -345,6 +345,9 @@
             },
             "userManagement": {
               "type": "boolean"
+            },
+            "engenharia": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false

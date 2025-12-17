@@ -19,6 +19,7 @@ import {
   Wallet,
   FilePlus2,
   List,
+  Briefcase,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -73,6 +74,15 @@ const allNavItems: NavItem[] = [
     subItems: [
         { href: '/dashboard/compras/aprovacoes', label: 'Aprovações', permission: 'compras_aprovacoes' },
         { href: '/dashboard/compras/controle', label: 'Controle', permission: 'compras_controle' },
+    ]
+  },
+  {
+    href: '/dashboard/engenharia',
+    icon: Briefcase,
+    label: 'Engenharia',
+    permission: 'engenharia',
+    subItems: [
+      { href: '/dashboard/engenharia/aprovacoes', label: 'Aprovações', permission: 'engenharia_aprovacoes' },
     ]
   },
   { 

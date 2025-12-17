@@ -25,6 +25,8 @@ const availableScreens = [
     { id: 'compras', label: 'Compras (Módulo)', isParent: true },
     { id: 'compras_aprovacoes', label: 'Aprovações', isParent: false, parentId: 'compras' },
     { id: 'compras_controle', label: 'Controle', isParent: false, parentId: 'compras' },
+    { id: 'engenharia', label: 'Engenharia (Módulo)', isParent: true },
+    { id: 'engenharia_aprovacoes', label: 'Aprovações', isParent: false, parentId: 'engenharia' },
     { id: 'financeiro', label: 'Financeiro (Módulo)', isParent: true },
     { id: 'financeiro_visao-geral', label: 'Visão Geral', isParent: false, parentId: 'financeiro' },
     { id: 'financeiro_orcamento', label: 'Orçamento', isParent: false, parentId: 'financeiro' },
