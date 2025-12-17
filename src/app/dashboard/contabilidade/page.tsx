@@ -1,3 +1,3 @@
 export default function ContabilidadePage() {
-  return <div>Página de Contabilidade</div>;
+  return <div>Página Fiscal/Contábil</div>;
 }

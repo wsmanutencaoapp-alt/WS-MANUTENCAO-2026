@@ -89,7 +89,7 @@ const allNavItems: NavItem[] = [
   { 
     href: '/dashboard/contabilidade', 
     icon: Landmark, 
-    label: 'Contabilidade',
+    label: 'Fiscal/Contábil',
     permission: 'contabilidade',
     subItems: [
         { href: '/dashboard/contabilidade/balancete', label: 'Balancete', permission: 'contabilidade_balancete' },

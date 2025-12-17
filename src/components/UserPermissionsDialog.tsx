@@ -38,6 +38,9 @@ const availableScreens = [
     { id: 'configurador_alcada-aprovacao', label: 'Alçada de Aprovação', isParent: false, parentId: 'configurador' },
     { id: 'cadastros', label: 'Cadastros (Módulo)', isParent: true },
     { id: 'cadastros_ferramentas', label: 'Ferramentas', isParent: false, parentId: 'cadastros' },
+    { id: 'contabilidade', label: 'Fiscal/Contábil (Módulo)', isParent: true },
+    { id: 'contabilidade_balancete', label: 'Balancete', isParent: false, parentId: 'contabilidade' },
+    { id: 'contabilidade_relatorios', label: 'Relatórios', isParent: false, parentId: 'contabilidade' },
 ];
 
 
