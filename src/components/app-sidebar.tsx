@@ -65,6 +65,7 @@ const allNavItems: NavItem[] = [
     permission: 'engenharia',
     subItems: [
       { href: '/dashboard/engenharia/aprovacoes', label: 'Aprovações', permission: 'engenharia_aprovacoes' },
+      { href: '/dashboard/engenharia/projetos', label: 'Projetos', permission: 'engenharia_projetos' },
     ]
   },
   { 

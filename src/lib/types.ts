@@ -60,6 +60,7 @@ export type Permissions = {
   cadastros_ferramentas?: boolean;
   engenharia?: boolean;
   engenharia_aprovacoes?: boolean;
+  engenharia_projetos?: boolean;
   [key: string]: boolean | undefined;
 };
 
