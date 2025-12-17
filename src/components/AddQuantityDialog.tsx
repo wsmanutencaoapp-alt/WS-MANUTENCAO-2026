@@ -10,7 +10,8 @@ import {
   runTransaction,
   doc,
   limit,
-  orderBy
+  orderBy,
+  addDoc
 } from 'firebase/firestore';
 import {
   Dialog,
@@ -161,40 +162,39 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
     setIsSaving(true);
     const newTools: FoundTool[] = [];
-    const { tipo, familia, classificacao, lastSequencial } = selectedToolGroup;
+    const { tipo, familia, classificacao } = selectedToolGroup;
     const baseCode = `${tipo}-${familia}-${classificacao}`;
     
     try {
       const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
 
-      await runTransaction(firestore, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        if (!counterDoc.exists()) {
-          throw new Error(`Contador para ${baseCode} não encontrado.`);
-        }
-        let lastId = counterDoc.data().lastId;
-        
-        const { id, unitCount, lastSequencial: ls, ...baseData } = selectedToolGroup;
-
-        for (let i = 0; i < quantityToAdd; i++) {
-          const newSequencial = lastId + 1 + i;
-          const newCode = `${baseCode}-${newSequencial.toString().padStart(4, '0')}`;
-          
-          const newToolDocRef = doc(collection(firestore, 'tools'));
-          
-          const newToolData: Omit<Tool, 'id'> = {
-            ...baseData,
-            codigo: newCode,
-            sequencial: newSequencial,
-            status: 'Disponível',
-          };
-          
-          transaction.set(newToolDocRef, newToolData);
-          newTools.push({ ...newToolData, id: newToolDocRef.id });
-        }
-        
-        transaction.update(counterRef, { lastId: lastId + quantityToAdd });
+      const newLastId = await runTransaction(firestore, async (transaction) => {
+          const counterDoc = await transaction.get(counterRef);
+          if (!counterDoc.exists()) {
+              throw new Error(`Contador para a lógica ${baseCode} não encontrado. Cadastre a lógica primeiro.`);
+          }
+          const currentId = counterDoc.data().lastId;
+          const newId = currentId + quantityToAdd;
+          transaction.update(counterRef, { lastId: newId });
+          return currentId;
       });
+
+      const { id, unitCount, lastSequencial: ls, ...baseData } = selectedToolGroup;
+
+      for (let i = 0; i < quantityToAdd; i++) {
+        const newSequencial = newLastId + 1 + i;
+        const newCode = `${baseCode}-${newSequencial.toString().padStart(4, '0')}`;
+        
+        const newToolData: Omit<Tool, 'id'> = {
+          ...baseData,
+          codigo: newCode,
+          sequencial: newSequencial,
+          status: 'Disponível',
+        };
+        
+        const docRef = await addDoc(collection(firestore, 'tools'), newToolData);
+        newTools.push({ ...newToolData, id: docRef.id });
+      }
       
       toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.descricao} foram adicionadas.` });
       
@@ -206,7 +206,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       console.error(error);
       const permissionError = new FirestorePermissionError({
         path: 'tools/{newToolId}',
-        operation: 'write', 
+        operation: 'create', 
         requestResourceData: { info: `Transaction to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
       });
       errorEmitter.emit('permission-error', permissionError);
@@ -321,5 +321,3 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
-
-    

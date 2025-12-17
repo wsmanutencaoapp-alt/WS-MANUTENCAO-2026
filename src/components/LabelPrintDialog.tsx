@@ -16,14 +16,10 @@ import { useFirestore, useStorage } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import JsBarcode from 'jsbarcode';
+import type { Tool } from '@/lib/types';
 
-type ToolLabelData = {
+type ToolLabelData = Partial<Tool> & {
   id: string;
-  descricao?: string;
-  codigo?: string;
-  enderecamento?: string;
-  data_vencimento?: string;
-  label_url?: string | null;
 };
 
 interface LabelPrintDialogProps {
@@ -140,7 +136,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
 
       generateAndSaveLabels();
     }
-  }, [isOpen, tools, toast, firestore, storage, error]);
+  }, [isOpen, tools, toast, firestore, storage]);
 
   const handlePrint = () => {
     const printableContent = printableAreaRef.current;
@@ -154,17 +150,12 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
     
     const styles = `
       @page {
-        size: 100mm 60mm;
+        size: 55mm 25mm;
         margin: 0;
       }
       body {
         margin: 0;
         padding: 0;
-        width: 100mm;
-        height: 60mm;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         -webkit-print-color-adjust: exact;
       }
       .label-container {
@@ -172,13 +163,23 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
         height: 25mm;
         display: block;
         page-break-inside: avoid;
+        break-inside: avoid;
+        page-break-after: always;
+      }
+      .label-container:last-child {
+        page-break-after: auto;
       }
     `;
+
+    let contentToPrint = '';
+    Array.from(generatedLabels.entries()).forEach(([id, svg]) => {
+        contentToPrint += `<div class="label-container">${svg}</div>`;
+    });
 
     printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
     printWindow.document.write(`<style>${styles}</style>`);
     printWindow.document.write('</head><body>');
-    printWindow.document.write(printableContent.innerHTML);
+    printWindow.document.write(contentToPrint);
     printWindow.document.write('</body></html>');
     printWindow.document.close();
     printWindow.focus();
@@ -204,7 +205,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           </DialogDescription>
         </DialogHeader>
         
-        <div className="max-h-[60vh] overflow-y-auto p-4 border rounded-md bg-muted/50">
+        <div ref={printableAreaRef} className="max-h-[60vh] overflow-y-auto p-4 border rounded-md bg-muted/50">
           {isLoading && (
             <div className="flex flex-col items-center justify-center h-40">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -218,7 +219,7 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
              </div>
           )}
           {!isLoading && !error && generatedLabels.size > 0 && (
-            <div ref={printableAreaRef} className="space-y-4">
+            <div className="space-y-4">
               {Array.from(generatedLabels.entries()).map(([id, svg]) => (
                 <div key={id} className="label-container" dangerouslySetInnerHTML={{ __html: svg }} />
               ))}
@@ -242,5 +243,3 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
     </Dialog>
   );
 }
-
-    
