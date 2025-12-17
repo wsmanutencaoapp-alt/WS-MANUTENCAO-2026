@@ -2,7 +2,6 @@ export const allUserPermissions: { id: string; path: string }[] = [
     { id: 'suprimentos', path: '/dashboard/suprimentos' },
     { id: 'suprimentos_movimentacao', path: '/dashboard/suprimentos/movimentacao' },
     { id: 'ferramentaria', path: '/dashboard/ferramentaria' },
-    { id: 'ferramentaria_cadastro', path: '/dashboard/ferramentaria/cadastro' },
     { id: 'ferramentaria_movimentacao', path: '/dashboard/ferramentaria/movimentacao' },
     { id: 'calibracao', path: '/dashboard/calibracao' },
     { id: 'compras', path: '/dashboard/compras' },
@@ -18,12 +17,14 @@ export const allUserPermissions: { id: string; path: string }[] = [
     { id: 'userManagement', path: '/dashboard/user-management' },
     { id: 'configurador', path: '/dashboard/configurador' },
     { id: 'configurador_alcada-aprovacao', path: '/dashboard/configurador/alcada-aprovacao' },
+    { id: 'cadastros', path: '/dashboard/cadastros' },
+    { id: 'cadastros_ferramentas', path: '/dashboard/cadastros/ferramentas' },
 ];
 
 export const getRequiredPermissionForPath = (path: string): string | null => {
-    // A rota /dashboard/ferramentaria é um alias, então tratamos como /cadastro
+    // A rota /dashboard/ferramentaria é um alias, então tratamos como /movimentacao
     if (path === '/dashboard/ferramentaria') {
-        path = '/dashboard/ferramentaria/cadastro';
+        path = '/dashboard/ferramentaria/movimentacao';
     }
     const permission = allUserPermissions.find(p => p.path === path);
     return permission ? permission.id : null;

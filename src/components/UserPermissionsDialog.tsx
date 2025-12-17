@@ -20,7 +20,6 @@ const availableScreens = [
     { id: 'suprimentos', label: 'Suprimentos (Módulo)', isParent: true },
     { id: 'suprimentos_movimentacao', label: 'Movimentação', isParent: false, parentId: 'suprimentos' },
     { id: 'ferramentaria', label: 'Ferramentaria (Módulo)', isParent: true },
-    { id: 'ferramentaria_cadastro', label: 'Cadastro', isParent: false, parentId: 'ferramentaria' },
     { id: 'ferramentaria_movimentacao', label: 'Entrada e Saída', isParent: false, parentId: 'ferramentaria' },
     { id: 'calibracao', label: 'Calibração', isParent: false, parentId: 'ferramentaria' },
     { id: 'compras', label: 'Compras (Módulo)', isParent: true },
@@ -33,6 +32,8 @@ const availableScreens = [
     { id: 'userManagement', label: 'Gerenciar Usuários', isParent: true },
     { id: 'configurador', label: 'Configurador (Módulo)', isParent: true },
     { id: 'configurador_alcada-aprovacao', label: 'Alçada de Aprovação', isParent: false, parentId: 'configurador' },
+    { id: 'cadastros', label: 'Cadastros (Módulo)', isParent: true },
+    { id: 'cadastros_ferramentas', label: 'Ferramentas', isParent: false, parentId: 'cadastros' },
 ];
 
 

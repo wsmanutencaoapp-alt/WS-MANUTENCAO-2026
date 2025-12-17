@@ -56,6 +56,8 @@ export type Permissions = {
   contabilidade_balancete?: boolean;
   contabilidade_relatorios?: boolean;
   'configurador_alcada-aprovacao'?: boolean;
+  cadastros?: boolean;
+  cadastros_ferramentas?: boolean;
   [key: string]: boolean | undefined;
 };
 
@@ -82,5 +84,3 @@ export type Despesa = {
   employeeId: string;
   employeeName: string;
 };
-
-    

@@ -13,6 +13,7 @@ import {
   Users,
   SlidersHorizontal,
   Wallet,
+  FilePlus2,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -40,7 +41,6 @@ const allNavItems: NavItem[] = [
     label: 'Ferramentaria',
     permission: 'ferramentaria',
     subItems: [
-        { href: '/dashboard/ferramentaria/cadastro', label: 'Cadastro', permission: 'ferramentaria_cadastro' },
         { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
         { href: '/dashboard/calibracao', label: 'Calibração', permission: 'calibracao' },
     ]
@@ -79,6 +79,15 @@ const allNavItems: NavItem[] = [
 ];
 
 const allBottomNavItems: NavItem[] = [
+    { 
+        href: '/dashboard/cadastros', 
+        icon: FilePlus2, 
+        label: 'Cadastros',
+        permission: 'cadastros',
+        subItems: [
+            { href: '/dashboard/cadastros/ferramentas', label: 'Ferramentas', permission: 'cadastros_ferramentas' }
+        ]
+    },
     { href: '/dashboard/user-management', icon: Users, label: 'Usuários', permission: 'userManagement' },
     { 
         href: '/dashboard/configurador', 
@@ -102,8 +111,17 @@ const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permi
                 newItem.subItems = item.subItems.filter(subItem => permissions[subItem.permission!]);
                 // Se o item principal tem permissão, mas nenhum subitem tem, não mostramos o item principal
                 // a menos que a rota principal seja um destino válido por si só.
-                if (newItem.subItems.length > 0) {
+                if (newItem.subItems.length > 0 || !item.href.includes('/dashboard/')) { // Keep items that are just containers
                    acc.push(newItem);
+                } else if(newItem.subItems.length === 0 && item.href.includes('/dashboard/')) {
+                    // This handles cases where a parent is allowed but has no allowed children, but it's a valid page itself.
+                    // Let's check if we should add it anyway.
+                    // For now, if subItems array exists but is empty after filter, we might not want to add parent.
+                    // But if the parent link is a page itself, it should be kept.
+                    const isParentAPage = !allNavItems.some(parent => parent.subItems && parent.subItems.some(sub => sub.href === newItem.href));
+                     if(isParentAPage || newItem.subItems.length > 0) {
+                         acc.push(newItem);
+                     }
                 }
             } else {
               acc.push(newItem);
@@ -129,25 +147,23 @@ export function AppSidebar() {
   const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
 
   const navItems = useMemo(() => {
-    return filterItemsByPermissions(allNavItems, employeeData?.permissions, isAdmin);
+    if (!employeeData) return [];
+    return filterItemsByPermissions(allNavItems, employeeData.permissions || {}, isAdmin);
   }, [employeeData, isAdmin]);
 
   const bottomNavItems = useMemo(() => {
-    return filterItemsByPermissions(allBottomNavItems, employeeData?.permissions, isAdmin);
+    if (!employeeData) return [];
+    return filterItemsByPermissions(allBottomNavItems, employeeData.permissions || {}, isAdmin);
   }, [employeeData, isAdmin]);
 
   return (
-    <Sidebar collapsible="icon" className="group-[[data-variant=sidebar]]:border-r group-[[data-variant=sidebar]]:bg-background">
-      <SidebarHeader className="flex h-14 shrink-0 items-center justify-between rounded-none border-b bg-background px-4 sm:px-6">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2 text-lg font-semibold text-primary"
-        >
-          <img src="/logo.png" alt="APP WS Logo" className="h-8 w-auto" />
+    <Sidebar collapsible="icon" className="group-[[data-variant=sidebar]]:border-r group-[[data-variant=sidebar]]:bg-sidebar">
+      <SidebarHeader className="flex h-14 shrink-0 items-center justify-center rounded-none border-b bg-background px-4">
+         <div className="flex items-center gap-2 text-lg font-semibold text-primary">
+          <img src="/logo.png" alt="APP WS Logo" className={cn("h-8 w-auto transition-all", state === 'collapsed' ? 'h-8' : 'h-8' )} />
           <span className={cn("font-bold", state === 'collapsed' && "hidden")}>APP WS</span>
           <span className="sr-only">APP WS</span>
-        </Link>
-        <SidebarTrigger className="hidden md:flex" />
+        </div>
       </SidebarHeader>
       <SidebarContent className="flex flex-col gap-2 p-2 sm:p-4">
         <SidebarMenu className='flex-1'>

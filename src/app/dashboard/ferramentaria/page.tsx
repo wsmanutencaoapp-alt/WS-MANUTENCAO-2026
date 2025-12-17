@@ -1,4 +1,4 @@
-// This page is an alias for the /dashboard/ferramentaria/cadastro page.
-import CadastroPage from "./cadastro/page";
+// This page is an alias for the /dashboard/ferramentaria/movimentacao page.
+import MovimentacaoPage from "./movimentacao/page";
 
-export default CadastroPage;
+export default MovimentacaoPage;

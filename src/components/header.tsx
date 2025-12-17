@@ -17,6 +17,7 @@ import {
   Users,
   SlidersHorizontal,
   Wallet,
+  FilePlus2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -58,7 +59,6 @@ const allNavItems: NavItem[] = [
     label: 'Ferramentaria',
     permission: 'ferramentaria',
     subItems: [
-        { href: '/dashboard/ferramentaria/cadastro', label: 'Cadastro', permission: 'ferramentaria_cadastro' },
         { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
         { href: '/dashboard/calibracao', label: 'Calibração', permission: 'calibracao' },
     ]
@@ -95,6 +95,15 @@ const allNavItems: NavItem[] = [
     ]
   },
   { 
+    href: '/dashboard/cadastros', 
+    icon: FilePlus2, 
+    label: 'Cadastros',
+    permission: 'cadastros',
+     subItems: [
+        { href: '/dashboard/cadastros/ferramentas', label: 'Ferramentas', permission: 'cadastros_ferramentas' }
+    ]
+  },
+  { 
     href: '/dashboard/user-management', 
     icon: Users, 
     label: 'Usuários',
@@ -127,7 +136,7 @@ const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permi
             const newItem = { ...item };
             if (item.subItems) {
                 newItem.subItems = item.subItems.filter(subItem => !subItem.permission || permissions[subItem.permission]);
-                 if (newItem.subItems.length > 0) {
+                 if (newItem.subItems.length > 0 || !item.href.includes('/dashboard/')) {
                    acc.push(newItem);
                 }
             } else {
