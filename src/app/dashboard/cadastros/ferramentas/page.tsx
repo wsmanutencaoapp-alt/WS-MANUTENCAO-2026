@@ -15,7 +15,7 @@ import {
   runTransaction,
   getDoc,
 } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,6 +62,7 @@ const CadastroLogicaFerramentas = () => {
   const storage = useStorage();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docEngenhariaInputRef = useRef<HTMLInputElement>(null);
   
   const queryClient = useQueryClient();
   const logicasQueryKey = 'logicasFerramentas';
@@ -79,6 +80,8 @@ const CadastroLogicaFerramentas = () => {
 
   const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
   const [toolImage, setToolImage] = useState<string | null>(null);
+  const [docEngenhariaFile, setDocEngenhariaFile] = useState<File | null>(null);
+
 
   const toolsQuery = useMemoFirebase(() => (
     firestore ? query(collection(firestore, 'tools'), orderBy('codigo')) : null
@@ -130,18 +133,35 @@ const CadastroLogicaFerramentas = () => {
     }
   };
 
+  const handleDocEngenhariaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        setDocEngenhariaFile(file);
+    }
+  };
+
+
   const resetForm = () => {
     setNewFerramenta({
       tipo: 'STD', familia: 'MEC', classificacao: 'N', descricao: '',
       pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '',
     });
     setToolImage(null);
+    setDocEngenhariaFile(null);
     setEditingLogic(null);
     if(fileInputRef.current) fileInputRef.current.value = '';
+    if(docEngenhariaInputRef.current) docEngenhariaInputRef.current.value = '';
   };
 
 
-  const uploadImage = async (dataUrl: string, path: string): Promise<string> => {
+  const uploadFile = async (file: File, path: string): Promise<string> => {
+    if (!storage) throw new Error("Storage service not available.");
+    const fileRef = storageRef(storage, path);
+    await uploadBytes(fileRef, file);
+    return getDownloadURL(fileRef);
+  };
+  
+  const uploadImageAsDataUrl = async (dataUrl: string, path: string): Promise<string> => {
     if (!storage) throw new Error("Storage service not available.");
     const imageRef = storageRef(storage, path);
     const snapshot = await uploadString(imageRef, dataUrl, 'data_url');
@@ -149,7 +169,7 @@ const CadastroLogicaFerramentas = () => {
   };
 
   const handleSaveToolLogic = async () => {
-    if (!user || !firestore) {
+    if (!user || !firestore || !storage) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado ou falha na conexão.' });
         return;
     }
@@ -159,10 +179,10 @@ const CadastroLogicaFerramentas = () => {
     if (newFerramenta.tipo === 'EQV' && !newFerramenta.pn_referencia) {
       toast({ variant: "destructive", description: "P/N Referência é obrigatório para tipo 'Equivalente'." }); return;
     }
-     if (newFerramenta.tipo === 'EQV') {
+     if (newFerramenta.tipo === 'EQV' && !docEngenhariaFile && !editingLogic?.doc_engenharia_url) {
       toast({ variant: "destructive", description: "Doc. Engenharia é obrigatório para tipo 'Equivalente'." }); return;
     }
-     if (!toolImage) {
+     if (!toolImage && !editingLogic?.imageUrl) {
       toast({ variant: "destructive", description: "A imagem de referência é obrigatória para a lógica." }); return;
     }
   
@@ -170,7 +190,17 @@ const CadastroLogicaFerramentas = () => {
   
     try {
         const tempId = doc(collection(firestore, 'temp')).id;
-        let imageUrl = toolImage.startsWith('data:') ? await uploadImage(toolImage, `tool_logic_images/${editingLogic?.docId || tempId}.jpg`) : toolImage;
+        const logicId = editingLogic?.docId || tempId;
+        
+        let imageUrl = editingLogic?.imageUrl;
+        if (toolImage && toolImage.startsWith('data:')) {
+            imageUrl = await uploadImageAsDataUrl(toolImage, `tool_logic_images/${logicId}.jpg`);
+        }
+
+        let docEngenhariaUrl = editingLogic?.doc_engenharia_url;
+        if (docEngenhariaFile) {
+            docEngenhariaUrl = await uploadFile(docEngenhariaFile, `doc_engenharia/${logicId}_${docEngenhariaFile.name}`);
+        }
         
         let status: Tool['status'] = 'Disponível';
         if (newFerramenta.tipo === 'EQV') status = 'Pendente';
@@ -178,14 +208,19 @@ const CadastroLogicaFerramentas = () => {
         const sequencial = 0; // Logic template has no sequencial, it's a template
         const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${sequencial.toString().padStart(4, '0')}`;
         
-        const toolData = {
+        const toolData: Partial<Tool> = {
             ...newFerramenta,
             codigo: codigoCompleto,
             sequencial: sequencial,
             status: status,
             imageUrl: imageUrl,
             enderecamento: 'LOGICA', // Mark this as a logic template
+            doc_engenharia_url: docEngenhariaUrl
         };
+        
+        // Remove undefined properties to avoid overwriting existing data with nothing
+        Object.keys(toolData).forEach(key => toolData[key as keyof Partial<Tool>] === undefined && delete toolData[key as keyof Partial<Tool>]);
+
 
         if (editingLogic) {
             // Update existing logic
@@ -194,7 +229,7 @@ const CadastroLogicaFerramentas = () => {
             toast({ title: "Sucesso!", description: `Lógica de ferramenta atualizada.` });
         } else {
             // Add new logic
-            await addDoc(collection(firestore, 'tools'), toolData as Partial<Tool>);
+            await addDoc(collection(firestore, 'tools'), toolData);
             toast({ title: "Sucesso!", description: `Nova lógica de ferramenta cadastrada.` });
         }
         
@@ -239,6 +274,7 @@ const CadastroLogicaFerramentas = () => {
     setEditingLogic(logic);
     setNewFerramenta(logic);
     setToolImage(logic.imageUrl || null);
+    setDocEngenhariaFile(null); // Reset file input
     setIsFormDialogOpen(true);
   };
 
@@ -252,7 +288,7 @@ const CadastroLogicaFerramentas = () => {
             setIsFormDialogOpen(isOpen);
         }}>
           <DialogTrigger asChild>
-            <Button onClick={() => setEditingLogic(null)}>
+            <Button onClick={() => { setEditingLogic(null); resetForm(); }}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Adicionar Lógica
             </Button>
@@ -334,8 +370,18 @@ const CadastroLogicaFerramentas = () => {
                      <div className="col-span-2 flex items-center gap-4">
                         {toolImage ? <Image src={toolImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}
                         <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Foto de Referência<span className='text-destructive ml-1'>*</span></Button>
-                        <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*" required/>
+                        <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
                     </div>
+                    {newFerramenta.tipo === 'EQV' && (
+                       <div className="col-span-2 flex items-center gap-4">
+                           {docEngenhariaFile ? <FileText className="h-10 w-10 text-muted-foreground"/> : (editingLogic?.doc_engenharia_url && <a href={editingLogic.doc_engenharia_url} target="_blank" rel="noopener noreferrer"><FileText className="h-10 w-10 text-blue-500 hover:text-blue-700"/></a>) || <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
+                           <div className='flex-1'>
+                             <Button type="button" variant="outline" size="sm" onClick={() => docEngenhariaInputRef.current?.click()}><Upload className="mr-2"/>Doc. Engenharia<span className='text-destructive ml-1'>*</span></Button>
+                             <Input type="file" ref={docEngenhariaInputRef} onChange={handleDocEngenhariaChange} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"/>
+                             {docEngenhariaFile && <p className="text-xs text-muted-foreground mt-1 truncate">{docEngenhariaFile.name}</p>}
+                           </div>
+                       </div>
+                    )}
                  </CardContent>
               </Card>
 
@@ -444,3 +490,5 @@ const CadastroLogicaFerramentas = () => {
 };
 
 export default CadastroLogicaFerramentas;
+
+    
