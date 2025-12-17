@@ -15,7 +15,7 @@ import {
   runTransaction,
   getDoc,
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject, uploadString } from 'firebase/storage';
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -258,6 +258,11 @@ const CadastroLogicaFerramentas = () => {
         if (logica.imageUrl) {
             const imageRef = storageRef(storage, logica.imageUrl);
             await deleteObject(imageRef).catch(err => console.warn("Could not delete image, it might not exist:", err));
+        }
+
+        if (logica.doc_engenharia_url) {
+            const docRef = storageRef(storage, logica.doc_engenharia_url);
+            await deleteObject(docRef).catch(err => console.warn("Could not delete doc, it might not exist:", err));
         }
 
         toast({ title: 'Sucesso', description: 'Lógica de ferramenta excluída.' });
