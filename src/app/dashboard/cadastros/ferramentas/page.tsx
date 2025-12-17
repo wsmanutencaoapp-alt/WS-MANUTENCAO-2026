@@ -15,7 +15,7 @@ import {
   runTransaction,
   getDoc,
 } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,17 +27,30 @@ import {
   DialogDescription,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip } from 'lucide-react';
+import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2 } from 'lucide-react';
 import type { Tool } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import Image from 'next/image';
 import { useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { WithDocId } from '@/firebase/firestore/use-collection';
 
 const familiaSuggestions: { [key in Tool['familia']]: Tool['classificacao'] } = {
     TRQ: 'C', PRE: 'C', ELE: 'C', RIG: 'L', MET: 'C', SEG: 'V', MEC: 'N',
@@ -55,6 +68,7 @@ const CadastroLogicaFerramentas = () => {
 
   const [isNewToolDialogOpen, setIsNewToolDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [newFerramenta, setNewFerramenta] = useState<Partial<Tool>>({
       tipo: 'STD', familia: 'MEC', classificacao: 'N', descricao: '',
@@ -63,6 +77,14 @@ const CadastroLogicaFerramentas = () => {
 
   const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
   const [toolImage, setToolImage] = useState<string | null>(null);
+
+  const logicasQuery = useMemoFirebase(() => (
+    firestore ? query(collection(firestore, 'tools'), where('enderecamento', '==', 'LOGICA'), orderBy('codigo')) : null
+  ), [firestore]);
+  
+  const { data: logicas, isLoading: isLoadingLogicas, error: logicasError } = useCollection<Tool>(logicasQuery, {
+    queryKey: [logicasQueryKey]
+  });
 
   useEffect(() => {
     const { tipo, familia, classificacao } = newFerramenta;
@@ -139,22 +161,23 @@ const CadastroLogicaFerramentas = () => {
         const tempId = doc(collection(firestore, 'temp')).id;
         let imageUrl = await uploadImage(toolImage, `tool_logic_images/${tempId}.jpg`);
         
-        let status = 'Disponível';
-        if(newFerramenta.tipo === 'EQV') status = 'Pendente';
+        let status: Tool['status'] = 'Disponível';
+        if (newFerramenta.tipo === 'EQV') status = 'Pendente';
 
         const sequencial = 0; // Logic template has no sequencial, it's a template
         const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${sequencial.toString().padStart(4, '0')}`;
         
-        const toolData: Omit<Tool, 'id'> = {
+        const toolData = {
             ...newFerramenta,
             codigo: codigoCompleto,
             sequencial: sequencial,
             status: status,
-            status_inicial: newFerramenta.tipo === 'EQV' ? 'Bloqueado' : 'Ativo',
             imageUrl: imageUrl,
             enderecamento: 'LOGICA', // Mark this as a logic template
         };
-        await addDoc(collection(firestore, 'tools'), toolData);
+
+        // Explicitly cast to Partial<Tool> to satisfy addDoc
+        await addDoc(collection(firestore, 'tools'), toolData as Partial<Tool>);
         
         toast({ title: "Sucesso!", description: `Nova lógica de ferramenta cadastrada.` });
         resetForm();
@@ -166,6 +189,31 @@ const CadastroLogicaFerramentas = () => {
       toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar a lógica. Verifique as permissões.` });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (logica: WithDocId<Tool>) => {
+    if (!firestore || !storage) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Serviço indisponível.' });
+        return;
+    }
+    setIsDeleting(true);
+    try {
+        const docRef = doc(firestore, 'tools', logica.docId);
+        await deleteDoc(docRef);
+
+        if (logica.imageUrl) {
+            const imageRef = storageRef(storage, logica.imageUrl);
+            await deleteObject(imageRef).catch(err => console.warn("Could not delete image, it might not exist:", err));
+        }
+
+        toast({ title: 'Sucesso', description: 'Lógica de ferramenta excluída.' });
+        queryClient.invalidateQueries({ queryKey: [logicasQueryKey] });
+    } catch (error) {
+        console.error("Erro ao excluir lógica:", error);
+        toast({ variant: 'destructive', title: 'Erro ao Excluir', description: 'Não foi possível excluir a lógica.' });
+    } finally {
+        setIsDeleting(false);
     }
   };
 
@@ -238,24 +286,24 @@ const CadastroLogicaFerramentas = () => {
                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="col-span-2">
                         <Label htmlFor="descricao">Descrição Genérica</Label>
-                        <Input id="descricao" value={newFerramenta.descricao} onChange={handleInputChange} required />
+                        <Input id="descricao" value={newFerramenta.descricao || ''} onChange={handleInputChange} required />
                     </div>
                      {newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'GSE' || newFerramenta.tipo === 'EQV' ? (
                         <div>
                             <Label htmlFor="pn_fabricante">P/N Fabricante {newFerramenta.tipo !== 'STD' && <span className='text-destructive'>*</span>}</Label>
-                            <Input id="pn_fabricante" value={newFerramenta.pn_fabricante} onChange={handleInputChange} required={newFerramenta.tipo !== 'STD'} />
+                            <Input id="pn_fabricante" value={newFerramenta.pn_fabricante || ''} onChange={handleInputChange} required={newFerramenta.tipo !== 'STD'} />
                         </div>
                      ) : null}
                     {newFerramenta.tipo === 'EQV' ? (
                         <div>
                             <Label htmlFor="pn_referencia">P/N Referência (Substitui qual?) <span className='text-destructive'>*</span></Label>
-                            <Input id="pn_referencia" value={newFerramenta.pn_referencia} onChange={handleInputChange} required />
+                            <Input id="pn_referencia" value={newFerramenta.pn_referencia || ''} onChange={handleInputChange} required />
                         </div>
                      ) : null}
                     {newFerramenta.tipo === 'ESP' && (
                         <div>
                             <Label htmlFor="aeronave_aplicavel">Aeronave Aplicável <span className='text-destructive'>*</span></Label>
-                            <Input id="aeronave_aplicavel" value={newFerramenta.aeronave_aplicavel} onChange={handleInputChange} required />
+                            <Input id="aeronave_aplicavel" value={newFerramenta.aeronave_aplicavel || ''} onChange={handleInputChange} required />
                         </div>
                     )}
                      <div className="col-span-2 flex items-center gap-4">
@@ -290,12 +338,73 @@ const CadastroLogicaFerramentas = () => {
             <CardDescription>Gerencie os modelos (templates) de ferramentas.</CardDescription>
         </CardHeader>
         <CardContent>
-            {/* TODO: Listar aqui as lógicas já cadastradas */}
-             <div className="p-4 border rounded-lg bg-muted/20">
-                <p className="text-sm text-center text-muted-foreground">
-                    A lista de lógicas de ferramentas será implementada aqui.
-                </p>
-            </div>
+             {isLoadingLogicas && (
+                <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
+                            <Skeleton className="h-16 w-16 rounded-md" />
+                            <div className="space-y-2 flex-1">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-4 w-1/2" />
+                            </div>
+                            <Skeleton className="h-8 w-8 rounded-full" />
+                        </div>
+                    ))}
+                </div>
+             )}
+             {logicasError && (
+                <div className="p-4 border rounded-lg bg-destructive/10 text-destructive text-center">
+                    <p>Erro ao carregar as lógicas de ferramentas. Verifique suas permissões.</p>
+                </div>
+             )}
+             {!isLoadingLogicas && !logicasError && logicas && logicas.length > 0 && (
+                <div className="space-y-3">
+                    {logicas.map(logica => (
+                        <div key={logica.docId} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                            <Image 
+                                src={logica.imageUrl || 'https://picsum.photos/seed/default-tool/64/64'} 
+                                alt={logica.descricao}
+                                width={64}
+                                height={64}
+                                className="rounded-md aspect-square object-cover"
+                            />
+                            <div className="flex-1 text-sm">
+                                <p className="font-bold text-base">{logica.descricao}</p>
+                                <p className="font-mono text-muted-foreground">{logica.codigo}</p>
+                            </div>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="icon" disabled={isDeleting}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Tem certeza que deseja excluir a lógica <span className="font-bold">"{logica.descricao}"</span>? Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(logica)} disabled={isDeleting}>
+                                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                        Sim, Excluir
+                                    </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    ))}
+                </div>
+             )}
+             {!isLoadingLogicas && !logicasError && (!logicas || logicas.length === 0) && (
+                <div className="p-4 border-2 border-dashed rounded-lg bg-muted/20">
+                    <p className="text-sm text-center text-muted-foreground">
+                        Nenhuma lógica de ferramenta cadastrada ainda. Clique em "Adicionar Lógica" para começar.
+                    </p>
+                </div>
+             )}
         </CardContent>
       </Card>
       
@@ -304,3 +413,5 @@ const CadastroLogicaFerramentas = () => {
 };
 
 export default CadastroLogicaFerramentas;
+
+    
