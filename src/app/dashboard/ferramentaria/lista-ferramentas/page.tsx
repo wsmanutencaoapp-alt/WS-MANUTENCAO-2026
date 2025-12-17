@@ -51,25 +51,31 @@ const ListaFerramentasPage = () => {
   
   const ferramentasQueryKey = 'ferramentas';
 
+  // Corrected Query: Fetch all tools and filter on the client-side.
   const ferramentasCollectionRef = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'tools'), where('enderecamento', '!=', 'LOGICA'), orderBy('enderecamento')) : null),
+    () => (firestore ? query(collection(firestore, 'tools'), orderBy('codigo')) : null),
     [firestore]
   );
   
-  const { data: ferramentas, isLoading, error: firestoreError } = useCollection<Ferramenta>(ferramentasCollectionRef, {
+  const { data: todasAsFerramentas, isLoading, error: firestoreError } = useCollection<Ferramenta>(ferramentasCollectionRef, {
     queryKey: [ferramentasQueryKey]
   });
+  
+  // Filter out logic templates on the client-side
+  const ferramentasVisiveis = useMemo(() => {
+    return todasAsFerramentas?.filter(ferramenta => ferramenta.enderecamento !== 'LOGICA') || [];
+  }, [todasAsFerramentas]);
 
   const filteredFerramentas = useMemo(() => {
-    if (!ferramentas) return [];
-    if (!searchTerm) return ferramentas;
+    if (!ferramentasVisiveis) return [];
+    if (!searchTerm) return ferramentasVisiveis;
 
     const lowercasedTerm = searchTerm.toLowerCase();
-    return ferramentas.filter(ferramenta => 
+    return ferramentasVisiveis.filter(ferramenta => 
         (ferramenta.descricao && ferramenta.descricao.toLowerCase().includes(lowercasedTerm)) ||
         (ferramenta.codigo && ferramenta.codigo.toLowerCase().includes(lowercasedTerm))
     );
-  }, [ferramentas, searchTerm]);
+  }, [ferramentasVisiveis, searchTerm]);
 
   const getStatusVariant = (status: string) => {
     const statusMap: { [key: string]: 'success' | 'destructive' | 'default' } = {
@@ -228,3 +234,5 @@ const ListaFerramentasPage = () => {
 };
 
 export default ListaFerramentasPage;
+
+    
