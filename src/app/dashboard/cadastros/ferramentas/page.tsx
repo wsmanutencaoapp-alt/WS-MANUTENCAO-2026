@@ -78,13 +78,21 @@ const CadastroLogicaFerramentas = () => {
   const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
   const [toolImage, setToolImage] = useState<string | null>(null);
 
-  const logicasQuery = useMemoFirebase(() => (
-    firestore ? query(collection(firestore, 'tools'), where('enderecamento', '==', 'LOGICA'), orderBy('codigo')) : null
+  const toolsQuery = useMemoFirebase(() => (
+    firestore ? query(collection(firestore, 'tools'), orderBy('codigo')) : null
   ), [firestore]);
   
-  const { data: logicas, isLoading: isLoadingLogicas, error: logicasError } = useCollection<Tool>(logicasQuery, {
-    queryKey: [logicasQueryKey]
+  const { data: allTools, isLoading: isLoadingTools, error: toolsError } = useCollection<Tool>(toolsQuery, {
+    queryKey: ['allToolsForLogicPage']
   });
+
+  const logicas = useMemo(() => {
+    return allTools?.filter(tool => tool.enderecamento === 'LOGICA') || [];
+  }, [allTools]);
+  
+  const isLoadingLogicas = isLoadingTools;
+  const logicasError = toolsError;
+
 
   useEffect(() => {
     const { tipo, familia, classificacao } = newFerramenta;
@@ -182,7 +190,7 @@ const CadastroLogicaFerramentas = () => {
         toast({ title: "Sucesso!", description: `Nova lógica de ferramenta cadastrada.` });
         resetForm();
         setIsNewToolDialogOpen(false);
-        queryClient.invalidateQueries({ queryKey: [logicasQueryKey] });
+        queryClient.invalidateQueries({ queryKey: [logicasQueryKey, 'allToolsForLogicPage'] });
 
     } catch (error) {
       console.error("Erro ao salvar lógica:", error);
@@ -208,7 +216,7 @@ const CadastroLogicaFerramentas = () => {
         }
 
         toast({ title: 'Sucesso', description: 'Lógica de ferramenta excluída.' });
-        queryClient.invalidateQueries({ queryKey: [logicasQueryKey] });
+        queryClient.invalidateQueries({ queryKey: [logicasQueryKey, 'allToolsForLogicPage'] });
     } catch (error) {
         console.error("Erro ao excluir lógica:", error);
         toast({ variant: 'destructive', title: 'Erro ao Excluir', description: 'Não foi possível excluir a lógica.' });
