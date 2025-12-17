@@ -413,5 +413,3 @@ const CadastroLogicaFerramentas = () => {
 };
 
 export default CadastroLogicaFerramentas;
-
-    
