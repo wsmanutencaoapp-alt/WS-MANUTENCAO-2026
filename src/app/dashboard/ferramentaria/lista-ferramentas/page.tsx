@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import ReprintDialog from '@/components/ReprintDialog';
+import { cn } from '@/lib/utils';
 
 
 interface Ferramenta extends Tool {
@@ -161,7 +162,7 @@ const ListaFerramentasPage = () => {
                  <TableRow><TableCell colSpan={6} className="text-center text-destructive">Erro: {firestoreError.message}</TableCell></TableRow>
               ) : filteredFerramentas && filteredFerramentas.length > 0 ? (
                 filteredFerramentas.map((ferramenta) => (
-                  <TableRow key={ferramenta.docId}>
+                  <TableRow key={ferramenta.docId} className={cn(ferramenta.tipo === 'EQV' && 'bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-100/80 dark:hover:bg-blue-900/50')}>
                     <TableCell className="hidden sm:table-cell">
                         <button className="relative group focus:outline-none" onClick={() => setSelectedToolForDetails(ferramenta)}>
                           <Image
@@ -234,5 +235,3 @@ const ListaFerramentasPage = () => {
 };
 
 export default ListaFerramentasPage;
-
-    
