@@ -97,13 +97,10 @@ const allNavItems: NavItem[] = [
     ]
   },
   { 
-    href: '/dashboard/cadastros', 
+    href: '/dashboard/cadastros/ferramentas', 
     icon: FilePlus2, 
     label: 'Cadastros',
     permission: 'cadastros',
-     subItems: [
-        { href: '/dashboard/cadastros/ferramentas', label: 'Ferramentas', permission: 'cadastros_ferramentas' }
-    ]
   },
   { 
     href: '/dashboard/user-management', 

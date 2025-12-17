@@ -51,6 +51,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
+import LabelPrintDialog from '@/components/LabelPrintDialog';
+import { useRouter } from 'next/navigation';
+
 
 const familiaSuggestions: { [key in Tool['familia']]: Tool['classificacao'] } = {
     TRQ: 'C', PRE: 'C', ELE: 'C', RIG: 'L', MET: 'C', SEG: 'V', MEC: 'N',
@@ -63,6 +66,7 @@ const CadastroLogicaFerramentas = () => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docEngenhariaInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   
   const queryClient = useQueryClient();
   const logicasQueryKey = 'logicasFerramentas';
@@ -72,10 +76,13 @@ const CadastroLogicaFerramentas = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   
   const [editingLogic, setEditingLogic] = useState<WithDocId<Tool> | null>(null);
+  const [toolsToPrint, setToolsToPrint] = useState<any[]>([]);
+  const [isLabelPrintOpen, setIsLabelPrintOpen] = useState(false);
 
   const [newFerramenta, setNewFerramenta] = useState<Partial<Tool>>({
       tipo: 'STD', familia: 'MEC', classificacao: 'N', descricao: '',
       pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '',
+      enderecamento: '', status: 'Disponível',
   });
 
   const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
@@ -145,6 +152,7 @@ const CadastroLogicaFerramentas = () => {
     setNewFerramenta({
       tipo: 'STD', familia: 'MEC', classificacao: 'N', descricao: '',
       pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '',
+      enderecamento: '', status: 'Disponível',
     });
     setToolImage(null);
     setDocEngenhariaFile(null);
@@ -173,6 +181,8 @@ const CadastroLogicaFerramentas = () => {
         toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado ou falha na conexão.' });
         return;
     }
+    const isDirectCreation = newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'EQV';
+    
     if (newFerramenta.tipo === 'ESP' && !newFerramenta.pn_fabricante) {
       toast({ variant: "destructive", description: "P/N Fabricante é obrigatório para tipo 'Especial'." }); return;
     }
@@ -183,7 +193,10 @@ const CadastroLogicaFerramentas = () => {
       toast({ variant: "destructive", description: "Doc. Engenharia é obrigatório para tipo 'Equivalente'." }); return;
     }
      if (!toolImage && !editingLogic?.imageUrl) {
-      toast({ variant: "destructive", description: "A imagem de referência é obrigatória para a lógica." }); return;
+      toast({ variant: "destructive", description: "A imagem de referência é obrigatória." }); return;
+    }
+    if (isDirectCreation && !newFerramenta.enderecamento) {
+        toast({ variant: "destructive", description: "Endereçamento é obrigatório para cadastro direto." }); return;
     }
   
     setIsSaving(true);
@@ -194,7 +207,7 @@ const CadastroLogicaFerramentas = () => {
         
         let imageUrl = editingLogic?.imageUrl;
         if (toolImage && toolImage.startsWith('data:')) {
-            imageUrl = await uploadImageAsDataUrl(toolImage, `tool_logic_images/${logicId}.jpg`);
+            imageUrl = await uploadImageAsDataUrl(toolImage, `tool_images/${logicId}.jpg`);
         }
 
         let docEngenhariaUrl = editingLogic?.doc_engenharia_url;
@@ -202,33 +215,61 @@ const CadastroLogicaFerramentas = () => {
             docEngenhariaUrl = await uploadFile(docEngenhariaFile, `doc_engenharia/${logicId}_${docEngenhariaFile.name}`);
         }
         
-        let status: Tool['status'] = 'Disponível';
-        if (newFerramenta.tipo === 'EQV') status = 'Pendente';
-
-        const sequencial = 0; // Logic template has no sequencial, it's a template
-        const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${sequencial.toString().padStart(4, '0')}`;
-        
-        const toolData: Partial<Tool> = {
+        const baseToolData: Partial<Tool> = {
             ...newFerramenta,
-            codigo: codigoCompleto,
-            sequencial: sequencial,
-            status: status,
             imageUrl: imageUrl,
-            enderecamento: 'LOGICA', // Mark this as a logic template
             doc_engenharia_url: docEngenhariaUrl
         };
-        
         // Remove undefined properties to avoid overwriting existing data with nothing
-        Object.keys(toolData).forEach(key => toolData[key as keyof Partial<Tool>] === undefined && delete toolData[key as keyof Partial<Tool>]);
+        Object.keys(baseToolData).forEach(key => baseToolData[key as keyof Partial<Tool>] === undefined && delete baseToolData[key as keyof Partial<Tool>]);
+        
+        if (isDirectCreation && !editingLogic) { // Only for new ESP or EQV tools
+            const { tipo, familia, classificacao } = newFerramenta;
+            const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
+            
+            const newSequencial = await runTransaction(firestore, async (transaction) => {
+                const counterDoc = await transaction.get(counterRef);
+                 if (!counterDoc.exists()) {
+                    transaction.set(counterRef, { lastId: 1 });
+                    return 1;
+                }
+                const newId = (counterDoc.data().lastId || 0) + 1;
+                transaction.update(counterRef, { lastId: newId });
+                return newId;
+            });
+            
+            const codigoCompleto = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
+            const status: Tool['status'] = tipo === 'EQV' ? 'Pendente' : 'Disponível';
 
+            const toolData: Omit<Tool, 'id'> = {
+                ...(baseToolData as Omit<Tool, 'id' | 'codigo' | 'sequencial' | 'status'>),
+                codigo: codigoCompleto,
+                sequencial: newSequencial,
+                status: status,
+            };
+            
+            const docRef = await addDoc(collection(firestore, 'tools'), toolData);
+            setToolsToPrint([{...toolData, id: docRef.id}]);
+            setIsLabelPrintOpen(true);
+            toast({ title: "Sucesso!", description: `Ferramenta ${codigoCompleto} criada.` });
 
-        if (editingLogic) {
-            // Update existing logic
+        } else if (editingLogic) {
+            // Update existing logic OR existing unique tool
             const logicRef = doc(firestore, 'tools', editingLogic.docId);
-            await updateDoc(logicRef, toolData);
-            toast({ title: "Sucesso!", description: `Lógica de ferramenta atualizada.` });
+            await updateDoc(logicRef, baseToolData);
+            toast({ title: "Sucesso!", description: `Ferramenta/Lógica atualizada.` });
         } else {
-            // Add new logic
+            // Add new logic template (STD or GSE)
+            const sequencial = 0;
+            const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${sequencial.toString().padStart(4, '0')}`;
+            const toolData: Partial<Tool> = {
+                ...baseToolData,
+                codigo: codigoCompleto,
+                sequencial: sequencial,
+                status: 'Disponível', // Status for a logic is just a default
+                enderecamento: 'LOGICA', // Mark this as a logic template
+            };
+
             await addDoc(collection(firestore, 'tools'), toolData);
             toast({ title: "Sucesso!", description: `Nova lógica de ferramenta cadastrada.` });
         }
@@ -238,8 +279,8 @@ const CadastroLogicaFerramentas = () => {
         queryClient.invalidateQueries({ queryKey: [logicasQueryKey, 'allToolsForLogicPage'] });
 
     } catch (error) {
-      console.error("Erro ao salvar lógica:", error);
-      toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível salvar a lógica. Verifique as permissões.` });
+      console.error("Erro ao salvar:", error);
+      toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível salvar. Verifique as permissões.` });
     } finally {
       setIsSaving(false);
     }
@@ -256,20 +297,28 @@ const CadastroLogicaFerramentas = () => {
         await deleteDoc(docRef);
 
         if (logica.imageUrl) {
-            const imageRef = storageRef(storage, logica.imageUrl);
-            await deleteObject(imageRef).catch(err => console.warn("Could not delete image, it might not exist:", err));
+            try {
+              const imageRef = storageRef(storage, logica.imageUrl);
+              await deleteObject(imageRef);
+            } catch(err: any) {
+               if (err.code !== 'storage/object-not-found') console.warn("Could not delete image:", err)
+            }
         }
 
         if (logica.doc_engenharia_url) {
-            const docRef = storageRef(storage, logica.doc_engenharia_url);
-            await deleteObject(docRef).catch(err => console.warn("Could not delete doc, it might not exist:", err));
+            try {
+              const docUrlRef = storageRef(storage, logica.doc_engenharia_url);
+              await deleteObject(docUrlRef);
+            } catch(err: any) {
+               if (err.code !== 'storage/object-not-found') console.warn("Could not delete engineering doc:", err)
+            }
         }
 
-        toast({ title: 'Sucesso', description: 'Lógica de ferramenta excluída.' });
+        toast({ title: 'Sucesso', description: 'Lógica/Ferramenta excluída.' });
         queryClient.invalidateQueries({ queryKey: [logicasQueryKey, 'allToolsForLogicPage'] });
     } catch (error) {
-        console.error("Erro ao excluir lógica:", error);
-        toast({ variant: 'destructive', title: 'Erro ao Excluir', description: 'Não foi possível excluir a lógica.' });
+        console.error("Erro ao excluir:", error);
+        toast({ variant: 'destructive', title: 'Erro ao Excluir', description: 'Não foi possível excluir o item.' });
     } finally {
         setIsDeleting(false);
     }
@@ -287,7 +336,7 @@ const CadastroLogicaFerramentas = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Cadastro de Lógica de Ferramentas</h1>
+        <h1 className="text-2xl font-bold">Cadastro de Ferramentas</h1>
         <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
             if (!isOpen) resetForm();
             setIsFormDialogOpen(isOpen);
@@ -295,14 +344,14 @@ const CadastroLogicaFerramentas = () => {
           <DialogTrigger asChild>
             <Button onClick={() => { setEditingLogic(null); resetForm(); }}>
               <PlusCircle className="mr-2 h-4 w-4" />
-              Adicionar Lógica
+              Adicionar
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>{editingLogic ? 'Editar Lógica' : 'Cadastrar Nova Lógica'} de Ferramenta</DialogTitle>
+              <DialogTitle>{editingLogic ? 'Editar Ferramenta/Lógica' : 'Cadastrar Nova Ferramenta ou Lógica'}</DialogTitle>
               <DialogDescription>
-                Preencha os campos para criar ou atualizar um modelo de ferramenta. O código será: <span className="font-mono font-bold text-primary">{generatedCode}</span>
+                Use para cadastrar novas ferramentas <span className="font-bold">ESP/EQV</span> diretamente, ou criar modelos <span className="font-bold">STD/GSE</span> para adição em massa.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
@@ -313,10 +362,10 @@ const CadastroLogicaFerramentas = () => {
                     <Label htmlFor="tipo">Tipo</Label>
                     <Select value={newFerramenta.tipo} onValueChange={(v) => handleSelectChange('tipo', v)}><SelectTrigger id="tipo"><SelectValue/></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="STD">STD (Standard)</SelectItem>
-                        <SelectItem value="ESP">ESP (Específico)</SelectItem>
-                        <SelectItem value="GSE">GSE (Apoio de Solo)</SelectItem>
-                        <SelectItem value="EQV">EQV (Equivalente)</SelectItem>
+                        <SelectItem value="STD">STD (Standard - Modelo)</SelectItem>
+                        <SelectItem value="ESP">ESP (Específico - Cadastro Direto)</SelectItem>
+                        <SelectItem value="GSE">GSE (Apoio de Solo - Modelo)</SelectItem>
+                        <SelectItem value="EQV">EQV (Equivalente - Cadastro Direto)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -348,12 +397,31 @@ const CadastroLogicaFerramentas = () => {
                 </CardContent>
               </Card>
               <Card>
-                 <CardHeader><CardTitle className="text-lg">Dados Cadastrais Genéricos</CardTitle></CardHeader>
+                 <CardHeader><CardTitle className="text-lg">Dados Cadastrais</CardTitle></CardHeader>
                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="col-span-2">
-                        <Label htmlFor="descricao">Descrição Genérica</Label>
+                        <Label htmlFor="descricao">Descrição Genérica <span className='text-destructive'>*</span></Label>
                         <Input id="descricao" value={newFerramenta.descricao || ''} onChange={handleInputChange} required />
                     </div>
+                     {(newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'EQV') && (
+                         <>
+                            <div className="col-span-1">
+                                <Label htmlFor="enderecamento">Endereçamento <span className='text-destructive'>*</span></Label>
+                                <Input id="enderecamento" value={newFerramenta.enderecamento || ''} onChange={handleInputChange} required placeholder="Ex: GAV-01-A" />
+                            </div>
+                             <div className="col-span-1">
+                                <Label htmlFor="status">Status Inicial</Label>
+                                <Select value={newFerramenta.status} onValueChange={(v) => handleSelectChange('status', v)}><SelectTrigger id="status"><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Disponível">Disponível</SelectItem>
+                                    <SelectItem value="Em Aferição">Em Aferição</SelectItem>
+                                    <SelectItem value="Em Manutenção">Em Manutenção</SelectItem>
+                                    <SelectItem value="Bloqueado">Bloqueado</SelectItem>
+                                </SelectContent>
+                                </Select>
+                            </div>
+                         </>
+                     )}
                      {newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'GSE' || newFerramenta.tipo === 'EQV' ? (
                         <div>
                             <Label htmlFor="pn_fabricante">P/N Fabricante {newFerramenta.tipo !== 'STD' && <span className='text-destructive'>*</span>}</Label>
@@ -390,10 +458,16 @@ const CadastroLogicaFerramentas = () => {
                  </CardContent>
               </Card>
 
-                {newFerramenta.tipo === 'EQV' && (
+                {(newFerramenta.tipo === 'EQV') && (
                     <div className="col-span-full bg-blue-100 dark:bg-blue-900/30 border border-blue-400 text-blue-800 dark:text-blue-200 px-4 py-3 rounded-md flex items-center gap-3">
                         <AlertTriangle className="h-5 w-5" />
                         <p className="text-sm">O status inicial para ferramentas 'EQV' será <span className="font-bold">"Pendente"</span> e aguardará aprovação da engenharia.</p>
+                    </div>
+                )}
+                 {(newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'EQV') && !editingLogic && (
+                    <div className="col-span-full bg-green-100 dark:bg-green-900/30 border border-green-400 text-green-800 dark:text-green-200 px-4 py-3 rounded-md flex items-center gap-3">
+                        <AlertTriangle className="h-5 w-5" />
+                        <p className="text-sm">Esta ferramenta será cadastrada diretamente. Após salvar, você poderá imprimir a etiqueta.</p>
                     </div>
                 )}
             </div>
@@ -401,7 +475,7 @@ const CadastroLogicaFerramentas = () => {
               <Button variant="outline" onClick={() => setIsFormDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleSaveToolLogic} disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editingLogic ? 'Salvar Alterações' : 'Salvar Lógica'}
+                {editingLogic ? 'Salvar Alterações' : 'Salvar'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -410,8 +484,8 @@ const CadastroLogicaFerramentas = () => {
 
        <Card>
         <CardHeader>
-            <CardTitle>Lógicas Cadastradas</CardTitle>
-            <CardDescription>Gerencie os modelos (templates) de ferramentas.</CardDescription>
+            <CardTitle>Modelos Cadastrados (STD/GSE)</CardTitle>
+            <CardDescription>Gerencie os modelos (templates) para ferramentas STD e GSE.</CardDescription>
         </CardHeader>
         <CardContent>
              {isLoadingLogicas && (
@@ -430,7 +504,7 @@ const CadastroLogicaFerramentas = () => {
              )}
              {logicasError && (
                 <div className="p-4 border rounded-lg bg-destructive/10 text-destructive text-center">
-                    <p>Erro ao carregar as lógicas de ferramentas. Verifique suas permissões.</p>
+                    <p>Erro ao carregar os modelos de ferramentas. Verifique suas permissões.</p>
                 </div>
              )}
              {!isLoadingLogicas && !logicasError && logicas && logicas.length > 0 && (
@@ -463,7 +537,7 @@ const CadastroLogicaFerramentas = () => {
                                         <AlertDialogHeader>
                                         <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                            Tem certeza que deseja excluir a lógica <span className="font-bold">"{logica.descricao}"</span>? Esta ação não pode ser desfeita.
+                                            Tem certeza que deseja excluir o modelo <span className="font-bold">"{logica.descricao}"</span>? Esta ação não pode ser desfeita.
                                         </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
@@ -483,17 +557,24 @@ const CadastroLogicaFerramentas = () => {
              {!isLoadingLogicas && !logicasError && (!logicas || logicas.length === 0) && (
                 <div className="p-4 border-2 border-dashed rounded-lg bg-muted/20">
                     <p className="text-sm text-center text-muted-foreground">
-                        Nenhuma lógica de ferramenta cadastrada ainda. Clique em "Adicionar Lógica" para começar.
+                        Nenhum modelo de ferramenta cadastrado ainda. Clique em "Adicionar" para criar um.
                     </p>
                 </div>
              )}
         </CardContent>
       </Card>
       
+       <LabelPrintDialog
+        isOpen={isLabelPrintOpen}
+        onClose={() => {
+            setIsLabelPrintOpen(false);
+            setToolsToPrint([]);
+            router.push('/dashboard/ferramentaria/lista-ferramentas');
+        }}
+        tools={toolsToPrint}
+      />
     </div>
   );
 };
 
 export default CadastroLogicaFerramentas;
-
-    
