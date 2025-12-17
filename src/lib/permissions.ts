@@ -23,6 +23,7 @@ export const allUserPermissions: { id: string; path: string }[] = [
     { id: 'engenharia', path: '/dashboard/engenharia' },
     { id: 'engenharia_aprovacoes', path: '/dashboard/engenharia/aprovacoes' },
     { id: 'engenharia_projetos', path: '/dashboard/engenharia/projetos' },
+    { id: 'comercial', path: '/dashboard/comercial' },
 ];
 
 export const getRequiredPermissionForPath = (path: string): string | null => {

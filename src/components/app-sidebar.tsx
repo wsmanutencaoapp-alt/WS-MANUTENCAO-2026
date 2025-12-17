@@ -16,6 +16,7 @@ import {
   FilePlus2,
   List,
   Briefcase,
+  DollarSign,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -67,6 +68,12 @@ const allNavItems: NavItem[] = [
       { href: '/dashboard/engenharia/aprovacoes', label: 'Aprovações', permission: 'engenharia_aprovacoes' },
       { href: '/dashboard/engenharia/projetos', label: 'Projetos', permission: 'engenharia_projetos' },
     ]
+  },
+  {
+    href: '/dashboard/comercial',
+    icon: DollarSign,
+    label: 'Comercial',
+    permission: 'comercial',
   },
   { 
     href: '/dashboard/financeiro', 

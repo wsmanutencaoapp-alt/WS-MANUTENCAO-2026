@@ -28,6 +28,7 @@ const availableScreens = [
     { id: 'engenharia', label: 'Engenharia (Módulo)', isParent: true },
     { id: 'engenharia_aprovacoes', label: 'Aprovações', isParent: false, parentId: 'engenharia' },
     { id: 'engenharia_projetos', label: 'Projetos', isParent: false, parentId: 'engenharia' },
+    { id: 'comercial', label: 'Comercial (Módulo)', isParent: true },
     { id: 'financeiro', label: 'Financeiro (Módulo)', isParent: true },
     { id: 'financeiro_visao-geral', label: 'Visão Geral', isParent: false, parentId: 'financeiro' },
     { id: 'financeiro_orcamento', label: 'Orçamento', isParent: false, parentId: 'financeiro' },
@@ -44,9 +45,10 @@ interface UserPermissionsDialogProps {
     isOpen: boolean;
     onClose: () => void;
     employee: WithDocId<Employee> | null;
+    onPermissionsChange: (employeeId: string, permissions: { [key: string]: boolean }) => void;
 }
 
-export default function UserPermissionsDialog({ isOpen, onClose, employee }: UserPermissionsDialogProps) {
+export default function UserPermissionsDialog({ isOpen, onClose, employee, onPermissionsChange }: UserPermissionsDialogProps) {
     const [currentPermissions, setCurrentPermissions] = useState<{[key: string]: boolean}>({});
     const [isSaving, setIsSaving] = useState(false);
     const firestore = useFirestore();
@@ -71,6 +73,8 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee }: Use
                 title: 'Sucesso!',
                 description: `Permissões de ${employee.firstName} atualizadas.`,
             });
+            // This is the call that updates the parent component's state
+            onPermissionsChange(employee.docId, newPermissions);
             queryClient.invalidateQueries({ queryKey: ['employees'] });
             onClose();
         } catch (error) {
