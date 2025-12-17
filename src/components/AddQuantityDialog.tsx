@@ -107,7 +107,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           limit(25)
         );
 
-        const [logicSnapshot, codeSnapshot] = await Promise.all([getDocs(logicQuery), getDocs(codeSnapshot)]);
+        const [logicSnapshot, codeSnapshot] = await Promise.all([getDocs(logicQuery), getDocs(codeQuery)]);
 
         const logicTools = new Map<string, FoundTool>();
         logicSnapshot.docs.forEach(doc => {
