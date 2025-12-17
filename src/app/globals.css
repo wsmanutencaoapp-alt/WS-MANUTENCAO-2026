@@ -10,8 +10,8 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 35 92% 55%;
-    --primary-foreground: 35 92% 15%;
+    --primary: 240 10% 15%;
+    --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
     --muted: 240 4.8% 95.9%;
@@ -22,7 +22,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 35 92% 55%;
+    --ring: 240 10% 15%;
     --radius: 0.5rem;
 
     /* Custom Sidebar Colors */
@@ -37,14 +37,14 @@
   }
 
   .dark {
-    --background: 240 6% 10%;
+    --background: 240 6% 12%;
     --foreground: 0 0% 98%;
-    --card: 240 6% 10%;
+    --card: 240 6% 12%;
     --card-foreground: 0 0% 98%;
     --popover: 240 6% 10%;
     --popover-foreground: 0 0% 98%;
-    --primary: 35 92% 55%;
-    --primary-foreground: 35 92% 15%;
+    --primary: 240 10% 15%;
+    --primary-foreground: 0 0% 98%;
     --secondary: 240 5% 18%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 5% 18%;
@@ -55,7 +55,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 240 5% 18%;
     --input: 240 5% 22%;
-    --ring: 35 92% 55%;
+    --ring: 240 10% 15%;
     
     /* Custom Sidebar Colors */
     --sidebar-background: 240 10% 3.9%;
