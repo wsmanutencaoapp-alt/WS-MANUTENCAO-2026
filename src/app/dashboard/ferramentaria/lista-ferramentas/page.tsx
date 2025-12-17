@@ -52,7 +52,7 @@ const ListaFerramentasPage = () => {
   const ferramentasQueryKey = 'ferramentas';
 
   const ferramentasCollectionRef = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'tools'), where('enderecamento', '!=', 'LOGICA'), orderBy('enderecamento'), orderBy('codigo', 'desc')) : null),
+    () => (firestore ? query(collection(firestore, 'tools'), where('enderecamento', '!=', 'LOGICA'), orderBy('enderecamento')) : null),
     [firestore]
   );
   
