@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useFirestore } from '@/firebase';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useFirestore, useStorage } from '@/firebase';
 import {
   collection,
   query,
@@ -13,6 +13,7 @@ import {
   orderBy,
   addDoc
 } from 'firebase/firestore';
+import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import {
   Dialog,
   DialogContent,
@@ -25,13 +26,17 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, Upload, Paperclip, CalendarIcon, ImageIcon, FileText } from 'lucide-react';
 import type { Tool } from '@/lib/types';
 import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Calendar } from './ui/calendar';
+import { format } from 'date-fns';
 
 
 interface AddQuantityDialogProps {
@@ -60,8 +65,18 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
   const [selectedToolGroup, setSelectedToolGroup] = useState<ToolGroup | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [toolImage, setToolImage] = useState<string | null>(null);
+  const [dataReferencia, setDataReferencia] = useState<Date | undefined>();
+  const [dataVencimento, setDataVencimento] = useState<Date | undefined>();
+  const [docAnexo, setDocAnexo] = useState<File | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const docAnexoInputRef = useRef<HTMLInputElement>(null);
+
 
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -76,6 +91,10 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       setSelectedToolGroup(null);
       setIsSearching(false);
       setIsSaving(false);
+      setToolImage(null);
+      setDataReferencia(undefined);
+      setDataVencimento(undefined);
+      setDocAnexo(null);
     }
   }, [isOpen]);
   
@@ -92,12 +111,9 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       try {
         const toolsRef = collection(firestore, 'tools');
         
-        // Query logic templates, which are marked with 'LOGICA'
         const logicQuery = query(
           toolsRef, 
           where('enderecamento', '==', 'LOGICA'),
-          // This part is tricky without composite indexes for every field.
-          // For now, we will filter client-side after getting the templates.
         );
         const codeQuery = query(
           toolsRef, 
@@ -119,12 +135,10 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         });
         codeSnapshot.docs.forEach(doc => logicTools.set(doc.id, { id: doc.id, ...doc.data() } as FoundTool));
         
-        // Templates/Logics are unique, so no grouping needed. We just list them.
-        // The 'ToolGroup' type can be simplified or used as is.
         const aggregatedGroups: ToolGroup[] = Array.from(logicTools.values()).map(tool => ({
             ...tool,
-            unitCount: 0, // This is a logic, no real unit count
-            lastSequencial: 0, // Not relevant for the template search view
+            unitCount: 0,
+            lastSequencial: 0,
         }));
         
         setFoundToolGroups(aggregatedGroups);
@@ -144,10 +158,30 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     return () => clearTimeout(debounceSearch);
   }, [searchTerm, firestore, toast]);
 
+    const uploadFile = async (file: File, path: string): Promise<string> => {
+        if (!storage) throw new Error("Storage service not available.");
+        const fileRef = storageRef(storage, path);
+        // We use 'data_url' for both image and file now for simplicity
+        const fileAsDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        const snapshot = await uploadString(fileRef, fileAsDataUrl, 'data_url');
+        return getDownloadURL(snapshot.ref);
+    };
+
+    const uploadImage = async (dataUrl: string, path: string): Promise<string> => {
+        if (!storage) throw new Error("Storage service not available.");
+        const imageRef = storageRef(storage, path);
+        const snapshot = await uploadString(imageRef, dataUrl, 'data_url');
+        return getDownloadURL(snapshot.ref);
+    };
 
   const handleSave = async () => {
-    if (!firestore || !selectedToolGroup) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Nenhuma lógica de ferramenta selecionada.' });
+    if (!firestore || !selectedToolGroup || !storage) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Nenhuma lógica de ferramenta selecionada ou serviço indisponível.' });
       return;
     }
     if (quantityToAdd <= 0) {
@@ -157,6 +191,16 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     if (!enderecamento) {
       toast({ variant: 'destructive', title: 'Erro', description: 'O Endereçamento é obrigatório.' });
       return;
+    }
+    if (!toolImage) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'A Foto da ferramenta é obrigatória.'});
+        return;
+    }
+    if ((selectedToolGroup.classificacao === 'C' || selectedToolGroup.classificacao === 'L' || selectedToolGroup.classificacao === 'V') && !dataVencimento) {
+      toast({ variant: "destructive", description: "Data de Vencimento é obrigatória para esta classificação." }); return;
+    }
+    if ((selectedToolGroup.classificacao === 'C' || selectedToolGroup.classificacao === 'L') && !docAnexo) {
+        toast({ variant: "destructive", description: "Anexo de Certificado/Laudo é obrigatório para esta classificação." }); return;
     }
 
     setIsSaving(true);
@@ -185,6 +229,13 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         const newSequencial = newLastId + 1 + i;
         const newCode = `${baseCode}-${newSequencial.toString().padStart(4, '0')}`;
         
+        // Upload assets for each tool instance if needed (or once if they are shared)
+        // For simplicity, we assume they are unique per new tool for now.
+        const tempId = doc(collection(firestore, 'temp')).id;
+        const imageUrl = await uploadImage(toolImage, `tool_images/${newCode}_${tempId}.jpg`);
+        let docAnexoUrl;
+        if (docAnexo) docAnexoUrl = await uploadFile(docAnexo, `docs_anexos/${newCode}_${tempId}_${docAnexo.name}`);
+        
         const newToolData: Omit<Tool, 'id'> = {
           ...baseData,
           codigo: newCode,
@@ -192,6 +243,10 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível', // Respect initial status
           enderecamento: enderecamento,
           patrimonio: patrimonio || '',
+          imageUrl: imageUrl,
+          data_referencia: dataReferencia?.toISOString(),
+          data_vencimento: dataVencimento?.toISOString(),
+          documento_anexo_url: docAnexoUrl,
         };
         
         const docRef = await addDoc(collection(firestore, 'tools'), newToolData);
@@ -221,7 +276,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Adicionar Ferramenta ao Estoque</DialogTitle>
           <DialogDescription>
@@ -229,7 +284,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
           <div className="relative">
             <Label htmlFor="searchTerm">Pesquisar Lógica</Label>
             <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
@@ -277,7 +332,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           )}
 
           {selectedToolGroup && (
-            <div className="p-4 border rounded-lg bg-muted/50 space-y-3 animate-in fade-in-50">
+            <div className="p-4 border rounded-lg bg-muted/50 space-y-4 animate-in fade-in-50">
                 <div className="flex justify-between items-start">
                     <h4 className="font-semibold">Lógica Selecionada</h4>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedToolGroup(null)}>Alterar</Button>
@@ -293,41 +348,63 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                   <div className="text-sm">
                       <p className="font-bold">{selectedToolGroup.descricao}</p>
                       <p><strong>Código Base:</strong> {selectedToolGroup.codigo.substring(0, selectedToolGroup.codigo.lastIndexOf('-'))}</p>
+                      <p><strong>Classificação:</strong> {selectedToolGroup.classificacao}</p>
                   </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                 <div className="space-y-1.5">
-                    <Label htmlFor="quantityToAdd">Quantidade <span className="text-destructive">*</span></Label>
-                    <Input
-                        id="quantityToAdd"
-                        type="number"
-                        min="1"
-                        value={quantityToAdd}
-                        onChange={(e) => setQuantityToAdd(parseInt(e.target.value, 10) || 1)}
-                    />
-                </div>
-                 <div className="space-y-1.5">
-                    <Label htmlFor="enderecamento">Endereçamento <span className="text-destructive">*</span></Label>
-                    <Input
-                        id="enderecamento"
-                        value={enderecamento}
-                        onChange={(e) => setEnderecamento(e.target.value)}
-                        placeholder="Ex: GAV-01-A"
-                    />
-                </div>
-                <div className="col-span-2 space-y-1.5">
-                    <Label htmlFor="patrimonio">Nº Patrimônio (Opcional)</Label>
-                    <Input
-                        id="patrimonio"
-                        value={patrimonio}
-                        onChange={(e) => setPatrimonio(e.target.value)}
-                        placeholder="Definido pela contabilidade"
-                    />
-                </div>
-              </div>
+              <Card>
+                <CardHeader><CardTitle className="text-lg">Dados da Instância</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="quantityToAdd">Quantidade <span className="text-destructive">*</span></Label>
+                        <Input id="quantityToAdd" type="number" min="1" value={quantityToAdd} onChange={(e) => setQuantityToAdd(parseInt(e.target.value, 10) || 1)} />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="enderecamento">Endereçamento <span className="text-destructive">*</span></Label>
+                        <Input id="enderecamento" value={enderecamento} onChange={(e) => setEnderecamento(e.target.value)} placeholder="Ex: GAV-01-A" />
+                    </div>
+                    <div className="md:col-span-2 space-y-1.5">
+                        <Label htmlFor="patrimonio">Nº Patrimônio (Opcional)</Label>
+                        <Input id="patrimonio" value={patrimonio} onChange={(e) => setPatrimonio(e.target.value)} placeholder="Definido pela contabilidade" />
+                    </div>
+                    <div className="flex items-center gap-4 md:col-span-2">
+                        {toolImage ? <Image src={toolImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted-foreground/20 rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}
+                        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Anexar Foto da Ferramenta<span className='text-destructive ml-1'>*</span></Button>
+                        <Input type="file" ref={fileInputRef} onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setToolImage(reader.result as string); reader.readAsDataURL(file); }}} className="hidden" accept="image/*" required/>
+                    </div>
+                 </CardContent>
+              </Card>
+
+              {selectedToolGroup.classificacao !== 'N' && (
+                  <Card>
+                    <CardHeader><CardTitle className="text-lg">Controle e Validade</CardTitle></CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                           <Label>
+                                {selectedToolGroup.classificacao === 'C' ? 'Data Última Calibração' : selectedToolGroup.classificacao === 'L' ? 'Data Último Teste' : 'Data Fabricação/Insp.'}
+                           </Label>
+                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataReferencia ? format(dataReferencia, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
+                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataReferencia} onSelect={setDataReferencia} initialFocus /></PopoverContent>
+                            </Popover>
+                        </div>
+                        <div>
+                           <Label>Data de Vencimento <span className='text-destructive'>*</span></Label>
+                           <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataVencimento ? format(dataVencimento, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
+                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataVencimento} onSelect={setDataVencimento} initialFocus /></PopoverContent>
+                            </Popover>
+                        </div>
+                        {(selectedToolGroup.classificacao === 'C' || selectedToolGroup.classificacao === 'L') && (
+                            <div className="flex items-center gap-4 col-span-2">
+                                {docAnexo ? <FileText/> : <div className="h-12 w-12 flex items-center justify-center bg-muted-foreground/20 rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
+                                <Button type="button" variant="outline" size="sm" onClick={() => docAnexoInputRef.current?.click()}>Anexar Certificado/Laudo <span className='text-destructive ml-1'>*</span></Button>
+                                <Input type="file" ref={docAnexoInputRef} onChange={(e) => setDocAnexo(e.target.files?.[0] || null)} className="hidden" required/>
+                                {docAnexo && <span className="text-sm text-muted-foreground truncate">{docAnexo.name}</span>}
+                            </div>
+                        )}
+                    </CardContent>
+                  </Card>
+              )}
             </div>
           )}
-
         </div>
 
         <DialogFooter>
@@ -341,3 +418,5 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
+
+    
