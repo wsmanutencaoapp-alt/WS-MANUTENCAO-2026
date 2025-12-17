@@ -61,7 +61,8 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
   const [quantityToAdd, setQuantityToAdd] = useState(1);
   const [enderecamento, setEnderecamento] = useState('');
   const [patrimonio, setPatrimonio] = useState('');
-  const [foundToolGroups, setFoundToolGroups] = useState<ToolGroup[]>([]);
+  const [allLogicTools, setAllLogicTools] = useState<ToolGroup[]>([]);
+  const [filteredLogicTools, setFilteredLogicTools] = useState<ToolGroup[]>([]);
   const [selectedToolGroup, setSelectedToolGroup] = useState<ToolGroup | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -80,6 +81,48 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch all logic tools once when the dialog opens
+  useEffect(() => {
+    const fetchAllLogics = async () => {
+        if (!firestore || !isOpen) return;
+        setIsSearching(true);
+        try {
+            const toolsRef = collection(firestore, 'tools');
+            const q = query(toolsRef, where('enderecamento', '==', 'LOGICA'));
+            const querySnapshot = await getDocs(q);
+            const logics: ToolGroup[] = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...(doc.data() as Tool),
+                unitCount: 0,
+                lastSequencial: 0,
+            }));
+            setAllLogicTools(logics);
+        } catch (error) {
+            console.error('Erro ao buscar lógicas:', error);
+            toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível carregar as lógicas de ferramentas.' });
+        } finally {
+            setIsSearching(false);
+        }
+    };
+    
+    fetchAllLogics();
+  }, [isOpen, firestore, toast]);
+
+  // Filter logic tools based on search term
+  useEffect(() => {
+    if (searchTerm.length < 3) {
+      setFilteredLogicTools([]);
+      return;
+    }
+    const lowercasedTerm = searchTerm.toLowerCase();
+    const filtered = allLogicTools.filter(tool => 
+        tool.descricao.toLowerCase().includes(lowercasedTerm) || 
+        tool.codigo.toLowerCase().includes(lowercasedTerm)
+    );
+    setFilteredLogicTools(filtered);
+  }, [searchTerm, allLogicTools]);
+
+
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (!isOpen) {
@@ -87,7 +130,8 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       setQuantityToAdd(1);
       setEnderecamento('');
       setPatrimonio('');
-      setFoundToolGroups([]);
+      setAllLogicTools([]);
+      setFilteredLogicTools([]);
       setSelectedToolGroup(null);
       setIsSearching(false);
       setIsSaving(false);
@@ -98,65 +142,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     }
   }, [isOpen]);
   
-  // Debounced search effect
-  useEffect(() => {
-    const handleSearch = async () => {
-      if (!firestore || searchTerm.length < 3) {
-        setFoundToolGroups([]);
-        return;
-      }
-      setIsSearching(true);
-      setSelectedToolGroup(null);
-      
-      try {
-        const toolsRef = collection(firestore, 'tools');
-        
-        const logicQuery = query(
-          toolsRef, 
-          where('enderecamento', '==', 'LOGICA'),
-        );
-        const codeQuery = query(
-          toolsRef, 
-          where('enderecamento', '==', 'LOGICA'),
-          where('codigo', '>=', searchTerm.toUpperCase()),
-          where('codigo', '<=', searchTerm.toUpperCase() + '\uf8ff'),
-          limit(25)
-        );
-
-        const [logicSnapshot, codeSnapshot] = await Promise.all([getDocs(logicQuery), getDocs(codeQuery)]);
-
-        const logicTools = new Map<string, FoundTool>();
-        logicSnapshot.docs.forEach(doc => {
-            const toolData = { id: doc.id, ...doc.data() } as FoundTool;
-            const lowerCaseSearch = searchTerm.toLowerCase();
-            if (toolData.descricao.toLowerCase().includes(lowerCaseSearch) || toolData.codigo.toLowerCase().includes(lowerCaseSearch)) {
-                 logicTools.set(doc.id, toolData);
-            }
-        });
-        codeSnapshot.docs.forEach(doc => logicTools.set(doc.id, { id: doc.id, ...doc.data() } as FoundTool));
-        
-        const aggregatedGroups: ToolGroup[] = Array.from(logicTools.values()).map(tool => ({
-            ...tool,
-            unitCount: 0,
-            lastSequencial: 0,
-        }));
-        
-        setFoundToolGroups(aggregatedGroups);
-
-      } catch (error) {
-        console.error('Erro ao pesquisar lógica:', error);
-        toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível realizar a busca de lógicas.' });
-      } finally {
-        setIsSearching(false);
-      }
-    };
-
-    const debounceSearch = setTimeout(() => {
-      handleSearch();
-    }, 300);
-
-    return () => clearTimeout(debounceSearch);
-  }, [searchTerm, firestore, toast]);
 
     const uploadFile = async (file: File, path: string): Promise<string> => {
         if (!storage) throw new Error("Storage service not available.");
@@ -214,7 +199,9 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       const newLastId = await runTransaction(firestore, async (transaction) => {
           const counterDoc = await transaction.get(counterRef);
           if (!counterDoc.exists()) {
-              throw new Error(`Contador para a lógica ${baseCode} não encontrado. Cadastre a lógica primeiro.`);
+              // If it doesn't exist, create it starting from 0. The first tool will be 1.
+              transaction.set(counterRef, { lastId: quantityToAdd });
+              return 0;
           }
           const currentId = counterDoc.data().lastId || 0;
           const newId = currentId + quantityToAdd;
@@ -301,9 +288,9 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
           {!isSearching && searchTerm.length > 2 && !selectedToolGroup && (
             <ScrollArea className="h-[200px] border rounded-md p-2">
-                {foundToolGroups.length > 0 ? (
+                {filteredLogicTools.length > 0 ? (
                     <div className="space-y-2">
-                        {foundToolGroups.map((group) => (
+                        {filteredLogicTools.map((group) => (
                             <button
                                 key={group.id}
                                 onClick={() => setSelectedToolGroup(group)}
@@ -418,5 +405,3 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
-
-    
