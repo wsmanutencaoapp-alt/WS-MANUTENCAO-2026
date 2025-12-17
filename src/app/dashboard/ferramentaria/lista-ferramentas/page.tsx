@@ -5,6 +5,7 @@ import {
   collection,
   query,
   orderBy,
+  where,
 } from 'firebase/firestore';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -51,7 +52,7 @@ const ListaFerramentasPage = () => {
   const ferramentasQueryKey = 'ferramentas';
 
   const ferramentasCollectionRef = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'tools'), orderBy('codigo', 'desc')) : null),
+    () => (firestore ? query(collection(firestore, 'tools'), where('enderecamento', '!=', 'LOGICA'), orderBy('enderecamento'), orderBy('codigo', 'desc')) : null),
     [firestore]
   );
   

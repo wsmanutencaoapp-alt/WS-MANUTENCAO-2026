@@ -54,6 +54,8 @@ type ToolGroup = FoundTool & {
 export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQuantityDialogProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [quantityToAdd, setQuantityToAdd] = useState(1);
+  const [enderecamento, setEnderecamento] = useState('');
+  const [patrimonio, setPatrimonio] = useState('');
   const [foundToolGroups, setFoundToolGroups] = useState<ToolGroup[]>([]);
   const [selectedToolGroup, setSelectedToolGroup] = useState<ToolGroup | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -68,6 +70,8 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     if (!isOpen) {
       setSearchTerm('');
       setQuantityToAdd(1);
+      setEnderecamento('');
+      setPatrimonio('');
       setFoundToolGroups([]);
       setSelectedToolGroup(null);
       setIsSearching(false);
@@ -88,55 +92,46 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       try {
         const toolsRef = collection(firestore, 'tools');
         
-        // Query by 'descricao' (name) or 'codigo'
-        const nameQuery = query(
+        // Query logic templates, which are marked with 'LOGICA'
+        const logicQuery = query(
           toolsRef, 
-          where('descricao', '>=', searchTerm),
-          where('descricao', '<=', searchTerm + '\uf8ff'),
-          limit(25)
+          where('enderecamento', '==', 'LOGICA'),
+          // This part is tricky without composite indexes for every field.
+          // For now, we will filter client-side after getting the templates.
         );
         const codeQuery = query(
           toolsRef, 
+          where('enderecamento', '==', 'LOGICA'),
           where('codigo', '>=', searchTerm.toUpperCase()),
           where('codigo', '<=', searchTerm.toUpperCase() + '\uf8ff'),
           limit(25)
         );
 
-        const [nameSnapshot, codeSnapshot] = await Promise.all([getDocs(nameQuery), getDocs(codeQuery)]);
+        const [logicSnapshot, codeSnapshot] = await Promise.all([getDocs(logicQuery), getDocs(codeSnapshot)]);
 
-        const allTools = new Map<string, FoundTool>();
-        nameSnapshot.docs.forEach(doc => allTools.set(doc.id, { id: doc.id, ...doc.data() } as FoundTool));
-        codeSnapshot.docs.forEach(doc => allTools.set(doc.id, { id: doc.id, ...doc.data() } as FoundTool));
-        
-        // Group tools by base code (TIPO-FAMILIA-CLASSIFICACAO)
-        const groups = new Map<string, FoundTool[]>();
-        allTools.forEach(tool => {
-            if (tool.codigo) {
-                const baseCode = tool.codigo.substring(0, tool.codigo.lastIndexOf('-'));
-                if (!groups.has(baseCode)) {
-                    groups.set(baseCode, []);
-                }
-                groups.get(baseCode)!.push(tool);
+        const logicTools = new Map<string, FoundTool>();
+        logicSnapshot.docs.forEach(doc => {
+            const toolData = { id: doc.id, ...doc.data() } as FoundTool;
+            const lowerCaseSearch = searchTerm.toLowerCase();
+            if (toolData.descricao.toLowerCase().includes(lowerCaseSearch) || toolData.codigo.toLowerCase().includes(lowerCaseSearch)) {
+                 logicTools.set(doc.id, toolData);
             }
         });
-
-        const aggregatedGroups: ToolGroup[] = [];
-        groups.forEach((toolsInGroup) => {
-            const representative = toolsInGroup.reduce((latest, current) => 
-                (current.sequencial > latest.sequencial) ? current : latest
-            );
-            aggregatedGroups.push({
-                ...representative,
-                unitCount: toolsInGroup.length,
-                lastSequencial: representative.sequencial,
-            });
-        });
+        codeSnapshot.docs.forEach(doc => logicTools.set(doc.id, { id: doc.id, ...doc.data() } as FoundTool));
+        
+        // Templates/Logics are unique, so no grouping needed. We just list them.
+        // The 'ToolGroup' type can be simplified or used as is.
+        const aggregatedGroups: ToolGroup[] = Array.from(logicTools.values()).map(tool => ({
+            ...tool,
+            unitCount: 0, // This is a logic, no real unit count
+            lastSequencial: 0, // Not relevant for the template search view
+        }));
         
         setFoundToolGroups(aggregatedGroups);
 
       } catch (error) {
-        console.error('Erro ao pesquisar ferramenta:', error);
-        toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível realizar a busca.' });
+        console.error('Erro ao pesquisar lógica:', error);
+        toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível realizar a busca de lógicas.' });
       } finally {
         setIsSearching(false);
       }
@@ -152,11 +147,15 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
   const handleSave = async () => {
     if (!firestore || !selectedToolGroup) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Nenhuma ferramenta selecionada.' });
+      toast({ variant: 'destructive', title: 'Erro', description: 'Nenhuma lógica de ferramenta selecionada.' });
       return;
     }
     if (quantityToAdd <= 0) {
       toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade deve ser maior que zero.' });
+      return;
+    }
+    if (!enderecamento) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'O Endereçamento é obrigatório.' });
       return;
     }
 
@@ -173,13 +172,14 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           if (!counterDoc.exists()) {
               throw new Error(`Contador para a lógica ${baseCode} não encontrado. Cadastre a lógica primeiro.`);
           }
-          const currentId = counterDoc.data().lastId;
+          const currentId = counterDoc.data().lastId || 0;
           const newId = currentId + quantityToAdd;
           transaction.update(counterRef, { lastId: newId });
           return currentId;
       });
 
-      const { id, unitCount, lastSequencial: ls, ...baseData } = selectedToolGroup;
+      // Exclude logic-specific fields from the new tool instance
+      const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
 
       for (let i = 0; i < quantityToAdd; i++) {
         const newSequencial = newLastId + 1 + i;
@@ -189,7 +189,9 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           ...baseData,
           codigo: newCode,
           sequencial: newSequencial,
-          status: 'Disponível',
+          status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível', // Respect initial status
+          enderecamento: enderecamento,
+          patrimonio: patrimonio || '',
         };
         
         const docRef = await addDoc(collection(firestore, 'tools'), newToolData);
@@ -221,19 +223,19 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Adicionar Quantidade a Item Existente</DialogTitle>
+          <DialogTitle>Adicionar Ferramenta ao Estoque</DialogTitle>
           <DialogDescription>
-            Pesquise por descrição ou código e adicione novas unidades a uma ferramenta.
+            Pesquise por uma lógica de ferramenta e adicione novas unidades ao inventário.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
           <div className="relative">
-            <Label htmlFor="searchTerm">Pesquisar por Descrição ou Código</Label>
+            <Label htmlFor="searchTerm">Pesquisar Lógica</Label>
             <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               id="searchTerm"
-              placeholder="Digite a descrição ou código (ex: Martelo, STD-MEC-N...)"
+              placeholder="Digite a descrição ou código da lógica (ex: Torquímetro, STD-TRQ...)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8"
@@ -248,7 +250,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                     <div className="space-y-2">
                         {foundToolGroups.map((group) => (
                             <button
-                                key={group.codigo}
+                                key={group.id}
                                 onClick={() => setSelectedToolGroup(group)}
                                 className="flex items-start gap-4 p-2 border rounded-lg hover:bg-muted/80 w-full text-left"
                             >
@@ -262,14 +264,13 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                                 <div className="text-sm">
                                     <p className="font-bold">{group.descricao}</p>
                                     <p><strong>Código Base:</strong> {group.codigo.substring(0, group.codigo.lastIndexOf('-'))}</p>
-                                    <p className="text-xs text-muted-foreground">{group.unitCount} unidade(s) em estoque</p>
                                 </div>
                             </button>
                         ))}
                     </div>
                 ) : (
                     <div className="p-4 text-center text-sm text-muted-foreground">
-                        <p>Nenhuma ferramenta encontrada.</p>
+                        <p>Nenhuma lógica encontrada.</p>
                     </div>
                 )}
             </ScrollArea>
@@ -278,7 +279,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           {selectedToolGroup && (
             <div className="p-4 border rounded-lg bg-muted/50 space-y-3 animate-in fade-in-50">
                 <div className="flex justify-between items-start">
-                    <h4 className="font-semibold">Ferramenta Selecionada</h4>
+                    <h4 className="font-semibold">Lógica Selecionada</h4>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedToolGroup(null)}>Alterar</Button>
                 </div>
                <div className="flex items-start gap-4">
@@ -292,18 +293,37 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                   <div className="text-sm">
                       <p className="font-bold">{selectedToolGroup.descricao}</p>
                       <p><strong>Código Base:</strong> {selectedToolGroup.codigo.substring(0, selectedToolGroup.codigo.lastIndexOf('-'))}</p>
-                      <p><strong>Último Seq.:</strong> {selectedToolGroup.lastSequencial.toString().padStart(4, '0')}</p>
                   </div>
               </div>
-              <div className="grid w-full max-w-sm items-center gap-1.5 pt-2">
-                  <Label htmlFor="quantityToAdd">Quantidade a Adicionar</Label>
-                  <Input
-                    id="quantityToAdd"
-                    type="number"
-                    min="1"
-                    value={quantityToAdd}
-                    onChange={(e) => setQuantityToAdd(parseInt(e.target.value, 10) || 1)}
-                  />
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                 <div className="space-y-1.5">
+                    <Label htmlFor="quantityToAdd">Quantidade <span className="text-destructive">*</span></Label>
+                    <Input
+                        id="quantityToAdd"
+                        type="number"
+                        min="1"
+                        value={quantityToAdd}
+                        onChange={(e) => setQuantityToAdd(parseInt(e.target.value, 10) || 1)}
+                    />
+                </div>
+                 <div className="space-y-1.5">
+                    <Label htmlFor="enderecamento">Endereçamento <span className="text-destructive">*</span></Label>
+                    <Input
+                        id="enderecamento"
+                        value={enderecamento}
+                        onChange={(e) => setEnderecamento(e.target.value)}
+                        placeholder="Ex: GAV-01-A"
+                    />
+                </div>
+                <div className="col-span-2 space-y-1.5">
+                    <Label htmlFor="patrimonio">Nº Patrimônio (Opcional)</Label>
+                    <Input
+                        id="patrimonio"
+                        value={patrimonio}
+                        onChange={(e) => setPatrimonio(e.target.value)}
+                        placeholder="Definido pela contabilidade"
+                    />
+                </div>
               </div>
             </div>
           )}
@@ -314,7 +334,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button onClick={handleSave} disabled={!selectedToolGroup || isSaving || isSearching}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Adicionar e Imprimir
+            Adicionar e Imprimir Etiquetas
           </Button>
         </DialogFooter>
       </DialogContent>
