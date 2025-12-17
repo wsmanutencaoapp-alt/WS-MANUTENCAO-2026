@@ -41,6 +41,10 @@ const availableScreens = [
     { id: 'contabilidade', label: 'Fiscal/Contábil (Módulo)', isParent: true },
     { id: 'contabilidade_balancete', label: 'Balancete', isParent: false, parentId: 'contabilidade' },
     { id: 'contabilidade_relatorios', label: 'Relatórios', isParent: false, parentId: 'contabilidade' },
+    { id: 'qualidade', label: 'Qualidade (Módulo)', isParent: true },
+    { id: 'gso', label: 'GSO (Módulo)', isParent: true },
+    { id: 'planejamento', label: 'Planejamento (Módulo)', isParent: true },
+    { id: 'manutencao', label: 'Manutenção (Módulo)', isParent: true },
 ];
 
 

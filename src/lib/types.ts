@@ -62,6 +62,10 @@ export type Permissions = {
   engenharia_aprovacoes?: boolean;
   engenharia_projetos?: boolean;
   comercial?: boolean;
+  qualidade?: boolean;
+  gso?: boolean;
+  planejamento?: boolean;
+  manutencao?: boolean;
   [key: string]: boolean | undefined;
 };
 

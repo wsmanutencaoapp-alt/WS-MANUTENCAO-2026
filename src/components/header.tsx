@@ -21,6 +21,10 @@ import {
   List,
   Briefcase,
   DollarSign,
+  ShieldCheck,
+  Plane,
+  CalendarCheck,
+  HardHat,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -113,6 +117,30 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/contabilidade/balancete', label: 'Balancete', permission: 'contabilidade_balancete' },
         { href: '/dashboard/contabilidade/relatorios', label: 'Relatórios', permission: 'contabilidade_relatorios' },
     ]
+  },
+  {
+    href: '/dashboard/qualidade',
+    icon: ShieldCheck,
+    label: 'Qualidade',
+    permission: 'qualidade',
+  },
+  {
+    href: '/dashboard/gso',
+    icon: Plane,
+    label: 'GSO',
+    permission: 'gso',
+  },
+  {
+    href: '/dashboard/planejamento',
+    icon: CalendarCheck,
+    label: 'Planejamento',
+    permission: 'planejamento',
+  },
+  {
+    href: '/dashboard/manutencao',
+    icon: HardHat,
+    label: 'Manutenção',
+    permission: 'manutencao',
   },
   { 
     href: '/dashboard/cadastros/ferramentas', 
