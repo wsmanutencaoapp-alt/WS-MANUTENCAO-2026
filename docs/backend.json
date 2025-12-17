@@ -295,6 +295,64 @@
         "email",
         "accessLevel"
       ]
+    },
+    "Despesa": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Despesa",
+      "type": "object",
+      "description": "Represents a financial expense record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Expense entity."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the expense."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary value of the expense."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date the expense occurred.",
+          "format": "date-time"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the expense.",
+          "enum": [
+            "Suprimentos",
+            "Manutenção",
+            "Administrativo",
+            "Outros"
+          ]
+        },
+        "paymentProofUrl": {
+          "type": "string",
+          "description": "URL of the uploaded payment proof.",
+          "format": "uri"
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "Reference to Employee who registered the expense."
+        },
+        "employeeName": {
+          "type": "string",
+          "description": "Name of the employee who registered the expense for display purposes."
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "amount",
+        "date",
+        "category",
+        "paymentProofUrl",
+        "employeeId",
+        "employeeName"
+      ]
     }
   },
   "auth": {
@@ -396,6 +454,22 @@
             {
               "name": "employeeId",
               "description": "Unique identifier for the employee."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/expenses/{expenseId}",
+        "definition": {
+          "entityName": "Despesa",
+          "schema": {
+            "$ref": "#/backend/entities/Despesa"
+          },
+          "description": "Stores financial expense records.",
+          "params": [
+            {
+              "name": "expenseId",
+              "description": "Unique identifier for the expense record."
             }
           ]
         }

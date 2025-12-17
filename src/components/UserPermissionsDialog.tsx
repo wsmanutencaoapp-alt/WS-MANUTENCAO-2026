@@ -29,6 +29,7 @@ const availableScreens = [
     { id: 'financeiro', label: 'Financeiro (Módulo)', isParent: true },
     { id: 'financeiro_visao-geral', label: 'Visão Geral', isParent: false, parentId: 'financeiro' },
     { id: 'financeiro_orcamento', label: 'Orçamento', isParent: false, parentId: 'financeiro' },
+    { id: 'financeiro_despesas', label: 'Despesas', isParent: false, parentId: 'financeiro' },
     { id: 'userManagement', label: 'Gerenciar Usuários', isParent: true },
     { id: 'configurador', label: 'Configurador (Módulo)', isParent: true },
     { id: 'configurador_alcada-aprovacao', label: 'Alçada de Aprovação', isParent: false, parentId: 'configurador' },

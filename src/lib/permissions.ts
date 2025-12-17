@@ -11,6 +11,7 @@ export const allUserPermissions: { id: string; path: string }[] = [
     { id: 'financeiro', path: '/dashboard/financeiro' },
     { id: 'financeiro_visao-geral', path: '/dashboard/financeiro/visao-geral' },
     { id: 'financeiro_orcamento', path: '/dashboard/financeiro/orcamento' },
+    { id: 'financeiro_despesas', path: '/dashboard/financeiro/despesas' },
     { id: 'userManagement', path: '/dashboard/user-management' },
     { id: 'configurador', path: '/dashboard/configurador' },
     { id: 'configurador_alcada-aprovacao', path: '/dashboard/configurador/alcada-aprovacao' },

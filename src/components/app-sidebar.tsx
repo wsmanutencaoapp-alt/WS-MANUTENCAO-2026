@@ -12,6 +12,7 @@ import {
   Landmark,
   Users,
   SlidersHorizontal,
+  Wallet,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -62,6 +63,7 @@ const allNavItems: NavItem[] = [
     subItems: [
         { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral', permission: 'financeiro_visao-geral' },
         { href: '/dashboard/financeiro/orcamento', label: 'Orçamento', permission: 'financeiro_orcamento' },
+        { href: '/dashboard/financeiro/despesas', label: 'Despesas', permission: 'financeiro_despesas' },
     ]
   },
 ];

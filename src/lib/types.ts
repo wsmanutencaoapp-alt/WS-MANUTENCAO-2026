@@ -46,6 +46,7 @@ export type Permissions = {
   compras_controle?: boolean;
   financeiro_visao-geral?: boolean;
   financeiro_orcamento?: boolean;
+  financeiro_despesas?: boolean;
   'configurador_alcada-aprovacao'?: boolean;
   [key: string]: boolean | undefined;
 };
@@ -61,4 +62,15 @@ export type Employee = {
   accessLevel: 'Admin' | 'Técnico' | string;
   photoURL?: string | null;
   permissions?: Permissions;
+};
+
+export type Despesa = {
+  id?: string;
+  description: string;
+  amount: number;
+  date: string;
+  category: 'Suprimentos' | 'Manutenção' | 'Administrativo' | 'Outros';
+  paymentProofUrl: string;
+  employeeId: string;
+  employeeName: string;
 };
