@@ -91,7 +91,8 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         setIsSearching(true);
         try {
             const toolsRef = collection(firestore, 'tools');
-            const q = query(toolsRef, where('enderecamento', '==', 'LOGICA'));
+            // This query now ensures only STD and GSE types marked as LOGICA are fetched.
+            const q = query(toolsRef, where('enderecamento', '==', 'LOGICA'), where('tipo', 'in', ['STD', 'GSE']));
             const querySnapshot = await getDocs(q);
             const logics: ToolGroup[] = querySnapshot.docs.map(doc => ({
                 id: doc.id,
@@ -279,17 +280,17 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         <DialogHeader>
           <DialogTitle>Adicionar Ferramenta ao Estoque</DialogTitle>
           <DialogDescription>
-            Pesquise por uma lógica de ferramenta e adicione novas unidades ao inventário.
+            Pesquise por um modelo (STD/GSE) e adicione novas unidades ao inventário.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
           <div className="relative">
-            <Label htmlFor="searchTerm">Pesquisar Lógica</Label>
+            <Label htmlFor="searchTerm">Pesquisar Modelo</Label>
             <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               id="searchTerm"
-              placeholder="Digite a descrição ou código da lógica (ex: Torquímetro, STD-TRQ...)"
+              placeholder="Digite a descrição ou código do modelo (ex: Torquímetro, STD-TRQ...)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8"
@@ -324,7 +325,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                     </div>
                 ) : (
                     <div className="p-4 text-center text-sm text-muted-foreground">
-                        <p>Nenhuma lógica encontrada.</p>
+                        <p>Nenhum modelo encontrado.</p>
                     </div>
                 )}
             </ScrollArea>
@@ -333,7 +334,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           {selectedToolGroup && (
             <div className="p-4 border rounded-lg bg-muted/50 space-y-4 animate-in fade-in-50">
                 <div className="flex justify-between items-start">
-                    <h4 className="font-semibold">Lógica Selecionada</h4>
+                    <h4 className="font-semibold">Modelo Selecionado</h4>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedToolGroup(null)}>Alterar</Button>
                 </div>
                <div className="flex items-start gap-4">
