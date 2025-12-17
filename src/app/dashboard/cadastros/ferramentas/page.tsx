@@ -107,13 +107,10 @@ const Equipamentos = () => {
       tipo: 'STD',
       familia: 'MEC',
       classificacao: 'N',
-      quantidade_estoque: 1,
       descricao: '',
-      enderecamento: '',
       pn_fabricante: '',
       pn_referencia: '',
       aeronave_aplicavel: '',
-      patrimonio: '',
   });
 
   const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
@@ -171,8 +168,8 @@ const Equipamentos = () => {
 
   const resetForm = () => {
     setNewFerramenta({
-      tipo: 'STD', familia: 'MEC', classificacao: 'N', quantidade_estoque: 1, descricao: '',
-      enderecamento: '', pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '', patrimonio: '',
+      tipo: 'STD', familia: 'MEC', classificacao: 'N', descricao: '',
+      pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '',
     });
     setToolImage(null);
     setDocEngenharia(null);
@@ -228,8 +225,7 @@ const Equipamentos = () => {
         const counterRef = doc(firestore, 'counters', `tool_${newFerramenta.tipo}_${newFerramenta.familia}_${newFerramenta.classificacao}`);
         
         let newTools = [];
-
-        const quantity = newFerramenta.quantidade_estoque || 1;
+        const quantity = 1; // Always 1 for logic creation
 
         const newLastId = await runTransaction(firestore, async (transaction) => {
             const counterDoc = await transaction.get(counterRef);
@@ -256,7 +252,7 @@ const Equipamentos = () => {
         if (docAnexo) docAnexoUrl = await uploadFile(docAnexo, `docs_anexos/${doc(collection(firestore, 'temp')).id}_${docAnexo.name}`);
         
         let status = 'Disponível';
-        if(newFerramenta.tipo === 'EQV') status = 'Pendente'; // 'ALT' no doc é 'EQV' aqui
+        if(newFerramenta.tipo === 'EQV') status = 'Pendente';
 
         for (let i = 0; i < quantity; i++) {
             const sequencial = newLastId + 1 + i;
@@ -279,17 +275,18 @@ const Equipamentos = () => {
             newTools.push({ ...toolData, id: docRef.id });
         }
         
-        toast({ title: "Sucesso!", description: `${quantity} ferramenta(s) cadastrada(s).` });
+        toast({ title: "Sucesso!", description: `Nova lógica de ferramenta cadastrada.` });
         resetForm();
         setIsNewToolDialogOpen(false);
         queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
 
-        setToolsToPrint(newTools);
-        setIsLabelPrintDialogOpen(true);
+        // Don't auto-print label for logic creation
+        // setToolsToPrint(newTools);
+        // setIsLabelPrintDialogOpen(true);
 
     } catch (error) {
       console.error("Erro ao salvar ferramenta:", error);
-      toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões.` });
+      toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar a lógica. Verifique as permissões.` });
     } finally {
       setIsSaving(false);
     }
@@ -342,14 +339,14 @@ const Equipamentos = () => {
               <DialogTrigger asChild>
                 <Button>
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  Adicionar Nova Lógica
+                  Adicionar Ferramenta (Lógica)
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-3xl">
                 <DialogHeader>
-                  <DialogTitle>Cadastrar Nova Ferramenta (Lógica)</DialogTitle>
+                  <DialogTitle>Cadastrar Nova Lógica de Ferramenta</DialogTitle>
                   <DialogDescription>
-                    Preencha os campos para gerar o código e registrar a ferramenta. O código será: <span className="font-mono font-bold text-primary">{generatedCode}</span>
+                    Preencha os campos para criar um modelo (template) de ferramenta. O código será: <span className="font-mono font-bold text-primary">{generatedCode}</span>
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
@@ -404,14 +401,6 @@ const Equipamentos = () => {
                             <Label htmlFor="descricao">Descrição</Label>
                             <Input id="descricao" value={newFerramenta.descricao} onChange={handleInputChange} required />
                         </div>
-                        <div>
-                            <Label htmlFor="enderecamento">Endereçamento</Label>
-                            <Input id="enderecamento" value={newFerramenta.enderecamento} onChange={handleInputChange} required />
-                        </div>
-                         <div>
-                            <Label htmlFor="quantidade_estoque">Quantidade</Label>
-                            <Input id="quantidade_estoque" type="number" min="1" value={newFerramenta.quantidade_estoque} onChange={handleInputChange} required />
-                        </div>
                          {newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'GSE' || newFerramenta.tipo === 'EQV' ? (
                             <div>
                                 <Label htmlFor="pn_fabricante">P/N Fabricante {newFerramenta.tipo !== 'STD' && <span className='text-destructive'>*</span>}</Label>
@@ -430,10 +419,6 @@ const Equipamentos = () => {
                                 <Input id="aeronave_aplicavel" value={newFerramenta.aeronave_aplicavel} onChange={handleInputChange} required />
                             </div>
                         )}
-                         <div>
-                            <Label htmlFor="patrimonio">Patrimônio</Label>
-                            <Input id="patrimonio" value={newFerramenta.patrimonio} onChange={handleInputChange} />
-                        </div>
                      </CardContent>
                   </Card>
 
@@ -507,7 +492,7 @@ const Equipamentos = () => {
                   <Button variant="outline" onClick={() => setIsNewToolDialogOpen(false)}>Cancelar</Button>
                   <Button onClick={handleSaveNewTool} disabled={isSaving}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                     {newFerramenta.tipo === 'EQV' ? 'Salvar para Aprovação' : 'Salvar e Imprimir'}
+                    Salvar Lógica
                   </Button>
                 </DialogFooter>
               </DialogContent>
