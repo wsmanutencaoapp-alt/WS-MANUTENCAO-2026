@@ -264,7 +264,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Adicionar Ferramenta ao Estoque</DialogTitle>
