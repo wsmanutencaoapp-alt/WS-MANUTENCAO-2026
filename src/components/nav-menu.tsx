@@ -140,7 +140,7 @@ export function NavMenu({ items, pathname, isMobile = false }: NavMenuProps) {
                         href={subItem.href}
                         className={cn(
                         'block rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground',
-                        pathname === subItem.href && 'bg-accent text-accent-foreground font-medium'
+                        pathname === subItem.href && 'bg-accent/10 text-accent-foreground font-semibold'
                         )}
                     >
                         {subItem.label}
