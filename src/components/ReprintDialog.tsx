@@ -11,7 +11,7 @@ import {
 import { Button } from './ui/button';
 
 interface ReprintDialogProps {
-  tool: { id: string; codigo?: string; nome?: string; label_url?: string | null } | null;
+  tool: { id: string; codigo?: string; descricao?: string; label_url?: string | null } | null;
   isOpen: boolean;
   onClose: () => void;
   onReprintConfirmed: (tool: any) => void;
@@ -37,7 +37,7 @@ export default function ReprintDialog({ tool, isOpen, onClose, onReprintConfirme
             {tool && (
                 <div className="p-4 border rounded-md bg-muted/50">
                     <p><strong>Código:</strong> {tool.codigo}</p>
-                    <p><strong>Nome:</strong> {tool.nome}</p>
+                    <p><strong>Descrição:</strong> {tool.descricao}</p>
                 </div>
             )}
             <DialogFooter>
@@ -48,3 +48,5 @@ export default function ReprintDialog({ tool, isOpen, onClose, onReprintConfirme
     </Dialog>
   );
 }
+
+    

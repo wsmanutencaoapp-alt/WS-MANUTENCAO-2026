@@ -11,25 +11,30 @@ export type Supply = {
 };
 
 export type Tool = {
-  id: string; // This is the Firestore document ID for new tools from forms.
-  name: string;
-  serialNumber: string;
-  status: 'Available' | 'In Use' | 'In Calibration' | 'Disponível';
-  lastCalibration: string;
-  calibratedBy: string;
-  imageUrl: string;
-  imageHint: string;
-  // Campos adicionados do app do usuário
-  marca?: string;
-  codigo?: string;
-  unitCode?: string; // Lote sequencial por unidade
+  id: string;
+  codigo: string;
+  tipo: 'STD' | 'ESP' | 'GSE' | 'EQV';
+  familia: 'MEC' | 'TRQ' | 'PRE' | 'ELE' | 'RIG' | 'MET' | 'SEG';
+  classificacao: 'N' | 'C' | 'L' | 'V';
+  sequencial: number;
+  descricao: string;
   enderecamento?: string;
-  is_calibrable?: boolean;
-  tipos?: 'Comuns' | 'Especiais' | 'GSEs' | string;
-  aeronave_principal?: string | null;
-  label_url?: string | null;
-  quantidade_estoque?: number;
+  pn_fabricante?: string;
+  pn_referencia?: string;
+  aeronave_aplicavel?: string;
+  doc_engenharia_url?: string;
+  doc_seguranca_url?: string;
+  patrimonio?: string;
+  status: 'Disponível' | 'Em Empréstimo' | 'Em Aferição' | 'Em Manutenção' | 'Vencido' | 'Bloqueado' | 'Inoperante' | 'Pendente';
+  status_inicial?: 'Ativo' | 'Bloqueado';
+  data_vencimento?: string; // date
+  data_referencia?: string; // date
+  documento_anexo_url?: string;
+  label_url?: string;
+  imageUrl?: string;
+  quantidade_estoque?: number; // Used only in form, not stored per-item
 };
+
 
 export type Permissions = {
   ferramentaria?: boolean;
@@ -77,3 +82,5 @@ export type Despesa = {
   employeeId: string;
   employeeName: string;
 };
+
+    

@@ -38,7 +38,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon, MoreHorizontal, ZoomIn, Search, PlusSquare } from 'lucide-react';
+import { PlusCircle, Repeat2, FileText, Loader2, Image as ImageIcon, MoreHorizontal, ZoomIn, Search, PlusSquare, AlertTriangle, Upload, Paperclip } from 'lucide-react';
 import SectorBudgetStatus from '@/components/SectorBudgetStatus';
 import { Checkbox } from '@/components/ui/checkbox';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
@@ -54,22 +54,24 @@ import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface Ferramenta extends Tool {
-  docId: string; 
-  nome: string; 
-  codigo: string; 
-  unitCode: string; 
-  enderecamento: string; 
-  status: string; 
-  quantidade_estoque: number;
-  is_calibrable: boolean; 
-  aeronave_principal: string | null;
-  label_url: string | null;
+  docId: string;
 }
 
-type ToolLabelData = Partial<Ferramenta> & { id?: string };
+const familiaSuggestions: { [key in Tool['familia']]: Tool['classificacao'] } = {
+    TRQ: 'C',
+    PRE: 'C',
+    ELE: 'C',
+    RIG: 'L',
+    MET: 'C',
+    SEG: 'V',
+    MEC: 'N',
+};
 
 const Equipamentos = () => {
   const { user } = useUser();
@@ -77,8 +79,11 @@ const Equipamentos = () => {
   const storage = useStorage();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const queryClient = useQueryClient();
+  const docEngenhariaInputRef = useRef<HTMLInputElement>(null);
+  const docSegurancaInputRef = useRef<HTMLInputElement>(null);
+  const docAnexoInputRef = useRef<HTMLInputElement>(null);
 
+  const queryClient = useQueryClient();
   const ferramentasQueryKey = 'ferramentas';
 
   const ferramentasCollectionRef = useMemoFirebase(
@@ -91,223 +96,201 @@ const Equipamentos = () => {
   });
 
   const [isNewToolDialogOpen, setIsNewToolDialogOpen] = useState(false);
-  const [isAddQuantityDialogOpen, setIsAddQuantityDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-
-  const [toolsToLabel, setToolsToLabel] = useState<ToolLabelData[]>([]);
-  const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] = useState(false);
-  const [toolsToConfirm, setToolsToConfirm] = useState<ToolLabelData[]>([]);
-
-  const [isReprintDialogOpen, setIsReprintDialogOpen] = useState(false);
-  const [toolToReprint, setToolToReprint] = useState<ToolLabelData | null>(null);
-
-  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [selectedTool, setSelectedTool] = useState<Ferramenta | null>(null);
   
-  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-
-
-  const [newFerramenta, setNewFerramenta] = useState({
-    name: '',
-    marca: '',
-    enderecamento: '',
-    aeronave_principal: '',
-    quantidade_estoque: 1,
-    is_calibrable: true,
-    tipos: 'Comuns',
+  const [newFerramenta, setNewFerramenta] = useState<Partial<Tool>>({
+      tipo: 'STD',
+      familia: 'MEC',
+      classificacao: 'N',
+      quantidade_estoque: 1,
+      descricao: '',
+      enderecamento: '',
+      pn_fabricante: '',
+      pn_referencia: '',
+      aeronave_aplicavel: '',
+      patrimonio: '',
   });
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
+
+  const [toolImage, setToolImage] = useState<string | null>(null);
+  const [docEngenharia, setDocEngenharia] = useState<File | null>(null);
+  const [docSeguranca, setDocSeguranca] = useState<File | null>(null);
+  const [docAnexo, setDocAnexo] = useState<File | null>(null);
+
+  const [dataReferencia, setDataReferencia] = useState<Date | undefined>();
+  const [dataVencimento, setDataVencimento] = useState<Date | undefined>();
+
+
+  // Update generated code preview
+  useEffect(() => {
+    const { tipo, familia, classificacao } = newFerramenta;
+    if (tipo && familia && classificacao) {
+      setGeneratedCode(`${tipo}-${familia}-${classificacao}-XXXX`);
+    }
+  }, [newFerramenta.tipo, newFerramenta.familia, newFerramenta.classificacao]);
+
+
+  // Handle automatic suggestion for 'Classificação'
+  useEffect(() => {
+    if (newFerramenta.familia) {
+      const suggestedClassificacao = familiaSuggestions[newFerramenta.familia];
+      if (suggestedClassificacao) {
+        setNewFerramenta(prev => ({ ...prev, classificacao: suggestedClassificacao }));
+      }
+    }
+  }, [newFerramenta.familia]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    if (id === 'quantidade_estoque') {
-      const num = parseInt(value) || 0;
-      setNewFerramenta((prev) => ({ ...prev, [id]: num > 0 ? num : 1 }));
-    } else {
-      setNewFerramenta((prev) => ({ ...prev, [id]: value }));
-    }
+     setNewFerramenta((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleSelectChange = (value: string) => {
-    setNewFerramenta((prev) => ({ ...prev, tipos: value }));
+  const handleSelectChange = (id: keyof Tool, value: string) => {
+    setNewFerramenta(prev => ({ ...prev, [id]: value }));
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileChange = (setter: React.Dispatch<React.SetStateAction<File | null>>, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setter(file || null);
+  };
+  
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result as string);
-      };
+      reader.onloadend = () => setToolImage(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
 
   const resetForm = () => {
-    setNewFerramenta({ name: '', marca: '', enderecamento: '', aeronave_principal: '', quantidade_estoque: 1, is_calibrable: true, tipos: 'Comuns' });
-    setPreviewImage(null);
-    if(fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
+    setNewFerramenta({
+      tipo: 'STD', familia: 'MEC', classificacao: 'N', quantidade_estoque: 1, descricao: '',
+      enderecamento: '', pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '', patrimonio: '',
+    });
+    setToolImage(null);
+    setDocEngenharia(null);
+    setDocSeguranca(null);
+    setDocAnexo(null);
+    setDataReferencia(undefined);
+    setDataVencimento(undefined);
+    if(fileInputRef.current) fileInputRef.current.value = '';
+    if(docEngenhariaInputRef.current) docEngenhariaInputRef.current.value = '';
+    if(docSegurancaInputRef.current) docSegurancaInputRef.current.value = '';
+    if(docAnexoInputRef.current) docAnexoInputRef.current.value = '';
   };
 
-  const handleCheckboxChange = (checked: boolean | 'indeterminate') => {
-    if (typeof checked === 'boolean') {
-      setNewFerramenta((prev) => ({ ...prev, is_calibrable: checked }));
-    }
+  const uploadFile = async (file: File, path: string): Promise<string> => {
+    if (!storage) throw new Error("Storage service not available.");
+    const fileRef = storageRef(storage, path);
+    const snapshot = await uploadString(fileRef, await file.text(), 'raw', { contentType: file.type });
+    return getDownloadURL(snapshot.ref);
   };
-  
+
+  const uploadImage = async (dataUrl: string, path: string): Promise<string> => {
+    if (!storage) throw new Error("Storage service not available.");
+    const imageRef = storageRef(storage, path);
+    const snapshot = await uploadString(imageRef, dataUrl, 'data_url');
+    return getDownloadURL(snapshot.ref);
+  };
+
   const handleSaveNewTool = async () => {
-    if (!newFerramenta.name) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Nome é um campo obrigatório.' });
-      return;
+    if (!user || !firestore) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado ou falha na conexão.' });
+        return;
     }
-    if (!user || !firestore || !storage) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado ou falha na conexão.' });
-      return;
+    // Validation based on Matrix
+    if (newFerramenta.tipo === 'ESP' && !newFerramenta.pn_fabricante) {
+      toast({ variant: "destructive", description: "P/N Fabricante é obrigatório para tipo 'Especial'." }); return;
+    }
+    if (newFerramenta.tipo === 'EQV' && !newFerramenta.pn_referencia) {
+      toast({ variant: "destructive", description: "P/N Referência é obrigatório para tipo 'Equivalente'." }); return;
+    }
+     if (newFerramenta.tipo === 'EQV' && !docEngenharia) {
+      toast({ variant: "destructive", description: "Doc. Engenharia é obrigatório para tipo 'Equivalente'." }); return;
+    }
+    if ((newFerramenta.classificacao === 'C' || newFerramenta.classificacao === 'L' || newFerramenta.classificacao === 'V') && !dataVencimento) {
+      toast({ variant: "destructive", description: "Data de Vencimento é obrigatória para esta classificação." }); return;
+    }
+    if ((newFerramenta.classificacao === 'C' || newFerramenta.classificacao === 'L') && !docAnexo) {
+        toast({ variant: "destructive", description: "Anexo de Certificado/Laudo é obrigatório para esta classificação." }); return;
     }
   
     setIsSaving(true);
-    const insertedTools: ToolLabelData[] = [];
   
     try {
-      let imageUrl = "https://picsum.photos/seed/tool/200/200"; // Placeholder
-      if (previewImage) {
-        try {
-          const tempId = doc(collection(firestore, 'temp')).id;
-          const imageRef = storageRef(storage, `tool_images/${tempId}`);
-          const snapshot = await uploadString(imageRef, previewImage, 'data_url');
-          imageUrl = await getDownloadURL(snapshot.ref);
-        } catch (storageError) {
-          console.error("Erro no upload da imagem:", storageError);
-          toast({ variant: 'destructive', title: 'Erro de Upload', description: 'Não foi possível salvar a imagem. Verifique as permissões do Storage.' });
-          setIsSaving(false);
-          return;
-        }
-      }
-  
-      const counterRef = doc(firestore, 'counters', 'tools');
-      const mainToolCode = await runTransaction(firestore, async (transaction) => {
-          const counterDoc = await transaction.get(counterRef);
-          if (!counterDoc.exists()) {
-              transaction.set(counterRef, { lastId: 1 });
-              return 1;
-          }
-          const newId = counterDoc.data().lastId + 1;
-          transaction.update(counterRef, { lastId: newId });
-          return newId;
-      }).catch(error => {
-          const permissionError = new FirestorePermissionError({
-            path: counterRef.path,
-            operation: 'write', 
-            requestResourceData: { lastId: 'newId' }
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          throw permissionError;
-      });
-  
-      const codigo = `FE${mainToolCode.toString().padStart(6, '0')}`;
-  
-      for (let i = 0; i < newFerramenta.quantidade_estoque; i++) {
-        const toolDocRef = doc(collection(firestore, 'tools'));
-        const unitCode = `A${(i + 1).toString().padStart(4, '0')}`;
-  
-        const toolData: Omit<Tool, 'id'> = {
-          name: newFerramenta.name,
-          marca: newFerramenta.marca,
-          enderecamento: newFerramenta.enderecamento,
-          aeronave_principal: newFerramenta.aeronave_principal || null,
-          is_calibrable: newFerramenta.is_calibrable,
-          tipos: newFerramenta.tipos,
-          status: 'Disponível',
-          lastCalibration: 'N/A',
-          calibratedBy: 'N/A',
-          serialNumber: `SN-${Date.now()}-${i}`,
-          imageUrl: imageUrl,
-          imageHint: "tool",
-          codigo: codigo,
-          unitCode: unitCode,
-        };
-  
-        await setDoc(toolDocRef, toolData).catch(error => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: toolDocRef.path,
-            operation: 'create',
-            requestResourceData: toolData
-          }));
-          throw error; 
+        const counterRef = doc(firestore, 'counters', `tool_${newFerramenta.tipo}_${newFerramenta.familia}_${newFerramenta.classificacao}`);
+        const lastId = await runTransaction(firestore, async (transaction) => {
+            const counterDoc = await transaction.get(counterRef);
+            if (!counterDoc.exists()) {
+                transaction.set(counterRef, { lastId: 1 });
+                return 1;
+            }
+            const newId = counterDoc.data().lastId + 1;
+            transaction.update(counterRef, { lastId: newId });
+            return newId;
         });
-        insertedTools.push({ ...toolData, id: toolDocRef.id });
-      }
-  
-      toast({ title: "Sucesso!", description: `${newFerramenta.quantidade_estoque} unidade(s) de ${newFerramenta.name} cadastrada(s).` });
-      
-      resetForm();
-      queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
-      setToolsToConfirm(insertedTools);
-      setIsConfirmationDialogOpen(true);
-      setIsNewToolDialogOpen(false);
-  
+
+        const sequencial = lastId.toString().padStart(4, '0');
+        const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${sequencial}`;
+
+        // Handle file uploads
+        const tempId = doc(collection(firestore, 'temp')).id;
+        let imageUrl;
+        if (toolImage) imageUrl = await uploadImage(toolImage, `tool_images/${tempId}.jpg`);
+        let docEngenhariaUrl;
+        if (docEngenharia) docEngenhariaUrl = await uploadFile(docEngenharia, `docs_engenharia/${tempId}_${docEngenharia.name}`);
+        let docSegurancaUrl;
+        if (docSeguranca) docSegurancaUrl = await uploadFile(docSeguranca, `docs_seguranca/${tempId}_${docSeguranca.name}`);
+        let docAnexoUrl;
+        if (docAnexo) docAnexoUrl = await uploadFile(docAnexo, `docs_anexos/${tempId}_${docAnexo.name}`);
+        
+        let status = 'Disponível';
+        if(newFerramenta.tipo === 'EQV') status = 'Pendente'; // 'ALT' no doc é 'EQV' aqui
+
+        const toolData: Omit<Tool, 'id'> = {
+            ...newFerramenta,
+            codigo: codigoCompleto,
+            sequencial: lastId,
+            status: status,
+            status_inicial: newFerramenta.tipo === 'EQV' ? 'Bloqueado' : 'Ativo',
+            data_referencia: dataReferencia?.toISOString(),
+            data_vencimento: dataVencimento?.toISOString(),
+            imageUrl,
+            doc_engenharia_url: docEngenhariaUrl,
+            doc_seguranca_url: docSegurancaUrl,
+            documento_anexo_url: docAnexoUrl,
+        };
+
+        const quantity = newFerramenta.quantidade_estoque || 1;
+        for (let i = 0; i < quantity; i++) {
+            const finalToolData = { ...toolData, sequencial: lastId + i };
+            if (quantity > 1) {
+              finalToolData.codigo = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${(lastId + i).toString().padStart(4, '0')}`;
+            }
+             await addDoc(collection(firestore, 'tools'), finalToolData);
+        }
+
+        // Update counter for block reservation
+        if (quantity > 1) {
+            await runTransaction(firestore, async (transaction) => {
+                transaction.update(counterRef, { lastId: lastId + quantity - 1 });
+            });
+        }
+        
+        toast({ title: "Sucesso!", description: `${quantity} ferramenta(s) cadastrada(s) com o código inicial ${codigoCompleto}.` });
+        resetForm();
+        setIsNewToolDialogOpen(false);
+        queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
+
     } catch (error) {
-      if (!(error instanceof FirestorePermissionError)) {
-          console.error("Erro ao salvar ferramenta:", error);
-          toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões.` });
-      }
+      console.error("Erro ao salvar ferramenta:", error);
+      toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar o equipamento. Verifique as permissões.` });
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleAddQuantitySuccess = (newTools: ToolLabelData[]) => {
-    setIsAddQuantityDialogOpen(false);
-    queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
-    setToolsToLabel(newTools); 
-  };
-
-  const handleFinalizeCadastro = () => {
-    setToolsToLabel(toolsToConfirm);
-    setIsConfirmationDialogOpen(false);
-    setToolsToConfirm([]);
-  };
-
-  const handleOpenReprintDialog = (tool: Ferramenta) => {
-    setToolToReprint({ id: tool.docId, codigo: tool.codigo, name: tool.name, label_url: tool.label_url, unitCode: tool.unitCode, enderecamento: tool.enderecamento });
-    setIsReprintDialogOpen(true);
-  };
-  
-  const handleReprintConfirmed = (tools: ToolLabelData[]) => {
-    setToolsToLabel(tools);
-    setIsReprintDialogOpen(false);
-    setToolToReprint(null);
-  };
-  
-  const handleOpenDetails = (tool: Ferramenta) => {
-    setSelectedTool(tool);
-    setIsDetailsDialogOpen(true);
-  };
-
-  const handleToolDeleted = (toolId: string) => {
-    queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
-    setIsDetailsDialogOpen(false);
-    toast({
-        title: "Sucesso!",
-        description: "A ferramenta foi excluída."
-    });
-  };
-
-  const handleToolUpdated = (updatedTool: Ferramenta) => {
-    queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
-    toast({
-        title: "Sucesso!",
-        description: "As informações da ferramenta foram atualizadas."
-    });
-  };
-  
-  const openImagePreview = (imageUrl: string) => {
-    setPreviewImageUrl(imageUrl);
-    setIsPreviewDialogOpen(true);
   };
 
   const filteredFerramentas = useMemo(() => {
@@ -316,31 +299,28 @@ const Equipamentos = () => {
 
     const lowercasedTerm = searchTerm.toLowerCase();
     return ferramentas.filter(ferramenta => 
-        (ferramenta.name && ferramenta.name.toLowerCase().includes(lowercasedTerm)) ||
+        (ferramenta.descricao && ferramenta.descricao.toLowerCase().includes(lowercasedTerm)) ||
         (ferramenta.codigo && ferramenta.codigo.toLowerCase().includes(lowercasedTerm))
     );
   }, [ferramentas, searchTerm]);
 
   const getStatusVariant = (status: string) => {
-    return status === 'Disponível' || status === 'Available' ? 'success' : 'default';
-  };
-
-  const translateStatus = (status: string) => {
-    return status === 'Available' ? 'Disponível' : status;
+    const statusMap: { [key: string]: 'success' | 'destructive' | 'default' } = {
+        'Disponível': 'success',
+        'Vencido': 'destructive',
+        'Bloqueado': 'destructive',
+        'Inoperante': 'destructive',
+        'Pendente': 'default',
+        'Em Empréstimo': 'default',
+        'Em Aferição': 'default'
+    }
+    return statusMap[status] || 'default';
   };
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Cadastro de Ferramentas</h1>
-
-      <SectorBudgetStatus />
-
-      <div className="flex items-center justify-end gap-2">
-         <Button variant="outline" onClick={() => setIsAddQuantityDialogOpen(true)}>
-            <PlusSquare className="mr-2 h-4 w-4" />
-            Adicionar Quantidade
-         </Button>
-
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Cadastro de Ferramentas</h1>
         <Dialog open={isNewToolDialogOpen} onOpenChange={(isOpen) => {
             if (!isOpen) resetForm();
             setIsNewToolDialogOpen(isOpen);
@@ -351,113 +331,169 @@ const Equipamentos = () => {
               Adicionar Ferramenta
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>Cadastrar Nova Ferramenta</DialogTitle>
               <DialogDescription>
-                O código da ferramenta e o lote serão gerados automaticamente.
+                Preencha os campos para gerar o código e registrar a ferramenta. O código será: <span className="font-mono font-bold text-primary">{generatedCode}</span>
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
-                  Nome
-                </Label>
-                <Input id="name" value={newFerramenta.name} onChange={handleInputChange} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="marca" className="text-right">
-                  Marca
-                </Label>
-                <Input id="marca" value={newFerramenta.marca} onChange={handleInputChange} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="enderecamento" className="text-right">
-                  Endereçamento
-                </Label>
-                <Input id="enderecamento" value={newFerramenta.enderecamento} onChange={handleInputChange} className="col-span-3" placeholder="Ex: Gaveta 1A" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="aeronave_principal" className="text-right">
-                  Aeronave Principal
-                </Label>
-                <Input id="aeronave_principal" value={newFerramenta.aeronave_principal} onChange={handleInputChange} className="col-span-3" placeholder="Ex: PR-ABC" />
-              </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="quantidade_estoque" className="text-right">
-                  Qtd. Unidades
-                </Label>
-                <Input 
-                    id="quantidade_estoque" 
-                    type="number" 
-                    step="1"
-                    min="1"
-                    value={newFerramenta.quantidade_estoque} 
-                    onChange={handleInputChange} 
-                    className="col-span-3" 
-                    required 
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="tipos" className="text-right">
-                  Tipos
-                </Label>
-                <Select onValueChange={handleSelectChange} defaultValue={newFerramenta.tipos}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Selecione um tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Comuns">Comuns</SelectItem>
-                    <SelectItem value="Especiais">Especiais</SelectItem>
-                    <SelectItem value="GSEs">GSEs</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="is_calibrable" className="text-right">
-                  Calibrável?
-                </Label>
-                <div className="col-span-3 flex items-center space-x-2">
-                  <Checkbox
-                    id="is_calibrable"
-                    checked={newFerramenta.is_calibrable}
-                    onCheckedChange={handleCheckboxChange}
-                  />
-                  <Label htmlFor="is_calibrable" className="text-sm font-normal">
-                    Requer controle de calibração.
-                  </Label>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">
-                  Imagem
-                </Label>
-                <div className="col-span-3 flex items-center gap-4">
-                    {previewImage ? (
-                        <Image src={previewImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" />
-                    ) : (
-                        <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md">
-                           <ImageIcon className="h-6 w-6 text-muted-foreground" />
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
+              {/* --- TAXONOMIA --- */}
+              <Card>
+                <CardHeader><CardTitle className="text-lg">Taxonomia e Codificação</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="tipo">Tipo</Label>
+                    <Select value={newFerramenta.tipo} onValueChange={(v) => handleSelectChange('tipo', v)}><SelectTrigger id="tipo"><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="STD">STD (Standard)</SelectItem>
+                        <SelectItem value="ESP">ESP (Específico)</SelectItem>
+                        <SelectItem value="GSE">GSE (Apoio de Solo)</SelectItem>
+                        <SelectItem value="EQV">EQV (Equivalente)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="familia">Família</Label>
+                     <Select value={newFerramenta.familia} onValueChange={(v) => handleSelectChange('familia', v)}><SelectTrigger id="familia"><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MEC">MEC (Mecânica)</SelectItem>
+                        <SelectItem value="TRQ">TRQ (Torque)</SelectItem>
+                        <SelectItem value="PRE">PRE (Pressão/Hidr.)</SelectItem>
+                        <SelectItem value="ELE">ELE (Elétrica/Aviônica)</SelectItem>
+                        <SelectItem value="RIG">RIG (Içamento)</SelectItem>
+                        <SelectItem value="MET">MET (Metrologia)</SelectItem>
+                        <SelectItem value="SEG">SEG (Segurança)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="classificacao">Classificação</Label>
+                    <Select value={newFerramenta.classificacao} onValueChange={(v) => handleSelectChange('classificacao', v)}><SelectTrigger id="classificacao"><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="N">N (Normal)</SelectItem>
+                        <SelectItem value="C">C (Calibrável)</SelectItem>
+                        <SelectItem value="L">L (Load Test)</SelectItem>
+                        <SelectItem value="V">V (Vencimento)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* --- DADOS CADASTRAIS (Matriz Principal) --- */}
+              <Card>
+                 <CardHeader><CardTitle className="text-lg">Dados Cadastrais</CardTitle></CardHeader>
+                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                        <Label htmlFor="descricao">Descrição</Label>
+                        <Input id="descricao" value={newFerramenta.descricao} onChange={handleInputChange} required />
+                    </div>
+                    <div>
+                        <Label htmlFor="enderecamento">Endereçamento</Label>
+                        <Input id="enderecamento" value={newFerramenta.enderecamento} onChange={handleInputChange} required />
+                    </div>
+                     <div>
+                        <Label htmlFor="quantidade_estoque">Quantidade</Label>
+                        <Input id="quantidade_estoque" type="number" min="1" value={newFerramenta.quantidade_estoque} onChange={handleInputChange} required />
+                    </div>
+                     {newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'GSE' || newFerramenta.tipo === 'EQV' ? (
+                        <div>
+                            <Label htmlFor="pn_fabricante">P/N Fabricante {newFerramenta.tipo !== 'STD' && <span className='text-destructive'>*</span>}</Label>
+                            <Input id="pn_fabricante" value={newFerramenta.pn_fabricante} onChange={handleInputChange} required={newFerramenta.tipo !== 'STD'} />
+                        </div>
+                     ) : null}
+                    {newFerramenta.tipo === 'EQV' ? (
+                        <div>
+                            <Label htmlFor="pn_referencia">P/N Referência (Substitui qual?) <span className='text-destructive'>*</span></Label>
+                            <Input id="pn_referencia" value={newFerramenta.pn_referencia} onChange={handleInputChange} required />
+                        </div>
+                     ) : null}
+                    {newFerramenta.tipo === 'ESP' && (
+                        <div>
+                            <Label htmlFor="aeronave_aplicavel">Aeronave Aplicável <span className='text-destructive'>*</span></Label>
+                            <Input id="aeronave_aplicavel" value={newFerramenta.aeronave_aplicavel} onChange={handleInputChange} required />
                         </div>
                     )}
-                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                        Anexar Imagem
-                    </Button>
-                    <Input 
-                        type="file" 
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        className="hidden" 
-                        accept="image/png, image/jpeg"
-                    />
-                </div>
-              </div>
+                     <div>
+                        <Label htmlFor="patrimonio">Patrimônio</Label>
+                        <Input id="patrimonio" value={newFerramenta.patrimonio} onChange={handleInputChange} />
+                    </div>
+                 </CardContent>
+              </Card>
+
+              {/* --- DOCUMENTOS (Matriz Principal) --- */}
+              <Card>
+                 <CardHeader><CardTitle className="text-lg">Documentos e Anexos</CardTitle></CardHeader>
+                 <CardContent className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        {toolImage ? <Image src={toolImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}
+                        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Anexar Foto <span className='text-destructive ml-1'>*</span></Button>
+                        <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*" required/>
+                    </div>
+                     {newFerramenta.tipo === 'EQV' && (
+                        <div className="flex items-center gap-4">
+                            {docEngenharia ? <FileText/> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
+                            <Button type="button" variant="outline" size="sm" onClick={() => docEngenhariaInputRef.current?.click()}>Doc. Engenharia <span className='text-destructive ml-1'>*</span></Button>
+                            <Input type="file" ref={docEngenhariaInputRef} onChange={(e) => handleFileChange(setDocEngenharia, e)} className="hidden" required/>
+                             {docEngenharia && <span className="text-sm text-muted-foreground truncate">{docEngenharia.name}</span>}
+                        </div>
+                     )}
+                     {newFerramenta.tipo === 'GSE' || newFerramenta.tipo === 'EQV' ? (
+                        <div className="flex items-center gap-4">
+                            {docSeguranca ? <FileText/> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
+                            <Button type="button" variant="outline" size="sm" onClick={() => docSegurancaInputRef.current?.click()}>Doc. Segurança</Button>
+                            <Input type="file" ref={docSegurancaInputRef} onChange={(e) => handleFileChange(setDocSeguranca, e)} className="hidden" />
+                             {docSeguranca && <span className="text-sm text-muted-foreground truncate">{docSeguranca.name}</span>}
+                        </div>
+                     ) : null}
+                 </CardContent>
+              </Card>
+
+              {/* --- CONTROLE E VALIDADE (Matriz de Controle) --- */}
+              {newFerramenta.classificacao !== 'N' && (
+                  <Card>
+                    <CardHeader><CardTitle className="text-lg">Controle e Validade</CardTitle></CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                           <Label>
+                                {newFerramenta.classificacao === 'C' ? 'Data Última Calibração' : newFerramenta.classificacao === 'L' ? 'Data Último Teste' : 'Data Fabricação/Insp.'}
+                           </Label>
+                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataReferencia ? format(dataReferencia, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
+                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataReferencia} onSelect={setDataReferencia} initialFocus /></PopoverContent>
+                            </Popover>
+                        </div>
+                        <div>
+                           <Label>Data de Vencimento <span className='text-destructive'>*</span></Label>
+                           <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataVencimento ? format(dataVencimento, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
+                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataVencimento} onSelect={setDataVencimento} initialFocus /></PopoverContent>
+                            </Popover>
+                        </div>
+                        {(newFerramenta.classificacao === 'C' || newFerramenta.classificacao === 'L') && (
+                            <div className="flex items-center gap-4 col-span-2">
+                                {docAnexo ? <FileText/> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
+                                <Button type="button" variant="outline" size="sm" onClick={() => docAnexoInputRef.current?.click()}>Anexar Certificado/Laudo <span className='text-destructive ml-1'>*</span></Button>
+                                <Input type="file" ref={docAnexoInputRef} onChange={(e) => handleFileChange(setDocAnexo, e)} className="hidden" required/>
+                                {docAnexo && <span className="text-sm text-muted-foreground truncate">{docAnexo.name}</span>}
+                            </div>
+                        )}
+                    </CardContent>
+                  </Card>
+              )}
+
+                {newFerramenta.tipo === 'EQV' && (
+                    <div className="col-span-full bg-blue-100 dark:bg-blue-900/30 border border-blue-400 text-blue-800 dark:text-blue-200 px-4 py-3 rounded-md flex items-center gap-3">
+                        <AlertTriangle className="h-5 w-5" />
+                        <p className="text-sm">O status inicial para ferramentas 'EQV' será <span className="font-bold">"Pendente"</span> e aguardará aprovação da engenharia.</p>
+                    </div>
+                )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsNewToolDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleSaveNewTool} disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar
+                 {newFerramenta.tipo === 'EQV' ? 'Salvar para Aprovação' : 'Salvar'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -473,7 +509,7 @@ const Equipamentos = () => {
             <div className="relative pt-4">
                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                <Input
-                   placeholder="Pesquisar por nome ou código..."
+                   placeholder="Pesquisar por descrição ou código..."
                    value={searchTerm}
                    onChange={(e) => setSearchTerm(e.target.value)}
                    className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -484,10 +520,9 @@ const Equipamentos = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[64px] sm:table-cell">Imagem</TableHead>
+                <TableHead className="w-[64px] sm:table-cell">Foto</TableHead>
                 <TableHead>Código</TableHead>
-                <TableHead>Lote/Unid.</TableHead>
-                <TableHead>Nome</TableHead>
+                <TableHead>Descrição</TableHead>
                 <TableHead>Endereçamento</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -496,11 +531,11 @@ const Equipamentos = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow key="loading">
-                  <TableCell colSpan={7} className="text-center">Carregando...</TableCell>
+                  <TableCell colSpan={6} className="text-center">Carregando...</TableCell>
                 </TableRow>
               ) : firestoreError ? (
                  <TableRow key="error">
-                  <TableCell colSpan={7} className="text-center text-destructive">
+                  <TableCell colSpan={6} className="text-center text-destructive">
                     Erro ao carregar ferramentas: {firestoreError.message}
                   </TableCell>
                 </TableRow>
@@ -508,12 +543,9 @@ const Equipamentos = () => {
                 filteredFerramentas.map((ferramenta) => (
                   <TableRow key={ferramenta.docId}>
                     <TableCell className="hidden sm:table-cell">
-                        <button
-                          onClick={() => openImagePreview(ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64")}
-                          className="relative group focus:outline-none"
-                        >
+                        <button className="relative group focus:outline-none">
                           <Image
-                              alt={ferramenta.name}
+                              alt={ferramenta.descricao}
                               className="aspect-square rounded-md object-cover"
                               height="64"
                               src={ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64"}
@@ -525,19 +557,17 @@ const Equipamentos = () => {
                         </button>
                     </TableCell>
                     <TableCell className="font-medium">{ferramenta.codigo}</TableCell>
-                    <TableCell className="font-mono text-xs">{ferramenta.unitCode}</TableCell>
-                    <TableCell>{ferramenta.name}</TableCell>
+                    <TableCell>{ferramenta.descricao}</TableCell>
                     <TableCell>{ferramenta.enderecamento}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(ferramenta.status)}>
-                        {translateStatus(ferramenta.status)}
+                        {ferramenta.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                        <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleOpenDetails(ferramenta)}
                         title="Detalhes"
                       >
                         <MoreHorizontal className="h-4 w-4" />
@@ -545,28 +575,16 @@ const Equipamentos = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleOpenReprintDialog(ferramenta)}
                         title="Reimprimir Etiqueta"
                       >
                         <Repeat2 className="h-4 w-4" />
                       </Button>
-                      {ferramenta.label_url && (
-                        <a
-                          href={ferramenta.label_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-2 inline-flex items-center text-primary hover:text-primary/80"
-                          title="Ver Etiqueta Salva"
-                        >
-                          <FileText className="h-4 w-4" />
-                        </a>
-                      )}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow key="no-results">
-                  <TableCell colSpan={7} className="text-center">Nenhuma ferramenta encontrada.</TableCell>
+                  <TableCell colSpan={6} className="text-center">Nenhuma ferramenta encontrada.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -574,67 +592,10 @@ const Equipamentos = () => {
         </CardContent>
       </Card>
       
-      <AddQuantityDialog
-        isOpen={isAddQuantityDialogOpen}
-        onClose={() => setIsAddQuantityDialogOpen(false)}
-        onSuccess={handleAddQuantitySuccess}
-      />
-      
-      <LabelPrintDialog 
-        tools={toolsToLabel} 
-        isOpen={toolsToLabel.length > 0} 
-        onClose={() => setToolsToLabel([])} 
-      />
-      
-      {toolsToConfirm.length > 0 && (
-          <LabelConfirmationDialog
-              tool={toolsToConfirm[0]}
-              isOpen={isConfirmationDialogOpen}
-              onConfirm={handleFinalizeCadastro}
-              onCancel={() => {
-                  setIsConfirmationDialogOpen(false);
-                  setToolsToConfirm([]);
-              }}
-          />
-      )}
-      
-      <ReprintDialog
-        tool={toolToReprint}
-        isOpen={isReprintDialogOpen}
-        onClose={() => setIsReprintDialogOpen(false)}
-        onReprintConfirmed={handleReprintConfirmed}
-      />
-
-      <ToolDetailsDialog
-        tool={selectedTool}
-        isOpen={isDetailsDialogOpen}
-        onClose={() => setIsDetailsDialogOpen(false)}
-        onToolDeleted={handleToolDeleted}
-        onToolUpdated={handleToolUpdated}
-      />
-
-      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Visualização da Imagem</DialogTitle>
-          </DialogHeader>
-          {previewImageUrl && (
-            <div className="relative mt-4" style={{ paddingBottom: '75%' }}>
-              <Image
-                src={previewImageUrl}
-                alt="Visualização ampliada da ferramenta"
-                layout="fill"
-                className="object-contain"
-              />
-            </div>
-          )}
-           <DialogFooter>
-             <Button variant="outline" onClick={() => setIsPreviewDialogOpen(false)}>Fechar</Button>
-           </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
 
 export default Equipamentos;
+
+    

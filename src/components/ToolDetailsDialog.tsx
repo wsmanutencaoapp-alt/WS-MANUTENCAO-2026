@@ -71,11 +71,16 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   }
 
   const getStatusVariant = (status: string) => {
-    return status === 'Disponível' || status === 'Available' ? 'success' : 'default';
-  };
-
-  const translateStatus = (status: string) => {
-    return status === 'Available' ? 'Disponível' : status;
+    const statusMap: { [key: string]: 'success' | 'destructive' | 'default' } = {
+        'Disponível': 'success',
+        'Vencido': 'destructive',
+        'Bloqueado': 'destructive',
+        'Inoperante': 'destructive',
+        'Pendente': 'default',
+        'Em Empréstimo': 'default',
+        'Em Aferição': 'default'
+    }
+    return statusMap[status] || 'default';
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,14 +88,8 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     setEditableTool(prev => ({...prev, [id]: value}));
   };
 
-  const handleSelectChange = (value: string) => {
-    setEditableTool((prev) => ({ ...prev, tipos: value }));
-  };
-
-  const handleCheckboxChange = (checked: boolean | 'indeterminate') => {
-     if (typeof checked === 'boolean') {
-      setEditableTool(prev => ({ ...prev, is_calibrable: checked }));
-    }
+  const handleSelectChange = (id: string, value: string) => {
+    setEditableTool((prev) => ({ ...prev, [id]: value }));
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,13 +161,13 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar Ferramenta" : "Detalhes da Ferramenta"}</DialogTitle>
           <DialogDescription>
-            {isEditing ? `Modifique as informações de ${tool.name}.` : `Informações completas sobre ${tool.name}.`}
+            {isEditing ? `Modifique as informações de ${tool.descricao}.` : `Informações completas sobre ${tool.descricao}.`}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="relative group">
             <Image
-              alt={tool.name}
+              alt={tool.descricao}
               className="aspect-video w-full rounded-md object-cover"
               height="250"
               src={previewImage || tool.imageUrl || "https://picsum.photos/seed/tool/400/250"}
@@ -202,82 +201,49 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                     />
                 </div>
                 <div className="col-span-2 space-y-1">
-                    <Label htmlFor="name">Nome</Label>
-                    <Input id="name" value={editableTool.name} onChange={handleInputChange} />
+                    <Label htmlFor="descricao">Descrição</Label>
+                    <Input id="descricao" value={editableTool.descricao} onChange={handleInputChange} />
                 </div>
                 <div className="col-span-2 space-y-1">
-                    <Label htmlFor="marca">Marca</Label>
-                    <Input id="marca" value={editableTool.marca || ''} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-1">
                     <Label htmlFor="enderecamento">Endereçamento</Label>
                     <Input id="enderecamento" value={editableTool.enderecamento || ''} onChange={handleInputChange} />
                 </div>
-                <div className="space-y-1">
-                    <Label htmlFor="aeronave_principal">Aeronave Principal</Label>
-                    <Input id="aeronave_principal" value={editableTool.aeronave_principal || ''} onChange={handleInputChange} />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <Label htmlFor="tipos">Tipos</Label>
-                  <Select onValueChange={handleSelectChange} defaultValue={editableTool.tipos}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Comuns">Comuns</SelectItem>
-                      <SelectItem value="Especiais">Especiais</SelectItem>
-                      <SelectItem value="GSEs">GSEs</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-2 flex items-center space-x-2 pt-2">
-                    <Checkbox id="is_calibrable" checked={editableTool.is_calibrable} onCheckedChange={handleCheckboxChange} />
-                    <Label htmlFor="is_calibrable" className="font-normal">Requer controle de calibração</Label>
+                 <div className="col-span-2 space-y-1">
+                    <Label htmlFor="aeronave_aplicavel">Aeronave Aplicável</Label>
+                    <Input id="aeronave_aplicavel" value={editableTool.aeronave_aplicavel || ''} onChange={handleInputChange} />
                 </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div>
-                <p className="font-semibold text-muted-foreground">Código</p>
-                <p>{tool.codigo || 'N/A'}</p>
+                <div className="col-span-2">
+                  <p className="font-semibold text-muted-foreground">Código</p>
+                  <p className="font-mono text-base">{tool.codigo || 'N/A'}</p>
                 </div>
-                 <div>
-                  <p className="font-semibold text-muted-foreground">Lote/Unidade</p>
-                  <p className="font-mono text-xs">{tool.unitCode || 'N/A'}</p>
+                 <div className="col-span-2">
+                  <p className="font-semibold text-muted-foreground">Descrição</p>
+                  <p>{tool.descricao}</p>
                 </div>
                 <div>
                   <p className="font-semibold text-muted-foreground">Status</p>
                   <Badge variant={getStatusVariant(tool.status || '')}>
-                    {translateStatus(tool.status || 'N/A')}
+                    {tool.status || 'N/A'}
                   </Badge>
                 </div>
                 <div>
-                  <p className="font-semibold text-muted-foreground">Marca</p>
-                  <p>{tool.marca || 'N/A'}</p>
-                </div>
-                <div className="col-span-2">
-                <p className="font-semibold text-muted-foreground">Nome</p>
-                <p>{tool.name}</p>
+                  <p className="font-semibold text-muted-foreground">Endereçamento</p>
+                  <p>{tool.enderecamento || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="font-semibold text-muted-foreground">Tipo</p>
-                  <p>{tool.tipos || 'N/A'}</p>
+                  <p className="font-semibold text-muted-foreground">P/N Fabricante</p>
+                  <p>{tool.pn_fabricante || 'N/A'}</p>
                 </div>
                 <div>
-                <p className="font-semibold text-muted-foreground">Endereçamento</p>
-                <p>{tool.enderecamento || 'N/A'}</p>
+                  <p className="font-semibold text-muted-foreground">Aeronave Aplicável</p>
+                  <p>{tool.aeronave_aplicavel || 'N/A'}</p>
                 </div>
                 <div>
-                <p className="font-semibold text-muted-foreground">Aeronave Principal</p>
-                <p>{tool.aeronave_principal || 'N/A'}</p>
-                </div>
-                <div>
-                <p className="font-semibold text-muted-foreground">Calibrável</p>
-                <p>{tool.is_calibrable ? 'Sim' : 'Não'}</p>
-                </div>
-                <div>
-                <p className="font-semibold text-muted-foreground">Última Calibração</p>
-                <p>{tool.lastCalibration || 'N/A'}</p>
+                  <p className="font-semibold text-muted-foreground">Vencimento</p>
+                  <p>{tool.data_vencimento ? new Date(tool.data_vencimento).toLocaleDateString() : 'N/A'}</p>
                 </div>
             </div>
           )}
@@ -308,7 +274,7 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                         <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                         <AlertDialogDescription>
                             Esta ação não pode ser desfeita. Isso irá excluir permanentemente a ferramenta
-                            <span className="font-bold"> {tool.codigo} ({tool.name})</span>.
+                            <span className="font-bold"> {tool.codigo} ({tool.descricao})</span>.
                         </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -338,3 +304,5 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     </Dialog>
   );
 }
+
+    

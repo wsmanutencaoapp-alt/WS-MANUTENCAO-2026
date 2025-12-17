@@ -49,76 +49,135 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Tool",
       "type": "object",
-      "description": "Represents a tool used in aircraft maintenance.",
+      "description": "Represents a tool used in aircraft maintenance with intelligent taxonomy.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Tool entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the tool."
-        },
-        "marca": {
-          "type": "string",
-          "description": "Brand of the tool."
-        },
-        "description": {
-          "type": "string",
-          "description": "Detailed description of the tool."
-        },
-        "lastCalibrationDate": {
-          "type": "string",
-          "description": "The date when the tool was last calibrated.",
-          "format": "date-time"
-        },
-        "calibrationDueDate": {
-          "type": "string",
-          "description": "The date when the tool calibration is due.",
-          "format": "date-time"
-        },
-        "assignedEmployeeId": {
-          "type": "string",
-          "description": "Reference to Employee who is assigned to the tool. (Relationship: Employee 1:N Tool)"
+          "description": "Unique identifier for the Tool entity (document ID)."
         },
         "codigo": {
           "type": "string",
-          "description": "The unique code for the tool."
+          "description": "The full intelligent code (e.g., STD-MEC-N-0001)."
+        },
+        "tipo": {
+          "type": "string",
+          "description": "Defines origin and documentation requirements.",
+          "enum": [
+            "STD",
+            "ESP",
+            "GSE",
+            "EQV"
+          ]
+        },
+        "familia": {
+          "type": "string",
+          "description": "Defines the functional grouping.",
+          "enum": [
+            "MEC",
+            "TRQ",
+            "PRE",
+            "ELE",
+            "RIG",
+            "MET",
+            "SEG"
+          ]
+        },
+        "classificacao": {
+          "type": "string",
+          "description": "Defines the control and locking rule.",
+          "enum": [
+            "N",
+            "C",
+            "L",
+            "V"
+          ]
+        },
+        "sequencial": {
+          "type": "number",
+          "description": "The 4-digit sequential number."
+        },
+        "descricao": {
+          "type": "string",
+          "description": "Detailed description of the tool."
         },
         "enderecamento": {
           "type": "string",
           "description": "The storage location of the tool."
         },
+        "pn_fabricante": {
+          "type": "string",
+          "description": "Manufacturer's Part Number (OEM for ESP, Plaque for GSE)."
+        },
+        "pn_referencia": {
+          "type": "string",
+          "description": "Reference P/N for equivalent tools (which part it replaces)."
+        },
+        "aeronave_aplicavel": {
+          "type": "string",
+          "description": "The applicable aircraft for the tool."
+        },
+        "doc_engenharia_url": {
+          "type": "string",
+          "description": "URL for the engineering document (mandatory for EQV)."
+        },
+        "doc_seguranca_url": {
+          "type": "string",
+          "description": "URL for the safety document (e.g., manual, APR)."
+        },
+        "patrimonio": {
+          "type": "string",
+          "description": "Asset number, defined by accounting."
+        },
         "status": {
           "type": "string",
-          "description": "Current status of the tool (e.g., Available, In Use)."
+          "description": "Current status of the tool (e.g., Ativo, Pendente, Bloqueado).",
+          "enum": [
+            "Disponível",
+            "Em Empréstimo",
+            "Em Aferição",
+            "Em Manutenção",
+            "Vencido",
+            "Bloqueado",
+            "Inoperante",
+            "Pendente"
+          ]
         },
-        "is_calibrable": {
-          "type": "boolean",
-          "description": "Indicates if the tool requires calibration."
+        "status_inicial": {
+            "type": "string",
+            "description": "The initial status when created, especially for ALT type."
         },
-        "aeronave_principal": {
+        "data_vencimento": {
           "type": "string",
-          "description": "The main aircraft the tool is associated with."
+          "format": "date",
+          "description": "Due date for Calibration, Load Test, or Expiration."
+        },
+        "data_referencia": {
+            "type": "string",
+            "format": "date",
+            "description": "Reference date (last calibration, last test, manufacturing date)."
+        },
+        "documento_anexo_url": {
+          "type": "string",
+          "description": "URL for the attached document (certificate, report)."
         },
         "label_url": {
           "type": "string",
           "description": "URL of the generated tool label image.",
           "format": "uri"
         },
-        "tipos": {
-          "type": "string",
-          "description": "The type of the tool.",
-          "enum": [
-            "Comuns",
-            "Especiais",
-            "GSEs"
-          ]
+        "imageUrl": {
+            "type": "string",
+            "description": "URL of the tool's photo.",
+            "format": "uri"
         }
       },
       "required": [
-        "id",
-        "name",
+        "codigo",
+        "tipo",
+        "familia",
+        "classificacao",
+        "sequencial",
+        "descricao",
         "status"
       ]
     },
@@ -385,7 +444,7 @@
           "schema": {
             "$ref": "#/backend/entities/Tool"
           },
-          "description": "Stores aircraft maintenance tools and their calibration details. Includes assignedEmployeeId for tracking tool assignments.",
+          "description": "Stores aircraft maintenance tools and their calibration details based on intelligent taxonomy.",
           "params": [
             {
               "name": "toolId",
@@ -478,3 +537,5 @@
     "reasoning": "This Firestore data structure is designed to support AeroTrack's aircraft maintenance management features, focusing on supply and tool control, operation recording, and image storage. The structure prioritizes authorization independence through denormalization where needed and adheres to structural segregation principles to ensure consistent security postures within collections.  Path-based ownership is used for user-related data (none explicitly defined, but included for future expansion). Collaborative data patterns, utilizing membership maps, are employed where applicable. \n\nSpecifically, authorization independence is achieved by denormalizing necessary authorization data (like supplier or employee IDs) directly into subcollections when access needs to be controlled at the subcollection level without relying on `get()` calls to parent documents.  For example, the OperationRecord collection includes the employeeId to track which employee performed the operation and use it for authorization.  This denormalization is critical for atomic operations and simplifies security rule implementation. QAPs (Rules are not Filters) are supported through structural segregation. Each top-level collection is treated as having homogeneous security requirements. Additionally, the use of employeeId as a foreign key in relevant collections like OperationRecord allows for efficient querying and filtering based on employee-specific operations. This design facilitates secure list operations because rules can be written based on the contents of the document itself, not on related documents."
   }
 }
+
+    

@@ -19,10 +19,10 @@ import JsBarcode from 'jsbarcode';
 
 type ToolLabelData = {
   id: string;
-  name?: string;
+  descricao?: string;
   codigo?: string;
-  unitCode?: string;
   enderecamento?: string;
+  data_vencimento?: string;
   label_url?: string | null;
 };
 
@@ -33,8 +33,8 @@ interface LabelPrintDialogProps {
 }
 
 const generateLabelSvgLocally = (tool: ToolLabelData): string => {
-    const { codigo = 'N/A', name = 'N/A', unitCode = 'N/A', enderecamento = '' } = tool;
-    const uniqueBarcodeValue = `${codigo}-${unitCode}`;
+    const { codigo = 'N/A', descricao = 'N/A', data_vencimento, enderecamento = '' } = tool;
+    const uniqueBarcodeValue = `${codigo}`;
 
     const svgContainer = document.createElement('div');
     const barcodeSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -61,23 +61,27 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     
     const barcodeX = (labelWidth - barcodeWidth) / 2;
 
-    const truncatedName = name.length > 40 ? name.substring(0, 37) + '...' : name;
+    const truncatedName = descricao.length > 40 ? descricao.substring(0, 37) + '...' : descricao;
+    const vencimentoText = data_vencimento ? `VENC: ${new Date(data_vencimento).toLocaleDateString('pt-BR')}` : '';
 
     return `
         <svg width="55mm" height="25mm" viewBox="0 0 ${labelWidth} ${labelHeight}" xmlns="http://www.w3.org/2000/svg" style="background-color:white; font-family: sans-serif;">
             <style>
                 .name { font-size: 8px; font-weight: bold; text-anchor: middle; }
                 .details { font-size: 7px; text-anchor: middle; }
+                .vencimento { font-size: 9px; font-weight: bold; text-anchor: middle; fill: black; }
             </style>
             
-            <text x="${labelWidth / 2}" y="18" class="name">${truncatedName}</text>
-            <text x="${labelWidth / 2}" y="36" class="details">
-                Cód: ${codigo} | Lote: ${unitCode} ${enderecamento ? `| Loc: ${enderecamento}` : ''}
+            <text x="${labelWidth / 2}" y="15" class="name">${truncatedName}</text>
+            <text x="${labelWidth / 2}" y="30" class="details">
+                Cód: ${codigo} ${enderecamento ? `| Loc: ${enderecamento}` : ''}
             </text>
 
-            <g transform="translate(${barcodeX}, 45)">
+            <g transform="translate(${barcodeX}, 38)">
                 ${barcodeSvgContent}
             </g>
+            
+            ${vencimentoText ? `<text x="${labelWidth/2}" y="85" class="vencimento">${vencimentoText}</text>` : ''}
         </svg>
     `;
 };
@@ -238,3 +242,5 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
     </Dialog>
   );
 }
+
+    

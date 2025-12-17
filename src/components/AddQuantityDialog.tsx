@@ -43,10 +43,10 @@ type FoundTool = Tool & {
   id: string;
 };
 
-// Represents a group of tools with the same 'codigo'
+// Represents a group of tools with the same 'codigo' base
 type ToolGroup = FoundTool & {
   unitCount: number;
-  lastUnitCode: string;
+  lastSequencial: number;
 };
 
 
@@ -86,44 +86,48 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       
       try {
         const toolsRef = collection(firestore, 'tools');
-        const searchTermUpper = searchTerm.toUpperCase();
         
-        // Query 1: by exact code
-        const codeQuery = query(toolsRef, where('codigo', '==', searchTermUpper));
-        
-        // Query 2: by name (prefix search)
+        // Query by 'descricao' (name) or 'codigo'
         const nameQuery = query(
           toolsRef, 
-          where('name', '>=', searchTerm),
-          where('name', '<=', searchTerm + '\uf8ff'),
-          limit(25) // Limit results for performance
+          where('descricao', '>=', searchTerm),
+          where('descricao', '<=', searchTerm + '\uf8ff'),
+          limit(25)
+        );
+        const codeQuery = query(
+          toolsRef, 
+          where('codigo', '>=', searchTerm.toUpperCase()),
+          where('codigo', '<=', searchTerm.toUpperCase() + '\uf8ff'),
+          limit(25)
         );
 
-        const [codeSnapshot, nameSnapshot] = await Promise.all([getDocs(codeQuery), getDocs(nameQuery)]);
+        const [nameSnapshot, codeSnapshot] = await Promise.all([getDocs(nameQuery), getDocs(codeQuery)]);
 
         const allTools = new Map<string, FoundTool>();
-        codeSnapshot.docs.forEach(doc => allTools.set(doc.id, { id: doc.id, ...doc.data() } as FoundTool));
         nameSnapshot.docs.forEach(doc => allTools.set(doc.id, { id: doc.id, ...doc.data() } as FoundTool));
+        codeSnapshot.docs.forEach(doc => allTools.set(doc.id, { id: doc.id, ...doc.data() } as FoundTool));
         
-        // Group tools by 'codigo'
+        // Group tools by base code (TIPO-FAMILIA-CLASSIFICACAO)
         const groups = new Map<string, FoundTool[]>();
         allTools.forEach(tool => {
             if (tool.codigo) {
-                if (!groups.has(tool.codigo)) {
-                    groups.set(tool.codigo, []);
+                const baseCode = tool.codigo.substring(0, tool.codigo.lastIndexOf('-'));
+                if (!groups.has(baseCode)) {
+                    groups.set(baseCode, []);
                 }
-                groups.get(tool.codigo)!.push(tool);
+                groups.get(baseCode)!.push(tool);
             }
         });
 
         const aggregatedGroups: ToolGroup[] = [];
-        groups.forEach((toolsInGroup, codigo) => {
-            toolsInGroup.sort((a, b) => (a.unitCode || '').localeCompare(b.unitCode || ''));
-            const representative = toolsInGroup[toolsInGroup.length - 1]; // Get the last one
+        groups.forEach((toolsInGroup) => {
+            const representative = toolsInGroup.reduce((latest, current) => 
+                (current.sequencial > latest.sequencial) ? current : latest
+            );
             aggregatedGroups.push({
                 ...representative,
                 unitCount: toolsInGroup.length,
-                lastUnitCode: representative.unitCode || 'A0000',
+                lastSequencial: representative.sequencial,
             });
         });
         
@@ -157,43 +161,56 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
     setIsSaving(true);
     const newTools: FoundTool[] = [];
-    const { lastUnitCode } = selectedToolGroup;
-    const lastUnitNumber = parseInt(lastUnitCode.replace('A', ''), 10);
-
+    const { tipo, familia, classificacao, lastSequencial } = selectedToolGroup;
+    const baseCode = `${tipo}-${familia}-${classificacao}`;
+    
     try {
+      const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
+
       await runTransaction(firestore, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        if (!counterDoc.exists()) {
+          throw new Error(`Contador para ${baseCode} não encontrado.`);
+        }
+        let lastId = counterDoc.data().lastId;
+        
+        const { id, unitCount, lastSequencial: ls, ...baseData } = selectedToolGroup;
+
         for (let i = 0; i < quantityToAdd; i++) {
-          const newUnitNumber = lastUnitNumber + 1 + i;
-          const newUnitCode = `A${newUnitNumber.toString().padStart(4, '0')}`;
+          const newSequencial = lastId + 1 + i;
+          const newCode = `${baseCode}-${newSequencial.toString().padStart(4, '0')}`;
           
           const newToolDocRef = doc(collection(firestore, 'tools'));
           
-          const { id, unitCount, lastUnitCode: lUC, ...baseData } = selectedToolGroup;
-
-          const newToolData: Omit<FoundTool, 'id'> = {
+          const newToolData: Omit<Tool, 'id'> = {
             ...baseData,
-            unitCode: newUnitCode,
+            codigo: newCode,
+            sequencial: newSequencial,
             status: 'Disponível',
           };
           
           transaction.set(newToolDocRef, newToolData);
           newTools.push({ ...newToolData, id: newToolDocRef.id });
         }
+        
+        transaction.update(counterRef, { lastId: lastId + quantityToAdd });
       });
       
-      toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.name} foram adicionadas.` });
+      toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.descricao} foram adicionadas.` });
       
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
       
       onSuccess(newTools);
 
     } catch (error) {
+      console.error(error);
       const permissionError = new FirestorePermissionError({
         path: 'tools/{newToolId}',
         operation: 'write', 
         requestResourceData: { info: `Transaction to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
       });
       errorEmitter.emit('permission-error', permissionError);
+      toast({ variant: 'destructive', title: 'Erro na Transação', description: (error as Error).message });
     } finally {
       setIsSaving(false);
     }
@@ -206,17 +223,17 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         <DialogHeader>
           <DialogTitle>Adicionar Quantidade a Item Existente</DialogTitle>
           <DialogDescription>
-            Pesquise por nome ou código e adicione novas unidades a uma ferramenta.
+            Pesquise por descrição ou código e adicione novas unidades a uma ferramenta.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
           <div className="relative">
-            <Label htmlFor="searchTerm">Pesquisar por Nome ou Código</Label>
+            <Label htmlFor="searchTerm">Pesquisar por Descrição ou Código</Label>
             <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               id="searchTerm"
-              placeholder="Digite o nome ou código (ex: Martelo, FE000001)"
+              placeholder="Digite a descrição ou código (ex: Martelo, STD-MEC-N...)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8"
@@ -237,14 +254,14 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                             >
                                 <Image
                                     src={group.imageUrl || "https://picsum.photos/seed/tool/64/64"}
-                                    alt={group.name}
+                                    alt={group.descricao}
                                     width={48}
                                     height={48}
                                     className="aspect-square rounded-md object-cover"
                                 />
                                 <div className="text-sm">
-                                    <p className="font-bold">{group.name}</p>
-                                    <p><strong>Código:</strong> {group.codigo}</p>
+                                    <p className="font-bold">{group.descricao}</p>
+                                    <p><strong>Código Base:</strong> {group.codigo.substring(0, group.codigo.lastIndexOf('-'))}</p>
                                     <p className="text-xs text-muted-foreground">{group.unitCount} unidade(s) em estoque</p>
                                 </div>
                             </button>
@@ -267,17 +284,15 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                <div className="flex items-start gap-4">
                  <Image
                     src={selectedToolGroup.imageUrl || "https://picsum.photos/seed/tool/64/64"}
-                    alt={selectedToolGroup.name}
+                    alt={selectedToolGroup.descricao}
                     width={64}
                     height={64}
                     className="aspect-square rounded-md object-cover"
                   />
                   <div className="text-sm">
-                      <p className="font-bold">{selectedToolGroup.name}</p>
-                      <p><strong>Código:</strong> {selectedToolGroup.codigo}</p>
-                      <p><strong>Marca:</strong> {selectedToolGroup.marca || 'N/A'}</p>
-                      <p><strong>Tipo:</strong> {selectedToolGroup.tipos || 'N/A'}</p>
-                      <p><strong>Último Lote:</strong> {selectedToolGroup.lastUnitCode}</p>
+                      <p className="font-bold">{selectedToolGroup.descricao}</p>
+                      <p><strong>Código Base:</strong> {selectedToolGroup.codigo.substring(0, selectedToolGroup.codigo.lastIndexOf('-'))}</p>
+                      <p><strong>Último Seq.:</strong> {selectedToolGroup.lastSequencial.toString().padStart(4, '0')}</p>
                   </div>
               </div>
               <div className="grid w-full max-w-sm items-center gap-1.5 pt-2">
@@ -306,3 +321,5 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
+
+    
