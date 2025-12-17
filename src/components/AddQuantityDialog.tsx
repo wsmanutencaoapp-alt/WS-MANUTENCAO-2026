@@ -105,7 +105,9 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         }
     };
     
-    fetchAllLogics();
+    if (isOpen) {
+      fetchAllLogics();
+    }
   }, [isOpen, firestore, toast]);
 
   // Filter logic tools based on search term
@@ -370,13 +372,13 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                                 {selectedToolGroup.classificacao === 'C' ? 'Data Última Calibração' : selectedToolGroup.classificacao === 'L' ? 'Data Último Teste' : 'Data Fabricação/Insp.'}
                            </Label>
                             <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataReferencia ? format(dataReferencia, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
-                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataReferencia} onSelect={setDataReferencia} initialFocus /></PopoverContent>
+                            <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={dataReferencia} onSelect={setDataReferencia} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
                         <div>
                            <Label>Data de Vencimento <span className='text-destructive'>*</span></Label>
                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataVencimento ? format(dataVencimento, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
-                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataVencimento} onSelect={setDataVencimento} initialFocus /></PopoverContent>
+                            <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={dataVencimento} onSelect={setDataVencimento} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
                         {(selectedToolGroup.classificacao === 'C' || selectedToolGroup.classificacao === 'L') && (
