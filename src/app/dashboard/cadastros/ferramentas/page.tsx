@@ -42,7 +42,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2 } from 'lucide-react';
+import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import type { Tool } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -66,10 +66,12 @@ const CadastroLogicaFerramentas = () => {
   const queryClient = useQueryClient();
   const logicasQueryKey = 'logicasFerramentas';
 
-  const [isNewToolDialogOpen, setIsNewToolDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
+  const [editingLogic, setEditingLogic] = useState<WithDocId<Tool> | null>(null);
+
   const [newFerramenta, setNewFerramenta] = useState<Partial<Tool>>({
       tipo: 'STD', familia: 'MEC', classificacao: 'N', descricao: '',
       pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '',
@@ -134,6 +136,7 @@ const CadastroLogicaFerramentas = () => {
       pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '',
     });
     setToolImage(null);
+    setEditingLogic(null);
     if(fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -145,7 +148,7 @@ const CadastroLogicaFerramentas = () => {
     return getDownloadURL(snapshot.ref);
   };
 
-  const handleSaveNewTool = async () => {
+  const handleSaveToolLogic = async () => {
     if (!user || !firestore) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado ou falha na conexão.' });
         return;
@@ -167,7 +170,7 @@ const CadastroLogicaFerramentas = () => {
   
     try {
         const tempId = doc(collection(firestore, 'temp')).id;
-        let imageUrl = await uploadImage(toolImage, `tool_logic_images/${tempId}.jpg`);
+        let imageUrl = toolImage.startsWith('data:') ? await uploadImage(toolImage, `tool_logic_images/${editingLogic?.docId || tempId}.jpg`) : toolImage;
         
         let status: Tool['status'] = 'Disponível';
         if (newFerramenta.tipo === 'EQV') status = 'Pendente';
@@ -184,17 +187,24 @@ const CadastroLogicaFerramentas = () => {
             enderecamento: 'LOGICA', // Mark this as a logic template
         };
 
-        // Explicitly cast to Partial<Tool> to satisfy addDoc
-        await addDoc(collection(firestore, 'tools'), toolData as Partial<Tool>);
+        if (editingLogic) {
+            // Update existing logic
+            const logicRef = doc(firestore, 'tools', editingLogic.docId);
+            await updateDoc(logicRef, toolData);
+            toast({ title: "Sucesso!", description: `Lógica de ferramenta atualizada.` });
+        } else {
+            // Add new logic
+            await addDoc(collection(firestore, 'tools'), toolData as Partial<Tool>);
+            toast({ title: "Sucesso!", description: `Nova lógica de ferramenta cadastrada.` });
+        }
         
-        toast({ title: "Sucesso!", description: `Nova lógica de ferramenta cadastrada.` });
         resetForm();
-        setIsNewToolDialogOpen(false);
+        setIsFormDialogOpen(false);
         queryClient.invalidateQueries({ queryKey: [logicasQueryKey, 'allToolsForLogicPage'] });
 
     } catch (error) {
       console.error("Erro ao salvar lógica:", error);
-      toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível cadastrar a lógica. Verifique as permissões.` });
+      toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível salvar a lógica. Verifique as permissões.` });
     } finally {
       setIsSaving(false);
     }
@@ -225,26 +235,33 @@ const CadastroLogicaFerramentas = () => {
     }
   };
 
+  const handleOpenEditDialog = (logic: WithDocId<Tool>) => {
+    setEditingLogic(logic);
+    setNewFerramenta(logic);
+    setToolImage(logic.imageUrl || null);
+    setIsFormDialogOpen(true);
+  };
+
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Cadastro de Lógica de Ferramentas</h1>
-        <Dialog open={isNewToolDialogOpen} onOpenChange={(isOpen) => {
+        <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
             if (!isOpen) resetForm();
-            setIsNewToolDialogOpen(isOpen);
+            setIsFormDialogOpen(isOpen);
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => setEditingLogic(null)}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Adicionar Lógica
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Cadastrar Nova Lógica de Ferramenta</DialogTitle>
+              <DialogTitle>{editingLogic ? 'Editar Lógica' : 'Cadastrar Nova Lógica'} de Ferramenta</DialogTitle>
               <DialogDescription>
-                Preencha os campos para criar um modelo (template) de ferramenta. O código será: <span className="font-mono font-bold text-primary">{generatedCode}</span>
+                Preencha os campos para criar ou atualizar um modelo de ferramenta. O código será: <span className="font-mono font-bold text-primary">{generatedCode}</span>
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
@@ -330,10 +347,10 @@ const CadastroLogicaFerramentas = () => {
                 )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsNewToolDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={handleSaveNewTool} disabled={isSaving}>
+              <Button variant="outline" onClick={() => setIsFormDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSaveToolLogic} disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar Lógica
+                {editingLogic ? 'Salvar Alterações' : 'Salvar Lógica'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -380,28 +397,34 @@ const CadastroLogicaFerramentas = () => {
                                 <p className="font-bold text-base">{logica.descricao}</p>
                                 <p className="font-mono text-muted-foreground">{logica.codigo}</p>
                             </div>
-                             <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" size="icon" disabled={isDeleting}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Tem certeza que deseja excluir a lógica <span className="font-bold">"{logica.descricao}"</span>? Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                    <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(logica)} disabled={isDeleting}>
-                                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                        Sim, Excluir
-                                    </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="icon" onClick={() => handleOpenEditDialog(logica)}>
+                                    <Edit className="h-4 w-4" />
+                                    <span className="sr-only">Editar</span>
+                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" size="icon" disabled={isDeleting}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                        <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Tem certeza que deseja excluir a lógica <span className="font-bold">"{logica.descricao}"</span>? Esta ação não pode ser desfeita.
+                                        </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDelete(logica)} disabled={isDeleting}>
+                                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                            Sim, Excluir
+                                        </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
                         </div>
                     ))}
                 </div>
