@@ -2,30 +2,12 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    match /employees/{userId} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Regras para ferramentas e suas lógicas
-    match /tools/{toolId} {
-      // Permite que usuários logados leiam, criem, atualizem e excluam ferramentas
-      allow read, write: if isSignedIn();
-    }
-
-    // Regras para os contadores usados para gerar IDs sequenciais
-    match /counters/{counterId} {
-      // Permite que usuários logados leiam e atualizem os contadores
-      allow read, write: if isSignedIn();
-    }
-
-    // Regras para as despesas
-    match /expenses/{expenseId} {
-      allow read, write: if isSignedIn();
+    // WARNING: This is a completely permissive rule set.
+    // It allows anyone to read, write, and delete any data in your database.
+    // This is intended for initial development and MUST be replaced with
+    // secure rules before deploying to a production environment.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

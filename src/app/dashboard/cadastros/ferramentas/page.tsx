@@ -13,6 +13,7 @@ import {
   setDoc,
   deleteDoc,
   runTransaction,
+  getDoc,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
@@ -48,9 +49,7 @@ const CadastroLogicaFerramentas = () => {
   const storage = useStorage();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const docEngenhariaInputRef = useRef<HTMLInputElement>(null);
-  const docSegurancaInputRef = useRef<HTMLInputElement>(null);
-
+  
   const queryClient = useQueryClient();
   const logicasQueryKey = 'logicasFerramentas';
 
@@ -64,8 +63,6 @@ const CadastroLogicaFerramentas = () => {
 
   const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
   const [toolImage, setToolImage] = useState<string | null>(null);
-  const [docEngenharia, setDocEngenharia] = useState<File | null>(null);
-  const [docSeguranca, setDocSeguranca] = useState<File | null>(null);
 
   useEffect(() => {
     const { tipo, familia, classificacao } = newFerramenta;
@@ -91,11 +88,6 @@ const CadastroLogicaFerramentas = () => {
   const handleSelectChange = (id: keyof Tool, value: string) => {
     setNewFerramenta(prev => ({ ...prev, [id]: value }));
   };
-
-  const handleFileChange = (setter: React.Dispatch<React.SetStateAction<File | null>>, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    setter(file || null);
-  };
   
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -112,26 +104,9 @@ const CadastroLogicaFerramentas = () => {
       pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '',
     });
     setToolImage(null);
-    setDocEngenharia(null);
-    setDocSeguranca(null);
     if(fileInputRef.current) fileInputRef.current.value = '';
-    if(docEngenhariaInputRef.current) docEngenhariaInputRef.current.value = '';
-    if(docSegurancaInputRef.current) docSegurancaInputRef.current.value = '';
   };
 
-  const uploadFile = async (file: File, path: string): Promise<string> => {
-    if (!storage) throw new Error("Storage service not available.");
-    const fileRef = storageRef(storage, path);
-    // Convert file to data URL to upload
-    const fileAsDataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-    const snapshot = await uploadString(fileRef, fileAsDataUrl, 'data_url');
-    return getDownloadURL(snapshot.ref);
-  };
 
   const uploadImage = async (dataUrl: string, path: string): Promise<string> => {
     if (!storage) throw new Error("Storage service not available.");
@@ -151,7 +126,7 @@ const CadastroLogicaFerramentas = () => {
     if (newFerramenta.tipo === 'EQV' && !newFerramenta.pn_referencia) {
       toast({ variant: "destructive", description: "P/N Referência é obrigatório para tipo 'Equivalente'." }); return;
     }
-     if (newFerramenta.tipo === 'EQV' && !docEngenharia) {
+     if (newFerramenta.tipo === 'EQV') {
       toast({ variant: "destructive", description: "Doc. Engenharia é obrigatório para tipo 'Equivalente'." }); return;
     }
      if (!toolImage) {
@@ -161,19 +136,8 @@ const CadastroLogicaFerramentas = () => {
     setIsSaving(true);
   
     try {
-        const counterRef = doc(firestore, 'counters', `tool_${newFerramenta.tipo}_${newFerramenta.familia}_${newFerramenta.classificacao}`);
-        
-        const existingCounter = await getDoc(counterRef);
-        if (!existingCounter.exists()) {
-             await setDoc(counterRef, { lastId: 0 });
-        }
-        
         const tempId = doc(collection(firestore, 'temp')).id;
         let imageUrl = await uploadImage(toolImage, `tool_logic_images/${tempId}.jpg`);
-        let docEngenhariaUrl;
-        if (docEngenharia) docEngenhariaUrl = await uploadFile(docEngenharia, `docs_engenharia/${tempId}_${docEngenharia.name}`);
-        let docSegurancaUrl;
-        if (docSeguranca) docSegurancaUrl = await uploadFile(docSeguranca, `docs_seguranca/${tempId}_${docSeguranca.name}`);
         
         let status = 'Disponível';
         if(newFerramenta.tipo === 'EQV') status = 'Pendente';
@@ -188,8 +152,6 @@ const CadastroLogicaFerramentas = () => {
             status: status,
             status_inicial: newFerramenta.tipo === 'EQV' ? 'Bloqueado' : 'Ativo',
             imageUrl: imageUrl,
-            doc_engenharia_url: docEngenhariaUrl,
-            doc_seguranca_url: docSegurancaUrl,
             enderecamento: 'LOGICA', // Mark this as a logic template
         };
         await addDoc(collection(firestore, 'tools'), toolData);
@@ -296,32 +258,11 @@ const CadastroLogicaFerramentas = () => {
                             <Input id="aeronave_aplicavel" value={newFerramenta.aeronave_aplicavel} onChange={handleInputChange} required />
                         </div>
                     )}
-                 </CardContent>
-              </Card>
-              <Card>
-                 <CardHeader><CardTitle className="text-lg">Documentos e Imagem de Referência</CardTitle></CardHeader>
-                 <CardContent className="space-y-4">
-                    <div className="flex items-center gap-4">
+                     <div className="col-span-2 flex items-center gap-4">
                         {toolImage ? <Image src={toolImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}
-                        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Anexar Foto de Referência <span className='text-destructive ml-1'>*</span></Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Foto de Referência<span className='text-destructive ml-1'>*</span></Button>
                         <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*" required/>
                     </div>
-                     {newFerramenta.tipo === 'EQV' && (
-                        <div className="flex items-center gap-4">
-                            {docEngenharia ? <FileText/> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
-                            <Button type="button" variant="outline" size="sm" onClick={() => docEngenhariaInputRef.current?.click()}>Doc. Engenharia <span className='text-destructive ml-1'>*</span></Button>
-                            <Input type="file" ref={docEngenhariaInputRef} onChange={(e) => handleFileChange(setDocEngenharia, e)} className="hidden" required/>
-                             {docEngenharia && <span className="text-sm text-muted-foreground truncate">{docEngenharia.name}</span>}
-                        </div>
-                     )}
-                     {newFerramenta.tipo === 'GSE' || newFerramenta.tipo === 'EQV' ? (
-                        <div className="flex items-center gap-4">
-                            {docSeguranca ? <FileText/> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
-                            <Button type="button" variant="outline" size="sm" onClick={() => docSegurancaInputRef.current?.click()}>Doc. Segurança</Button>
-                            <Input type="file" ref={docSegurancaInputRef} onChange={(e) => handleFileChange(setDocSeguranca, e)} className="hidden" />
-                             {docSeguranca && <span className="text-sm text-muted-foreground truncate">{docSeguranca.name}</span>}
-                        </div>
-                     ) : null}
                  </CardContent>
               </Card>
 
@@ -363,5 +304,3 @@ const CadastroLogicaFerramentas = () => {
 };
 
 export default CadastroLogicaFerramentas;
-
-    
