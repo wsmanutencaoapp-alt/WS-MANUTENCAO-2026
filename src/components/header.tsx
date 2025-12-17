@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   Wallet,
   FilePlus2,
+  List,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -59,6 +60,7 @@ const allNavItems: NavItem[] = [
     label: 'Ferramentaria',
     permission: 'ferramentaria',
     subItems: [
+        { href: '/dashboard/ferramentaria/lista-ferramentas', icon: List, label: 'Lista de Ferramentas', permission: 'ferramentaria_lista' },
         { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
         { href: '/dashboard/calibracao', label: 'Calibração', permission: 'calibracao' },
     ]
@@ -131,7 +133,6 @@ const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permi
     if (!permissions) return [];
 
     return items.reduce((acc, item) => {
-        // Items sem 'permission' são sempre visíveis (ex: 'Seu Perfil')
         if (!item.permission || permissions[item.permission]) {
             const newItem = { ...item };
             if (item.subItems) {

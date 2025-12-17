@@ -1,4 +1,4 @@
-// This page is an alias for the /dashboard/ferramentaria/movimentacao page.
-import MovimentacaoPage from "./movimentacao/page";
+// This page is an alias for the /dashboard/ferramentaria/lista-ferramentas page.
+import ListaFerramentasPage from "./lista-ferramentas/page";
 
-export default MovimentacaoPage;
+export default ListaFerramentasPage;

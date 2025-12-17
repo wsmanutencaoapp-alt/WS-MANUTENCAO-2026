@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Wallet,
   FilePlus2,
+  List,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -41,6 +42,7 @@ const allNavItems: NavItem[] = [
     label: 'Ferramentaria',
     permission: 'ferramentaria',
     subItems: [
+        { href: '/dashboard/ferramentaria/lista-ferramentas', icon: List, label: 'Lista de Ferramentas', permission: 'ferramentaria_lista' },
         { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
         { href: '/dashboard/calibracao', label: 'Calibração', permission: 'calibracao' },
     ]
@@ -109,15 +111,9 @@ const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permi
             const newItem = { ...item };
             if (item.subItems) {
                 newItem.subItems = item.subItems.filter(subItem => permissions[subItem.permission!]);
-                // Se o item principal tem permissão, mas nenhum subitem tem, não mostramos o item principal
-                // a menos que a rota principal seja um destino válido por si só.
-                if (newItem.subItems.length > 0 || !item.href.includes('/dashboard/')) { // Keep items that are just containers
+                if (newItem.subItems.length > 0 || !item.href.includes('/dashboard/')) {
                    acc.push(newItem);
                 } else if(newItem.subItems.length === 0 && item.href.includes('/dashboard/')) {
-                    // This handles cases where a parent is allowed but has no allowed children, but it's a valid page itself.
-                    // Let's check if we should add it anyway.
-                    // For now, if subItems array exists but is empty after filter, we might not want to add parent.
-                    // But if the parent link is a page itself, it should be kept.
                     const isParentAPage = !allNavItems.some(parent => parent.subItems && parent.subItems.some(sub => sub.href === newItem.href));
                      if(isParentAPage || newItem.subItems.length > 0) {
                          acc.push(newItem);

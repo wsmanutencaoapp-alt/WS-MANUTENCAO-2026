@@ -32,7 +32,6 @@ export type Tool = {
   documento_anexo_url?: string;
   label_url?: string;
   imageUrl?: string;
-  quantidade_estoque?: number; // Used only in form, not stored per-item
 };
 
 
@@ -44,7 +43,7 @@ export type Permissions = {
   configurador?: boolean;
   userManagement?: boolean;
   suprimentos_movimentacao?: boolean;
-  ferramentaria_cadastro?: boolean;
+  ferramentaria_lista?: boolean;
   ferramentaria_movimentacao?: boolean;
   calibracao?: boolean;
   compras_aprovacoes?: boolean;
