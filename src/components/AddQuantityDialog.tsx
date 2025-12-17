@@ -37,6 +37,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { format } from 'date-fns';
+import { Textarea } from './ui/textarea';
 
 
 interface AddQuantityDialogProps {
@@ -67,6 +68,8 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
+  const [descricaoEspecifica, setDescricaoEspecifica] = useState('');
+  const [marca, setMarca] = useState('');
   const [toolImage, setToolImage] = useState<string | null>(null);
   const [dataReferencia, setDataReferencia] = useState<Date | undefined>();
   const [dataVencimento, setDataVencimento] = useState<Date | undefined>();
@@ -97,6 +100,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                 lastSequencial: 0,
             }));
             setAllLogicTools(logics);
+            setFilteredLogicTools(logics); // Show all logics initially
         } catch (error) {
             console.error('Erro ao buscar lógicas:', error);
             toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível carregar as lógicas de ferramentas.' });
@@ -112,8 +116,8 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
   // Filter logic tools based on search term
   useEffect(() => {
-    if (searchTerm.length < 3) {
-      setFilteredLogicTools([]);
+    if (searchTerm.length < 1) {
+      setFilteredLogicTools(allLogicTools);
       return;
     }
     const lowercasedTerm = searchTerm.toLowerCase();
@@ -127,7 +131,9 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
   // Reset state when dialog opens/closes
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+        setDescricaoEspecifica(selectedToolGroup?.descricao || '');
+    } else {
       setSearchTerm('');
       setQuantityToAdd(1);
       setEnderecamento('');
@@ -141,8 +147,10 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       setDataReferencia(undefined);
       setDataVencimento(undefined);
       setDocAnexo(null);
+      setDescricaoEspecifica('');
+      setMarca('');
     }
-  }, [isOpen]);
+  }, [isOpen, selectedToolGroup]);
   
 
     const uploadFile = async (file: File, path: string): Promise<string> => {
@@ -229,6 +237,8 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           ...baseData,
           codigo: newCode,
           sequencial: newSequencial,
+          descricao: descricaoEspecifica || baseData.descricao,
+          marca: marca || '',
           status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível', // Respect initial status
           enderecamento: enderecamento,
           patrimonio: patrimonio || '',
@@ -288,7 +298,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
              {isSearching && <Loader2 className="absolute right-2.5 bottom-2.5 h-4 w-4 animate-spin" />}
           </div>
 
-          {!isSearching && searchTerm.length > 2 && !selectedToolGroup && (
+          {!isSearching && !selectedToolGroup && (
             <ScrollArea className="h-[200px] border rounded-md p-2">
                 {filteredLogicTools.length > 0 ? (
                     <div className="space-y-2">
@@ -343,6 +353,14 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
               <Card>
                 <CardHeader><CardTitle className="text-lg">Dados da Instância</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="col-span-2 space-y-1.5">
+                         <Label htmlFor="descricaoEspecifica">Descrição Específica</Label>
+                         <Textarea id="descricaoEspecifica" value={descricaoEspecifica} onChange={(e) => setDescricaoEspecifica(e.target.value)} placeholder={`Ex: ${selectedToolGroup.descricao} 1/2 polegada`} />
+                    </div>
+                     <div className="space-y-1.5">
+                        <Label htmlFor="marca">Marca</Label>
+                        <Input id="marca" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ex: Gedore, Fluke" />
+                    </div>
                     <div className="space-y-1.5">
                         <Label htmlFor="quantityToAdd">Quantidade <span className="text-destructive">*</span></Label>
                         <Input id="quantityToAdd" type="number" min="1" value={quantityToAdd} onChange={(e) => setQuantityToAdd(parseInt(e.target.value, 10) || 1)} />
@@ -351,7 +369,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                         <Label htmlFor="enderecamento">Endereçamento <span className="text-destructive">*</span></Label>
                         <Input id="enderecamento" value={enderecamento} onChange={(e) => setEnderecamento(e.target.value)} placeholder="Ex: GAV-01-A" />
                     </div>
-                    <div className="md:col-span-2 space-y-1.5">
+                    <div className="space-y-1.5">
                         <Label htmlFor="patrimonio">Nº Patrimônio (Opcional)</Label>
                         <Input id="patrimonio" value={patrimonio} onChange={(e) => setPatrimonio(e.target.value)} placeholder="Definido pela contabilidade" />
                     </div>

@@ -18,6 +18,7 @@ export type Tool = {
   classificacao: 'N' | 'C' | 'L' | 'V';
   sequencial: number;
   descricao: string;
+  marca?: string;
   enderecamento?: string;
   pn_fabricante?: string;
   pn_referencia?: string;
