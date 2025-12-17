@@ -40,7 +40,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { Employee } from '@/lib/types';
 import { useMemo } from 'react';
 import { ThemeToggle } from './theme-toggle';
-import { Logo } from '@/components/logo';
+import Image from 'next/image';
 
 const allNavItems: NavItem[] = [
   { 
@@ -186,7 +186,7 @@ export function Header() {
               href="/dashboard"
               className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
             >
-              <Logo className="h-6 w-6 text-primary-foreground" />
+              <Image src="/logo.png" alt="APP WS Logo" width={24} height={24} className="h-6 w-6" />
               <span className="sr-only">APP WS</span>
             </Link>
             <NavMenu items={navItems} pathname={pathname} isMobile={true} />

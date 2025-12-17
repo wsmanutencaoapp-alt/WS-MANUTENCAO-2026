@@ -21,7 +21,7 @@ import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Employee } from '@/lib/types';
 import { useMemo } from 'react';
 import { doc } from 'firebase/firestore';
-import { Logo } from '@/components/logo';
+import Image from 'next/image';
 
 
 const allNavItems: NavItem[] = [
@@ -143,7 +143,7 @@ export function AppSidebar() {
           href="/dashboard"
           className="flex items-center gap-2 text-lg font-semibold text-primary"
         >
-          <Logo />
+          <Image src="/logo.png" alt="APP WS Logo" width={32} height={32} className="h-8 w-8" />
           <span className={cn("font-bold", state === 'collapsed' && "hidden")}>APP WS</span>
           <span className="sr-only">APP WS</span>
         </Link>
