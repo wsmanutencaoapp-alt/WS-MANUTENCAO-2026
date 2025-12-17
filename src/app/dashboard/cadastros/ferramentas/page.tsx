@@ -37,10 +37,6 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import Image from 'next/image';
 import { useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
 
 const familiaSuggestions: { [key in Tool['familia']]: Tool['classificacao'] } = {
     TRQ: 'C', PRE: 'C', ELE: 'C', RIG: 'L', MET: 'C', SEG: 'V', MEC: 'N',
@@ -54,7 +50,6 @@ const CadastroLogicaFerramentas = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docEngenhariaInputRef = useRef<HTMLInputElement>(null);
   const docSegurancaInputRef = useRef<HTMLInputElement>(null);
-  const docAnexoInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
   const logicasQueryKey = 'logicasFerramentas';
@@ -71,9 +66,6 @@ const CadastroLogicaFerramentas = () => {
   const [toolImage, setToolImage] = useState<string | null>(null);
   const [docEngenharia, setDocEngenharia] = useState<File | null>(null);
   const [docSeguranca, setDocSeguranca] = useState<File | null>(null);
-  const [docAnexo, setDocAnexo] = useState<File | null>(null);
-  const [dataReferencia, setDataReferencia] = useState<Date | undefined>();
-  const [dataVencimento, setDataVencimento] = useState<Date | undefined>();
 
   useEffect(() => {
     const { tipo, familia, classificacao } = newFerramenta;
@@ -122,19 +114,22 @@ const CadastroLogicaFerramentas = () => {
     setToolImage(null);
     setDocEngenharia(null);
     setDocSeguranca(null);
-    setDocAnexo(null);
-    setDataReferencia(undefined);
-    setDataVencimento(undefined);
     if(fileInputRef.current) fileInputRef.current.value = '';
     if(docEngenhariaInputRef.current) docEngenhariaInputRef.current.value = '';
     if(docSegurancaInputRef.current) docSegurancaInputRef.current.value = '';
-    if(docAnexoInputRef.current) docAnexoInputRef.current.value = '';
   };
 
   const uploadFile = async (file: File, path: string): Promise<string> => {
     if (!storage) throw new Error("Storage service not available.");
     const fileRef = storageRef(storage, path);
-    const snapshot = await uploadString(fileRef, await file.text(), 'raw', { contentType: file.type });
+    // Convert file to data URL to upload
+    const fileAsDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+    const snapshot = await uploadString(fileRef, fileAsDataUrl, 'data_url');
     return getDownloadURL(snapshot.ref);
   };
 
@@ -159,11 +154,8 @@ const CadastroLogicaFerramentas = () => {
      if (newFerramenta.tipo === 'EQV' && !docEngenharia) {
       toast({ variant: "destructive", description: "Doc. Engenharia é obrigatório para tipo 'Equivalente'." }); return;
     }
-    if ((newFerramenta.classificacao === 'C' || newFerramenta.classificacao === 'L' || newFerramenta.classificacao === 'V') && !dataVencimento) {
-      toast({ variant: "destructive", description: "Data de Vencimento é obrigatória para esta classificação." }); return;
-    }
-    if ((newFerramenta.classificacao === 'C' || newFerramenta.classificacao === 'L') && !docAnexo) {
-        toast({ variant: "destructive", description: "Anexo de Certificado/Laudo é obrigatório para esta classificação." }); return;
+     if (!toolImage) {
+      toast({ variant: "destructive", description: "A imagem de referência é obrigatória para a lógica." }); return;
     }
   
     setIsSaving(true);
@@ -171,27 +163,22 @@ const CadastroLogicaFerramentas = () => {
     try {
         const counterRef = doc(firestore, 'counters', `tool_${newFerramenta.tipo}_${newFerramenta.familia}_${newFerramenta.classificacao}`);
         
-        await runTransaction(firestore, async (transaction) => {
-            const counterDoc = await transaction.get(counterRef);
-            if (!counterDoc.exists()) {
-                transaction.set(counterRef, { lastId: 0 });
-            }
-        });
-
+        const existingCounter = await getDoc(counterRef);
+        if (!existingCounter.exists()) {
+             await setDoc(counterRef, { lastId: 0 });
+        }
+        
         const tempId = doc(collection(firestore, 'temp')).id;
-        let imageUrl;
-        if (toolImage) imageUrl = await uploadImage(toolImage, `tool_images/${tempId}.jpg`);
+        let imageUrl = await uploadImage(toolImage, `tool_logic_images/${tempId}.jpg`);
         let docEngenhariaUrl;
         if (docEngenharia) docEngenhariaUrl = await uploadFile(docEngenharia, `docs_engenharia/${tempId}_${docEngenharia.name}`);
         let docSegurancaUrl;
         if (docSeguranca) docSegurancaUrl = await uploadFile(docSeguranca, `docs_seguranca/${tempId}_${docSeguranca.name}`);
-        let docAnexoUrl;
-        if (docAnexo) docAnexoUrl = await uploadFile(docAnexo, `docs_anexos/${tempId}_${docAnexo.name}`);
         
         let status = 'Disponível';
         if(newFerramenta.tipo === 'EQV') status = 'Pendente';
 
-        const sequencial = 0; // Logic template has no sequencial
+        const sequencial = 0; // Logic template has no sequencial, it's a template
         const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${sequencial.toString().padStart(4, '0')}`;
         
         const toolData: Omit<Tool, 'id'> = {
@@ -200,12 +187,9 @@ const CadastroLogicaFerramentas = () => {
             sequencial: sequencial,
             status: status,
             status_inicial: newFerramenta.tipo === 'EQV' ? 'Bloqueado' : 'Ativo',
-            data_referencia: dataReferencia?.toISOString(),
-            data_vencimento: dataVencimento?.toISOString(),
-            imageUrl,
+            imageUrl: imageUrl,
             doc_engenharia_url: docEngenhariaUrl,
             doc_seguranca_url: docSegurancaUrl,
-            documento_anexo_url: docAnexoUrl,
             enderecamento: 'LOGICA', // Mark this as a logic template
         };
         await addDoc(collection(firestore, 'tools'), toolData);
@@ -288,10 +272,10 @@ const CadastroLogicaFerramentas = () => {
                 </CardContent>
               </Card>
               <Card>
-                 <CardHeader><CardTitle className="text-lg">Dados Cadastrais</CardTitle></CardHeader>
+                 <CardHeader><CardTitle className="text-lg">Dados Cadastrais Genéricos</CardTitle></CardHeader>
                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="col-span-2">
-                        <Label htmlFor="descricao">Descrição</Label>
+                        <Label htmlFor="descricao">Descrição Genérica</Label>
                         <Input id="descricao" value={newFerramenta.descricao} onChange={handleInputChange} required />
                     </div>
                      {newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'GSE' || newFerramenta.tipo === 'EQV' ? (
@@ -315,11 +299,11 @@ const CadastroLogicaFerramentas = () => {
                  </CardContent>
               </Card>
               <Card>
-                 <CardHeader><CardTitle className="text-lg">Documentos e Anexos</CardTitle></CardHeader>
+                 <CardHeader><CardTitle className="text-lg">Documentos e Imagem de Referência</CardTitle></CardHeader>
                  <CardContent className="space-y-4">
                     <div className="flex items-center gap-4">
                         {toolImage ? <Image src={toolImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}
-                        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Anexar Foto <span className='text-destructive ml-1'>*</span></Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Anexar Foto de Referência <span className='text-destructive ml-1'>*</span></Button>
                         <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*" required/>
                     </div>
                      {newFerramenta.tipo === 'EQV' && (
@@ -340,35 +324,6 @@ const CadastroLogicaFerramentas = () => {
                      ) : null}
                  </CardContent>
               </Card>
-              {newFerramenta.classificacao !== 'N' && (
-                  <Card>
-                    <CardHeader><CardTitle className="text-lg">Controle e Validade</CardTitle></CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                           <Label>
-                                {newFerramenta.classificacao === 'C' ? 'Data Última Calibração' : newFerramenta.classificacao === 'L' ? 'Data Último Teste' : 'Data Fabricação/Insp.'}
-                           </Label>
-                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataReferencia ? format(dataReferencia, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
-                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataReferencia} onSelect={setDataReferencia} initialFocus /></PopoverContent>
-                            </Popover>
-                        </div>
-                        <div>
-                           <Label>Data de Vencimento <span className='text-destructive'>*</span></Label>
-                           <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataVencimento ? format(dataVencimento, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
-                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataVencimento} onSelect={setDataVencimento} initialFocus /></PopoverContent>
-                            </Popover>
-                        </div>
-                        {(newFerramenta.classificacao === 'C' || newFerramenta.classificacao === 'L') && (
-                            <div className="flex items-center gap-4 col-span-2">
-                                {docAnexo ? <FileText/> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
-                                <Button type="button" variant="outline" size="sm" onClick={() => docAnexoInputRef.current?.click()}>Anexar Certificado/Laudo <span className='text-destructive ml-1'>*</span></Button>
-                                <Input type="file" ref={docAnexoInputRef} onChange={(e) => handleFileChange(setDocAnexo, e)} className="hidden" required/>
-                                {docAnexo && <span className="text-sm text-muted-foreground truncate">{docAnexo.name}</span>}
-                            </div>
-                        )}
-                    </CardContent>
-                  </Card>
-              )}
 
                 {newFerramenta.tipo === 'EQV' && (
                     <div className="col-span-full bg-blue-100 dark:bg-blue-900/30 border border-blue-400 text-blue-800 dark:text-blue-200 px-4 py-3 rounded-md flex items-center gap-3">
@@ -408,3 +363,5 @@ const CadastroLogicaFerramentas = () => {
 };
 
 export default CadastroLogicaFerramentas;
+
+    
