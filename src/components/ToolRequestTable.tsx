@@ -91,8 +91,9 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
   }
 
   const loanedToolsForRequest = useMemo(() => {
-    if (!selectedRequestForReturn || !loanedTools) return [];
-    return loanedTools.filter(tool => selectedRequestForReturn.toolIds.includes(tool.docId));
+    if (!selectedRequestForReturn) return [];
+    const requestToolIds = new Set(selectedRequestForReturn.toolIds);
+    return loanedTools.filter(tool => requestToolIds.has(tool.docId));
   }, [selectedRequestForReturn, loanedTools]);
 
 

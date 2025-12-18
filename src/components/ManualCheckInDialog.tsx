@@ -58,20 +58,20 @@ export default function ManualCheckInDialog({
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
+  const preselectedIdsString = useMemo(() => preselectedToolIds.sort().join(','), [preselectedToolIds]);
+
   useEffect(() => {
     if (isOpen) {
-        // If preselected IDs are provided (from a specific request), use them.
         const initialIds = new Set(preselectedToolIds);
         setSelectedToolIds(initialIds);
 
-        // Initialize inspection data for the preselected tools
         const newInspectionData: Record<string, InspectionState> = {};
         initialIds.forEach(id => {
             newInspectionData[id] = { visual: null, funcional: null, observacao: '' };
         });
         setInspectionData(newInspectionData);
     }
-}, [isOpen, preselectedToolIds]);
+  }, [isOpen, preselectedIdsString]);
 
 
   const filteredTools = useMemo(() => {
