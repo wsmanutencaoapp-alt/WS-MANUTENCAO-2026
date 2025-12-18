@@ -2,7 +2,7 @@
 import { forwardRef, useImperativeHandle, useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import type { ToolRequest } from '@/lib/types';
+import type { Tool, ToolRequest } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertCircle, Inbox } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
+import Image from 'next/image';
 
 export interface ToolMovementHistoryTableRef {
   refetchHistory: () => void;
@@ -39,6 +40,19 @@ const getStatusVariant = (status: ToolRequest['status']) => {
     }
 }
 
+type ExpandedHistoryItem = {
+  requestId: string;
+  toolId: string;
+  osNumber: string;
+  requesterName: string;
+  status: ToolRequest['status'];
+  toolCode: string;
+  toolDescription: string;
+  toolImage?: string;
+  handledAt?: string;
+  returnedAt?: string;
+};
+
 
 const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((props, ref) => {
   const firestore = useFirestore();
@@ -53,18 +67,49 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
     [firestore]
   );
   
-  const { data: requests, isLoading, error } = useCollection<WithDocId<ToolRequest>>(requestsQuery, {
+  const { data: requests, isLoading: isLoadingRequests, error } = useCollection<WithDocId<ToolRequest>>(requestsQuery, {
       queryKey
   });
 
-  const sortedRequests = useMemo(() => {
-    if (!requests) return [];
-    return [...requests].sort((a, b) => {
-      const dateA = a.returnedAt || a.handledAt || a.requestedAt;
-      const dateB = b.returnedAt || b.handledAt || b.requestedAt;
-      return new Date(dateB).getTime() - new Date(dateA).getTime();
+  const toolsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'tools') : null), [firestore]);
+  const { data: allTools, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery, {
+      queryKey: ['allToolsForHistory'],
+      staleTime: Infinity, // Tools don't change often in this context, cache them longer
+  });
+
+  const expandedHistory = useMemo((): ExpandedHistoryItem[] => {
+    if (!requests || !allTools) return [];
+
+    const toolsMap = new Map(allTools.map(tool => [tool.docId, tool]));
+    
+    const historyItems: ExpandedHistoryItem[] = [];
+
+    for (const request of requests) {
+        for (const toolId of request.toolIds) {
+            const tool = toolsMap.get(toolId);
+            historyItems.push({
+                requestId: request.docId,
+                toolId: toolId,
+                osNumber: request.osNumber,
+                requesterName: request.requesterName,
+                status: request.status,
+                toolCode: tool?.codigo || 'N/A',
+                toolDescription: tool?.descricao || 'Ferramenta não encontrada',
+                toolImage: tool?.imageUrl,
+                handledAt: request.handledAt,
+                returnedAt: request.returnedAt,
+            });
+        }
+    }
+    
+    // Sort by return/handled date descending
+    return historyItems.sort((a, b) => {
+        const dateA = a.returnedAt || a.handledAt || '';
+        const dateB = b.returnedAt || b.handledAt || '';
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
     });
-  }, [requests]);
+
+  }, [requests, allTools]);
 
 
   useImperativeHandle(ref, () => ({
@@ -72,58 +117,76 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
       queryClient.invalidateQueries({ queryKey });
     }
   }));
+
+  const isLoading = isLoadingRequests || isLoadingTools;
   
   return (
     <Card>
         <CardHeader>
              <CardTitle>Histórico de Movimentações</CardTitle>
              <CardDescription>
-                Visualize todos os empréstimos de ferramentas concluídos (devolvidos, cancelados, etc).
+                Visualize o extrato de todas as movimentações de ferramentas (saídas e retornos).
              </CardDescription>
         </CardHeader>
         <CardContent>
              <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Nº da OS</TableHead>
+                    <TableHead className="w-[100px]">OS</TableHead>
+                    <TableHead>Ferramenta</TableHead>
                     <TableHead>Solicitante</TableHead>
-                    <TableHead>Data Retirada</TableHead>
-                    <TableHead>Data Devolução</TableHead>
+                    <TableHead>Data Saída</TableHead>
+                    <TableHead>Data Retorno</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center">
+                      <TableCell colSpan={6} className="text-center">
                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                       </TableCell>
                     </TableRow>
                   )}
                   {error && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-destructive">
+                      <TableCell colSpan={6} className="text-center text-destructive">
                          <AlertCircle className="inline-block mr-2" /> Erro ao carregar histórico.
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && sortedRequests.length === 0 && (
+                  {!isLoading && expandedHistory.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center h-24">
+                      <TableCell colSpan={6} className="text-center h-24">
                         <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                         <p className="text-muted-foreground">Nenhum histórico de movimentação encontrado.</p>
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && sortedRequests.map(request => (
-                    <TableRow key={request.docId}>
+                  {!isLoading && expandedHistory.map((item, index) => (
+                    <TableRow key={`${item.requestId}-${item.toolId}-${index}`}>
+                      <TableCell className="font-mono">{item.osNumber}</TableCell>
                       <TableCell>
-                          <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
+                          <div className="flex items-center gap-3">
+                              <Image 
+                                src={item.toolImage || "https://picsum.photos/seed/default/40/40"}
+                                alt={item.toolDescription}
+                                width={40}
+                                height={40}
+                                className="rounded-md object-cover hidden sm:block"
+                              />
+                              <div>
+                                <p className="font-bold">{item.toolDescription}</p>
+                                <p className="font-mono text-xs text-muted-foreground">{item.toolCode}</p>
+                              </div>
+                          </div>
                       </TableCell>
-                      <TableCell className="font-mono">{request.osNumber}</TableCell>
-                      <TableCell>{request.requesterName}</TableCell>
-                      <TableCell>{request.handledAt ? format(new Date(request.handledAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
-                      <TableCell>{request.returnedAt ? format(new Date(request.returnedAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                      <TableCell>{item.requesterName}</TableCell>
+                      <TableCell>{item.handledAt ? format(new Date(item.handledAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                      <TableCell>{item.returnedAt ? format(new Date(item.returnedAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                      <TableCell>
+                          <Badge variant={getStatusVariant(item.status)}>{item.status}</Badge>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
