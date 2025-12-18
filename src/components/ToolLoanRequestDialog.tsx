@@ -46,10 +46,13 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
   const [isSaving, setIsSaving] = useState(false);
 
   const filteredTools = useMemo(() => {
+    if (!allAvailableTools) return [];
     if (!searchTerm) return allAvailableTools;
     const lowercasedTerm = searchTerm.toLowerCase();
     return allAvailableTools.filter(
-      tool => tool.descricao.toLowerCase().includes(lowercasedTerm) || tool.codigo.toLowerCase().includes(lowercasedTerm)
+      tool =>
+        (tool.descricao && tool.descricao.toLowerCase().includes(lowercasedTerm)) ||
+        (tool.codigo && tool.codigo.toLowerCase().includes(lowercasedTerm))
     );
   }, [allAvailableTools, searchTerm]);
 
@@ -176,8 +179,8 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
 
           <ScrollArea className="h-64 border rounded-md flex-1">
             <div className="p-2 space-y-2">
-              {allAvailableTools.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma ferramenta disponível.</p>}
-              {filteredTools.map(tool => (
+              {allAvailableTools && allAvailableTools.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma ferramenta disponível.</p>}
+              {filteredTools && filteredTools.map(tool => (
                 <div 
                   key={tool.docId}
                   className="flex items-center gap-4 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer"
@@ -190,7 +193,7 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
                   />
                   <Image
                     src={tool.imageUrl || "https://picsum.photos/seed/tool/64/64"}
-                    alt={tool.descricao}
+                    alt={tool.descricao || 'Ferramenta'}
                     width={40}
                     height={40}
                     className="aspect-square rounded-md object-cover"
