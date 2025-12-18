@@ -185,7 +185,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         </DialogHeader>
 
         {isEditing ? (
-            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
+            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] h-[55vh]">
                 {/* Coluna 1: Dados do kit e Ferramentas no Kit */}
                 <div className="flex flex-col gap-4">
                     <div className="space-y-4 p-1">
@@ -269,9 +269,9 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
             </ScrollArea>
         )}
         
-        <DialogFooter className="sm:justify-between pt-4">
+        <DialogFooter className="pt-4">
             {isEditing ? (
-                <>
+                <div className="flex w-full justify-between">
                     <Button variant="ghost" onClick={handleCancelEdit} disabled={isSaving}>
                         <X className="mr-2 h-4 w-4" /> Cancelar
                     </Button>
@@ -279,7 +279,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         Salvar Alterações
                     </Button>
-                </>
+                </div>
             ) : (
                 <div className="flex w-full justify-between">
                     <Button variant="outline" onClick={() => setIsEditing(true)}>
