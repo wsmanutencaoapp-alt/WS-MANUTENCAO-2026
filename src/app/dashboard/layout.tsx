@@ -30,30 +30,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       router.push('/login');
       return;
     }
-
-    if (!isLoading && user && employeeData) {
-      const requiredPermission = getRequiredPermissionForPath(pathname);
-      const isAdmin = employeeData.accessLevel === 'Admin';
-      
-      // Se não há permissão requerida, todos podem acessar
-      if (!requiredPermission) {
-        return;
-      }
-      
-      // Admins podem acessar tudo
-      if (isAdmin) {
-        return;
-      }
-
-      // Se o usuário não é admin e não tem a permissão, redireciona
-      if (!employeeData.permissions || !employeeData.permissions[requiredPermission]) {
-        // Redireciona para a primeira página que o usuário tiver permissão, ou dashboard
-        const firstAllowedPage = allUserPermissions.find(p => employeeData.permissions?.[p.id])?.path || '/dashboard/suprimentos';
-        router.push(firstAllowedPage);
-      }
-    }
-
-  }, [user, employeeData, isLoading, router, pathname]);
+  }, [user, isLoading, router]);
 
   if (isLoading || !user) {
     return (
