@@ -253,7 +253,7 @@ export function AppSidebar() {
           <Input
             type="search"
             placeholder="Pesquisar módulos..."
-            className="w-full rounded-lg bg-background pl-8"
+            className="w-full rounded-lg bg-background pl-8 text-blue-600 dark:text-blue-400"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
