@@ -1,71 +1,73 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+import { useMemo } from 'react';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { ListChecks, Send, Wrench, Loader2, History, LogOut, LogIn } from 'lucide-react';
-import ToolLoanRequestDialog from '@/components/ToolLoanRequestDialog';
-import ToolRequestTable, { ToolRequestTableRef } from '@/components/ToolRequestTable';
-import ToolMovementHistoryTable, { ToolMovementHistoryTableRef } from '@/components/ToolMovementHistoryTable';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Wrench } from 'lucide-react';
 import type { Tool } from '@/lib/types';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import ManualCheckoutDialog from '@/components/ManualCheckoutDialog';
-import ManualCheckInDialog from '@/components/ManualCheckInDialog';
+import MovementTables from '@/components/MovementTables';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const MovimentacaoFerramentaria = () => {
+// This is now the main container component for the movement page.
+// It is responsible for fetching all necessary data and passing it down to child components.
+// This pattern avoids re-fetching and infinite loops caused by nested components triggering state changes.
+const MovimentacaoFerramentariaPage = () => {
   const { toast } = useToast();
   const firestore = useFirestore();
-  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
-  const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false);
-  const [isCheckInDialogOpen, setIsCheckInDialogOpen] = useState(false);
-  
-  const requestTableRef = useRef<ToolRequestTableRef>(null);
-  const historyTableRef = useRef<ToolMovementHistoryTableRef>(null);
 
-  // Query for available tools
+  // Query 1: Fetch all tools that are currently available for loan.
   const availableToolsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Disponível')) : null),
     [firestore]
   );
   
   const { data: availableTools, isLoading: isLoadingAvailable, error: availableError } = useCollection<WithDocId<Tool>>(availableToolsQuery, {
-      queryKey: ['availableTools']
+      queryKey: ['availableToolsForMovement']
   });
 
-  // Query for loaned tools
+  // Query 2: Fetch all tools that are currently on loan.
   const loanedToolsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Em Empréstimo')) : null),
     [firestore]
   );
   
   const { data: loanedTools, isLoading: isLoadingLoaned, error: loanedError } = useCollection<WithDocId<Tool>>(loanedToolsQuery, {
-      queryKey: ['loanedTools']
+      queryKey: ['loanedToolsForMovement']
   });
-
-
-  const handleActionSuccess = () => {
-    requestTableRef.current?.refetchRequests();
-    historyTableRef.current?.refetchHistory();
-    // Invalidating queries is handled by useCollection, but we can be explicit if needed
-    // queryClient.invalidateQueries({ queryKey: ['availableTools'] });
-    // queryClient.invalidateQueries({ queryKey: ['loanedTools'] });
-    toast({ title: "Sucesso!", description: "A operação foi concluída." });
-    setIsRequestDialogOpen(false);
-    setIsCheckoutDialogOpen(false);
-    setIsCheckInDialogOpen(false);
-  };
   
-  useEffect(() => {
-    if(availableError || loanedError){
-        toast({ variant: 'destructive', title: 'Erro ao buscar equipamentos', description: 'Você pode não ter permissão para ver estes dados.'})
-    }
-  }, [availableError, loanedError, toast]);
+  // Memoize the filtered tools to prevent re-calculations on every render.
+  const toolsForKit = useMemo(() => {
+    return availableTools?.filter(tool => tool.enderecamento !== 'LOGICA') || [];
+  }, [availableTools]);
 
+  // Combine loading states
   const isLoading = isLoadingAvailable || isLoadingLoaned;
+
+  // Display a single loading skeleton if data isn't ready.
+  if (isLoading) {
+    return (
+        <div className="space-y-6">
+            <h1 className="text-2xl font-bold flex items-center">
+                <Wrench className="h-6 w-6 mr-2" /> Controle de Entrada e Saída de Ferramentas
+            </h1>
+            <div className="flex justify-end gap-2">
+                <Skeleton className="h-10 w-40" />
+                <Skeleton className="h-10 w-40" />
+                <Skeleton className="h-10 w-44" />
+            </div>
+            <Skeleton className="h-96 w-full" />
+        </div>
+    );
+  }
+
+  // Display error message if fetching fails
+  if (availableError || loanedError) {
+      const error = availableError || loanedError;
+      toast({ variant: 'destructive', title: 'Erro ao buscar equipamentos', description: error?.message || 'Você pode não ter permissão para ver estes dados.'})
+  }
 
   return (
     <div className="space-y-6">
@@ -74,65 +76,13 @@ const MovimentacaoFerramentaria = () => {
         <Wrench className="h-6 w-6 mr-2" /> Controle de Entrada e Saída de Ferramentas
       </h1>
       
-      <div className="flex justify-end gap-2">
-         <Button variant="outline" onClick={() => setIsCheckInDialogOpen(true)}>
-            <LogIn className="mr-2 h-4 w-4" /> Registrar Entrada
-        </Button>
-        <Button variant="outline" onClick={() => setIsCheckoutDialogOpen(true)}>
-            <LogOut className="mr-2 h-4 w-4" /> Registrar Saída
-        </Button>
-        <Button onClick={() => setIsRequestDialogOpen(true)}>
-          <Send className="mr-2 h-4 w-4" /> Solicitar Empréstimo
-        </Button>
-      </div>
-      
-      <Tabs defaultValue="requisicoes">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="requisicoes">
-            <ListChecks className="mr-2 h-4 w-4" /> Requisições Ativas
-          </TabsTrigger>
-          <TabsTrigger value="historico">
-            <History className="mr-2 h-4 w-4" /> Histórico de Movimentações
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="requisicoes" className="mt-4">
-          <ToolRequestTable 
-            ref={requestTableRef}
-            onActionSuccess={handleActionSuccess}
-            allLoanedTools={loanedTools || []}
-          />
-        </TabsContent>
-
-        <TabsContent value="historico" className="mt-4">
-           <ToolMovementHistoryTable
-            ref={historyTableRef}
-          />
-        </TabsContent>
-      </Tabs>
-      
-      <ToolLoanRequestDialog 
-        isOpen={isRequestDialogOpen}
-        onClose={() => setIsRequestDialogOpen(false)}
-        allAvailableTools={availableTools || []}
-        onActionSuccess={handleActionSuccess}
-      />
-
-      <ManualCheckoutDialog
-        isOpen={isCheckoutDialogOpen}
-        onClose={() => setIsCheckoutDialogOpen(false)}
-        allAvailableTools={availableTools || []}
-        onActionSuccess={handleActionSuccess}
-      />
-
-      <ManualCheckInDialog
-        isOpen={isCheckInDialogOpen}
-        onClose={() => setIsCheckInDialogOpen(false)}
-        allLoanedTools={loanedTools || []}
-        onActionSuccess={handleActionSuccess}
+      {/* The MovementTables component now receives all data as props */}
+      <MovementTables 
+        availableTools={toolsForKit} 
+        loanedTools={loanedTools || []}
       />
     </div>
   );
 };
 
-export default MovimentacaoFerramentaria;
+export default MovimentacaoFerramentariaPage;

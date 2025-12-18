@@ -1,5 +1,5 @@
 'use client';
-import { forwardRef, useImperativeHandle, useState, useMemo } from 'react';
+import { forwardRef, useImperativeHandle, useState, useMemo, useEffect } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import type { ToolRequest, Tool } from '@/lib/types';
@@ -34,7 +34,10 @@ export interface ToolRequestTableRef {
 
 interface ToolRequestTableProps {
     onActionSuccess: () => void;
-    allLoanedTools: WithDocId<Tool>[];
+    loanedTools: WithDocId<Tool>[];
+    requests: WithDocId<ToolRequest>[] | undefined;
+    isLoading: boolean;
+    error: Error | null;
 }
 
 const getStatusVariant = (status: ToolRequest['status']) => {
@@ -48,25 +51,11 @@ const getStatusVariant = (status: ToolRequest['status']) => {
     }
 }
 
-const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(({ onActionSuccess, allLoanedTools }, ref) => {
-  const firestore = useFirestore();
+const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(({ onActionSuccess, loanedTools, requests, isLoading, error }, ref) => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequestForFulfillment, setSelectedRequestForFulfillment] = useState<WithDocId<ToolRequest> | null>(null);
   const [selectedRequestForReturn, setSelectedRequestForReturn] = useState<WithDocId<ToolRequest> | null>(null);
-
-  const queryKey = ['tool_requests_active'];
-  const requestsQuery = useMemoFirebase(
-    () => (firestore ? query(
-        collection(firestore, 'tool_requests'), 
-        where('status', 'in', ['Pendente', 'Em Uso']),
-    ) : null),
-    [firestore]
-  );
-  
-  const { data: requests, isLoading, error } = useCollection<WithDocId<ToolRequest>>(requestsQuery, {
-      queryKey
-  });
 
   const filteredRequests = useMemo(() => {
     if (!requests) return [];
@@ -91,7 +80,7 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
 
   useImperativeHandle(ref, () => ({
     refetchRequests() {
-      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ['tool_requests_active'] });
     }
   }));
   
@@ -102,9 +91,9 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
   }
 
   const loanedToolsForRequest = useMemo(() => {
-    if (!selectedRequestForReturn || !allLoanedTools) return [];
-    return allLoanedTools.filter(tool => selectedRequestForReturn.toolIds.includes(tool.docId));
-  }, [selectedRequestForReturn, allLoanedTools]);
+    if (!selectedRequestForReturn || !loanedTools) return [];
+    return loanedTools.filter(tool => selectedRequestForReturn.toolIds.includes(tool.docId));
+  }, [selectedRequestForReturn, loanedTools]);
 
 
   return (

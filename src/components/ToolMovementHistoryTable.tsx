@@ -1,5 +1,5 @@
 'use client';
-import { forwardRef, useImperativeHandle, useState, useMemo } from 'react';
+import { forwardRef, useImperativeHandle, useState, useMemo, useEffect } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import type { Tool, ToolRequest, InspectionResult } from '@/lib/types';
@@ -58,30 +58,17 @@ type ExpandedHistoryItem = {
 };
 
 
-const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((props, ref) => {
-  const firestore = useFirestore();
+interface ToolMovementHistoryTableProps {
+  requests: WithDocId<ToolRequest>[] | undefined;
+  allTools: WithDocId<Tool>[] | undefined;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMovementHistoryTableProps>(({ requests, allTools, isLoading, error }, ref) => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-
-  const queryKey = ['tool_requests_history_completed'];
-  const requestsQuery = useMemoFirebase(
-    () => (firestore ? query(
-        collection(firestore, 'tool_requests'), 
-        where('status', 'in', ['Devolvida', 'Cancelada']),
-    ) : null),
-    [firestore]
-  );
   
-  const { data: requests, isLoading: isLoadingRequests, error } = useCollection<WithDocId<ToolRequest>>(requestsQuery, {
-      queryKey
-  });
-
-  const toolsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'tools') : null), [firestore]);
-  const { data: allTools, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery, {
-      queryKey: ['allToolsForHistory'],
-      staleTime: Infinity, // Tools don't change often in this context, cache them longer
-  });
-
   const expandedHistory = useMemo((): ExpandedHistoryItem[] => {
     if (!requests || !allTools) return [];
 
@@ -90,8 +77,6 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
     const historyItems: ExpandedHistoryItem[] = [];
 
     for (const request of requests) {
-        // For completed requests, we check the returnConditions map.
-        // The toolIds array might be empty if all tools were returned from a partial loan.
         const returnedToolIds = request.returnConditions ? Object.keys(request.returnConditions) : request.toolIds;
 
         for (const toolId of returnedToolIds) {
@@ -112,7 +97,6 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
         }
     }
     
-    // Sort by return/handled date descending
     return historyItems.sort((a, b) => {
         const dateA = a.returnedAt || a.handledAt || '';
         const dateB = b.returnedAt || b.handledAt || '';
@@ -138,11 +122,9 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
 
   useImperativeHandle(ref, () => ({
     refetchHistory() {
-      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ['tool_requests_history_completed'] });
     }
   }));
-
-  const isLoading = isLoadingRequests || isLoadingTools;
   
   return (
     <Card>
