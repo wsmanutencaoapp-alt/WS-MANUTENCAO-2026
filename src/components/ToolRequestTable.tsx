@@ -57,8 +57,6 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
     () => (firestore ? query(
         collection(firestore, 'tool_requests'), 
         where('status', 'in', ['Pendente', 'Em Uso']),
-        orderBy('status', 'desc'),
-        orderBy('requestedAt', 'asc'),
     ) : null),
     [firestore]
   );
@@ -66,6 +64,16 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
   const { data: requests, isLoading, error } = useCollection<WithDocId<ToolRequest>>(requestsQuery, {
       queryKey
   });
+
+  const sortedRequests = useMemo(() => {
+    if (!requests) return [];
+    // Sort client-side: 'Pendente' first, then by date ascending
+    return [...requests].sort((a, b) => {
+      if (a.status === 'Pendente' && b.status !== 'Pendente') return -1;
+      if (a.status !== 'Pendente' && b.status === 'Pendente') return 1;
+      return new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime();
+    });
+  }, [requests]);
 
   useImperativeHandle(ref, () => ({
     refetchRequests() {
@@ -115,7 +123,7 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && requests?.length === 0 && (
+                  {!isLoading && sortedRequests.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center h-24">
                         <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
@@ -123,7 +131,7 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && requests?.map(request => (
+                  {!isLoading && sortedRequests.map(request => (
                     <TableRow key={request.docId}>
                       <TableCell>
                           <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
