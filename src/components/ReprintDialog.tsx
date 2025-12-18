@@ -9,15 +9,15 @@ import {
   DialogDescription
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
-import type { Tool } from '@/lib/types';
+import type { Tool, Kit } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 
 
 interface ReprintDialogProps {
-  tool: WithDocId<Tool> | null;
+  tool: WithDocId<Tool | Kit> | null;
   isOpen: boolean;
   onClose: () => void;
-  onReprintConfirmed: (tools: WithDocId<Tool>[]) => void;
+  onReprintConfirmed: (tools: WithDocId<Tool | Kit>[]) => void;
 }
 
 
@@ -25,7 +25,7 @@ export default function ReprintDialog({ tool, isOpen, onClose, onReprintConfirme
 
   const handleConfirm = () => {
     if (tool) {
-        onReprintConfirmed([tool]); // Pass the whole tool object in an array
+        onReprintConfirmed([tool]); // Pass the whole tool/kit object in an array
     }
   }
   return (

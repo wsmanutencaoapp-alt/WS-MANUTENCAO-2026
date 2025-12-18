@@ -33,7 +33,8 @@ import ReprintDialog from '@/components/ReprintDialog';
 import { cn } from '@/lib/utils';
 import { differenceInDays } from 'date-fns';
 import CreateKitDialog from '@/components/CreateKitDialog';
-
+import { useRouter } from 'next/navigation';
+import KitDetailsDialog from '@/components/KitDetailsDialog';
 
 interface Ferramenta extends Tool {
   docId: string;
@@ -48,6 +49,7 @@ const ListaFerramentasPage = () => {
   const firestore = useFirestore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddQuantityDialogOpen, setIsAddQuantityDialogOpen] = useState(false);
@@ -55,7 +57,8 @@ const ListaFerramentasPage = () => {
   const [isLabelPrintDialogOpen, setIsLabelPrintDialogOpen] = useState(false);
   const [toolsToPrint, setToolsToPrint] = useState<any[]>([]);
   const [selectedToolForDetails, setSelectedToolForDetails] = useState<Ferramenta | null>(null);
-  const [selectedToolForReprint, setSelectedToolForReprint] = useState<WithDocId<Tool> | null>(null);
+  const [selectedKitForDetails, setSelectedKitForDetails] = useState<KitComDocId | null>(null);
+  const [selectedItemForReprint, setSelectedItemForReprint] = useState<WithDocId<Tool | Kit> | null>(null);
   
   const ferramentasQueryKey = 'ferramentas';
   const kitsQueryKey = 'kits';
@@ -166,9 +169,9 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
     queryClient.invalidateQueries({ queryKey: [kitsQueryKey] });
   };
 
-  const handleReprintConfirmed = (tools: WithDocId<Tool>[]) => {
-    setSelectedToolForReprint(null);
-    setToolsToPrint(tools);
+  const handleReprintConfirmed = (items: WithDocId<Tool | Kit>[]) => {
+    setSelectedItemForReprint(null);
+    setToolsToPrint(items);
     setIsLabelPrintDialogOpen(true);
   }
   
@@ -282,20 +285,24 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                         {!isKit && (
+                         {!isKit ? (
                             <>
                                 <Button variant="ghost" size="icon" title="Detalhes" onClick={() => setSelectedToolForDetails(item as Ferramenta)}>
                                 <MoreHorizontal className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" title="Reimprimir Etiqueta" onClick={() => setSelectedToolForReprint(item as WithDocId<Tool>)}>
+                                <Button variant="ghost" size="icon" title="Reimprimir Etiqueta" onClick={() => setSelectedItemForReprint(item as WithDocId<Tool>)}>
                                 <Repeat2 className="h-4 w-4" />
                                 </Button>
                             </>
-                         )}
-                         {isKit && (
-                              <Button variant="ghost" size="icon" title="Detalhes do Kit" onClick={() => router.push(`/dashboard/ferramentaria/kits`)}>
-                                <ZoomIn className="h-4 w-4" />
-                            </Button>
+                         ) : (
+                              <>
+                                <Button variant="ghost" size="icon" title="Detalhes do Kit" onClick={() => setSelectedKitForDetails(item as KitComDocId)}>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" title="Reimprimir Etiqueta do Kit" onClick={() => setSelectedItemForReprint(item as WithDocId<Kit>)}>
+                                    <Repeat2 className="h-4 w-4" />
+                                </Button>
+                             </>
                          )}
                       </TableCell>
                     </TableRow>
@@ -328,9 +335,9 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
       />
 
        <ReprintDialog 
-        isOpen={!!selectedToolForReprint}
-        onClose={() => setSelectedToolForReprint(null)}
-        tool={selectedToolForReprint}
+        isOpen={!!selectedItemForReprint}
+        onClose={() => setSelectedItemForReprint(null)}
+        tool={selectedItemForReprint}
         onReprintConfirmed={handleReprintConfirmed}
       />
 
@@ -340,6 +347,12 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
         onClose={() => setSelectedToolForDetails(null)}
         onToolUpdated={handleToolUpdate}
         onToolDeleted={handleToolDelete}
+      />
+
+      <KitDetailsDialog
+        kit={selectedKitForDetails}
+        isOpen={!!selectedKitForDetails}
+        onClose={() => setSelectedKitForDetails(null)}
       />
 
     </div>
