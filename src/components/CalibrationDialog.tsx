@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CalendarIcon, Upload } from 'lucide-react';
 import { format } from 'date-fns';
@@ -43,6 +43,8 @@ export default function CalibrationDialog({ tool, isOpen, onClose }: Calibration
   const [calibrationDate, setCalibrationDate] = useState<Date | undefined>(new Date());
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [calibratedBy, setCalibratedBy] = useState(user?.displayName || '');
+  const [isCalDateOpen, setIsCalDateOpen] = useState(false);
+  const [isDueDateOpen, setIsDueDateOpen] = useState(false);
 
   const handleSave = async () => {
     if (!firestore || !storage || !user) {
@@ -108,34 +110,45 @@ export default function CalibrationDialog({ tool, isOpen, onClose }: Calibration
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Data da Calibração</Label>
-              <Popover>
-                <PopoverTrigger asChild>
+            <Collapsible open={isCalDateOpen} onOpenChange={setIsCalDateOpen}>
+              <div className="space-y-2">
+                <Label>Data da Calibração</Label>
+                <CollapsibleTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {calibrationDate ? format(calibrationDate, 'PPP') : <span>Escolha uma data</span>}
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
-                  <Calendar mode="single" selected={calibrationDate} onSelect={setCalibrationDate} initialFocus />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div>
-              <Label>Nova Data de Vencimento</Label>
-               <Popover>
-                <PopoverTrigger asChild>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent>
+                <Calendar
+                    mode="single"
+                    selected={calibrationDate}
+                    onSelect={(day) => { setCalibrationDate(day); setIsCalDateOpen(false); }}
+                    initialFocus
+                  />
+              </CollapsibleContent>
+            </Collapsible>
+            
+            <Collapsible open={isDueDateOpen} onOpenChange={setIsDueDateOpen}>
+              <div className="space-y-2">
+                <Label>Nova Data de Vencimento</Label>
+                <CollapsibleTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {newDueDate ? format(newDueDate, 'PPP') : <span>Escolha uma data</span>}
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
-                  <Calendar mode="single" selected={newDueDate} onSelect={setNewDueDate} initialFocus />
-                </PopoverContent>
-              </Popover>
-            </div>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent>
+                <Calendar
+                    mode="single"
+                    selected={newDueDate}
+                    onSelect={(day) => { setNewDueDate(day); setIsDueDateOpen(false); }}
+                    initialFocus
+                  />
+              </CollapsibleContent>
+            </Collapsible>
           </div>
            <div>
               <Label htmlFor="calibratedBy">Calibrado Por</Label>
