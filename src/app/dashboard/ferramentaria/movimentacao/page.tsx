@@ -6,7 +6,7 @@ import { collection, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import ToolMovementTable from '@/components/ToolMovementTable';
 import { Button } from '@/components/ui/button';
-import { ListChecks, Send, Wrench, Loader2, History } from 'lucide-react';
+import { ListChecks, Send, Wrench, Loader2, History, LogOut } from 'lucide-react';
 import ToolLoanRequestDialog from '@/components/ToolLoanRequestDialog';
 import ToolRequestTable, { ToolRequestTableRef } from '@/components/ToolRequestTable';
 import ToolMovementHistoryTable, { ToolMovementHistoryTableRef } from '@/components/ToolMovementHistoryTable';
@@ -14,12 +14,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Tool } from '@/lib/types';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
+import ManualCheckoutDialog from '@/components/ManualCheckoutDialog';
 
 const MovimentacaoFerramentaria = () => {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user } = useUser();
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false);
   
   const requestTableRef = useRef<ToolRequestTableRef>(null);
   const historyTableRef = useRef<ToolMovementHistoryTableRef>(null);
@@ -37,6 +39,7 @@ const MovimentacaoFerramentaria = () => {
     historyTableRef.current?.refetchHistory();
     toast({ title: "Sucesso!", description: "A operação foi concluída." });
     setIsRequestDialogOpen(false);
+    setIsCheckoutDialogOpen(false);
   };
   
   useEffect(() => {
@@ -61,7 +64,10 @@ const MovimentacaoFerramentaria = () => {
         <Wrench className="h-6 w-6 mr-2" /> Controle de Entrada e Saída de Ferramentas
       </h1>
       
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={() => setIsCheckoutDialogOpen(true)}>
+            <LogOut className="mr-2 h-4 w-4" /> Registrar Saída
+        </Button>
         <Button onClick={() => setIsRequestDialogOpen(true)}>
           <Send className="mr-2 h-4 w-4" /> Solicitar Empréstimo
         </Button>
@@ -94,6 +100,13 @@ const MovimentacaoFerramentaria = () => {
       <ToolLoanRequestDialog 
         isOpen={isRequestDialogOpen}
         onClose={() => setIsRequestDialogOpen(false)}
+        allAvailableTools={availableTools || []}
+        onActionSuccess={handleActionSuccess}
+      />
+
+      <ManualCheckoutDialog
+        isOpen={isCheckoutDialogOpen}
+        onClose={() => setIsCheckoutDialogOpen(false)}
         allAvailableTools={availableTools || []}
         onActionSuccess={handleActionSuccess}
       />
