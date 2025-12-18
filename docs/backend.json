@@ -144,7 +144,9 @@
             "Bloqueado",
             "Inoperante",
             "Pendente",
-            "Em Kit"
+            "Em Kit",
+            "Em Conserto",
+            "Refugo"
           ]
         },
         "status_inicial": {
@@ -186,6 +188,10 @@
         "valor_estimado": {
             "type": "number",
             "description": "The estimated financial value of the tool."
+        },
+        "observacao": {
+            "type": "string",
+            "description": "Observations about the tool's condition or non-conformity."
         }
       },
       "required": [

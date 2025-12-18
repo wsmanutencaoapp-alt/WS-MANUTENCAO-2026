@@ -20,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare, PackagePlus, Box } from 'lucide-react';
+import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare, PackagePlus, Box, AlertTriangle } from 'lucide-react';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
 import AddQuantityDialog from '@/components/AddQuantityDialog';
 import type { Tool, Kit } from '@/lib/types';
@@ -36,6 +36,8 @@ import CreateKitDialog from '@/components/CreateKitDialog';
 import { useRouter } from 'next/navigation';
 import KitDetailsDialog from '@/components/KitDetailsDialog';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import NaoConformeTable from '@/components/NaoConformeTable';
 
 interface Ferramenta extends Tool {
   docId: string;
@@ -214,110 +216,124 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Inventário de Ferramentas</CardTitle>
-          <CardDescription>
-            Pesquise e gerencie os equipamentos e kits cadastrados no sistema.
-          </CardDescription>
-            <div className="relative pt-4">
-               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-               <Input
-                   placeholder="Pesquisar por descrição ou código..."
-                   value={searchTerm}
-                   onChange={(e) => setSearchTerm(e.target.value)}
-                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-               />
-            </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[64px] sm:table-cell">Item</TableHead>
-                <TableHead>Código</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Endereçamento</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center">Carregando...</TableCell></TableRow>
-              ) : anyError ? (
-                 <TableRow><TableCell colSpan={6} className="text-center text-destructive">Erro: {anyError.message}</TableCell></TableRow>
-              ) : filteredInventario && filteredInventario.length > 0 ? (
-                filteredInventario.map((item) => {
-                  const { status, variant } = getDynamicStatus(item);
-                  const isKit = item.isKit;
-                  return (
-                    <TableRow key={item.docId} className={cn(
-                        !isKit && (item as Ferramenta).tipo === 'ESP' && 'bg-yellow-100/70 dark:bg-yellow-900/30 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/50',
-                        !isKit && (item as Ferramenta).tipo === 'EQV' && 'bg-blue-100/70 dark:bg-blue-900/30 hover:bg-blue-100/80 dark:hover:bg-blue-900/50',
-                        isKit && 'bg-purple-100/70 dark:bg-purple-900/30 hover:bg-purple-100/80 dark:hover:bg-purple-900/50'
-                    )}>
-                      <TableCell className="hidden sm:table-cell">
-                          <button className="relative group focus:outline-none" onClick={() => !isKit && setSelectedToolForDetails(item as Ferramenta)}>
-                            <Image
-                                alt={item.descricao}
-                                className="aspect-square rounded-md object-cover"
-                                height="64"
-                                src={item.imageUrl || (isKit ? "https://picsum.photos/seed/kit/64/64" : "https://picsum.photos/seed/tool/64/64")}
-                                width="64"
-                            />
-                            {!isKit && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity rounded-md">
-                                <ZoomIn className="h-6 w-6 text-white" />
-                                </div>
-                            )}
-                            {isKit && (
-                                <div className="absolute bottom-0 right-0 p-0.5 bg-purple-600 rounded-tl-md rounded-br-md">
-                                    <Box className="h-3 w-3 text-white" />
-                                </div>
-                            )}
-                          </button>
-                      </TableCell>
-                      <TableCell className="font-medium">{item.codigo}</TableCell>
-                      <TableCell>{item.descricao}</TableCell>
-                      <TableCell>{item.enderecamento}</TableCell>
-                      <TableCell>
-                        <Badge variant={getBadgeVariant(variant)}>
-                          {status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                         {!isKit ? (
-                            <>
-                                <Button variant="ghost" size="icon" title="Detalhes" onClick={() => setSelectedToolForDetails(item as Ferramenta)}>
-                                <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" title="Reimprimir Etiqueta" onClick={() => setSelectedItemForReprint(item as WithDocId<Tool>)}>
-                                <Repeat2 className="h-4 w-4" />
-                                </Button>
-                            </>
-                         ) : (
-                              <div className="flex justify-end items-center gap-2">
-                                <Button variant="outline" size="sm" onClick={() => setSelectedKitForDetails(item as KitComDocId)}>
-                                  <ZoomIn className="mr-2 h-4 w-4" />
-                                  Ver Itens
-                                </Button>
-                                <Button variant="ghost" size="icon" title="Reimprimir Etiqueta do Kit" onClick={() => setSelectedItemForReprint(item as WithDocId<Kit>)}>
+      <Tabs defaultValue="inventory">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="inventory">Inventário Geral</TabsTrigger>
+          <TabsTrigger value="non-conforming">
+            <AlertTriangle className="mr-2 h-4 w-4" />
+            Não Conformes
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="inventory">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inventário Geral</CardTitle>
+              <CardDescription>
+                Pesquise e gerencie os equipamentos e kits cadastrados no sistema.
+              </CardDescription>
+                <div className="relative pt-4">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                      placeholder="Pesquisar por descrição ou código..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                  />
+                </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[64px] sm:table-cell">Item</TableHead>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Endereçamento</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={6} className="text-center">Carregando...</TableCell></TableRow>
+                  ) : anyError ? (
+                    <TableRow><TableCell colSpan={6} className="text-center text-destructive">Erro: {anyError.message}</TableCell></TableRow>
+                  ) : filteredInventario && filteredInventario.length > 0 ? (
+                    filteredInventario.map((item) => {
+                      const { status, variant } = getDynamicStatus(item);
+                      const isKit = item.isKit;
+                      return (
+                        <TableRow key={item.docId} className={cn(
+                            !isKit && (item as Ferramenta).tipo === 'ESP' && 'bg-yellow-100/70 dark:bg-yellow-900/30 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/50',
+                            !isKit && (item as Ferramenta).tipo === 'EQV' && 'bg-blue-100/70 dark:bg-blue-900/30 hover:bg-blue-100/80 dark:hover:bg-blue-900/50',
+                            isKit && 'bg-purple-100/70 dark:bg-purple-900/30 hover:bg-purple-100/80 dark:hover:bg-purple-900/50'
+                        )}>
+                          <TableCell className="hidden sm:table-cell">
+                              <button className="relative group focus:outline-none" onClick={() => !isKit && setSelectedToolForDetails(item as Ferramenta)}>
+                                <Image
+                                    alt={item.descricao}
+                                    className="aspect-square rounded-md object-cover"
+                                    height="64"
+                                    src={item.imageUrl || (isKit ? "https://picsum.photos/seed/kit/64/64" : "https://picsum.photos/seed/tool/64/64")}
+                                    width="64"
+                                />
+                                {!isKit && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity rounded-md">
+                                    <ZoomIn className="h-6 w-6 text-white" />
+                                    </div>
+                                )}
+                                {isKit && (
+                                    <div className="absolute bottom-0 right-0 p-0.5 bg-purple-600 rounded-tl-md rounded-br-md">
+                                        <Box className="h-3 w-3 text-white" />
+                                    </div>
+                                )}
+                              </button>
+                          </TableCell>
+                          <TableCell className="font-medium">{item.codigo}</TableCell>
+                          <TableCell>{item.descricao}</TableCell>
+                          <TableCell>{item.enderecamento}</TableCell>
+                          <TableCell>
+                            <Badge variant={getBadgeVariant(variant)}>
+                              {status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {!isKit ? (
+                                <>
+                                    <Button variant="ghost" size="icon" title="Detalhes" onClick={() => setSelectedToolForDetails(item as Ferramenta)}>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" title="Reimprimir Etiqueta" onClick={() => setSelectedItemForReprint(item as WithDocId<Tool>)}>
                                     <Repeat2 className="h-4 w-4" />
-                                </Button>
-                             </div>
-                         )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow><TableCell colSpan={6} className="text-center">Nenhum item encontrado.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                                    </Button>
+                                </>
+                            ) : (
+                                  <div className="flex justify-end items-center gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => setSelectedKitForDetails(item as KitComDocId)}>
+                                      <ZoomIn className="mr-2 h-4 w-4" />
+                                      Ver Itens
+                                    </Button>
+                                    <Button variant="ghost" size="icon" title="Reimprimir Etiqueta do Kit" onClick={() => setSelectedItemForReprint(item as WithDocId<Kit>)}>
+                                        <Repeat2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow><TableCell colSpan={6} className="text-center">Nenhum item encontrado.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="non-conforming">
+           <NaoConformeTable />
+        </TabsContent>
+      </Tabs>
       
       <AddQuantityDialog 
         isOpen={isAddQuantityDialogOpen}
