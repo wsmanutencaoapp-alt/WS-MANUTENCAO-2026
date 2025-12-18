@@ -173,7 +173,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         </DialogHeader>
 
         {isEditing ? (
-            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[70vh]">
+            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[65vh]">
                 {/* Coluna 1: Dados do kit e Ferramentas no Kit */}
                 <div className="flex flex-col gap-4">
                     <div className="space-y-4 p-1">
@@ -188,7 +188,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                     </div>
                     <Separator />
                     <Label>Ferramentas no Kit ({toolsInKit?.length || 0})</Label>
-                    <ScrollArea className="h-96 border rounded-md">
+                    <ScrollArea className="h-80 border rounded-md">
                         <div className="p-2 space-y-2">
                              {isLoadingKitTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
                              {!isLoadingKitTools && toolsInKit?.map(tool => (
@@ -210,7 +210,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                         <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                         <Input id="toolSearch" placeholder="Buscar por código ou descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
                     </div>
-                    <ScrollArea className="h-[28.5rem] border rounded-md">
+                    <ScrollArea className="h-96 border rounded-md">
                         <div className="p-2 space-y-2">
                            {isLoadingAvailableTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
                            {!isLoadingAvailableTools && filteredAvailableTools.map(tool => (
@@ -253,7 +253,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
             </ScrollArea>
         )}
         
-        <DialogFooter className="sm:justify-between">
+        <DialogFooter className="sm:justify-between pt-4">
             {isEditing ? (
                 <>
                     <Button variant="ghost" onClick={handleCancelEdit} disabled={isSaving}>
