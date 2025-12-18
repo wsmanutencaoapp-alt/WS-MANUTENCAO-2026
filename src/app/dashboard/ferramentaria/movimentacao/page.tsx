@@ -6,7 +6,7 @@ import { collection, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import ToolMovementTable from '@/components/ToolMovementTable';
 import { Button } from '@/components/ui/button';
-import { ListChecks, Send, Wrench, Loader2, History, LogOut } from 'lucide-react';
+import { ListChecks, Send, Wrench, Loader2, History, LogOut, LogIn } from 'lucide-react';
 import ToolLoanRequestDialog from '@/components/ToolLoanRequestDialog';
 import ToolRequestTable, { ToolRequestTableRef } from '@/components/ToolRequestTable';
 import ToolMovementHistoryTable, { ToolMovementHistoryTableRef } from '@/components/ToolMovementHistoryTable';
@@ -15,6 +15,7 @@ import type { Tool } from '@/lib/types';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import ManualCheckoutDialog from '@/components/ManualCheckoutDialog';
+import ManualCheckInDialog from '@/components/ManualCheckInDialog';
 
 const MovimentacaoFerramentaria = () => {
   const { toast } = useToast();
@@ -22,6 +23,7 @@ const MovimentacaoFerramentaria = () => {
   const { user } = useUser();
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false);
+  const [isCheckInDialogOpen, setIsCheckInDialogOpen] = useState(false);
   
   const requestTableRef = useRef<ToolRequestTableRef>(null);
   const historyTableRef = useRef<ToolMovementHistoryTableRef>(null);
@@ -32,7 +34,15 @@ const MovimentacaoFerramentaria = () => {
     [firestore]
   );
   
-  const { data: availableTools, isLoading, error } = useCollection<WithDocId<Tool>>(availableToolsQuery);
+  const { data: availableTools, isLoading: isLoadingAvailable, error: availableError } = useCollection<WithDocId<Tool>>(availableToolsQuery);
+
+  const loanedToolsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Em Empréstimo')) : null),
+    [firestore]
+  );
+  
+  const { data: loanedTools, isLoading: isLoadingLoaned, error: loanedError } = useCollection<WithDocId<Tool>>(loanedToolsQuery);
+
 
   const handleActionSuccess = () => {
     requestTableRef.current?.refetchRequests();
@@ -40,13 +50,16 @@ const MovimentacaoFerramentaria = () => {
     toast({ title: "Sucesso!", description: "A operação foi concluída." });
     setIsRequestDialogOpen(false);
     setIsCheckoutDialogOpen(false);
+    setIsCheckInDialogOpen(false);
   };
   
   useEffect(() => {
-    if(error){
+    if(availableError || loanedError){
         toast({ variant: 'destructive', title: 'Erro ao buscar equipamentos', description: 'Você pode não ter permissão para ver estes dados.'})
     }
-  }, [error, toast]);
+  }, [availableError, loanedError, toast]);
+
+  const isLoading = isLoadingAvailable || isLoadingLoaned;
 
   if (isLoading) {
     return (
@@ -65,6 +78,9 @@ const MovimentacaoFerramentaria = () => {
       </h1>
       
       <div className="flex justify-end gap-2">
+         <Button variant="outline" onClick={() => setIsCheckInDialogOpen(true)}>
+            <LogIn className="mr-2 h-4 w-4" /> Registrar Entrada
+        </Button>
         <Button variant="outline" onClick={() => setIsCheckoutDialogOpen(true)}>
             <LogOut className="mr-2 h-4 w-4" /> Registrar Saída
         </Button>
@@ -108,6 +124,13 @@ const MovimentacaoFerramentaria = () => {
         isOpen={isCheckoutDialogOpen}
         onClose={() => setIsCheckoutDialogOpen(false)}
         allAvailableTools={availableTools || []}
+        onActionSuccess={handleActionSuccess}
+      />
+
+      <ManualCheckInDialog
+        isOpen={isCheckInDialogOpen}
+        onClose={() => setIsCheckInDialogOpen(false)}
+        allLoanedTools={loanedTools || []}
         onActionSuccess={handleActionSuccess}
       />
     </div>
