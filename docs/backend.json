@@ -147,8 +147,8 @@
           ]
         },
         "status_inicial": {
-            "type": "string",
-            "description": "The initial status when created, especially for ALT type."
+          "type": "string",
+          "description": "The initial status when created, especially for ALT type."
         },
         "data_vencimento": {
           "type": "string",
@@ -156,9 +156,9 @@
           "description": "Due date for Calibration, Load Test, or Expiration."
         },
         "data_referencia": {
-            "type": "string",
-            "format": "date",
-            "description": "Reference date (last calibration, last test, manufacturing date)."
+          "type": "string",
+          "format": "date",
+          "description": "Reference date (last calibration, last test, manufacturing date)."
         },
         "documento_anexo_url": {
           "type": "string",
@@ -170,9 +170,9 @@
           "format": "uri"
         },
         "imageUrl": {
-            "type": "string",
-            "description": "URL of the tool's photo.",
-            "format": "uri"
+          "type": "string",
+          "description": "URL of the tool's photo.",
+          "format": "uri"
         }
       },
       "required": [
@@ -419,6 +419,54 @@
         "employeeId",
         "employeeName"
       ]
+    },
+    "CalibrationRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CalibrationRecord",
+      "type": "object",
+      "description": "Represents a historical record of a single tool calibration event.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the calibration record."
+        },
+        "toolId": {
+          "type": "string",
+          "description": "The ID of the tool that was calibrated."
+        },
+        "calibrationDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The date the calibration was performed."
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The date the next calibration is due."
+        },
+        "certificateUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the calibration certificate."
+        },
+        "calibratedBy": {
+          "type": "string",
+          "description": "Name of the employee or external company that performed the calibration."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when this record was created in the system."
+        }
+      },
+      "required": [
+        "toolId",
+        "calibrationDate",
+        "dueDate",
+        "certificateUrl",
+        "calibratedBy",
+        "timestamp"
+      ]
     }
   },
   "auth": {
@@ -456,6 +504,26 @@
             {
               "name": "toolId",
               "description": "Unique identifier for the tool."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tools/{toolId}/calibration_history/{calibrationId}",
+        "definition": {
+          "entityName": "CalibrationRecord",
+          "schema": {
+            "$ref": "#/backend/entities/CalibrationRecord"
+          },
+          "description": "Stores the historical records of all calibrations for a specific tool, ensuring traceability.",
+          "params": [
+            {
+              "name": "toolId",
+              "description": "The ID of the parent tool."
+            },
+            {
+              "name": "calibrationId",
+              "description": "Unique identifier for the calibration record."
             }
           ]
         }

@@ -35,6 +35,16 @@ export type Tool = {
   imageUrl?: string;
 };
 
+export type CalibrationRecord = {
+  id?: string;
+  toolId: string;
+  calibrationDate: string; // date
+  dueDate: string; // date
+  certificateUrl: string;
+  calibratedBy: string; // employeeId or external company name
+  timestamp: string; // ISO date string of when the record was created
+};
+
 
 export type Permissions = {
   dashboard?: boolean;

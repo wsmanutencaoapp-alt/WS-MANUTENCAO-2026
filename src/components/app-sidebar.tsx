@@ -57,7 +57,7 @@ const allNavItems: NavItem[] = [
     subItems: [
         { href: '/dashboard/ferramentaria/lista-ferramentas', icon: List, label: 'Lista de Ferramentas', permission: 'ferramentaria_lista' },
         { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
-        { href: '/dashboard/calibracao', label: 'Calibração', permission: 'calibracao' },
+        { href: '/dashboard/calibracao', label: 'Controle/Calibração', permission: 'calibracao' },
     ]
   },
   { 
