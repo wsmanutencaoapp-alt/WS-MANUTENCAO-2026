@@ -21,6 +21,7 @@ import CalibrationDialog from '@/components/CalibrationDialog';
 import HistoryDialog from '@/components/CalibrationHistoryDialog';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const CalibracaoPage = () => {
   const firestore = useFirestore();
@@ -28,6 +29,7 @@ const CalibracaoPage = () => {
   const [isCalibrationOpen, setIsCalibrationOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [classificacaoFilter, setClassificacaoFilter] = useState('todos');
 
   const controllableToolsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -43,14 +45,23 @@ const CalibracaoPage = () => {
 
   const filteredTools = useMemo(() => {
     if (!tools) return [];
-    if (!searchTerm) return tools;
     
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return tools.filter(tool => 
-        tool.codigo.toLowerCase().includes(lowercasedTerm) ||
-        tool.descricao.toLowerCase().includes(lowercasedTerm)
-    );
-  }, [tools, searchTerm]);
+    let tempTools = tools;
+
+    if (classificacaoFilter !== 'todos') {
+        tempTools = tempTools.filter(tool => tool.classificacao === classificacaoFilter);
+    }
+    
+    if (searchTerm) {
+        const lowercasedTerm = searchTerm.toLowerCase();
+        tempTools = tempTools.filter(tool => 
+            tool.codigo.toLowerCase().includes(lowercasedTerm) ||
+            tool.descricao.toLowerCase().includes(lowercasedTerm)
+        );
+    }
+
+    return tempTools;
+  }, [tools, searchTerm, classificacaoFilter]);
 
 
   const getStatus = (dueDate: string | undefined): { text: string; variant: 'success' | 'warning' | 'destructive' | 'attention' | 'critical' } => {
@@ -113,14 +124,27 @@ const CalibracaoPage = () => {
           <CardDescription>
             Gerencie o ciclo de vida de calibração e validade das suas ferramentas.
           </CardDescription>
-           <div className="relative pt-4">
-               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-               <Input
-                   placeholder="Pesquisar por código ou descrição..."
-                   value={searchTerm}
-                   onChange={(e) => setSearchTerm(e.target.value)}
-                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-               />
+           <div className="flex items-center gap-4 pt-4">
+               <div className="relative">
+                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                 <Input
+                     placeholder="Pesquisar por código ou descrição..."
+                     value={searchTerm}
+                     onChange={(e) => setSearchTerm(e.target.value)}
+                     className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                 />
+              </div>
+              <Select value={classificacaoFilter} onValueChange={setClassificacaoFilter}>
+                  <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filtrar por tipo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="todos">Todos os Tipos</SelectItem>
+                      <SelectItem value="C">Calibrável (C)</SelectItem>
+                      <SelectItem value="L">Teste de Carga (L)</SelectItem>
+                      <SelectItem value="V">Vencimento (V)</SelectItem>
+                  </SelectContent>
+              </Select>
             </div>
         </CardHeader>
         <CardContent>
