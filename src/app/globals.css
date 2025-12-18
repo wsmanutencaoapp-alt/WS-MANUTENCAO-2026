@@ -81,24 +81,20 @@
 }
 
 @layer utilities {
-  @keyframes spin-logo {
-    from {
-      transform: rotate(0deg);
+  @keyframes fade-in-out {
+    0%, 100% {
+      opacity: 0.7;
     }
-    to {
-      transform: rotate(360deg);
+    50% {
+      opacity: 1;
     }
   }
 
   .logo-styled {
     color: #800000; /* Bordeaux */
-    text-shadow:
-      -1px -1px 0 #FFD700,  
-       1px -1px 0 #FFD700,
-      -1px  1px 0 #FFD700,
-       1px  1px 0 #FFD700;
-    animation: spin-logo 10s linear infinite;
-    display: inline-block; /* Needed for transform */
+    text-shadow: 0 0 5px #ffd70099; /* Amarelo suave com blur e transparência */
+    animation: fade-in-out 4s ease-in-out infinite;
+    display: inline-block;
   }
 }
 
