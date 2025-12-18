@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useActionState } from 'react';
@@ -51,7 +52,7 @@ export function ReportGenerator() {
                       <span>Escolha uma data</span>
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <Calendar
                       mode="single"
                       onSelect={(day) => {
@@ -74,7 +75,7 @@ export function ReportGenerator() {
                       <span>Escolha uma data</span>
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                      <Calendar
                       mode="single"
                       onSelect={(day) => {
