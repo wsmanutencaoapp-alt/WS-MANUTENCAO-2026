@@ -58,8 +58,7 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMov
     () => (firestore ? query(
         collection(firestore, 'tool_requests'), 
         where('status', '!=', 'Pendente'),
-        orderBy('status')
-        // orderBy('requestedAt', 'desc') // REMOVIDO: Firestore não permite múltiplos orderBy com filtro de desigualdade
+        orderBy('status'),
     ) : null),
     [firestore]
   );
@@ -68,10 +67,13 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMov
       queryKey
   });
 
-  // Ordenação do lado do cliente como uma solução alternativa
   const sortedRequests = useMemo(() => {
     if (!requests) return [];
-    return [...requests].sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+    return [...requests].sort((a, b) => {
+      const dateA = a.returnedAt || a.handledAt || a.requestedAt;
+      const dateB = b.returnedAt || b.handledAt || b.requestedAt;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
   }, [requests]);
 
 

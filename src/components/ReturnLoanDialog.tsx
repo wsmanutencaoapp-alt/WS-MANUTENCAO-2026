@@ -39,6 +39,37 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 
+interface ConfirmationDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+  isSaving: boolean;
+  request: WithDocId<ToolRequest>;
+  toolCount: number;
+}
+
+function ConfirmationDialog({ isOpen, onOpenChange, onConfirm, isSaving, request, toolCount }: ConfirmationDialogProps) {
+    return (
+        <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Devolução</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta ação registrará a devolução de todos os {toolCount || 0} itens para a OS {request.osNumber} e atualizará o status deles para "Disponível". Deseja continuar?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isSaving}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={onConfirm} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Sim, confirmar devolução
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
+
 interface ReturnLoanDialogProps {
   request: WithDocId<ToolRequest>;
   isOpen: boolean;
@@ -74,14 +105,12 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
     try {
         const batch = writeBatch(firestore);
 
-        // 1. Update the request status to 'Devolvida'
         const requestRef = doc(firestore, 'tool_requests', request.docId);
         batch.update(requestRef, {
             status: 'Devolvida',
             returnedAt: new Date().toISOString(),
         });
 
-        // 2. Update each tool's status back to 'Disponível'
         for (const tool of tools) {
             const toolRef = doc(firestore, 'tools', tool.docId);
             batch.update(toolRef, { status: 'Disponível' });
@@ -91,7 +120,6 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
 
         toast({ title: "Sucesso!", description: `Devolução para a OS ${request.osNumber} registrada.` });
         
-        // Invalidate queries to refetch data in the tables
         queryClient.invalidateQueries({ queryKey: ['tool_requests_history'] });
         queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
         
@@ -181,23 +209,15 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Confirmar Devolução</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Esta ação registrará a devolução de todos os {tools?.length || 0} itens para a OS {request.osNumber} e atualizará o status deles para "Disponível". Deseja continuar?
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isSaving}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleReturn} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Sim, confirmar devolução
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
+
+    <ConfirmationDialog
+        isOpen={isConfirmOpen}
+        onOpenChange={setIsConfirmOpen}
+        onConfirm={handleReturn}
+        isSaving={isSaving}
+        request={request}
+        toolCount={tools?.length || 0}
+    />
     </>
   );
 }
