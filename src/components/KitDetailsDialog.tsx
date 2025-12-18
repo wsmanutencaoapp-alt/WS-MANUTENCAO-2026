@@ -40,7 +40,9 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
   const [editableKit, setEditableKit] = useState<Partial<Kit>>({});
   
   const [currentToolIds, setCurrentToolIds] = useState<Set<string>>(new Set());
-  const [searchTerm, setSearchTerm] = useState('');
+  const [availableToolsSearchTerm, setAvailableToolsSearchTerm] = useState('');
+  const [kitToolsSearchTerm, setKitToolsSearchTerm] = useState('');
+
 
   // Fetch tools currently IN this kit
   const toolsInKitQuery = useMemoFirebase(() => {
@@ -66,13 +68,22 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
   
   const filteredAvailableTools = useMemo(() => {
       if (!availableTools) return [];
-      const lowercasedTerm = searchTerm.toLowerCase();
+      const lowercasedTerm = availableToolsSearchTerm.toLowerCase();
       return availableTools.filter(tool => 
           !currentToolIds.has(tool.docId) &&
-          ((tool.descricao && tool.descricao.toLowerCase().includes(lowercasedTerm)) || 
-           (tool.codigo && tool.codigo.toLowerCase().includes(lowercasedTerm)))
+          ((tool.descricao?.toLowerCase().includes(lowercasedTerm)) || 
+           (tool.codigo?.toLowerCase().includes(lowercasedTerm)))
       );
-  }, [availableTools, searchTerm, currentToolIds]);
+  }, [availableTools, availableToolsSearchTerm, currentToolIds]);
+
+  const filteredToolsInKit = useMemo(() => {
+    if (!toolsInKit) return [];
+    const lowercasedTerm = kitToolsSearchTerm.toLowerCase();
+    return toolsInKit.filter(tool => 
+        ((tool.descricao?.toLowerCase().includes(lowercasedTerm)) || 
+         (tool.codigo?.toLowerCase().includes(lowercasedTerm)))
+    );
+  }, [toolsInKit, kitToolsSearchTerm]);
 
 
   useEffect(() => {
@@ -86,7 +97,8 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
     // Reset states when dialog opens or kit changes
     setIsEditing(false);
     setIsSaving(false);
-    setSearchTerm('');
+    setAvailableToolsSearchTerm('');
+    setKitToolsSearchTerm('');
   }, [kit, isOpen]);
 
   const handleToolAction = (toolId: string, action: 'add' | 'remove') => {
@@ -173,7 +185,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         </DialogHeader>
 
         {isEditing ? (
-            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[65vh]">
+            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
                 {/* Coluna 1: Dados do kit e Ferramentas no Kit */}
                 <div className="flex flex-col gap-4">
                     <div className="space-y-4 p-1">
@@ -187,18 +199,22 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                         </div>
                     </div>
                     <Separator />
-                    <Label>Ferramentas no Kit ({toolsInKit?.length || 0})</Label>
-                    <ScrollArea className="h-80 border rounded-md">
+                     <div className="relative">
+                        <Label htmlFor="kitToolsSearchTerm">Ferramentas no Kit ({filteredToolsInKit?.length || 0})</Label>
+                        <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input id="kitToolsSearchTerm" placeholder="Buscar no kit..." value={kitToolsSearchTerm} onChange={(e) => setKitToolsSearchTerm(e.target.value)} className="pl-8" />
+                    </div>
+                    <ScrollArea className="h-64 border rounded-md">
                         <div className="p-2 space-y-2">
                              {isLoadingKitTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
-                             {!isLoadingKitTools && toolsInKit?.map(tool => (
+                             {!isLoadingKitTools && filteredToolsInKit.map(tool => (
                                 <div key={tool.docId} className="flex items-center gap-2 p-2 border rounded-md">
                                     <Image src={tool.imageUrl || "https://picsum.photos/seed/tool/40/40"} alt={tool.descricao} width={32} height={32} className="aspect-square rounded-md object-cover"/>
                                     <div className="flex-1 text-xs"><p className="font-bold truncate">{tool.descricao}</p><p className="font-mono text-muted-foreground">{tool.codigo}</p></div>
                                     <Button size="icon" variant="ghost" className="shrink-0" onClick={() => handleToolAction(tool.docId, 'remove')}><MinusCircle className="h-4 w-4 text-destructive" /></Button>
                                 </div>
                             ))}
-                             {!isLoadingKitTools && toolsInKit?.length === 0 && <p className="text-muted-foreground text-center text-sm p-4">Nenhuma ferramenta no kit.</p>}
+                             {!isLoadingKitTools && filteredToolsInKit.length === 0 && <p className="text-muted-foreground text-center text-sm p-4">Nenhuma ferramenta no kit.</p>}
                         </div>
                     </ScrollArea>
                 </div>
@@ -206,11 +222,11 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                 {/* Coluna 2: Ferramentas Disponíveis */}
                 <div className="flex flex-col gap-4">
                      <div className="relative">
-                        <Label htmlFor="toolSearch">Adicionar Ferramentas Disponíveis</Label>
+                        <Label htmlFor="availableToolsSearchTerm">Adicionar Ferramentas Disponíveis</Label>
                         <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input id="toolSearch" placeholder="Buscar por código ou descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
+                        <Input id="availableToolsSearchTerm" placeholder="Buscar por código ou descrição..." value={availableToolsSearchTerm} onChange={(e) => setAvailableToolsSearchTerm(e.target.value)} className="pl-8" />
                     </div>
-                    <ScrollArea className="h-96 border rounded-md">
+                    <ScrollArea className="h-80 border rounded-md">
                         <div className="p-2 space-y-2">
                            {isLoadingAvailableTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
                            {!isLoadingAvailableTools && filteredAvailableTools.map(tool => (
