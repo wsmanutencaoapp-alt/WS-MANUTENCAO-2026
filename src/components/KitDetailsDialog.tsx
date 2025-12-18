@@ -185,7 +185,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         </DialogHeader>
 
         {isEditing ? (
-            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] h-[55vh]">
+            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 h-[55vh]">
                 {/* Coluna 1: Dados do kit e Ferramentas no Kit */}
                 <div className="flex flex-col gap-4">
                     <div className="space-y-4 p-1">
@@ -204,7 +204,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                         <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                         <Input id="kitToolsSearchTerm" placeholder="Buscar no kit..." value={kitToolsSearchTerm} onChange={(e) => setKitToolsSearchTerm(e.target.value)} className="pl-8" />
                     </div>
-                    <ScrollArea className="h-64 border rounded-md">
+                    <ScrollArea className="h-full border rounded-md">
                         <div className="p-2 space-y-2">
                              {isLoadingKitTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
                              {!isLoadingKitTools && filteredToolsInKit.map(tool => (
@@ -226,7 +226,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                         <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                         <Input id="availableToolsSearchTerm" placeholder="Buscar por código ou descrição..." value={availableToolsSearchTerm} onChange={(e) => setAvailableToolsSearchTerm(e.target.value)} className="pl-8" />
                     </div>
-                    <ScrollArea className="h-80 border rounded-md">
+                    <ScrollArea className="h-full border rounded-md">
                         <div className="p-2 space-y-2">
                            {isLoadingAvailableTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
                            {!isLoadingAvailableTools && filteredAvailableTools.map(tool => (
@@ -271,7 +271,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         
         <DialogFooter className="pt-4">
             {isEditing ? (
-                <div className="flex w-full justify-between">
+                <div className="flex w-full justify-end gap-2">
                     <Button variant="ghost" onClick={handleCancelEdit} disabled={isSaving}>
                         <X className="mr-2 h-4 w-4" /> Cancelar
                     </Button>
