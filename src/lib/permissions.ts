@@ -1,4 +1,5 @@
 export const allUserPermissions: { id: string; path: string }[] = [
+    { id: 'dashboard', path: '/dashboard' },
     { id: 'suprimentos', path: '/dashboard/suprimentos' },
     { id: 'suprimentos_movimentacao', path: '/dashboard/suprimentos/movimentacao' },
     { id: 'ferramentaria', path: '/dashboard/ferramentaria' },
@@ -34,6 +35,10 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
     // A rota /dashboard/ferramentaria é um alias, então tratamos como /lista-ferramentas
     if (path === '/dashboard/ferramentaria') {
         path = '/dashboard/ferramentaria/lista-ferramentas';
+    }
+    // A rota /dashboard é a página principal e deve ser acessível se o usuário estiver logado.
+    if (path === '/dashboard') {
+        return 'dashboard';
     }
     const permission = allUserPermissions.find(p => p.path === path);
     return permission ? permission.id : null;

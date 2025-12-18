@@ -37,6 +37,7 @@ export type Tool = {
 
 
 export type Permissions = {
+  dashboard?: boolean;
   ferramentaria?: boolean;
   suprimentos?: boolean;
   compras?: boolean;

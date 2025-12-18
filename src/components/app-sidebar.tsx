@@ -21,6 +21,7 @@ import {
   Plane,
   CalendarCheck,
   HardHat,
+  LayoutDashboard,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,12 @@ import Image from 'next/image';
 
 
 const allNavItems: NavItem[] = [
+  { 
+    href: '/dashboard', 
+    icon: LayoutDashboard, 
+    label: 'Dashboard',
+    permission: 'dashboard',
+  },
   { 
     href: '/dashboard/suprimentos', 
     icon: Box, 
@@ -187,7 +194,10 @@ export function AppSidebar() {
 
   const navItems = useMemo(() => {
     if (!employeeData) return [];
-    return filterItemsByPermissions(allNavItems, employeeData.permissions || {}, isAdmin);
+    // The dashboard link is always visible for logged-in users.
+    const baseItems = allNavItems.filter(item => item.permission === 'dashboard');
+    const permittedItems = filterItemsByPermissions(allNavItems.filter(item => item.permission !== 'dashboard'), employeeData.permissions || {}, isAdmin);
+    return [...baseItems, ...permittedItems];
   }, [employeeData, isAdmin]);
 
   const bottomNavItems = useMemo(() => {
