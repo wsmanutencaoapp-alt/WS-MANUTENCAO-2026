@@ -173,6 +173,14 @@
           "type": "string",
           "description": "URL of the tool's photo.",
           "format": "uri"
+        },
+        "natureza_item": {
+            "type": "string",
+            "description": "The accounting nature of the item (e.g., 'Ativo Imobilizado', 'Consumo')."
+        },
+        "classificacao_contabil": {
+            "type": "string",
+            "description": "The specific accounting classification or account number."
         }
       },
       "required": [

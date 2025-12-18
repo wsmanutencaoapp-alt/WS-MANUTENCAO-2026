@@ -33,6 +33,8 @@ export type Tool = {
   documento_anexo_url?: string;
   label_url?: string;
   imageUrl?: string;
+  natureza_item?: string;
+  classificacao_contabil?: string;
 };
 
 export type CalibrationRecord = {
@@ -77,6 +79,7 @@ export type Permissions = {
   gso?: boolean;
   planejamento?: boolean;
   manutencao?: boolean;
+  contabilidade_classificacao?: boolean;
   [key: string]: boolean | undefined;
 };
 

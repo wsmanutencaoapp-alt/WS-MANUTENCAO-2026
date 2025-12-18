@@ -16,6 +16,7 @@ export const allUserPermissions: { id: string; path: string }[] = [
     { id: 'contabilidade', path: '/dashboard/contabilidade' },
     { id: 'contabilidade_balancete', path: '/dashboard/contabilidade/balancete' },
     { id: 'contabilidade_relatorios', path: '/dashboard/contabilidade/relatorios' },
+    { id: 'contabilidade_classificacao', path: '/dashboard/contabilidade/classificacao' },
     { id: 'userManagement', path: '/dashboard/user-management' },
     { id: 'configurador', path: '/dashboard/configurador' },
     { id: 'configurador_alcada-aprovacao', path: '/dashboard/configurador/alcada-aprovacao' },
