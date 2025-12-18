@@ -20,7 +20,6 @@ import ManualCheckInDialog from '@/components/ManualCheckInDialog';
 const MovimentacaoFerramentaria = () => {
   const { toast } = useToast();
   const firestore = useFirestore();
-  const { user } = useUser();
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false);
   const [isCheckInDialogOpen, setIsCheckInDialogOpen] = useState(false);
@@ -28,25 +27,31 @@ const MovimentacaoFerramentaria = () => {
   const requestTableRef = useRef<ToolRequestTableRef>(null);
   const historyTableRef = useRef<ToolMovementHistoryTableRef>(null);
 
-
+  // Consulta para ferramentas disponíveis
   const availableToolsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Disponível')) : null),
     [firestore]
   );
   
-  const { data: availableTools, isLoading: isLoadingAvailable, error: availableError } = useCollection<WithDocId<Tool>>(availableToolsQuery);
+  const { data: availableTools, isLoading: isLoadingAvailable, error: availableError } = useCollection<WithDocId<Tool>>(availableToolsQuery, {
+      queryKey: ['availableTools']
+  });
 
+  // Consulta para ferramentas emprestadas
   const loanedToolsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Em Empréstimo')) : null),
     [firestore]
   );
   
-  const { data: loanedTools, isLoading: isLoadingLoaned, error: loanedError } = useCollection<WithDocId<Tool>>(loanedToolsQuery);
+  const { data: loanedTools, isLoading: isLoadingLoaned, error: loanedError } = useCollection<WithDocId<Tool>>(loanedToolsQuery, {
+      queryKey: ['loanedTools']
+  });
 
 
   const handleActionSuccess = () => {
     requestTableRef.current?.refetchRequests();
     historyTableRef.current?.refetchHistory();
+    // Invalidação das queries de ferramentas será feita pelos hooks useCollection
     toast({ title: "Sucesso!", description: "A operação foi concluída." });
     setIsRequestDialogOpen(false);
     setIsCheckoutDialogOpen(false);
@@ -60,15 +65,6 @@ const MovimentacaoFerramentaria = () => {
   }, [availableError, loanedError, toast]);
 
   const isLoading = isLoadingAvailable || isLoadingLoaned;
-
-  if (isLoading) {
-    return (
-        <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-8 w-8 animate-spin" />
-            <span className="ml-2">Carregando dados de Ferramentaria...</span>
-        </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
