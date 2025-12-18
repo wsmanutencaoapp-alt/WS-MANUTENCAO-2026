@@ -167,18 +167,9 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
                     <TableRow key={`${item.requestId}-${item.toolId}-${index}`}>
                       <TableCell className="font-mono">{item.osNumber}</TableCell>
                       <TableCell>
-                          <div className="flex items-center gap-3">
-                              <Image 
-                                src={item.toolImage || "https://picsum.photos/seed/default/40/40"}
-                                alt={item.toolDescription}
-                                width={40}
-                                height={40}
-                                className="rounded-md object-cover hidden sm:block"
-                              />
-                              <div>
-                                <p className="font-bold">{item.toolDescription}</p>
-                                <p className="font-mono text-xs text-muted-foreground">{item.toolCode}</p>
-                              </div>
+                          <div>
+                            <p className="font-bold">{item.toolDescription}</p>
+                            <p className="font-mono text-xs text-muted-foreground">{item.toolCode}</p>
                           </div>
                       </TableCell>
                       <TableCell>{item.requesterName}</TableCell>
