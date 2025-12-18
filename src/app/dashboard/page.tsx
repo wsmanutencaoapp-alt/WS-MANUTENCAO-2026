@@ -12,7 +12,7 @@ export default function DashboardPage() {
   const firestore = useFirestore();
 
   const toolsQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'tools'), where('enderecamento', '!=', 'LOGICA')) : null),
+    () => (firestore ? query(collection(firestore, 'tools'), where('sequencial', '>', 0)) : null),
     [firestore]
   );
   const { data: tools, isLoading: isLoadingTools } = useCollection<Tool>(toolsQuery);
