@@ -485,7 +485,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Kit",
       "type": "object",
-      "description": "Represents a kit or toolbox containing a collection of tools.",
+      "description": "Represents a kit or toolbox containing a collection of tools, treated as a single inventory item.",
       "properties": {
         "id": {
           "type": "string",
@@ -510,13 +510,96 @@
           "type": "string",
           "format": "date-time",
           "description": "Timestamp of when the kit was created."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the kit (e.g., Disponível, Em Empréstimo).",
+          "enum": ["Disponível", "Em Empréstimo"]
+        },
+        "enderecamento": {
+          "type": "string",
+          "description": "The storage location of the kit."
+        },
+        "imageUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "A generic image URL for the kit."
         }
       },
       "required": [
         "codigo",
         "descricao",
         "toolIds",
-        "createdAt"
+        "createdAt",
+        "status",
+        "enderecamento"
+      ]
+    },
+    "ToolRequest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ToolRequest",
+      "type": "object",
+      "description": "Represents a request to loan one or more tools for a specific work order.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the tool request."
+        },
+        "osNumber": {
+          "type": "string",
+          "description": "The work order number associated with the request."
+        },
+        "requesterId": {
+          "type": "string",
+          "description": "The Firebase UID of the employee who made the request."
+        },
+        "requesterName": {
+          "type": "string",
+          "description": "The name of the employee who made the request."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the request.",
+          "enum": ["Pendente", "Em Uso", "Devolvida", "Cancelada"]
+        },
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the request was created."
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The expected return date for the tools."
+        },
+        "toolIds": {
+          "type": "array",
+          "description": "An array of document IDs of the requested tools.",
+          "items": { "type": "string" }
+        },
+        "handledBy": {
+          "type": "string",
+          "description": "The UID of the ferramentaria user who handled the withdrawal."
+        },
+        "handledAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the tools were withdrawn."
+        },
+        "returnedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the tools were returned."
+        }
+      },
+      "required": [
+        "osNumber",
+        "requesterId",
+        "requesterName",
+        "status",
+        "requestedAt",
+        "dueDate",
+        "toolIds"
       ]
     }
   },
@@ -671,6 +754,22 @@
             {
               "name": "expenseId",
               "description": "Unique identifier for the expense record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tool_requests/{requestId}",
+        "definition": {
+          "entityName": "ToolRequest",
+          "schema": {
+            "$ref": "#/backend/entities/ToolRequest"
+          },
+          "description": "Stores requests for tool loans.",
+          "params": [
+            {
+              "name": "requestId",
+              "description": "Unique identifier for the tool loan request."
             }
           ]
         }

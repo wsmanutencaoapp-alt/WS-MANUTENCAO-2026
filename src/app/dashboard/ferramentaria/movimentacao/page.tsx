@@ -12,6 +12,7 @@ import ToolRequestTable, { ToolRequestTableRef } from '@/components/ToolRequestT
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Tool } from '@/lib/types';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
+import type { WithDocId } from '@/firebase/firestore/use-collection';
 
 const MovimentacaoFerramentaria = () => {
   const { toast } = useToast();
@@ -21,20 +22,17 @@ const MovimentacaoFerramentaria = () => {
   
   const requestTableRef = useRef<ToolRequestTableRef>(null);
 
-  const toolsCollectionRef = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'tools') : null),
+  const availableToolsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Disponível')) : null),
     [firestore]
   );
   
-  const { data: ferramentas, isLoading, error } = useCollection<Tool>(toolsCollectionRef);
+  const { data: availableTools, isLoading, error } = useCollection<WithDocId<Tool>>(availableToolsQuery);
 
   const handleActionSuccess = () => {
-    // A tabela de requisições será atualizada pelo useCollection,
-    // mas podemos forçar um refresh se o componente filho expor uma função.
     if (requestTableRef.current) {
         requestTableRef.current.refetchRequests();
     }
-    // A lista principal de ferramentas é atualizada em tempo real.
     toast({ title: "Sucesso!", description: "A operação foi concluída." });
     setIsRequestDialogOpen(false);
   };
@@ -44,8 +42,6 @@ const MovimentacaoFerramentaria = () => {
         toast({ variant: 'destructive', title: 'Erro ao buscar equipamentos', description: 'Você pode não ter permissão para ver estes dados.'})
     }
   }, [error, toast]);
-
-  const availableTools = ferramentas?.filter(t => t.status === 'Available') || [];
 
   if (isLoading) {
     return (
@@ -87,14 +83,14 @@ const MovimentacaoFerramentaria = () => {
         </TabsContent>
         
         <TabsContent value="movimentacao" className="mt-4">
-          <ToolMovementTable allTools={ferramentas || []} />
+          <ToolMovementTable allTools={availableTools || []} />
         </TabsContent>
       </Tabs>
       
       <ToolLoanRequestDialog 
         isOpen={isRequestDialogOpen}
         onClose={() => setIsRequestDialogOpen(false)}
-        allAvailableTools={availableTools}
+        allAvailableTools={availableTools || []}
         onActionSuccess={handleActionSuccess}
       />
     </div>

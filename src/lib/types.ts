@@ -61,6 +61,19 @@ export type CalibrationRecord = {
   timestamp: string; // ISO date string of when the record was created
 };
 
+export type ToolRequest = {
+  id?: string;
+  osNumber: string;
+  requesterId: string;
+  requesterName: string;
+  status: 'Pendente' | 'Em Uso' | 'Devolvida' | 'Cancelada';
+  requestedAt: string; // ISO date string
+  dueDate: string; // ISO date string
+  toolIds: string[];
+  handledBy?: string; // UID of ferramentaria user
+  handledAt?: string; // ISO date string
+  returnedAt?: string; // ISO date string
+};
 
 export type Permissions = {
   dashboard?: boolean;
