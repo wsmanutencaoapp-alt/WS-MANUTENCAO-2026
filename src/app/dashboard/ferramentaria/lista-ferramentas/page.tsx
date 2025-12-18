@@ -162,7 +162,10 @@ const ListaFerramentasPage = () => {
                  <TableRow><TableCell colSpan={6} className="text-center text-destructive">Erro: {firestoreError.message}</TableCell></TableRow>
               ) : filteredFerramentas && filteredFerramentas.length > 0 ? (
                 filteredFerramentas.map((ferramenta) => (
-                  <TableRow key={ferramenta.docId} className={cn((ferramenta.tipo === 'EQV' || ferramenta.tipo === 'ESP') && 'bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/50')}>
+                  <TableRow key={ferramenta.docId} className={cn(
+                        ferramenta.tipo === 'ESP' && 'bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/50',
+                        ferramenta.tipo === 'EQV' && 'bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-100/80 dark:hover:bg-blue-900/50'
+                    )}>
                     <TableCell className="hidden sm:table-cell">
                         <button className="relative group focus:outline-none" onClick={() => setSelectedToolForDetails(ferramenta)}>
                           <Image
