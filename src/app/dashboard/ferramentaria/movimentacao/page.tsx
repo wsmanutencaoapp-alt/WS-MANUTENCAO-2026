@@ -68,15 +68,12 @@ const MovimentacaoFerramentaria = () => {
       </div>
       
       <Tabs defaultValue="requisicoes">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="requisicoes">
-            <ListChecks className="mr-2 h-4 w-4" /> Requisições Pendentes
+            <ListChecks className="mr-2 h-4 w-4" /> Requisições Ativas
           </TabsTrigger>
           <TabsTrigger value="historico">
             <History className="mr-2 h-4 w-4" /> Histórico de Movimentações
-          </TabsTrigger>
-          <TabsTrigger value="movimentacao">
-            <Wrench className="mr-2 h-4 w-4" /> Registrar Movimentação Manual
           </TabsTrigger>
         </TabsList>
         
@@ -90,12 +87,7 @@ const MovimentacaoFerramentaria = () => {
         <TabsContent value="historico" className="mt-4">
            <ToolMovementHistoryTable
             ref={historyTableRef}
-            onActionSuccess={handleActionSuccess}
           />
-        </TabsContent>
-        
-        <TabsContent value="movimentacao" className="mt-4">
-          <ToolMovementTable allTools={availableTools || []} />
         </TabsContent>
       </Tabs>
       

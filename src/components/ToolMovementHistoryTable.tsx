@@ -19,25 +19,17 @@ import {
     CardTitle,
     CardDescription,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, Inbox, Undo2 } from 'lucide-react';
+import { Loader2, AlertCircle, Inbox } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
-import ReturnLoanDialog from './ReturnLoanDialog';
 
 export interface ToolMovementHistoryTableRef {
   refetchHistory: () => void;
 }
 
-interface ToolMovementHistoryTableProps {
-    onActionSuccess: () => void;
-}
-
 const getStatusVariant = (status: ToolRequest['status']) => {
     switch (status) {
-        case 'Em Uso':
-            return 'default';
         case 'Devolvida':
             return 'success';
         case 'Cancelada':
@@ -48,16 +40,15 @@ const getStatusVariant = (status: ToolRequest['status']) => {
 }
 
 
-const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMovementHistoryTableProps>(({ onActionSuccess }, ref) => {
+const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((props, ref) => {
   const firestore = useFirestore();
   const queryClient = useQueryClient();
-  const [selectedRequest, setSelectedRequest] = useState<WithDocId<ToolRequest> | null>(null);
 
-  const queryKey = ['tool_requests_history'];
+  const queryKey = ['tool_requests_history_completed'];
   const requestsQuery = useMemoFirebase(
     () => (firestore ? query(
         collection(firestore, 'tool_requests'), 
-        where('status', '!=', 'Pendente'),
+        where('status', 'in', ['Devolvida', 'Cancelada']),
         orderBy('status'),
     ) : null),
     [firestore]
@@ -82,19 +73,13 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMov
       queryClient.invalidateQueries({ queryKey });
     }
   }));
-
-  const handleReturnSuccess = () => {
-    onActionSuccess();
-    setSelectedRequest(null);
-  };
   
   return (
-    <>
     <Card>
         <CardHeader>
              <CardTitle>Histórico de Movimentações</CardTitle>
              <CardDescription>
-                Visualize todos os empréstimos de ferramentas (em uso, devolvidos, etc).
+                Visualize todos os empréstimos de ferramentas concluídos (devolvidos, cancelados, etc).
              </CardDescription>
         </CardHeader>
         <CardContent>
@@ -106,29 +91,28 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMov
                     <TableHead>Solicitante</TableHead>
                     <TableHead>Data Retirada</TableHead>
                     <TableHead>Data Devolução</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center">
+                      <TableCell colSpan={5} className="text-center">
                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                       </TableCell>
                     </TableRow>
                   )}
                   {error && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-destructive">
+                      <TableCell colSpan={5} className="text-center text-destructive">
                          <AlertCircle className="inline-block mr-2" /> Erro ao carregar histórico.
                       </TableCell>
                     </TableRow>
                   )}
                   {!isLoading && sortedRequests.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center h-24">
+                      <TableCell colSpan={5} className="text-center h-24">
                         <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
-                        <p className="text-muted-foreground">Nenhuma movimentação registrada.</p>
+                        <p className="text-muted-foreground">Nenhum histórico de movimentação encontrado.</p>
                       </TableCell>
                     </TableRow>
                   )}
@@ -141,30 +125,12 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMov
                       <TableCell>{request.requesterName}</TableCell>
                       <TableCell>{request.handledAt ? format(new Date(request.handledAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                       <TableCell>{request.returnedAt ? format(new Date(request.returnedAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
-                      <TableCell className="text-right">
-                          {request.status === 'Em Uso' && (
-                            <Button variant="outline" size="sm" onClick={() => setSelectedRequest(request)}>
-                                <Undo2 className="mr-2 h-4 w-4" />
-                                Registrar Devolução
-                            </Button>
-                          )}
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
             </Table>
         </CardContent>
     </Card>
-    
-    {selectedRequest && (
-        <ReturnLoanDialog
-            isOpen={!!selectedRequest}
-            onClose={() => setSelectedRequest(null)}
-            request={selectedRequest}
-            onSuccess={handleReturnSuccess}
-        />
-    )}
-    </>
   );
 });
 
