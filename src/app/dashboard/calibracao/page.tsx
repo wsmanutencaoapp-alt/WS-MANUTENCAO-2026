@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { Thermometer, History, PlusCircle, Loader2, Search } from 'lucide-react';
-import { addDays, format, isBefore, isAfter } from 'date-fns';
+import { addDays, format, isBefore, differenceInDays } from 'date-fns';
 import CalibrationDialog from '@/components/CalibrationDialog';
 import HistoryDialog from '@/components/CalibrationHistoryDialog';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
@@ -37,7 +37,9 @@ const CalibracaoPage = () => {
     );
   }, [firestore]);
 
-  const { data: tools, isLoading, error } = useCollection<Tool>(controllableToolsQuery);
+  const { data: tools, isLoading, error } = useCollection<Tool>(controllableToolsQuery, {
+      queryKey: ['controllableTools']
+  });
 
   const filteredTools = useMemo(() => {
     if (!tools) return [];
@@ -51,25 +53,36 @@ const CalibracaoPage = () => {
   }, [tools, searchTerm]);
 
 
-  const getStatus = (dueDate: string | undefined): { text: string; variant: 'success' | 'warning' | 'destructive' } => {
+  const getStatus = (dueDate: string | undefined): { text: string; variant: 'success' | 'warning' | 'destructive' | 'attention' | 'critical' } => {
     if (!dueDate) return { text: 'Sem data', variant: 'warning' };
-    const today = new Date();
-    const dueDateObj = new Date(dueDate);
-    const thirtyDaysFromNow = addDays(today, 30);
 
-    if (isBefore(dueDateObj, today)) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Ignore time part
+    const dueDateObj = new Date(dueDate);
+    
+    const daysUntilDue = differenceInDays(dueDateObj, today);
+
+    if (daysUntilDue < 0) {
       return { text: 'Vencido', variant: 'destructive' };
     }
-    if (isBefore(dueDateObj, thirtyDaysFromNow)) {
-      return { text: 'Vence em breve', variant: 'warning' };
+    if (daysUntilDue <= 5) {
+      return { text: `Vence em ${daysUntilDue + 1} dia(s)`, variant: 'critical' };
+    }
+    if (daysUntilDue <= 15) {
+      return { text: `Vence em ${daysUntilDue + 1} dias`, variant: 'warning' };
+    }
+     if (daysUntilDue <= 30) {
+      return { text: 'Vence em breve', variant: 'attention' };
     }
     return { text: 'Válido', variant: 'success' };
   };
   
-  const getBadgeVariant = (variant: 'success' | 'warning' | 'destructive') => {
+  const getBadgeVariant = (variant: 'success' | 'warning' | 'destructive' | 'attention' | 'critical') => {
       switch(variant) {
           case 'success': return 'success';
-          case 'warning': return 'default';
+          case 'attention': return 'secondary'; // Amarelo/Padrão
+          case 'warning': return 'default'; // Laranja/Primário
+          case 'critical': return 'destructive'; // Vermelho
           case 'destructive': return 'destructive';
           default: return 'secondary';
       }
@@ -146,6 +159,8 @@ const CalibracaoPage = () => {
               )}
               {!isLoading && filteredTools.map((tool) => {
                   const status = getStatus(tool.data_vencimento);
+                  const displayStatus = status.text;
+                  
                   return (
                     <TableRow key={tool.docId}>
                         <TableCell className="hidden sm:table-cell">
@@ -161,7 +176,7 @@ const CalibracaoPage = () => {
                         <TableCell>{tool.descricao}</TableCell>
                         <TableCell>{tool.data_vencimento ? format(new Date(tool.data_vencimento), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                         <TableCell>
-                          <Badge variant={getBadgeVariant(status.variant)}>{status.text}</Badge>
+                          <Badge variant={getBadgeVariant(status.variant)}>{displayStatus}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                             <Button variant="outline" size="sm" className="mr-2" onClick={() => handleOpenCalibration(tool)}>

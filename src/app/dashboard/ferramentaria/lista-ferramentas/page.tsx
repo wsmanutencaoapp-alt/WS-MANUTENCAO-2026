@@ -31,6 +31,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import ReprintDialog from '@/components/ReprintDialog';
 import { cn } from '@/lib/utils';
+import { differenceInDays } from 'date-fns';
 
 
 interface Ferramenta extends Tool {
@@ -78,13 +79,52 @@ const ListaFerramentasPage = () => {
     );
   }, [ferramentasVisiveis, searchTerm]);
 
-  const getStatusVariant = (status: string) => {
-    const statusMap: { [key: string]: 'success' | 'destructive' | 'default' } = {
-        'Disponível': 'success', 'Vencido': 'destructive', 'Bloqueado': 'destructive', 'Inoperante': 'destructive',
-        'Pendente': 'default', 'Em Empréstimo': 'default', 'Em Aferição': 'default'
+  const getDynamicStatus = (tool: Ferramenta): { status: string; variant: 'success' | 'destructive' | 'default' | 'attention' | 'warning' } => {
+    // Se não for uma ferramenta controlável, retorne o status original
+    if (!['C', 'L', 'V'].includes(tool.classificacao)) {
+        const statusMap: { [key: string]: 'success' | 'destructive' | 'default' } = {
+            'Disponível': 'success', 'Vencido': 'destructive', 'Bloqueado': 'destructive', 'Inoperante': 'destructive',
+            'Pendente': 'default', 'Em Empréstimo': 'default', 'Em Aferição': 'default', 'Em Manutenção': 'default'
+        }
+        return { status: tool.status, variant: statusMap[tool.status] || 'default' };
     }
-    return statusMap[status] || 'default';
-  };
+
+    // Lógica para ferramentas controláveis
+    if (!tool.data_vencimento) {
+        return { status: 'Cal. Pendente', variant: 'warning' };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(tool.data_vencimento);
+    const daysUntilDue = differenceInDays(dueDate, today);
+
+    if (daysUntilDue < 0) {
+        return { status: 'Vencido', variant: 'destructive' };
+    }
+    
+    // Se estiver disponível e não vencido, mostra o status de disponibilidade com cor de alerta
+    if (tool.status === 'Disponível') {
+        if (daysUntilDue <= 5) return { status: 'Disponível', variant: 'critical' };
+        if (daysUntilDue <= 15) return { status: 'Disponível', variant: 'warning' };
+        if (daysUntilDue <= 30) return { status: 'Disponível', variant: 'attention' };
+        return { status: 'Disponível', variant: 'success' };
+    }
+    
+    // Para outros status (Em Empréstimo, etc.), apenas retorna o status com sua cor padrão
+    return { status: tool.status, variant: 'default' };
+};
+
+const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'attention' | 'warning' | 'critical') => {
+    switch(variant) {
+        case 'success': return 'success';
+        case 'attention': return 'secondary'; // Amarelo
+        case 'warning': return 'default'; // Laranja
+        case 'critical': return 'destructive'; // Vermelho
+        case 'destructive': return 'destructive';
+        default: return 'secondary';
+    }
+};
   
   const handleAddQuantitySuccess = (newTools: any[]) => {
       setIsAddQuantityDialogOpen(false);
@@ -161,43 +201,46 @@ const ListaFerramentasPage = () => {
               ) : firestoreError ? (
                  <TableRow><TableCell colSpan={6} className="text-center text-destructive">Erro: {firestoreError.message}</TableCell></TableRow>
               ) : filteredFerramentas && filteredFerramentas.length > 0 ? (
-                filteredFerramentas.map((ferramenta) => (
-                  <TableRow key={ferramenta.docId} className={cn(
+                filteredFerramentas.map((ferramenta) => {
+                  const { status, variant } = getDynamicStatus(ferramenta);
+                  return (
+                    <TableRow key={ferramenta.docId} className={cn(
                         ferramenta.tipo === 'ESP' && 'bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/50',
                         ferramenta.tipo === 'EQV' && 'bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-100/80 dark:hover:bg-blue-900/50'
                     )}>
-                    <TableCell className="hidden sm:table-cell">
-                        <button className="relative group focus:outline-none" onClick={() => setSelectedToolForDetails(ferramenta)}>
-                          <Image
-                              alt={ferramenta.descricao}
-                              className="aspect-square rounded-md object-cover"
-                              height="64"
-                              src={ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64"}
-                              width="64"
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity rounded-md">
-                            <ZoomIn className="h-6 w-6 text-white" />
-                          </div>
-                        </button>
-                    </TableCell>
-                    <TableCell className="font-medium">{ferramenta.codigo}</TableCell>
-                    <TableCell>{ferramenta.descricao}</TableCell>
-                    <TableCell>{ferramenta.enderecamento}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(ferramenta.status)}>
-                        {ferramenta.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                       <Button variant="ghost" size="icon" title="Detalhes" onClick={() => setSelectedToolForDetails(ferramenta)}>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Reimprimir Etiqueta" onClick={() => setSelectedToolForReprint(ferramenta)}>
-                        <Repeat2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      <TableCell className="hidden sm:table-cell">
+                          <button className="relative group focus:outline-none" onClick={() => setSelectedToolForDetails(ferramenta)}>
+                            <Image
+                                alt={ferramenta.descricao}
+                                className="aspect-square rounded-md object-cover"
+                                height="64"
+                                src={ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64"}
+                                width="64"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity rounded-md">
+                              <ZoomIn className="h-6 w-6 text-white" />
+                            </div>
+                          </button>
+                      </TableCell>
+                      <TableCell className="font-medium">{ferramenta.codigo}</TableCell>
+                      <TableCell>{ferramenta.descricao}</TableCell>
+                      <TableCell>{ferramenta.enderecamento}</TableCell>
+                      <TableCell>
+                        <Badge variant={getBadgeVariant(variant)}>
+                          {status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                         <Button variant="ghost" size="icon" title="Detalhes" onClick={() => setSelectedToolForDetails(ferramenta)}>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" title="Reimprimir Etiqueta" onClick={() => setSelectedToolForReprint(ferramenta)}>
+                          <Repeat2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow><TableCell colSpan={6} className="text-center">Nenhuma ferramenta encontrada.</TableCell></TableRow>
               )}
