@@ -43,7 +43,7 @@ export function ToolingAlertHeader() {
     });
   }, [tools]);
 
-  if (isLoading || !toolsNearOrdue || toolsNearOrdue.length === 0) {
+  if (isLoading || !toolsNearOrOverdue || toolsNearOrOverdue.length === 0) {
     return null; // Don't render anything if loading, no data, or no tools need attention
   }
 
@@ -52,7 +52,7 @@ export function ToolingAlertHeader() {
       <AlertCircle className="h-4 w-4" />
       <AlertTitle className="font-bold">Atenção Necessária na Ferramentaria</AlertTitle>
       <AlertDescription>
-        Você tem <span className="font-bold">{toolsNearOrdue.length}</span> ferramenta(s) com calibração/validade vencida ou vencendo nos próximos 60 dias.
+        Você tem <span className="font-bold">{toolsNearOrOverdue.length}</span> ferramenta(s) com calibração/validade vencida ou vencendo nos próximos 60 dias.
         <Link href="/dashboard/calibracao" className="underline font-semibold ml-2 hover:text-yellow-900 dark:hover:text-yellow-100">
           Verificar agora.
         </Link>
