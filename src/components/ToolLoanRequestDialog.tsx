@@ -154,7 +154,7 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
                     {dueDate ? format(dueDate, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
                   <Calendar 
                     mode="single" 
                     selected={dueDate} 
