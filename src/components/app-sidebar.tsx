@@ -22,15 +22,17 @@ import {
   CalendarCheck,
   HardHat,
   LayoutDashboard,
+  Search,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
 import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, useSidebar, SidebarTrigger } from '@/components/ui/sidebar';
 import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Employee } from '@/lib/types';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { doc } from 'firebase/firestore';
 import Image from 'next/image';
+import { Input } from '@/components/ui/input';
 
 
 const allNavItems: NavItem[] = [
@@ -177,12 +179,42 @@ const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permi
     }, [] as NavItem[]);
 };
 
+const filterNavItemsBySearch = (items: NavItem[], searchTerm: string): NavItem[] => {
+    if (!searchTerm) {
+        return items;
+    }
+
+    const lowercasedTerm = searchTerm.toLowerCase();
+
+    return items.reduce((acc, item) => {
+        const itemLabelMatch = item.label.toLowerCase().includes(lowercasedTerm);
+
+        if (itemLabelMatch) {
+            acc.push(item);
+            return acc;
+        }
+
+        if (item.subItems) {
+            const matchingSubItems = item.subItems.filter(subItem =>
+                subItem.label.toLowerCase().includes(lowercasedTerm)
+            );
+
+            if (matchingSubItems.length > 0) {
+                acc.push({ ...item, subItems: matchingSubItems });
+            }
+        }
+
+        return acc;
+    }, [] as NavItem[]);
+};
+
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { state } = useSidebar();
   const { user } = useUser();
   const firestore = useFirestore();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -197,13 +229,14 @@ export function AppSidebar() {
     // The dashboard link is always visible for logged-in users.
     const baseItems = allNavItems.filter(item => item.permission === 'dashboard');
     const permittedItems = filterItemsByPermissions(allNavItems.filter(item => item.permission !== 'dashboard'), employeeData.permissions || {}, isAdmin);
-    return [...baseItems, ...permittedItems];
-  }, [employeeData, isAdmin]);
+    return filterNavItemsBySearch([...baseItems, ...permittedItems], searchTerm);
+  }, [employeeData, isAdmin, searchTerm]);
 
   const bottomNavItems = useMemo(() => {
     if (!employeeData) return [];
-    return filterItemsByPermissions(allBottomNavItems, employeeData.permissions || {}, isAdmin);
-  }, [employeeData, isAdmin]);
+    const permittedItems = filterItemsByPermissions(allBottomNavItems, employeeData.permissions || {}, isAdmin);
+    return filterNavItemsBySearch(permittedItems, searchTerm);
+  }, [employeeData, isAdmin, searchTerm]);
 
   return (
     <Sidebar collapsible="icon" className="group-[[data-variant=sidebar]]:border-r group-[[data-variant=sidebar]]:bg-sidebar">
@@ -215,6 +248,16 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="flex flex-col gap-2 p-2 sm:p-4">
+        <div className={cn("relative", state === 'collapsed' && "hidden")}>
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Pesquisar módulos..."
+            className="w-full rounded-lg bg-background pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
         <SidebarMenu className='flex-1'>
             <NavMenu items={navItems} pathname={pathname} />
         </SidebarMenu>
