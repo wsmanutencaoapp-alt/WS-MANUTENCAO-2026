@@ -6,9 +6,10 @@ import { collection, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import ToolMovementTable from '@/components/ToolMovementTable';
 import { Button } from '@/components/ui/button';
-import { ListChecks, Send, Wrench, Loader2 } from 'lucide-react';
+import { ListChecks, Send, Wrench, Loader2, History } from 'lucide-react';
 import ToolLoanRequestDialog from '@/components/ToolLoanRequestDialog';
 import ToolRequestTable, { ToolRequestTableRef } from '@/components/ToolRequestTable';
+import ToolMovementHistoryTable, { ToolMovementHistoryTableRef } from '@/components/ToolMovementHistoryTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Tool } from '@/lib/types';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
@@ -21,6 +22,8 @@ const MovimentacaoFerramentaria = () => {
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   
   const requestTableRef = useRef<ToolRequestTableRef>(null);
+  const historyTableRef = useRef<ToolMovementHistoryTableRef>(null);
+
 
   const availableToolsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Disponível')) : null),
@@ -30,9 +33,8 @@ const MovimentacaoFerramentaria = () => {
   const { data: availableTools, isLoading, error } = useCollection<WithDocId<Tool>>(availableToolsQuery);
 
   const handleActionSuccess = () => {
-    if (requestTableRef.current) {
-        requestTableRef.current.refetchRequests();
-    }
+    requestTableRef.current?.refetchRequests();
+    historyTableRef.current?.refetchHistory();
     toast({ title: "Sucesso!", description: "A operação foi concluída." });
     setIsRequestDialogOpen(false);
   };
@@ -66,9 +68,12 @@ const MovimentacaoFerramentaria = () => {
       </div>
       
       <Tabs defaultValue="requisicoes">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="requisicoes">
             <ListChecks className="mr-2 h-4 w-4" /> Requisições Pendentes
+          </TabsTrigger>
+          <TabsTrigger value="historico">
+            <History className="mr-2 h-4 w-4" /> Histórico de Movimentações
           </TabsTrigger>
           <TabsTrigger value="movimentacao">
             <Wrench className="mr-2 h-4 w-4" /> Registrar Movimentação Manual
@@ -78,6 +83,13 @@ const MovimentacaoFerramentaria = () => {
         <TabsContent value="requisicoes" className="mt-4">
           <ToolRequestTable 
             ref={requestTableRef}
+            onActionSuccess={handleActionSuccess}
+          />
+        </TabsContent>
+
+        <TabsContent value="historico" className="mt-4">
+           <ToolMovementHistoryTable
+            ref={historyTableRef}
             onActionSuccess={handleActionSuccess}
           />
         </TabsContent>
