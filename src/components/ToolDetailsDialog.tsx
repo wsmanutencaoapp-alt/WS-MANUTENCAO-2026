@@ -23,7 +23,7 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import type { Tool } from '@/lib/types';
-import { Edit, ZoomIn, Save, Trash2, X, Loader2, Upload } from 'lucide-react';
+import { Edit, ZoomIn, Save, Trash2, X, Loader2, Upload, AlertTriangle } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useFirestore, useStorage } from '@/firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -34,6 +34,7 @@ import { Checkbox } from './ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Alert, AlertTitle, AlertDescription } from './ui/alert';
 
 type DialogTool = Tool & Partial<WithDocId<Tool>>;
 
@@ -71,14 +72,16 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   }
 
   const getStatusVariant = (status: string) => {
-    const statusMap: { [key: string]: 'success' | 'destructive' | 'default' } = {
+    const statusMap: { [key: string]: 'success' | 'destructive' | 'default' | 'warning' } = {
         'Disponível': 'success',
         'Vencido': 'destructive',
         'Bloqueado': 'destructive',
         'Inoperante': 'destructive',
+        'Refugo': 'destructive',
         'Pendente': 'default',
         'Em Empréstimo': 'default',
-        'Em Aferição': 'default'
+        'Em Aferição': 'default',
+        'Liberado Condicional': 'warning',
     }
     return statusMap[status] || 'default';
   };
@@ -222,6 +225,16 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                 </div>
             </div>
           ) : (
+            <>
+              {tool.status === 'Liberado Condicional' && tool.observacao_condicional && (
+                <Alert variant="default" className="border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300 [&>svg]:text-orange-600 dark:[&>svg]:text-orange-400">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle className="font-bold">Detalhes da Liberação Condicional</AlertTitle>
+                  <AlertDescription>
+                    {tool.observacao_condicional}
+                  </AlertDescription>
+                </Alert>
+              )}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <div className="col-span-2">
                   <p className="font-semibold text-muted-foreground">Código</p>
@@ -258,6 +271,7 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                   <p>{(tool.valor_estimado ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                 </div>
             </div>
+            </>
           )}
         </div>
         <DialogFooter className="sm:justify-between flex-wrap gap-2">
