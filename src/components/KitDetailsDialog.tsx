@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, documentId, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, documentId, doc, writeBatch } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
-import { Loader2, Edit, Save, X } from 'lucide-react';
+import { Loader2, Edit, Save, X, PlusCircle, MinusCircle, Search } from 'lucide-react';
 import type { Kit, Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import Image from 'next/image';
@@ -22,6 +22,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { Separator } from './ui/separator';
 
 interface KitDetailsDialogProps {
   kit: WithDocId<Kit> | null;
@@ -37,6 +38,41 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editableKit, setEditableKit] = useState<Partial<Kit>>({});
+  
+  const [currentToolIds, setCurrentToolIds] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Fetch tools currently IN this kit
+  const toolsInKitQuery = useMemoFirebase(() => {
+    if (!firestore || !kit || currentToolIds.size === 0) return null;
+    return query(collection(firestore, 'tools'), where(documentId(), 'in', Array.from(currentToolIds)));
+  }, [firestore, kit, currentToolIds]);
+  
+  const { data: toolsInKit, isLoading: isLoadingKitTools } = useCollection<WithDocId<Tool>>(toolsInKitQuery, {
+      queryKey: ['kitTools', kit?.docId, Array.from(currentToolIds)],
+      enabled: !!kit && currentToolIds.size > 0,
+  });
+
+  // Fetch ALL available tools for adding
+  const availableToolsQuery = useMemoFirebase(() => {
+    if (!firestore || !isEditing) return null;
+    return query(collection(firestore, 'tools'), where('status', '==', 'Disponível'));
+  }, [firestore, isEditing]);
+
+  const { data: availableTools, isLoading: isLoadingAvailableTools } = useCollection<WithDocId<Tool>>(availableToolsQuery, {
+      queryKey: ['availableToolsForKitEditing'],
+      enabled: isEditing,
+  });
+  
+  const filteredAvailableTools = useMemo(() => {
+      if (!availableTools) return [];
+      const lowercasedTerm = searchTerm.toLowerCase();
+      return availableTools.filter(tool => 
+          !currentToolIds.has(tool.docId) &&
+          (tool.descricao.toLowerCase().includes(lowercasedTerm) || tool.codigo.toLowerCase().includes(lowercasedTerm))
+      );
+  }, [availableTools, searchTerm, currentToolIds]);
+
 
   useEffect(() => {
     if (kit) {
@@ -44,32 +80,65 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         descricao: kit.descricao,
         enderecamento: kit.enderecamento,
       });
+      setCurrentToolIds(new Set(kit.toolIds || []));
     }
-    setIsEditing(false); // Reset editing mode when kit changes
-  }, [kit]);
+    // Reset states when dialog opens or kit changes
+    setIsEditing(false);
+    setIsSaving(false);
+    setSearchTerm('');
+  }, [kit, isOpen]);
 
-  const toolsQuery = useMemoFirebase(() => {
-    if (!firestore || !kit || !kit.toolIds || kit.toolIds.length === 0) return null;
-    return query(collection(firestore, 'tools'), where(documentId(), 'in', kit.toolIds));
-  }, [firestore, kit]);
-
-  const { data: tools, isLoading, error } = useCollection<WithDocId<Tool>>(toolsQuery, {
-      queryKey: ['kitTools', kit?.docId],
-      enabled: !!kit && !!kit.toolIds && kit.toolIds.length > 0,
-  });
-
+  const handleToolAction = (toolId: string, action: 'add' | 'remove') => {
+      setCurrentToolIds(prev => {
+          const newSet = new Set(prev);
+          if (action === 'add') {
+              newSet.add(toolId);
+          } else {
+              newSet.delete(toolId);
+          }
+          return newSet;
+      });
+  };
+  
   const handleSaveChanges = async () => {
     if (!firestore || !kit) return;
     setIsSaving(true);
-    const kitRef = doc(firestore, 'kits', kit.docId);
+    
     try {
-        await updateDoc(kitRef, {
+        const batch = writeBatch(firestore);
+        const kitRef = doc(firestore, 'kits', kit.docId);
+
+        // Update kit details
+        batch.update(kitRef, {
             descricao: editableKit.descricao,
             enderecamento: editableKit.enderecamento,
+            toolIds: Array.from(currentToolIds),
         });
-        toast({ title: "Sucesso!", description: "As informações do kit foram atualizadas." });
+
+        const originalToolIds = new Set(kit.toolIds || []);
+        const newToolIds = currentToolIds;
+
+        // Tools to be added: in new set but not in original
+        const addedIds = Array.from(newToolIds).filter(id => !originalToolIds.has(id));
+        for (const toolId of addedIds) {
+            const toolRef = doc(firestore, 'tools', toolId);
+            batch.update(toolRef, { status: 'Em Kit', enderecamento: kit.codigo });
+        }
+
+        // Tools to be removed: in original set but not in new
+        const removedIds = Array.from(originalToolIds).filter(id => !newToolIds.has(id));
+        for (const toolId of removedIds) {
+            const toolRef = doc(firestore, 'tools', toolId);
+            batch.update(toolRef, { status: 'Disponível', enderecamento: '' }); // Reset location or set to a default
+        }
+        
+        await batch.commit();
+
+        toast({ title: "Sucesso!", description: "O kit foi atualizado." });
         queryClient.invalidateQueries({ queryKey: ['kits'] });
-        queryClient.invalidateQueries({ queryKey: ['ferramentas'] }); // Also invalidates the main inventory list
+        queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
+        queryClient.invalidateQueries({ queryKey: ['kitTools', kit.docId] });
+        queryClient.invalidateQueries({ queryKey: ['availableToolsForKitEditing'] });
         setIsEditing(false);
         onClose();
     } catch(err) {
@@ -84,35 +153,86 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
     const { id, value } = e.target;
     setEditableKit(prev => ({ ...prev, [id]: value }));
   };
+  
+  const handleCancelEdit = () => {
+      // Reset changes
+      if (kit) {
+          setCurrentToolIds(new Set(kit.toolIds || []));
+          setEditableKit({ descricao: kit.descricao, enderecamento: kit.enderecamento });
+      }
+      setIsEditing(false);
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar Kit" : "Itens do Kit"}: {kit?.codigo}</DialogTitle>
           {!isEditing && <DialogDescription>{kit?.descricao}</DialogDescription>}
         </DialogHeader>
 
         {isEditing ? (
-            <div className="space-y-4 py-4">
-                <div className="space-y-1">
-                    <Label htmlFor="descricao">Descrição do Kit</Label>
-                    <Input id="descricao" value={editableKit.descricao || ''} onChange={handleInputChange} />
+            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[70vh]">
+                {/* Coluna 1: Dados do kit e Ferramentas no Kit */}
+                <div className="flex flex-col gap-4">
+                    <div className="space-y-4 p-1">
+                        <div className="space-y-1">
+                            <Label htmlFor="descricao">Descrição do Kit</Label>
+                            <Input id="descricao" value={editableKit.descricao || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="enderecamento">Endereçamento do Kit</Label>
+                            <Input id="enderecamento" value={editableKit.enderecamento || ''} onChange={handleInputChange} />
+                        </div>
+                    </div>
+                    <Separator />
+                    <Label>Ferramentas no Kit ({toolsInKit?.length || 0})</Label>
+                    <ScrollArea className="h-96 border rounded-md">
+                        <div className="p-2 space-y-2">
+                             {isLoadingKitTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
+                             {!isLoadingKitTools && toolsInKit?.map(tool => (
+                                <div key={tool.docId} className="flex items-center gap-2 p-2 border rounded-md">
+                                    <Image src={tool.imageUrl || "https://picsum.photos/seed/tool/40/40"} alt={tool.descricao} width={32} height={32} className="aspect-square rounded-md object-cover"/>
+                                    <div className="flex-1 text-xs"><p className="font-bold truncate">{tool.descricao}</p><p className="font-mono text-muted-foreground">{tool.codigo}</p></div>
+                                    <Button size="icon" variant="ghost" className="shrink-0" onClick={() => handleToolAction(tool.docId, 'remove')}><MinusCircle className="h-4 w-4 text-destructive" /></Button>
+                                </div>
+                            ))}
+                             {!isLoadingKitTools && toolsInKit?.length === 0 && <p className="text-muted-foreground text-center text-sm p-4">Nenhuma ferramenta no kit.</p>}
+                        </div>
+                    </ScrollArea>
                 </div>
-                <div className="space-y-1">
-                    <Label htmlFor="enderecamento">Endereçamento do Kit</Label>
-                    <Input id="enderecamento" value={editableKit.enderecamento || ''} onChange={handleInputChange} />
+
+                {/* Coluna 2: Ferramentas Disponíveis */}
+                <div className="flex flex-col gap-4">
+                     <div className="relative">
+                        <Label htmlFor="toolSearch">Adicionar Ferramentas Disponíveis</Label>
+                        <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input id="toolSearch" placeholder="Buscar por código ou descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
+                    </div>
+                    <ScrollArea className="h-[28.5rem] border rounded-md">
+                        <div className="p-2 space-y-2">
+                           {isLoadingAvailableTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
+                           {!isLoadingAvailableTools && filteredAvailableTools.map(tool => (
+                                <div key={tool.docId} className="flex items-center gap-2 p-2 border rounded-md">
+                                    <Image src={tool.imageUrl || "https://picsum.photos/seed/tool/40/40"} alt={tool.descricao} width={32} height={32} className="aspect-square rounded-md object-cover"/>
+                                    <div className="flex-1 text-xs"><p className="font-bold truncate">{tool.descricao}</p><p className="font-mono text-muted-foreground">{tool.codigo}</p></div>
+                                    <Button size="icon" variant="ghost" className="shrink-0" onClick={() => handleToolAction(tool.docId, 'add')}><PlusCircle className="h-4 w-4 text-green-600" /></Button>
+                                </div>
+                            ))}
+                           {!isLoadingAvailableTools && filteredAvailableTools.length === 0 && <p className="text-muted-foreground text-center text-sm p-4">Nenhuma ferramenta disponível encontrada.</p>}
+                        </div>
+                    </ScrollArea>
                 </div>
             </div>
         ) : (
             <ScrollArea className="max-h-[60vh] h-96 border rounded-md">
             <div className="p-4 space-y-3">
-                {isLoading && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
+                {isLoadingKitTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
                 {error && <p className="text-destructive text-center">Erro ao carregar ferramentas.</p>}
-                {!isLoading && !tools?.length && (
+                {!isLoadingKitTools && !toolsInKit?.length && (
                     <p className="text-muted-foreground text-center">Nenhuma ferramenta encontrada neste kit.</p>
                 )}
-                {!isLoading && tools?.map(tool => (
+                {!isLoadingKitTools && toolsInKit?.map(tool => (
                     <div key={tool.docId} className="flex items-center gap-4 p-2 border rounded-md">
                         <Image
                             src={tool.imageUrl || "https://picsum.photos/seed/tool/40/40"}
@@ -135,12 +255,12 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         <DialogFooter className="sm:justify-between">
             {isEditing ? (
                 <>
-                    <Button variant="ghost" onClick={() => setIsEditing(false)} disabled={isSaving}>
+                    <Button variant="ghost" onClick={handleCancelEdit} disabled={isSaving}>
                         <X className="mr-2 h-4 w-4" /> Cancelar
                     </Button>
                     <Button onClick={handleSaveChanges} disabled={isSaving}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Salvar
+                        Salvar Alterações
                     </Button>
                 </>
             ) : (
