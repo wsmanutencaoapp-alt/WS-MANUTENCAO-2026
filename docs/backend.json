@@ -611,6 +611,19 @@
           "type": "string",
           "format": "date-time",
           "description": "Timestamp of when the tools were returned."
+        },
+        "returnConditions": {
+            "type": "object",
+            "description": "A map of tool IDs to their inspection results upon return.",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "visual": { "type": "string", "enum": ["ok", "nok"] },
+                    "funcional": { "type": "string", "enum": ["ok", "nok"] },
+                    "observacao": { "type": "string" }
+                },
+                "required": ["visual", "funcional", "observacao"]
+            }
         }
       },
       "required": [

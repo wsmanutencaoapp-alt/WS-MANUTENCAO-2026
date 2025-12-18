@@ -14,8 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { writeBatch, doc, query, collection, where, getDocs, limit } from 'firebase/firestore';
-import type { Tool, ToolRequest } from '@/lib/types';
+import { writeBatch, doc, query, collection, where, getDocs, limit, updateDoc } from 'firebase/firestore';
+import type { Tool, ToolRequest, InspectionResult } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Loader2, Search, Undo2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -168,13 +168,17 @@ export default function ManualCheckInDialog({
       const requestSnapshot = await getDocs(q);
 
       // We might have multiple requests if tools from different loans are returned together.
-      const requestUpdates: Map<string, { returnedTools: string[], allTools: string[] }> = new Map();
+      const requestUpdates: Map<string, { returnedTools: string[], allTools: string[], existingConditions: Record<string, InspectionResult> }> = new Map();
 
       toolIdsArray.forEach(toolId => {
         const reqDoc = requestSnapshot.docs.find(doc => (doc.data() as ToolRequest).toolIds.includes(toolId));
         if (reqDoc) {
             if (!requestUpdates.has(reqDoc.id)) {
-                requestUpdates.set(reqDoc.id, { returnedTools: [], allTools: (reqDoc.data() as ToolRequest).toolIds });
+                requestUpdates.set(reqDoc.id, { 
+                    returnedTools: [], 
+                    allTools: (reqDoc.data() as ToolRequest).toolIds,
+                    existingConditions: (reqDoc.data() as ToolRequest).returnConditions || {}
+                });
             }
             requestUpdates.get(reqDoc.id)!.returnedTools.push(toolId);
         }
@@ -185,12 +189,32 @@ export default function ManualCheckInDialog({
           const allToolsForThisRequestReturned = update.allTools.every(id => update.returnedTools.includes(id));
           const requestRef = doc(firestore, 'tool_requests', reqId);
 
+          // Prepare the return conditions object
+          const newReturnConditions = { ...update.existingConditions };
+          for (const toolId of update.returnedTools) {
+              const inspection = inspectionData[toolId];
+              if (inspection && inspection.visual && inspection.funcional) {
+                  newReturnConditions[toolId] = {
+                      visual: inspection.visual,
+                      funcional: inspection.funcional,
+                      observacao: inspection.observacao
+                  };
+              }
+          }
+
           if (allToolsForThisRequestReturned) {
-              batch.update(requestRef, { status: 'Devolvida', returnedAt: new Date().toISOString() });
+              batch.update(requestRef, { 
+                  status: 'Devolvida', 
+                  returnedAt: new Date().toISOString(),
+                  returnConditions: newReturnConditions
+              });
           } else {
               // Partial return: remove returned tools from the request's list
               const remainingToolIds = update.allTools.filter(id => !update.returnedTools.includes(id));
-              batch.update(requestRef, { toolIds: remainingToolIds });
+              batch.update(requestRef, { 
+                  toolIds: remainingToolIds,
+                  returnConditions: newReturnConditions 
+              });
           }
       }
 

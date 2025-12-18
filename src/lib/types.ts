@@ -65,6 +65,12 @@ export type CalibrationRecord = {
   timestamp: string; // ISO date string of when the record was created
 };
 
+export type InspectionResult = {
+  visual: 'ok' | 'nok';
+  funcional: 'ok' | 'nok';
+  observacao: string;
+};
+
 export type ToolRequest = {
   id?: string;
   osNumber: string;
@@ -77,6 +83,7 @@ export type ToolRequest = {
   handledBy?: string; // UID of ferramentaria user
   handledAt?: string; // ISO date string
   returnedAt?: string; // ISO date string
+  returnConditions?: Record<string, InspectionResult>; // toolId -> inspection data
 };
 
 export type Permissions = {

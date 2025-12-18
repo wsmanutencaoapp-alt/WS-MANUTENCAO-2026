@@ -2,7 +2,7 @@
 import { forwardRef, useImperativeHandle, useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import type { Tool, ToolRequest } from '@/lib/types';
+import type { Tool, ToolRequest, InspectionResult } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -20,11 +20,13 @@ import {
     CardDescription,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, Inbox, Search } from 'lucide-react';
+import { Loader2, AlertCircle, Inbox, Search, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 export interface ToolMovementHistoryTableRef {
   refetchHistory: () => void;
@@ -52,6 +54,7 @@ type ExpandedHistoryItem = {
   toolImage?: string;
   handledAt?: string;
   returnedAt?: string;
+  returnCondition?: InspectionResult;
 };
 
 
@@ -87,7 +90,11 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
     const historyItems: ExpandedHistoryItem[] = [];
 
     for (const request of requests) {
-        for (const toolId of request.toolIds) {
+        // For completed requests, we check the returnConditions map.
+        // The toolIds array might be empty if all tools were returned from a partial loan.
+        const returnedToolIds = request.returnConditions ? Object.keys(request.returnConditions) : request.toolIds;
+
+        for (const toolId of returnedToolIds) {
             const tool = toolsMap.get(toolId);
             historyItems.push({
                 requestId: request.docId,
@@ -100,6 +107,7 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
                 toolImage: tool?.imageUrl,
                 handledAt: request.handledAt,
                 returnedAt: request.returnedAt,
+                returnCondition: request.returnConditions?.[toolId],
             });
         }
     }
@@ -162,49 +170,73 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
                     <TableHead>Solicitante</TableHead>
                     <TableHead>Data Saída</TableHead>
                     <TableHead>Data Retorno</TableHead>
+                    <TableHead>Condição Devolução</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center">
+                      <TableCell colSpan={7} className="text-center">
                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                       </TableCell>
                     </TableRow>
                   )}
                   {error && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-destructive">
+                      <TableCell colSpan={7} className="text-center text-destructive">
                          <AlertCircle className="inline-block mr-2" /> Erro ao carregar histórico.
                       </TableCell>
                     </TableRow>
                   )}
                   {!isLoading && filteredHistory.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center h-24">
+                      <TableCell colSpan={7} className="text-center h-24">
                         <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                         <p className="text-muted-foreground">Nenhum histórico de movimentação encontrado.</p>
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && filteredHistory.map((item, index) => (
-                    <TableRow key={`${item.requestId}-${item.toolId}-${index}`}>
-                      <TableCell className="font-mono">{item.osNumber}</TableCell>
-                      <TableCell>
-                          <div>
-                            <p className="font-bold">{item.toolDescription}</p>
-                            <p className="font-mono text-xs text-muted-foreground">{item.toolCode}</p>
-                          </div>
-                      </TableCell>
-                      <TableCell>{item.requesterName}</TableCell>
-                      <TableCell>{item.handledAt ? format(new Date(item.handledAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
-                      <TableCell>{item.returnedAt ? format(new Date(item.returnedAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
-                      <TableCell>
-                          <Badge variant={getStatusVariant(item.status)}>{item.status}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {!isLoading && filteredHistory.map((item, index) => {
+                    const isNok = item.returnCondition?.visual === 'nok' || item.returnCondition?.funcional === 'nok';
+                    return (
+                        <TableRow key={`${item.requestId}-${item.toolId}-${index}`}>
+                        <TableCell className="font-mono">{item.osNumber}</TableCell>
+                        <TableCell>
+                            <div>
+                                <p className="font-bold">{item.toolDescription}</p>
+                                <p className="font-mono text-xs text-muted-foreground">{item.toolCode}</p>
+                            </div>
+                        </TableCell>
+                        <TableCell>{item.requesterName}</TableCell>
+                        <TableCell>{item.handledAt ? format(new Date(item.handledAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                        <TableCell>{item.returnedAt ? format(new Date(item.returnedAt), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                        <TableCell>
+                            {item.returnCondition ? (
+                                isNok ? (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Badge variant="destructive" className="cursor-help">
+                                                NOK <Info className="ml-1 h-3 w-3"/>
+                                            </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p className="max-w-xs">{item.returnCondition.observacao}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                ) : (
+                                    <Badge variant="success">OK</Badge>
+                                )
+                            ) : (
+                                <Badge variant="secondary">N/A</Badge>
+                            )}
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant={getStatusVariant(item.status)}>{item.status}</Badge>
+                        </TableCell>
+                        </TableRow>
+                    )
+                  })}
                 </TableBody>
             </Table>
         </CardContent>
