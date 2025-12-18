@@ -55,6 +55,7 @@ export function ReportGenerator() {
                   <PopoverContent className="w-auto p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <Calendar
                       mode="single"
+                      initialFocus
                       onSelect={(day) => {
                         const input = document.getElementById('startDate-input') as HTMLInputElement;
                         if (input && day) input.value = format(day, 'yyyy-MM-dd');
@@ -78,6 +79,7 @@ export function ReportGenerator() {
                   <PopoverContent className="w-auto p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                      <Calendar
                       mode="single"
+                      initialFocus
                       onSelect={(day) => {
                         const input = document.getElementById('endDate-input') as HTMLInputElement;
                         if (input && day) input.value = format(day, 'yyyy-MM-dd');

@@ -117,7 +117,7 @@ export default function CalibrationDialog({ tool, isOpen, onClose }: Calibration
                     {calibrationDate ? format(calibrationDate, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={calibrationDate} onSelect={setCalibrationDate} /></PopoverContent>
+                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={calibrationDate} onSelect={setCalibrationDate} initialFocus /></PopoverContent>
               </Popover>
             </div>
             <div>
@@ -129,7 +129,7 @@ export default function CalibrationDialog({ tool, isOpen, onClose }: Calibration
                     {newDueDate ? format(newDueDate, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={newDueDate} onSelect={setNewDueDate} /></PopoverContent>
+                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={newDueDate} onSelect={setNewDueDate} initialFocus /></PopoverContent>
               </Popover>
             </div>
           </div>
