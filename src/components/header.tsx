@@ -246,7 +246,7 @@ export function Header() {
               href="/dashboard"
               className="flex h-10 items-center gap-2 text-lg font-semibold"
             >
-              <img src="/logo.png" alt="APP WS Logo" className="h-8 w-auto" />
+              <img src="/logo.png" alt="APP WS Logo" className="h-10 w-auto" />
               <span className="sr-only">APP WS</span>
             </Link>
             <NavMenu items={navItems} pathname={pathname} isMobile={true} />
