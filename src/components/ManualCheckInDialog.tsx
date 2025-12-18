@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,6 +21,16 @@ import { Loader2, Search, Undo2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { Textarea } from './ui/textarea';
+import { Separator } from './ui/separator';
+
+type InspectionStatus = 'ok' | 'nok';
+interface InspectionState {
+  visual: InspectionStatus | null;
+  funcional: InspectionStatus | null;
+  observacao: string;
+}
 
 interface ManualCheckInDialogProps {
   isOpen: boolean;
@@ -35,8 +45,25 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
   const queryClient = useQueryClient();
 
   const [selectedToolIds, setSelectedToolIds] = useState<Set<string>>(new Set());
+  const [inspectionData, setInspectionData] = useState<Record<string, InspectionState>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  
+  useEffect(() => {
+    // Quando a seleção de ferramentas muda, inicializa o estado de inspeção para os novos itens.
+    const newInspectionData = { ...inspectionData };
+    let needsUpdate = false;
+    selectedToolIds.forEach(id => {
+      if (!newInspectionData[id]) {
+        newInspectionData[id] = { visual: null, funcional: null, observacao: '' };
+        needsUpdate = true;
+      }
+    });
+    if (needsUpdate) {
+      setInspectionData(newInspectionData);
+    }
+  }, [selectedToolIds]);
+
 
   const filteredTools = useMemo(() => {
     if (!allLoanedTools) return [];
@@ -54,6 +81,10 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
       const newSet = new Set(prev);
       if (newSet.has(toolId)) {
         newSet.delete(toolId);
+        // Também remove os dados de inspeção ao desmarcar
+        const newInspectionData = { ...inspectionData };
+        delete newInspectionData[toolId];
+        setInspectionData(newInspectionData);
       } else {
         newSet.add(toolId);
       }
@@ -61,20 +92,50 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
     });
   };
 
+  const handleInspectionChange = (toolId: string, type: 'visual' | 'funcional', value: InspectionStatus) => {
+    setInspectionData(prev => ({
+      ...prev,
+      [toolId]: { ...prev[toolId], [type]: value },
+    }));
+  };
+   const handleObservacaoChange = (toolId: string, value: string) => {
+    setInspectionData(prev => ({
+      ...prev,
+      [toolId]: { ...prev[toolId], observacao: value },
+    }));
+  };
+
   const resetAndClose = () => {
     setSelectedToolIds(new Set());
+    setInspectionData({});
     setSearchTerm('');
     setIsSaving(false);
     onClose();
   };
+
+  const isReturnDisabled = useMemo(() => {
+    if (isSaving || selectedToolIds.size === 0) return true;
+    // Verifica se todos os checklists estão preenchidos para as ferramentas selecionadas
+    for (const toolId of selectedToolIds) {
+      const inspection = inspectionData[toolId];
+      if (!inspection || !inspection.visual || !inspection.funcional) {
+        return true; // Desabilita se algum checklist não foi preenchido
+      }
+      // Se houver NOK, a observação é obrigatória
+      if ((inspection.visual === 'nok' || inspection.funcional === 'nok') && !inspection.observacao) {
+        return true;
+      }
+    }
+    return false;
+  }, [isSaving, selectedToolIds, inspectionData]);
 
   const handleReturn = async () => {
     if (!firestore) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Serviço indisponível.' });
       return;
     }
-    if (selectedToolIds.size === 0) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Selecione pelo menos uma ferramenta para devolver.' });
+    if (isReturnDisabled) {
+      toast({ variant: 'destructive', title: 'Ação Bloqueada', description: 'Preencha todos os checklists e observações (se houver NOK) antes de continuar.' });
       return;
     }
 
@@ -83,39 +144,63 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
       const batch = writeBatch(firestore);
       const toolIdsArray = Array.from(selectedToolIds);
 
-      // Find the active request for these tools
+      // Find active requests for these tools
       const requestsRef = collection(firestore, 'tool_requests');
       const q = query(
         requestsRef,
         where('toolIds', 'array-contains-any', toolIdsArray),
-        where('status', '==', 'Em Uso'),
-        limit(1) // Assuming one tool is only in one active request
+        where('status', '==', 'Em Uso')
       );
-
       const requestSnapshot = await getDocs(q);
-      
-      if (requestSnapshot.empty) {
-          throw new Error("Não foi possível encontrar a requisição de empréstimo ativa para as ferramentas selecionadas.");
-      }
-      
-      const requestDoc = requestSnapshot.docs[0];
-      const requestRef = doc(firestore, 'tool_requests', requestDoc.id);
 
-      // Update the request status
-      batch.update(requestRef, {
-        status: 'Devolvida',
-        returnedAt: new Date().toISOString(),
+      // We might have multiple requests if tools from different loans are returned together.
+      const requestUpdates: Map<string, { returnedTools: string[], allTools: string[] }> = new Map();
+
+      toolIdsArray.forEach(toolId => {
+        const reqDoc = requestSnapshot.docs.find(doc => (doc.data() as ToolRequest).toolIds.includes(toolId));
+        if (reqDoc) {
+            if (!requestUpdates.has(reqDoc.id)) {
+                requestUpdates.set(reqDoc.id, { returnedTools: [], allTools: (reqDoc.data() as ToolRequest).toolIds });
+            }
+            requestUpdates.get(reqDoc.id)!.returnedTools.push(toolId);
+        }
       });
+      
+      // Update requests and tools
+      for(const [reqId, update] of requestUpdates.entries()) {
+          const allToolsReturned = update.returnedTools.length === update.allTools.length;
+          const requestRef = doc(firestore, 'tool_requests', reqId);
+          if (allToolsReturned) {
+              batch.update(requestRef, { status: 'Devolvida', returnedAt: new Date().toISOString() });
+          } else {
+              // Partial return: remove returned tools from the request's list
+              const remainingToolIds = update.allTools.filter(id => !update.returnedTools.includes(id));
+              batch.update(requestRef, { toolIds: remainingToolIds });
+          }
+      }
 
-      // Update tools status
+      // Update tools status based on inspection
       for (const toolId of toolIdsArray) {
         const toolRef = doc(firestore, 'tools', toolId);
-        batch.update(toolRef, { status: 'Disponível' });
+        const inspection = inspectionData[toolId];
+        const isNonConforming = inspection.visual === 'nok' || inspection.funcional === 'nok';
+        
+        if (isNonConforming) {
+          batch.update(toolRef, { 
+            status: 'Em Manutenção',
+            observacao: inspection.observacao
+          });
+        } else {
+          batch.update(toolRef, { 
+            status: 'Disponível',
+            observacao: '' // Clear observation if OK
+          });
+        }
       }
 
       await batch.commit();
 
-      toast({ title: 'Sucesso', description: `${toolIdsArray.length} ferramenta(s) devolvida(s).` });
+      toast({ title: 'Sucesso', description: `${toolIdsArray.length} ferramenta(s) processada(s) na devolução.` });
       
       // Invalidate queries to refetch data across the app
       queryClient.invalidateQueries({ queryKey: ['tool_requests_active'] });
@@ -123,6 +208,7 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
       queryClient.invalidateQueries({ queryKey: ['loanedTools'] });
       queryClient.invalidateQueries({ queryKey: ['availableTools'] });
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
+      queryClient.invalidateQueries({ queryKey: ['nonConformingTools'] });
 
       onActionSuccess();
       resetAndClose();
@@ -136,66 +222,116 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
 
   return (
     <Dialog open={isOpen} onOpenChange={resetAndClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Registrar Entrada (Devolução)</DialogTitle>
+          <DialogTitle>Registrar Entrada (Devolução e Inspeção)</DialogTitle>
           <DialogDescription>
-            Selecione as ferramentas que estão sendo devolvidas ao estoque.
+            Selecione as ferramentas e realize o checklist de conformidade.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 max-h-[70vh] flex flex-col">
-          <div className="space-y-1.5">
-            <Label htmlFor="toolSearch-checkin">Buscar Ferramenta Emprestada ({selectedToolIds.size} selecionadas)</Label>
-            <div className="relative">
-              <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="toolSearch-checkin"
-                placeholder="Pesquisar por código ou descrição..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-          </div>
-
-          <ScrollArea className="h-72 border rounded-md flex-1">
-            <div className="p-2 space-y-2">
-              {!allLoanedTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
-              {allLoanedTools && allLoanedTools.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma ferramenta emprestada no momento.</p>}
-              {filteredTools && filteredTools.map(tool => (
-                <div 
-                  key={tool.docId}
-                  className="flex items-center gap-4 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                  onClick={() => handleToolSelect(tool.docId)}
-                >
-                  <Checkbox
-                    checked={selectedToolIds.has(tool.docId)}
-                    onCheckedChange={() => handleToolSelect(tool.docId)}
-                    aria-label={`Selecionar ${tool.descricao}`}
-                  />
-                  <Image
-                    src={tool.imageUrl || "https://picsum.photos/seed/tool/64/64"}
-                    alt={tool.descricao || 'Ferramenta'}
-                    width={40}
-                    height={40}
-                    className="aspect-square rounded-md object-cover"
-                  />
-                  <div className="flex-1 text-sm">
-                    <p className="font-bold">{tool.descricao}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{tool.codigo}</p>
-                  </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[70vh]">
+          {/* Coluna da Esquerda: Lista de Ferramentas */}
+          <div className="flex flex-col gap-4">
+             <div className="space-y-1.5">
+                <Label htmlFor="toolSearch-checkin">Buscar Ferramenta Emprestada</Label>
+                <div className="relative">
+                <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    id="toolSearch-checkin"
+                    placeholder="Pesquisar por código ou descrição..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                />
                 </div>
-              ))}
             </div>
-          </ScrollArea>
+            <ScrollArea className="h-96 border rounded-md">
+                <div className="p-2 space-y-2">
+                {!allLoanedTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
+                {allLoanedTools && allLoanedTools.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma ferramenta emprestada no momento.</p>}
+                {filteredTools && filteredTools.map(tool => (
+                    <div 
+                    key={tool.docId}
+                    className="flex items-center gap-4 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer data-[state=checked]:bg-blue-100 dark:data-[state=checked]:bg-blue-900/30"
+                    data-state={selectedToolIds.has(tool.docId) ? 'checked' : 'unchecked'}
+                    onClick={() => handleToolSelect(tool.docId)}
+                    >
+                    <Checkbox
+                        checked={selectedToolIds.has(tool.docId)}
+                        onCheckedChange={() => handleToolSelect(tool.docId)}
+                        aria-label={`Selecionar ${tool.descricao}`}
+                    />
+                    <Image
+                        src={tool.imageUrl || "https://picsum.photos/seed/tool/64/64"}
+                        alt={tool.descricao || 'Ferramenta'}
+                        width={40}
+                        height={40}
+                        className="aspect-square rounded-md object-cover"
+                    />
+                    <div className="flex-1 text-sm">
+                        <p className="font-bold">{tool.descricao}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{tool.codigo}</p>
+                    </div>
+                    </div>
+                ))}
+                </div>
+            </ScrollArea>
+          </div>
+          
+          {/* Coluna da Direita: Checklist */}
+          <div className="flex flex-col gap-4">
+            <Label>Checklist de Conformidade ({selectedToolIds.size} selecionadas)</Label>
+            <ScrollArea className="h-96 border rounded-md">
+              <div className="p-4 space-y-4">
+                {selectedToolIds.size === 0 && (
+                  <p className="p-4 text-center text-sm text-muted-foreground">Selecione uma ou mais ferramentas para inspecionar.</p>
+                )}
+                {Array.from(selectedToolIds).map((toolId, index) => {
+                  const tool = allLoanedTools.find(t => t.docId === toolId);
+                  const inspection = inspectionData[toolId];
+                  const showObservation = inspection?.visual === 'nok' || inspection?.funcional === 'nok';
+                  if (!tool || !inspection) return null;
+
+                  return (
+                    <div key={toolId}>
+                      <div className="font-semibold text-sm mb-2">{tool.codigo} - {tool.descricao}</div>
+                      <div className="grid grid-cols-2 gap-4 mb-2">
+                        <div>
+                          <Label className="text-xs">Aspecto Visual</Label>
+                          <RadioGroup value={inspection.visual || ''} onValueChange={(value) => handleInspectionChange(toolId, 'visual', value as InspectionStatus)} className="flex gap-4 mt-1">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="ok" id={`${toolId}-v-ok`} /><Label htmlFor={`${toolId}-v-ok`} className="text-xs">OK</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="nok" id={`${toolId}-v-nok`} /><Label htmlFor={`${toolId}-v-nok`} className="text-xs">NOK</Label></div>
+                          </RadioGroup>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Aspecto Funcional</Label>
+                           <RadioGroup value={inspection.funcional || ''} onValueChange={(value) => handleInspectionChange(toolId, 'funcional', value as InspectionStatus)} className="flex gap-4 mt-1">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="ok" id={`${toolId}-f-ok`} /><Label htmlFor={`${toolId}-f-ok`} className="text-xs">OK</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="nok" id={`${toolId}-f-nok`} /><Label htmlFor={`${toolId}-f-nok`} className="text-xs">NOK</Label></div>
+                          </RadioGroup>
+                        </div>
+                      </div>
+                      {showObservation && (
+                        <div className="space-y-1 animate-in fade-in-50">
+                          <Label htmlFor={`${toolId}-obs`} className="text-xs">Observação (Obrigatório para NOK) <span className="text-destructive">*</span></Label>
+                          <Textarea id={`${toolId}-obs`} value={inspection.observacao} onChange={(e) => handleObservacaoChange(toolId, e.target.value)} placeholder="Descreva a avaria encontrada..." />
+                        </div>
+                      )}
+                      {index < selectedToolIds.size - 1 && <Separator className="mt-4" />}
+                    </div>
+                  )
+                })}
+              </div>
+            </ScrollArea>
+          </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={resetAndClose} disabled={isSaving}>
             Cancelar
           </Button>
-          <Button onClick={handleReturn} disabled={isSaving || selectedToolIds.size === 0}>
+          <Button onClick={handleReturn} disabled={isReturnDisabled}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
             Confirmar Devolução
           </Button>

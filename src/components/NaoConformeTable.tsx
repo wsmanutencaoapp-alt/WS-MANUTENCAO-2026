@@ -30,6 +30,7 @@ type NonConformingTool = WithDocId<Tool>;
 
 const statusVariantMap: { [key: string]: 'default' | 'destructive' | 'secondary' } = {
     'Em Manutenção': 'default',
+    'Com Avaria': 'default',
     'Em Conserto': 'default',
     'Inoperante': 'destructive',
     'Bloqueado': 'destructive',
@@ -47,7 +48,8 @@ const NaoConformeTable = () => {
         'Inoperante',
         'Bloqueado',
         'Vencido',
-        'Refugo'
+        'Refugo',
+        'Com Avaria',
     ];
 
     const toolsQuery = useMemoFirebase(

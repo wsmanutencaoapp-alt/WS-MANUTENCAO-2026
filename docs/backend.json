@@ -146,7 +146,8 @@
             "Pendente",
             "Em Kit",
             "Em Conserto",
-            "Refugo"
+            "Refugo",
+            "Com Avaria"
           ]
         },
         "status_inicial": {
