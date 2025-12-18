@@ -1,0 +1,697 @@
+{
+  "entities": {
+    "Supply": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Supply",
+      "type": "object",
+      "description": "Represents an aircraft maintenance supply item.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Supply entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the supply item."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the supply item."
+        },
+        "quantityOnHand": {
+          "type": "number",
+          "description": "The number of supply items currently in stock."
+        },
+        "reorderPoint": {
+          "type": "number",
+          "description": "The quantity at which a reorder should be triggered."
+        },
+        "unitCost": {
+          "type": "number",
+          "description": "The cost of a single unit of the supply item."
+        },
+        "supplierId": {
+          "type": "string",
+          "description": "Reference to Supplier. (Relationship: Supplier 1:N Supply)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "quantityOnHand",
+        "reorderPoint",
+        "unitCost",
+        "supplierId"
+      ]
+    },
+    "Tool": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Tool",
+      "type": "object",
+      "description": "Represents a tool used in aircraft maintenance with intelligent taxonomy.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Tool entity (document ID)."
+        },
+        "codigo": {
+          "type": "string",
+          "description": "The full intelligent code (e.g., STD-MEC-N-0001)."
+        },
+        "tipo": {
+          "type": "string",
+          "description": "Defines origin and documentation requirements.",
+          "enum": [
+            "STD",
+            "ESP",
+            "GSE",
+            "EQV"
+          ]
+        },
+        "familia": {
+          "type": "string",
+          "description": "Defines the functional grouping.",
+          "enum": [
+            "MEC",
+            "TRQ",
+            "PRE",
+            "ELE",
+            "RIG",
+            "MET",
+            "SEG"
+          ]
+        },
+        "classificacao": {
+          "type": "string",
+          "description": "Defines the control and locking rule.",
+          "enum": [
+            "N",
+            "C",
+            "L",
+            "V"
+          ]
+        },
+        "sequencial": {
+          "type": "number",
+          "description": "The 4-digit sequential number."
+        },
+        "descricao": {
+          "type": "string",
+          "description": "Detailed description of the tool."
+        },
+        "marca": {
+          "type": "string",
+          "description": "The brand or manufacturer of the tool."
+        },
+        "enderecamento": {
+          "type": "string",
+          "description": "The storage location of the tool."
+        },
+        "pn_fabricante": {
+          "type": "string",
+          "description": "Manufacturer's Part Number (OEM for ESP, Plaque for GSE)."
+        },
+        "pn_referencia": {
+          "type": "string",
+          "description": "Reference P/N for equivalent tools (which part it replaces)."
+        },
+        "aeronave_aplicavel": {
+          "type": "string",
+          "description": "The applicable aircraft for the tool."
+        },
+        "doc_engenharia_url": {
+          "type": "string",
+          "description": "URL for the engineering document (mandatory for EQV)."
+        },
+        "doc_seguranca_url": {
+          "type": "string",
+          "description": "URL for the safety document (e.g., manual, APR)."
+        },
+        "patrimonio": {
+          "type": "string",
+          "description": "Asset number, defined by accounting."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the tool (e.g., Ativo, Pendente, Bloqueado).",
+          "enum": [
+            "Disponível",
+            "Em Empréstimo",
+            "Em Aferição",
+            "Em Manutenção",
+            "Vencido",
+            "Bloqueado",
+            "Inoperante",
+            "Pendente",
+            "Em Kit"
+          ]
+        },
+        "status_inicial": {
+          "type": "string",
+          "description": "The initial status when created, especially for ALT type."
+        },
+        "data_vencimento": {
+          "type": "string",
+          "format": "date",
+          "description": "Due date for Calibration, Load Test, or Expiration."
+        },
+        "data_referencia": {
+          "type": "string",
+          "format": "date",
+          "description": "Reference date (last calibration, last test, manufacturing date)."
+        },
+        "documento_anexo_url": {
+          "type": "string",
+          "description": "URL for the attached document (certificate, report)."
+        },
+        "label_url": {
+          "type": "string",
+          "description": "URL of the generated tool label image.",
+          "format": "uri"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the tool's photo.",
+          "format": "uri"
+        },
+        "natureza_item": {
+            "type": "string",
+            "description": "The accounting nature of the item (e.g., 'Ativo Imobilizado', 'Consumo')."
+        },
+        "classificacao_contabil": {
+            "type": "string",
+            "description": "The specific accounting classification or account number."
+        },
+        "valor_estimado": {
+            "type": "number",
+            "description": "The estimated financial value of the tool."
+        }
+      },
+      "required": [
+        "codigo",
+        "tipo",
+        "familia",
+        "classificacao",
+        "sequencial",
+        "descricao",
+        "status"
+      ]
+    },
+    "Supplier": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Supplier",
+      "type": "object",
+      "description": "Represents a supplier of aircraft maintenance supplies.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Supplier entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the supplier."
+        },
+        "contactEmail": {
+          "type": "string",
+          "description": "Email address of the supplier's contact person.",
+          "format": "email"
+        },
+        "contactPhone": {
+          "type": "string",
+          "description": "Phone number of the supplier's contact person."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "contactEmail",
+        "contactPhone"
+      ]
+    },
+    "OperationRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "OperationRecord",
+      "type": "object",
+      "description": "Represents a record of an operation performed within the system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the OperationRecord entity."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the operation was performed.",
+          "format": "date-time"
+        },
+        "operationType": {
+          "type": "string",
+          "description": "Type of operation performed (e.g., 'Supply Reorder', 'Tool Calibration')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the operation."
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "Reference to Employee who performed the operation. (Relationship: Employee 1:N OperationRecord)"
+        }
+      },
+      "required": [
+        "id",
+        "timestamp",
+        "operationType",
+        "description",
+        "employeeId"
+      ]
+    },
+    "Image": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Image",
+      "type": "object",
+      "description": "Represents an image stored within the system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Image entity."
+        },
+        "filename": {
+          "type": "string",
+          "description": "Name of the image file."
+        },
+        "url": {
+          "type": "string",
+          "description": "URL where the image is stored.",
+          "format": "uri"
+        },
+        "uploadTimestamp": {
+          "type": "string",
+          "description": "Timestamp of when the image was uploaded.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "filename",
+        "url",
+        "uploadTimestamp"
+      ]
+    },
+    "Employee": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Employee",
+      "type": "object",
+      "description": "Represents an employee in the system.",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Unique sequential identifier for the Employee entity."
+        },
+        "uid": {
+          "type": "string",
+          "description": "Firebase Authentication user unique identifier."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the employee."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the employee."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the employee.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the employee."
+        },
+        "accessLevel": {
+          "type": "string",
+          "description": "The access level of the employee (e.g., 'Admin', 'Técnico')."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "URL of the employee's profile picture.",
+          "format": "uri"
+        },
+        "permissions": {
+          "type": "object",
+          "description": "A map of screen names to booleans indicating access rights.",
+          "properties": {
+            "ferramentaria": {
+              "type": "boolean"
+            },
+            "suprimentos": {
+              "type": "boolean"
+            },
+            "compras": {
+              "type": "boolean"
+            },
+            "financeiro": {
+              "type": "boolean"
+            },
+            "configurador": {
+              "type": "boolean"
+            },
+            "userManagement": {
+              "type": "boolean"
+            },
+            "engenharia": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "uid",
+        "firstName",
+        "lastName",
+        "email",
+        "accessLevel"
+      ]
+    },
+    "Despesa": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Despesa",
+      "type": "object",
+      "description": "Represents a financial expense record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Expense entity."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the expense."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary value of the expense."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date the expense occurred.",
+          "format": "date-time"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the expense.",
+          "enum": [
+            "Suprimentos",
+            "Manutenção",
+            "Administrativo",
+            "Outros"
+          ]
+        },
+        "paymentProofUrl": {
+          "type": "string",
+          "description": "URL of the uploaded payment proof.",
+          "format": "uri"
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "Reference to Employee who registered the expense."
+        },
+        "employeeName": {
+          "type": "string",
+          "description": "Name of the employee who registered the expense for display purposes."
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "amount",
+        "date",
+        "category",
+        "paymentProofUrl",
+        "employeeId",
+        "employeeName"
+      ]
+    },
+    "CalibrationRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CalibrationRecord",
+      "type": "object",
+      "description": "Represents a historical record of a single tool calibration event.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the calibration record."
+        },
+        "toolId": {
+          "type": "string",
+          "description": "The ID of the tool that was calibrated."
+        },
+        "calibrationDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The date the calibration was performed."
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The date the next calibration is due."
+        },
+        "certificateUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the calibration certificate."
+        },
+        "calibratedBy": {
+          "type": "string",
+          "description": "Name of the employee or external company that performed the calibration."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when this record was created in the system."
+        }
+      },
+      "required": [
+        "toolId",
+        "calibrationDate",
+        "dueDate",
+        "certificateUrl",
+        "calibratedBy",
+        "timestamp"
+      ]
+    },
+    "Kit": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Kit",
+      "type": "object",
+      "description": "Represents a kit or toolbox containing a collection of tools, treated as a single inventory item.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Kit entity (document ID)."
+        },
+        "codigo": {
+          "type": "string",
+          "description": "Unique code for the kit (e.g., KIT-0001)."
+        },
+        "descricao": {
+          "type": "string",
+          "description": "A description of the kit and its purpose."
+        },
+        "toolIds": {
+          "type": "array",
+          "description": "An array of document IDs of the tools included in this kit.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the kit was created."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the kit (e.g., Disponível, Em Empréstimo).",
+          "enum": ["Disponível", "Em Empréstimo"]
+        },
+        "enderecamento": {
+          "type": "string",
+          "description": "The storage location of the kit."
+        },
+        "imageUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "A generic image URL for the kit."
+        }
+      },
+      "required": [
+        "codigo",
+        "descricao",
+        "toolIds",
+        "createdAt",
+        "status",
+        "enderecamento"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/supplies/{supplyId}",
+        "definition": {
+          "entityName": "Supply",
+          "schema": {
+            "$ref": "#/backend/entities/Supply"
+          },
+          "description": "Stores aircraft maintenance supplies.  Includes supplierId for associating supplies with suppliers.",
+          "params": [
+            {
+              "name": "supplyId",
+              "description": "Unique identifier for the supply item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tools/{toolId}",
+        "definition": {
+          "entityName": "Tool",
+          "schema": {
+            "$ref": "#/backend/entities/Tool"
+          },
+          "description": "Stores aircraft maintenance tools and their calibration details based on intelligent taxonomy.",
+          "params": [
+            {
+              "name": "toolId",
+              "description": "Unique identifier for the tool."
+            }
+          ]
+        }
+      },
+       {
+        "path": "/kits/{kitId}",
+        "definition": {
+          "entityName": "Kit",
+          "schema": {
+            "$ref": "#/backend/entities/Kit"
+          },
+          "description": "Stores tool kits, each containing references to multiple tools.",
+          "params": [
+            {
+              "name": "kitId",
+              "description": "Unique identifier for the tool kit."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tools/{toolId}/calibration_history/{calibrationId}",
+        "definition": {
+          "entityName": "CalibrationRecord",
+          "schema": {
+            "$ref": "#/backend/entities/CalibrationRecord"
+          },
+          "description": "Stores the historical records of all calibrations for a specific tool, ensuring traceability.",
+          "params": [
+            {
+              "name": "toolId",
+              "description": "The ID of the parent tool."
+            },
+            {
+              "name": "calibrationId",
+              "description": "Unique identifier for the calibration record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/suppliers/{supplierId}",
+        "definition": {
+          "entityName": "Supplier",
+          "schema": {
+            "$ref": "#/backend/entities/Supplier"
+          },
+          "description": "Stores information about suppliers of aircraft maintenance supplies.",
+          "params": [
+            {
+              "name": "supplierId",
+              "description": "Unique identifier for the supplier."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/operation_records/{operationRecordId}",
+        "definition": {
+          "entityName": "OperationRecord",
+          "schema": {
+            "$ref": "#/backend/entities/OperationRecord"
+          },
+          "description": "Stores records of operations performed in the system. Includes employeeId to track which employee performed the operation.",
+          "params": [
+            {
+              "name": "operationRecordId",
+              "description": "Unique identifier for the operation record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/images/{imageId}",
+        "definition": {
+          "entityName": "Image",
+          "schema": {
+            "$ref": "#/backend/entities/Image"
+          },
+          "description": "Stores images used within the system.",
+          "params": [
+            {
+              "name": "imageId",
+              "description": "Unique identifier for the image."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/employees/{employeeId}",
+        "definition": {
+          "entityName": "Employee",
+          "schema": {
+            "$ref": "#/backend/entities/Employee"
+          },
+          "description": "Stores employee information.",
+          "params": [
+            {
+              "name": "employeeId",
+              "description": "Unique identifier for the employee."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/expenses/{expenseId}",
+        "definition": {
+          "entityName": "Despesa",
+          "schema": {
+            "$ref": "#/backend/entities/Despesa"
+          },
+          "description": "Stores financial expense records.",
+          "params": [
+            {
+              "name": "expenseId",
+              "description": "Unique identifier for the expense record."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This Firestore data structure is designed to support AeroTrack's aircraft maintenance management features, focusing on supply and tool control, operation recording, and image storage. The structure prioritizes authorization independence through denormalization where needed and adheres to structural segregation principles to ensure consistent security postures within collections.  Path-based ownership is used for user-related data (none explicitly defined, but included for future expansion). Collaborative data patterns, utilizing membership maps, are employed where applicable. \n\nSpecifically, authorization independence is achieved by denormalizing necessary authorization data (like supplier or employee IDs) directly into subcollections when access needs to be controlled at the subcollection level without relying on `get()` calls to parent documents.  For example, the OperationRecord collection includes the employeeId to track which employee performed the operation and use it for authorization.  This denormalization is critical for atomic operations and simplifies security rule implementation. QAPs (Rules are not Filters) are supported through structural segregation. Each top-level collection is treated as having homogeneous security requirements. Additionally, the use of employeeId as a foreign key in relevant collections like OperationRecord allows for efficient querying and filtering based on employee-specific operations. This design facilitates secure list operations because rules can be written based on the contents of the document itself, not on related documents."
+  }
+}

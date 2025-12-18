@@ -44,6 +44,11 @@ export type Kit = {
   descricao: string;
   toolIds: string[];
   createdAt: string;
+  enderecamento: string;
+  status: 'Disponível' | 'Em Empréstimo';
+  // Kits não têm os mesmos campos que ferramentas, mas adicionamos os necessários para a lista
+  tipo: 'KIT'; 
+  imageUrl?: string;
 };
 
 export type CalibrationRecord = {

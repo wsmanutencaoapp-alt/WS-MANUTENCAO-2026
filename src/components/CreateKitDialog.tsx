@@ -41,25 +41,33 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
   const { toast } = useToast();
   
   const [kitDescription, setKitDescription] = useState('');
+  const [kitEnderecamento, setKitEnderecamento] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedToolIds, setSelectedToolIds] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
 
+  // This query correctly gets all tools that could POTENTIALLY be in a kit.
   const availableToolsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Disponível')) : null),
     [firestore]
   );
 
-  const { data: availableTools, isLoading } = useCollection<WithDocId<Tool>>(availableToolsQuery);
+  const { data: allAvailableTools, isLoading } = useCollection<WithDocId<Tool>>(availableToolsQuery);
+
+  // We add another client-side filter to remove the logic templates.
+  const toolsForKit = useMemo(() => {
+    return allAvailableTools?.filter(tool => tool.enderecamento !== 'LOGICA') || [];
+  }, [allAvailableTools]);
+
 
   const filteredTools = useMemo(() => {
-    if (!availableTools) return [];
-    if (!searchTerm) return availableTools;
+    if (!toolsForKit) return [];
+    if (!searchTerm) return toolsForKit;
     const lowercasedTerm = searchTerm.toLowerCase();
-    return availableTools.filter(
+    return toolsForKit.filter(
       tool => tool.descricao.toLowerCase().includes(lowercasedTerm) || tool.codigo.toLowerCase().includes(lowercasedTerm)
     );
-  }, [availableTools, searchTerm]);
+  }, [toolsForKit, searchTerm]);
   
   const handleToolSelect = (toolId: string) => {
     setSelectedToolIds(prev => {
@@ -75,6 +83,7 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
 
   const resetState = () => {
     setKitDescription('');
+    setKitEnderecamento('');
     setSearchTerm('');
     setSelectedToolIds(new Set());
     setIsSaving(false);
@@ -93,6 +102,10 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
     if (!kitDescription) {
       toast({ variant: 'destructive', title: 'Erro', description: 'A descrição do kit é obrigatória.' });
       return;
+    }
+    if (!kitEnderecamento) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'O endereçamento do kit é obrigatório.' });
+        return;
     }
     if (selectedToolIds.size === 0) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Selecione pelo menos uma ferramenta.' });
@@ -123,8 +136,11 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
       batch.set(kitRef, {
         codigo: kitCode,
         descricao: kitDescription,
+        enderecamento: kitEnderecamento,
         toolIds: Array.from(selectedToolIds),
         createdAt: new Date().toISOString(),
+        status: 'Disponível',
+        imageUrl: "https://picsum.photos/seed/kit/400/400", // Generic kit image
       });
 
       selectedToolIds.forEach(toolId => {
@@ -160,20 +176,31 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
         <DialogHeader>
           <DialogTitle>Criar Novo Kit de Ferramentas</DialogTitle>
           <DialogDescription>
-            Agrupe ferramentas disponíveis para criar um kit.
+            Agrupe ferramentas disponíveis para criar um kit. O kit será exibido como um item único no inventário.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4 max-h-[70vh] flex flex-col">
-           <div className="space-y-1.5">
-              <Label htmlFor="kitDescription">Descrição do Kit</Label>
-              <Input
-                id="kitDescription"
-                placeholder="Ex: Kit de Manutenção Aviônica para Boeing 737"
-                value={kitDescription}
-                onChange={(e) => setKitDescription(e.target.value)}
-              />
-          </div>
+           <div className="grid grid-cols-2 gap-4">
+             <div className="space-y-1.5">
+                <Label htmlFor="kitDescription">Descrição do Kit</Label>
+                <Input
+                  id="kitDescription"
+                  placeholder="Ex: Kit de Manutenção Aviônica"
+                  value={kitDescription}
+                  onChange={(e) => setKitDescription(e.target.value)}
+                />
+            </div>
+             <div className="space-y-1.5">
+                <Label htmlFor="kitEnderecamento">Endereçamento do Kit</Label>
+                <Input
+                  id="kitEnderecamento"
+                  placeholder="Ex: GAV-05-C"
+                  value={kitEnderecamento}
+                  onChange={(e) => setKitEnderecamento(e.target.value)}
+                />
+            </div>
+           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="toolSearch">Selecionar Ferramentas ({selectedToolIds.size} selecionadas)</Label>

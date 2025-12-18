@@ -20,10 +20,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare, PackagePlus } from 'lucide-react';
+import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare, PackagePlus, Box } from 'lucide-react';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
 import AddQuantityDialog from '@/components/AddQuantityDialog';
-import type { Tool } from '@/lib/types';
+import type { Tool, Kit } from '@/lib/types';
 import Image from 'next/image';
 import ToolDetailsDialog from '@/components/ToolDetailsDialog';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,11 @@ import CreateKitDialog from '@/components/CreateKitDialog';
 interface Ferramenta extends Tool {
   docId: string;
 }
+interface KitComDocId extends Kit {
+    docId: string;
+}
+type InventarioItem = (Ferramenta | KitComDocId) & { isKit?: boolean };
+
 
 const ListaFerramentasPage = () => {
   const firestore = useFirestore();
@@ -53,40 +58,59 @@ const ListaFerramentasPage = () => {
   const [selectedToolForReprint, setSelectedToolForReprint] = useState<WithDocId<Tool> | null>(null);
   
   const ferramentasQueryKey = 'ferramentas';
+  const kitsQueryKey = 'kits';
 
-  // Corrected Query: Fetch all tools and filter on the client-side.
   const ferramentasCollectionRef = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), orderBy('codigo')) : null),
     [firestore]
   );
   
-  const { data: todasAsFerramentas, isLoading, error: firestoreError } = useCollection<Ferramenta>(ferramentasCollectionRef, {
+  const { data: todasAsFerramentas, isLoading: isLoadingTools, error: firestoreError } = useCollection<Ferramenta>(ferramentasCollectionRef, {
     queryKey: [ferramentasQueryKey]
   });
-  
-  // Filter out logic templates on the client-side
-  const ferramentasVisiveis = useMemo(() => {
-    return todasAsFerramentas?.filter(ferramenta => ferramenta.enderecamento !== 'LOGICA') || [];
-  }, [todasAsFerramentas]);
 
-  const filteredFerramentas = useMemo(() => {
-    if (!ferramentasVisiveis) return [];
-    if (!searchTerm) return ferramentasVisiveis;
+  const kitsCollectionRef = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'kits'), orderBy('codigo')) : null),
+    [firestore]
+  );
+  
+  const { data: todosOsKits, isLoading: isLoadingKits, error: kitsError } = useCollection<KitComDocId>(kitsCollectionRef, {
+    queryKey: [kitsQueryKey]
+  });
+  
+  const inventarioVisivel = useMemo(() => {
+    const ferramentas = todasAsFerramentas?.filter(ferramenta => ferramenta.enderecamento !== 'LOGICA') || [];
+    const kits = todosOsKits?.map(kit => ({ ...kit, isKit: true, tipo: 'KIT' as const })) || [];
+    return [...ferramentas, ...kits].sort((a, b) => a.codigo.localeCompare(b.codigo));
+  }, [todasAsFerramentas, todosOsKits]);
+
+  const filteredInventario = useMemo(() => {
+    if (!inventarioVisivel) return [];
+    if (!searchTerm) return inventarioVisivel;
 
     const lowercasedTerm = searchTerm.toLowerCase();
-    return ferramentasVisiveis.filter(ferramenta => 
-        (ferramenta.descricao && ferramenta.descricao.toLowerCase().includes(lowercasedTerm)) ||
-        (ferramenta.codigo && ferramenta.codigo.toLowerCase().includes(lowercasedTerm))
+    return inventarioVisivel.filter(item => 
+        (item.descricao && item.descricao.toLowerCase().includes(lowercasedTerm)) ||
+        (item.codigo && item.codigo.toLowerCase().includes(lowercasedTerm))
     );
-  }, [ferramentasVisiveis, searchTerm]);
-
-  const getDynamicStatus = (tool: Ferramenta): { status: string; variant: 'success' | 'destructive' | 'default' | 'attention' | 'warning' | 'critical' } => {
+  }, [inventarioVisivel, searchTerm]);
+  
+  const getDynamicStatus = (item: InventarioItem): { status: string; variant: 'success' | 'destructive' | 'default' | 'attention' | 'warning' | 'critical' } => {
+    
+    if (item.isKit) {
+         const statusMap: { [key: string]: 'success' | 'default' } = {
+            'Disponível': 'success',
+            'Em Empréstimo': 'default',
+        }
+        return { status: item.status, variant: statusMap[item.status] || 'default' };
+    }
+    
+    const tool = item as Ferramenta;
     
     if (tool.status === 'Em Kit') {
       return { status: 'Em Kit', variant: 'default' };
     }
 
-    // Se não for uma ferramenta controlável, retorne o status original
     if (!['C', 'L', 'V'].includes(tool.classificacao)) {
         const statusMap: { [key: string]: 'success' | 'destructive' | 'default' } = {
             'Disponível': 'success', 'Vencido': 'destructive', 'Bloqueado': 'destructive', 'Inoperante': 'destructive',
@@ -95,7 +119,6 @@ const ListaFerramentasPage = () => {
         return { status: tool.status, variant: statusMap[tool.status] || 'default' };
     }
 
-    // Lógica para ferramentas controláveis
     if (!tool.data_vencimento) {
         return { status: 'Cal. Pendente', variant: 'destructive' };
     }
@@ -109,7 +132,6 @@ const ListaFerramentasPage = () => {
         return { status: 'Vencido', variant: 'destructive' };
     }
     
-    // Se estiver disponível e não vencido, mostra o status de disponibilidade com cor de alerta
     if (tool.status === 'Disponível') {
         if (daysUntilDue <= 5) return { status: 'Disponível', variant: 'critical' };
         if (daysUntilDue <= 15) return { status: 'Disponível', variant: 'warning' };
@@ -117,7 +139,6 @@ const ListaFerramentasPage = () => {
         return { status: 'Disponível', variant: 'success' };
     }
     
-    // Para outros status (Em Empréstimo, etc.), apenas retorna o status com sua cor padrão
     return { status: tool.status, variant: 'default' };
 };
 
@@ -142,7 +163,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
   const handleKitCreationSuccess = () => {
     setIsCreateKitDialogOpen(false);
     queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
-    queryClient.invalidateQueries({ queryKey: ['kits'] });
+    queryClient.invalidateQueries({ queryKey: [kitsQueryKey] });
   };
 
   const handleReprintConfirmed = (tools: WithDocId<Tool>[]) => {
@@ -169,10 +190,13 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
     setSelectedToolForDetails(null);
   }
 
+  const isLoading = isLoadingTools || isLoadingKits;
+  const anyError = firestoreError || kitsError;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Lista de Ferramentas</h1>
+        <h1 className="text-2xl font-bold">Lista de Ferramentas e Kits</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setIsCreateKitDialogOpen(true)}>
               <PackagePlus className="mr-2 h-4 w-4" />
@@ -189,7 +213,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
         <CardHeader>
           <CardTitle>Inventário de Ferramentas</CardTitle>
           <CardDescription>
-            Pesquise e gerencie os equipamentos cadastrados no sistema.
+            Pesquise e gerencie os equipamentos e kits cadastrados no sistema.
           </CardDescription>
             <div className="relative pt-4">
                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -205,7 +229,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[64px] sm:table-cell">Foto</TableHead>
+                <TableHead className="w-[64px] sm:table-cell">Item</TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Endereçamento</TableHead>
@@ -216,51 +240,69 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={6} className="text-center">Carregando...</TableCell></TableRow>
-              ) : firestoreError ? (
-                 <TableRow><TableCell colSpan={6} className="text-center text-destructive">Erro: {firestoreError.message}</TableCell></TableRow>
-              ) : filteredFerramentas && filteredFerramentas.length > 0 ? (
-                filteredFerramentas.map((ferramenta) => {
-                  const { status, variant } = getDynamicStatus(ferramenta);
+              ) : anyError ? (
+                 <TableRow><TableCell colSpan={6} className="text-center text-destructive">Erro: {anyError.message}</TableCell></TableRow>
+              ) : filteredInventario && filteredInventario.length > 0 ? (
+                filteredInventario.map((item) => {
+                  const { status, variant } = getDynamicStatus(item);
+                  const isKit = item.isKit;
                   return (
-                    <TableRow key={ferramenta.docId} className={cn(
-                        ferramenta.tipo === 'ESP' && 'bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/50',
-                        ferramenta.tipo === 'EQV' && 'bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-100/80 dark:hover:bg-blue-900/50'
+                    <TableRow key={item.docId} className={cn(
+                        !isKit && (item as Ferramenta).tipo === 'ESP' && 'bg-yellow-100/70 dark:bg-yellow-900/30 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/50',
+                        !isKit && (item as Ferramenta).tipo === 'EQV' && 'bg-blue-100/70 dark:bg-blue-900/30 hover:bg-blue-100/80 dark:hover:bg-blue-900/50',
+                        isKit && 'bg-purple-100/70 dark:bg-purple-900/30 hover:bg-purple-100/80 dark:hover:bg-purple-900/50'
                     )}>
                       <TableCell className="hidden sm:table-cell">
-                          <button className="relative group focus:outline-none" onClick={() => setSelectedToolForDetails(ferramenta)}>
+                          <button className="relative group focus:outline-none" onClick={() => !isKit && setSelectedToolForDetails(item as Ferramenta)}>
                             <Image
-                                alt={ferramenta.descricao}
+                                alt={item.descricao}
                                 className="aspect-square rounded-md object-cover"
                                 height="64"
-                                src={ferramenta.imageUrl || "https://picsum.photos/seed/tool/64/64"}
+                                src={item.imageUrl || (isKit ? "https://picsum.photos/seed/kit/64/64" : "https://picsum.photos/seed/tool/64/64")}
                                 width="64"
                             />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity rounded-md">
-                              <ZoomIn className="h-6 w-6 text-white" />
-                            </div>
+                            {!isKit && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity rounded-md">
+                                <ZoomIn className="h-6 w-6 text-white" />
+                                </div>
+                            )}
+                            {isKit && (
+                                <div className="absolute bottom-0 right-0 p-0.5 bg-purple-600 rounded-tl-md rounded-br-md">
+                                    <Box className="h-3 w-3 text-white" />
+                                </div>
+                            )}
                           </button>
                       </TableCell>
-                      <TableCell className="font-medium">{ferramenta.codigo}</TableCell>
-                      <TableCell>{ferramenta.descricao}</TableCell>
-                      <TableCell>{ferramenta.enderecamento}</TableCell>
+                      <TableCell className="font-medium">{item.codigo}</TableCell>
+                      <TableCell>{item.descricao}</TableCell>
+                      <TableCell>{item.enderecamento}</TableCell>
                       <TableCell>
                         <Badge variant={getBadgeVariant(variant)}>
                           {status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                         <Button variant="ghost" size="icon" title="Detalhes" onClick={() => setSelectedToolForDetails(ferramenta)}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" title="Reimprimir Etiqueta" onClick={() => setSelectedToolForReprint(ferramenta)}>
-                          <Repeat2 className="h-4 w-4" />
-                        </Button>
+                         {!isKit && (
+                            <>
+                                <Button variant="ghost" size="icon" title="Detalhes" onClick={() => setSelectedToolForDetails(item as Ferramenta)}>
+                                <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" title="Reimprimir Etiqueta" onClick={() => setSelectedToolForReprint(item as WithDocId<Tool>)}>
+                                <Repeat2 className="h-4 w-4" />
+                                </Button>
+                            </>
+                         )}
+                         {isKit && (
+                              <Button variant="ghost" size="icon" title="Detalhes do Kit" onClick={() => router.push(`/dashboard/ferramentaria/kits`)}>
+                                <ZoomIn className="h-4 w-4" />
+                            </Button>
+                         )}
                       </TableCell>
                     </TableRow>
                   );
                 })
               ) : (
-                <TableRow><TableCell colSpan={6} className="text-center">Nenhuma ferramenta encontrada.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center">Nenhum item encontrado.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
