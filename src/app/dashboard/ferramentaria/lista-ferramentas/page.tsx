@@ -20,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare, PackagePlus, Box, AlertTriangle } from 'lucide-react';
+import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare, PackagePlus, Box, AlertTriangle, AlertCircle } from 'lucide-react';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
 import AddQuantityDialog from '@/components/AddQuantityDialog';
 import type { Tool, Kit } from '@/lib/types';
@@ -92,10 +92,12 @@ const ListaFerramentasPage = () => {
 
   const filteredInventario = useMemo(() => {
     if (!inventarioVisivel) return [];
-    if (!searchTerm) return inventarioVisivel;
+    const filteredByStatus = inventarioVisivel.filter(item => item.status !== 'Refugo');
+
+    if (!searchTerm) return filteredByStatus;
 
     const lowercasedTerm = searchTerm.toLowerCase();
-    return inventarioVisivel.filter(item => 
+    return filteredByStatus.filter(item => 
         (item.descricao && item.descricao.toLowerCase().includes(lowercasedTerm)) ||
         (item.codigo && item.codigo.toLowerCase().includes(lowercasedTerm))
     );
@@ -113,8 +115,8 @@ const ListaFerramentasPage = () => {
     
     const tool = item as Ferramenta;
     
-    if (tool.status === 'Em Kit') {
-      return { status: 'Em Kit', variant: 'default' };
+    if (tool.status === 'Em Kit' || tool.status === 'Liberado Condicional') {
+      return { status: tool.status, variant: 'attention' };
     }
 
     if (!['C', 'L', 'V'].includes(tool.classificacao)) {
@@ -264,8 +266,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
                       const isKit = item.isKit;
                       return (
                         <TableRow key={item.docId} className={cn(
-                            !isKit && (item as Ferramenta).tipo === 'ESP' && 'bg-yellow-100/70 dark:bg-yellow-900/30 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/50',
-                            !isKit && (item as Ferramenta).tipo === 'EQV' && 'bg-blue-100/70 dark:bg-blue-900/30 hover:bg-blue-100/80 dark:hover:bg-blue-900/50',
+                            !isKit && (item as Ferramenta).status === 'Liberado Condicional' && 'bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-100/80 dark:hover:bg-orange-900/50',
                             isKit && 'bg-purple-100/70 dark:bg-purple-900/30 hover:bg-purple-100/80 dark:hover:bg-purple-900/50'
                         )}>
                           <TableCell className="hidden sm:table-cell">
@@ -277,6 +278,11 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
                                     src={item.imageUrl || (isKit ? "https://picsum.photos/seed/kit/64/64" : "https://picsum.photos/seed/tool/64/64")}
                                     width="64"
                                 />
+                                {(item as Ferramenta).status === 'Liberado Condicional' && (
+                                    <div className="absolute top-0 right-0 p-0.5 bg-orange-500 rounded-bl-md rounded-tr-md">
+                                        <AlertCircle className="h-3 w-3 text-white" />
+                                    </div>
+                                )}
                                 {!isKit && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity rounded-md">
                                     <ZoomIn className="h-6 w-6 text-white" />

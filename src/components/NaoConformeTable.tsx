@@ -25,6 +25,8 @@ import { Loader2, Search, Tool as ToolIcon, Edit } from 'lucide-react';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import Image from 'next/image';
 import { Input } from './ui/input';
+import ManageNonConformingDialog from './ManageNonConformingDialog';
+import { useQueryClient } from '@tanstack/react-query';
 
 type NonConformingTool = WithDocId<Tool>;
 
@@ -40,7 +42,9 @@ const statusVariantMap: { [key: string]: 'default' | 'destructive' | 'secondary'
 
 const NaoConformeTable = () => {
     const firestore = useFirestore();
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedTool, setSelectedTool] = useState<NonConformingTool | null>(null);
 
     const nonConformingStatuses: Tool['status'][] = [
         'Em Manutenção',
@@ -52,6 +56,7 @@ const NaoConformeTable = () => {
         'Com Avaria',
     ];
 
+    const queryKey = ['nonConformingTools'];
     const toolsQuery = useMemoFirebase(
         () => (firestore ? query(
             collection(firestore, 'tools'),
@@ -61,13 +66,12 @@ const NaoConformeTable = () => {
     );
 
     const { data: tools, isLoading, error } = useCollection<NonConformingTool>(toolsQuery, {
-        queryKey: ['nonConformingTools']
+        queryKey,
     });
 
     const filteredTools = useMemo(() => {
         if (!tools) return [];
         
-        // Client-side sorting
         const sortedTools = [...tools].sort((a, b) => (a.codigo || '').localeCompare(b.codigo || ''));
 
         if (!searchTerm) return sortedTools;
@@ -80,89 +84,103 @@ const NaoConformeTable = () => {
         );
     }, [tools, searchTerm]);
 
+    const handleSuccess = () => {
+        queryClient.invalidateQueries({ queryKey });
+        queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
+        setSelectedTool(null);
+    }
+
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Ferramentas Não Conformes</CardTitle>
-                <CardDescription>
-                    Gerencie ferramentas que precisam de atenção, como manutenção, conserto ou descarte.
-                </CardDescription>
-                 <div className="relative pt-4">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                      placeholder="Pesquisar por código, descrição, observação..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-                  />
-                </div>
-            </CardHeader>
-            <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="hidden sm:table-cell">Foto</TableHead>
-                            <TableHead>Código</TableHead>
-                            <TableHead>Descrição</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Observação</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading && (
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Ferramentas Não Conformes</CardTitle>
+                    <CardDescription>
+                        Gerencie ferramentas que precisam de atenção, como manutenção, conserto ou descarte.
+                    </CardDescription>
+                    <div className="relative pt-4">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Pesquisar por código, descrição, observação..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                    />
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
-                                    <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                                </TableCell>
+                                <TableHead className="hidden sm:table-cell">Foto</TableHead>
+                                <TableHead>Código</TableHead>
+                                <TableHead>Descrição</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Observação</TableHead>
+                                <TableHead className="text-right">Ações</TableHead>
                             </TableRow>
-                        )}
-                        {error && (
-                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center text-destructive">
-                                    Erro ao carregar ferramentas: {error.message}
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        {!isLoading && filteredTools.length === 0 && (
-                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
-                                    Nenhuma ferramenta não conforme encontrada.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        {!isLoading && filteredTools.map((tool) => (
-                            <TableRow key={tool.docId}>
-                                <TableCell className="hidden sm:table-cell">
-                                    <Image
-                                        alt={tool.descricao}
-                                        className="aspect-square rounded-md object-cover"
-                                        height="48"
-                                        src={tool.imageUrl || 'https://picsum.photos/seed/tool/48/48'}
-                                        width="48"
-                                    />
-                                </TableCell>
-                                <TableCell className="font-mono">{tool.codigo}</TableCell>
-                                <TableCell>{tool.descricao}</TableCell>
-                                <TableCell>
-                                    <Badge variant={statusVariantMap[tool.status] || 'secondary'}>
-                                        {tool.status}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="max-w-xs truncate">{tool.observacao || 'N/A'}</TableCell>
-                                 <TableCell className="text-right">
-                                    <Button variant="outline" size="sm">
-                                        <Edit className="mr-2 h-4 w-4"/>
-                                        Gerenciar
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-24 text-center">
+                                        <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {error && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-24 text-center text-destructive">
+                                        Erro ao carregar ferramentas: {error.message}
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && filteredTools.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-24 text-center">
+                                        Nenhuma ferramenta não conforme encontrada.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && filteredTools.map((tool) => (
+                                <TableRow key={tool.docId}>
+                                    <TableCell className="hidden sm:table-cell">
+                                        <Image
+                                            alt={tool.descricao}
+                                            className="aspect-square rounded-md object-cover"
+                                            height="48"
+                                            src={tool.imageUrl || 'https://picsum.photos/seed/tool/48/48'}
+                                            width="48"
+                                        />
+                                    </TableCell>
+                                    <TableCell className="font-mono">{tool.codigo}</TableCell>
+                                    <TableCell>{tool.descricao}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={statusVariantMap[tool.status] || 'secondary'}>
+                                            {tool.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="max-w-xs truncate">{tool.observacao || 'N/A'}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Button variant="outline" size="sm" onClick={() => setSelectedTool(tool)}>
+                                            <Edit className="mr-2 h-4 w-4"/>
+                                            Gerenciar
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            <ManageNonConformingDialog
+                isOpen={!!selectedTool}
+                onClose={() => setSelectedTool(null)}
+                tool={selectedTool}
+                onSuccess={handleSuccess}
+            />
+        </>
     );
 };
 

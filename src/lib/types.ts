@@ -26,7 +26,7 @@ export type Tool = {
   doc_engenharia_url?: string;
   doc_seguranca_url?: string;
   patrimonio?: string;
-  status: 'Disponível' | 'Em Empréstimo' | 'Em Aferição' | 'Em Manutenção' | 'Vencido' | 'Bloqueado' | 'Inoperante' | 'Pendente' | 'Em Kit' | 'Em Conserto' | 'Refugo' | 'Com Avaria';
+  status: 'Disponível' | 'Em Empréstimo' | 'Em Aferição' | 'Em Manutenção' | 'Vencido' | 'Bloqueado' | 'Inoperante' | 'Pendente' | 'Em Kit' | 'Em Conserto' | 'Refugo' | 'Com Avaria' | 'Liberado Condicional';
   status_inicial?: 'Ativo' | 'Bloqueado';
   data_vencimento?: string; // date
   data_referencia?: string; // date
@@ -37,6 +37,9 @@ export type Tool = {
   classificacao_contabil?: string;
   valor_estimado?: number;
   observacao?: string;
+  observacao_condicional?: string;
+  data_descarte?: string; // ISO date string
+  motivo_descarte?: string;
 };
 
 export type Kit = {

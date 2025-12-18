@@ -147,7 +147,8 @@
             "Em Kit",
             "Em Conserto",
             "Refugo",
-            "Com Avaria"
+            "Com Avaria",
+            "Liberado Condicional"
           ]
         },
         "status_inicial": {
@@ -193,6 +194,19 @@
         "observacao": {
             "type": "string",
             "description": "Observations about the tool's condition or non-conformity."
+        },
+        "observacao_condicional": {
+            "type": "string",
+            "description": "The condition for a conditional release."
+        },
+        "data_descarte": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the tool was discarded."
+        },
+        "motivo_descarte": {
+            "type": "string",
+            "description": "The reason for discarding the tool."
         }
       },
       "required": [
