@@ -243,7 +243,7 @@ export function AppSidebar() {
       <SidebarHeader className="flex h-14 shrink-0 items-center justify-center rounded-none border-b bg-background px-4">
          <div className="flex items-center gap-2 text-lg font-semibold text-primary">
           <img src="/logo.png" alt="APP WS Logo" className={cn("h-8 w-auto transition-all", state === 'collapsed' ? 'h-8' : 'h-8' )} />
-          <span className={cn("font-bold", state === 'collapsed' && "hidden")}>APP WS</span>
+          <span className={cn("font-headline font-bold animated-shine", state === 'collapsed' && "hidden")}>APP WS</span>
           <span className="sr-only">APP WS</span>
         </div>
       </SidebarHeader>
