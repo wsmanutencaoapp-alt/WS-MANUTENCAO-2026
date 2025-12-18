@@ -26,6 +26,7 @@ import {
   CalendarCheck,
   HardHat,
   LayoutDashboard,
+  Package,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -74,6 +75,7 @@ const allNavItems: NavItem[] = [
     permission: 'ferramentaria',
     subItems: [
         { href: '/dashboard/ferramentaria/lista-ferramentas', icon: List, label: 'Lista de Ferramentas', permission: 'ferramentaria_lista' },
+        { href: '/dashboard/ferramentaria/kits', icon: Package, label: 'Kits de Ferramentas', permission: 'ferramentaria_kits' },
         { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
         { href: '/dashboard/calibracao', label: 'Controle/Calibração', permission: 'calibracao' },
     ]

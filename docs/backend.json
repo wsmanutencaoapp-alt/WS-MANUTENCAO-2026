@@ -143,7 +143,8 @@
             "Vencido",
             "Bloqueado",
             "Inoperante",
-            "Pendente"
+            "Pendente",
+            "Em Kit"
           ]
         },
         "status_inicial": {
@@ -479,6 +480,44 @@
         "calibratedBy",
         "timestamp"
       ]
+    },
+    "Kit": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Kit",
+      "type": "object",
+      "description": "Represents a kit or toolbox containing a collection of tools.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Kit entity (document ID)."
+        },
+        "codigo": {
+          "type": "string",
+          "description": "Unique code for the kit (e.g., KIT-0001)."
+        },
+        "descricao": {
+          "type": "string",
+          "description": "A description of the kit and its purpose."
+        },
+        "toolIds": {
+          "type": "array",
+          "description": "An array of document IDs of the tools included in this kit.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the kit was created."
+        }
+      },
+      "required": [
+        "codigo",
+        "descricao",
+        "toolIds",
+        "createdAt"
+      ]
     }
   },
   "auth": {
@@ -516,6 +555,22 @@
             {
               "name": "toolId",
               "description": "Unique identifier for the tool."
+            }
+          ]
+        }
+      },
+       {
+        "path": "/kits/{kitId}",
+        "definition": {
+          "entityName": "Kit",
+          "schema": {
+            "$ref": "#/backend/entities/Kit"
+          },
+          "description": "Stores tool kits, each containing references to multiple tools.",
+          "params": [
+            {
+              "name": "kitId",
+              "description": "Unique identifier for the tool kit."
             }
           ]
         }

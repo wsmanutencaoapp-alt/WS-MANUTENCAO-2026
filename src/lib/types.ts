@@ -26,7 +26,7 @@ export type Tool = {
   doc_engenharia_url?: string;
   doc_seguranca_url?: string;
   patrimonio?: string;
-  status: 'Disponível' | 'Em Empréstimo' | 'Em Aferição' | 'Em Manutenção' | 'Vencido' | 'Bloqueado' | 'Inoperante' | 'Pendente';
+  status: 'Disponível' | 'Em Empréstimo' | 'Em Aferição' | 'Em Manutenção' | 'Vencido' | 'Bloqueado' | 'Inoperante' | 'Pendente' | 'Em Kit';
   status_inicial?: 'Ativo' | 'Bloqueado';
   data_vencimento?: string; // date
   data_referencia?: string; // date
@@ -36,6 +36,14 @@ export type Tool = {
   natureza_item?: string;
   classificacao_contabil?: string;
   valor_estimado?: number;
+};
+
+export type Kit = {
+  id?: string;
+  codigo: string;
+  descricao: string;
+  toolIds: string[];
+  createdAt: string;
 };
 
 export type CalibrationRecord = {
@@ -60,6 +68,7 @@ export type Permissions = {
   suprimentos_movimentacao?: boolean;
   ferramentaria_lista?: boolean;
   ferramentaria_movimentacao?: boolean;
+  ferramentaria_kits?: boolean;
   calibracao?: boolean;
   compras_aprovacoes?: boolean;
   compras_controle?: boolean;

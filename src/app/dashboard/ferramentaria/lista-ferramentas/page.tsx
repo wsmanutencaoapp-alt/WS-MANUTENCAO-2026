@@ -20,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare } from 'lucide-react';
+import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare, PackagePlus } from 'lucide-react';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
 import AddQuantityDialog from '@/components/AddQuantityDialog';
 import type { Tool } from '@/lib/types';
@@ -32,6 +32,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import ReprintDialog from '@/components/ReprintDialog';
 import { cn } from '@/lib/utils';
 import { differenceInDays } from 'date-fns';
+import CreateKitDialog from '@/components/CreateKitDialog';
 
 
 interface Ferramenta extends Tool {
@@ -45,6 +46,7 @@ const ListaFerramentasPage = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddQuantityDialogOpen, setIsAddQuantityDialogOpen] = useState(false);
+  const [isCreateKitDialogOpen, setIsCreateKitDialogOpen] = useState(false);
   const [isLabelPrintDialogOpen, setIsLabelPrintDialogOpen] = useState(false);
   const [toolsToPrint, setToolsToPrint] = useState<any[]>([]);
   const [selectedToolForDetails, setSelectedToolForDetails] = useState<Ferramenta | null>(null);
@@ -79,6 +81,11 @@ const ListaFerramentasPage = () => {
   }, [ferramentasVisiveis, searchTerm]);
 
   const getDynamicStatus = (tool: Ferramenta): { status: string; variant: 'success' | 'destructive' | 'default' | 'attention' | 'warning' | 'critical' } => {
+    
+    if (tool.status === 'Em Kit') {
+      return { status: 'Em Kit', variant: 'default' };
+    }
+
     // Se não for uma ferramenta controlável, retorne o status original
     if (!['C', 'L', 'V'].includes(tool.classificacao)) {
         const statusMap: { [key: string]: 'success' | 'destructive' | 'default' } = {
@@ -132,6 +139,12 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
       queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
   }
 
+  const handleKitCreationSuccess = () => {
+    setIsCreateKitDialogOpen(false);
+    queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
+    queryClient.invalidateQueries({ queryKey: ['kits'] });
+  };
+
   const handleReprintConfirmed = (tools: WithDocId<Tool>[]) => {
     setSelectedToolForReprint(null);
     setToolsToPrint(tools);
@@ -158,12 +171,18 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Lista de Ferramentas</h1>
-        <Button variant="default" onClick={() => setIsAddQuantityDialogOpen(true)}>
-            <PlusSquare className="mr-2 h-4 w-4" />
-            Adicionar Ferramenta
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsCreateKitDialogOpen(true)}>
+              <PackagePlus className="mr-2 h-4 w-4" />
+              Criar Kit
+          </Button>
+          <Button variant="default" onClick={() => setIsAddQuantityDialogOpen(true)}>
+              <PlusSquare className="mr-2 h-4 w-4" />
+              Adicionar Ferramenta
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -254,6 +273,12 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
         onSuccess={handleAddQuantitySuccess}
       />
       
+      <CreateKitDialog
+        isOpen={isCreateKitDialogOpen}
+        onClose={() => setIsCreateKitDialogOpen(false)}
+        onSuccess={handleKitCreationSuccess}
+      />
+
       <LabelPrintDialog
         isOpen={isLabelPrintDialogOpen}
         onClose={() => setIsLabelPrintDialogOpen(false)}

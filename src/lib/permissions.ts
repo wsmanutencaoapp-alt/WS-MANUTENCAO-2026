@@ -4,6 +4,7 @@ export const allUserPermissions: { id: string; path: string }[] = [
     { id: 'suprimentos_movimentacao', path: '/dashboard/suprimentos/movimentacao' },
     { id: 'ferramentaria', path: '/dashboard/ferramentaria' },
     { id: 'ferramentaria_lista', path: '/dashboard/ferramentaria/lista-ferramentas' },
+    { id: 'ferramentaria_kits', path: '/dashboard/ferramentaria/kits' },
     { id: 'ferramentaria_movimentacao', path: '/dashboard/ferramentaria/movimentacao' },
     { id: 'calibracao', path: '/dashboard/calibracao' },
     { id: 'compras', path: '/dashboard/compras' },
