@@ -21,11 +21,12 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, Inbox, Send, Undo2 } from 'lucide-react';
+import { Loader2, AlertCircle, Inbox, Send, Undo2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import FulfillRequestDialog from './FulfillRequestDialog';
 import ReturnLoanDialog from './ReturnLoanDialog';
 import { useQueryClient } from '@tanstack/react-query';
+import { Input } from '@/components/ui/input';
 
 export interface ToolRequestTableRef {
   refetchRequests: () => void;
@@ -49,6 +50,7 @@ const getStatusVariant = (status: ToolRequest['status']) => {
 const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(({ onActionSuccess }, ref) => {
   const firestore = useFirestore();
   const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequestForFulfillment, setSelectedRequestForFulfillment] = useState<WithDocId<ToolRequest> | null>(null);
   const [selectedRequestForReturn, setSelectedRequestForReturn] = useState<WithDocId<ToolRequest> | null>(null);
 
@@ -65,15 +67,26 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
       queryKey
   });
 
-  const sortedRequests = useMemo(() => {
+  const filteredRequests = useMemo(() => {
     if (!requests) return [];
-    // Sort client-side: 'Pendente' first, then by date ascending
-    return [...requests].sort((a, b) => {
+    
+    let sortedRequests = [...requests].sort((a, b) => {
       if (a.status === 'Pendente' && b.status !== 'Pendente') return -1;
       if (a.status !== 'Pendente' && b.status === 'Pendente') return 1;
       return new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime();
     });
-  }, [requests]);
+
+    if (!searchTerm) {
+        return sortedRequests;
+    }
+
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return sortedRequests.filter(request => 
+        request.osNumber.toLowerCase().includes(lowercasedTerm) ||
+        request.requesterName.toLowerCase().includes(lowercasedTerm)
+    );
+
+  }, [requests, searchTerm]);
 
   useImperativeHandle(ref, () => ({
     refetchRequests() {
@@ -95,6 +108,15 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
              <CardDescription>
                 Requisições de ferramentas pendentes de atendimento ou atualmente em uso.
              </CardDescription>
+             <div className="relative pt-4">
+               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+               <Input
+                   placeholder="Pesquisar por OS ou solicitante..."
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+               />
+            </div>
         </CardHeader>
         <CardContent>
              <Table>
@@ -123,15 +145,15 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && sortedRequests.length === 0 && (
+                  {!isLoading && filteredRequests.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center h-24">
                         <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
-                        <p className="text-muted-foreground">Nenhuma requisição ativa no momento.</p>
+                        <p className="text-muted-foreground">Nenhuma requisição ativa encontrada.</p>
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && sortedRequests.map(request => (
+                  {!isLoading && filteredRequests.map(request => (
                     <TableRow key={request.docId}>
                       <TableCell>
                           <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>

@@ -20,10 +20,11 @@ import {
     CardDescription,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, Inbox } from 'lucide-react';
+import { Loader2, AlertCircle, Inbox, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
+import { Input } from '@/components/ui/input';
 
 export interface ToolMovementHistoryTableRef {
   refetchHistory: () => void;
@@ -57,6 +58,7 @@ type ExpandedHistoryItem = {
 const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((props, ref) => {
   const firestore = useFirestore();
   const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const queryKey = ['tool_requests_history_completed'];
   const requestsQuery = useMemoFirebase(
@@ -111,6 +113,20 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
 
   }, [requests, allTools]);
 
+  const filteredHistory = useMemo(() => {
+      if (!expandedHistory) return [];
+      if (!searchTerm) return expandedHistory;
+      
+      const lowercasedTerm = searchTerm.toLowerCase();
+      return expandedHistory.filter(item => 
+        item.osNumber.toLowerCase().includes(lowercasedTerm) ||
+        item.requesterName.toLowerCase().includes(lowercasedTerm) ||
+        item.toolCode.toLowerCase().includes(lowercasedTerm) ||
+        item.toolDescription.toLowerCase().includes(lowercasedTerm)
+      );
+
+  }, [expandedHistory, searchTerm]);
+
 
   useImperativeHandle(ref, () => ({
     refetchHistory() {
@@ -127,6 +143,15 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
              <CardDescription>
                 Visualize o extrato de todas as movimentações de ferramentas (saídas e retornos).
              </CardDescription>
+             <div className="relative pt-4">
+               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+               <Input
+                   placeholder="Pesquisar por OS, solicitante, ferramenta..."
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+               />
+            </div>
         </CardHeader>
         <CardContent>
              <Table>
@@ -155,7 +180,7 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && expandedHistory.length === 0 && (
+                  {!isLoading && filteredHistory.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center h-24">
                         <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
@@ -163,7 +188,7 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && expandedHistory.map((item, index) => (
+                  {!isLoading && filteredHistory.map((item, index) => (
                     <TableRow key={`${item.requestId}-${item.toolId}-${index}`}>
                       <TableCell className="font-mono">{item.osNumber}</TableCell>
                       <TableCell>
