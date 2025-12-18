@@ -186,7 +186,10 @@ export default function ManualCheckInDialog({
       
       // Update requests and tools
       for(const [reqId, update] of requestUpdates.entries()) {
-          const allToolsForThisRequestReturned = update.allTools.every(id => update.returnedTools.includes(id));
+          
+          const remainingToolsInRequest = update.allTools.filter(id => !update.returnedTools.includes(id));
+          const allToolsForThisRequestReturned = remainingToolsInRequest.length === 0;
+
           const requestRef = doc(firestore, 'tool_requests', reqId);
 
           // Prepare the return conditions object
@@ -210,9 +213,8 @@ export default function ManualCheckInDialog({
               });
           } else {
               // Partial return: remove returned tools from the request's list
-              const remainingToolIds = update.allTools.filter(id => !update.returnedTools.includes(id));
               batch.update(requestRef, { 
-                  toolIds: remainingToolIds,
+                  toolIds: remainingToolsInRequest,
                   returnConditions: newReturnConditions 
               });
           }
@@ -244,8 +246,8 @@ export default function ManualCheckInDialog({
       // Invalidate queries to refetch data across the app
       queryClient.invalidateQueries({ queryKey: ['tool_requests_active'] });
       queryClient.invalidateQueries({ queryKey: ['tool_requests_history_completed'] });
-      queryClient.invalidateQueries({ queryKey: ['loanedTools'] });
-      queryClient.invalidateQueries({ queryKey: ['availableTools'] });
+      queryClient.invalidateQueries({ queryKey: ['loanedToolsForMovement'] });
+      queryClient.invalidateQueries({ queryKey: ['availableToolsForMovement'] });
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
       queryClient.invalidateQueries({ queryKey: ['nonConformingTools'] });
 
