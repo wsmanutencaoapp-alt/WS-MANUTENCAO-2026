@@ -58,8 +58,8 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMov
     () => (firestore ? query(
         collection(firestore, 'tool_requests'), 
         where('status', '!=', 'Pendente'),
-        orderBy('status'),
-        orderBy('requestedAt', 'desc')
+        orderBy('status')
+        // orderBy('requestedAt', 'desc') // REMOVIDO: Firestore não permite múltiplos orderBy com filtro de desigualdade
     ) : null),
     [firestore]
   );
@@ -67,6 +67,13 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMov
   const { data: requests, isLoading, error } = useCollection<WithDocId<ToolRequest>>(requestsQuery, {
       queryKey
   });
+
+  // Ordenação do lado do cliente como uma solução alternativa
+  const sortedRequests = useMemo(() => {
+    if (!requests) return [];
+    return [...requests].sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+  }, [requests]);
+
 
   useImperativeHandle(ref, () => ({
     refetchHistory() {
@@ -115,7 +122,7 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMov
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && requests?.length === 0 && (
+                  {!isLoading && sortedRequests.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center h-24">
                         <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
@@ -123,7 +130,7 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, ToolMov
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && requests?.map(request => (
+                  {!isLoading && sortedRequests.map(request => (
                     <TableRow key={request.docId}>
                       <TableCell>
                           <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
