@@ -79,7 +79,7 @@ const ListaFerramentasPage = () => {
     );
   }, [ferramentasVisiveis, searchTerm]);
 
-  const getDynamicStatus = (tool: Ferramenta): { status: string; variant: 'success' | 'destructive' | 'default' | 'attention' | 'warning' } => {
+  const getDynamicStatus = (tool: Ferramenta): { status: string; variant: 'success' | 'destructive' | 'default' | 'attention' | 'warning' | 'critical' } => {
     // Se não for uma ferramenta controlável, retorne o status original
     if (!['C', 'L', 'V'].includes(tool.classificacao)) {
         const statusMap: { [key: string]: 'success' | 'destructive' | 'default' } = {
@@ -91,7 +91,7 @@ const ListaFerramentasPage = () => {
 
     // Lógica para ferramentas controláveis
     if (!tool.data_vencimento) {
-        return { status: 'Cal. Pendente', variant: 'warning' };
+        return { status: 'Cal. Pendente', variant: 'destructive' };
     }
 
     const today = new Date();
