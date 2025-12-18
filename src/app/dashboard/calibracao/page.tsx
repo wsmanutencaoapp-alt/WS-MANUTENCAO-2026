@@ -15,17 +15,19 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Thermometer, History, PlusCircle, Loader2 } from 'lucide-react';
+import { Thermometer, History, PlusCircle, Loader2, Search } from 'lucide-react';
 import { addDays, format, isBefore, isAfter } from 'date-fns';
 import CalibrationDialog from '@/components/CalibrationDialog';
 import HistoryDialog from '@/components/CalibrationHistoryDialog';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
+import { Input } from '@/components/ui/input';
 
 const CalibracaoPage = () => {
   const firestore = useFirestore();
   const [selectedTool, setSelectedTool] = useState<WithDocId<Tool> | null>(null);
   const [isCalibrationOpen, setIsCalibrationOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const controllableToolsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -36,6 +38,18 @@ const CalibracaoPage = () => {
   }, [firestore]);
 
   const { data: tools, isLoading, error } = useCollection<Tool>(controllableToolsQuery);
+
+  const filteredTools = useMemo(() => {
+    if (!tools) return [];
+    if (!searchTerm) return tools;
+    
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return tools.filter(tool => 
+        tool.codigo.toLowerCase().includes(lowercasedTerm) ||
+        tool.descricao.toLowerCase().includes(lowercasedTerm)
+    );
+  }, [tools, searchTerm]);
+
 
   const getStatus = (dueDate: string | undefined): { text: string; variant: 'success' | 'warning' | 'destructive' } => {
     if (!dueDate) return { text: 'Sem data', variant: 'warning' };
@@ -86,6 +100,15 @@ const CalibracaoPage = () => {
           <CardDescription>
             Gerencie o ciclo de vida de calibração e validade das suas ferramentas.
           </CardDescription>
+           <div className="relative pt-4">
+               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+               <Input
+                   placeholder="Pesquisar por código ou descrição..."
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+               />
+            </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -114,14 +137,14 @@ const CalibracaoPage = () => {
                     </TableCell>
                 </TableRow>
               )}
-              {!isLoading && tools?.length === 0 && (
+              {!isLoading && filteredTools.length === 0 && (
                  <TableRow>
                     <TableCell colSpan={6} className="text-center">
                        Nenhuma ferramenta com controle de validade encontrada.
                     </TableCell>
                 </TableRow>
               )}
-              {!isLoading && tools?.map((tool) => {
+              {!isLoading && filteredTools.map((tool) => {
                   const status = getStatus(tool.data_vencimento);
                   return (
                     <TableRow key={tool.docId}>
