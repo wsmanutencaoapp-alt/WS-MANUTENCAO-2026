@@ -48,7 +48,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
     return query(collection(firestore, 'tools'), where(documentId(), 'in', Array.from(currentToolIds)));
   }, [firestore, kit, currentToolIds]);
   
-  const { data: toolsInKit, isLoading: isLoadingKitTools } = useCollection<WithDocId<Tool>>(toolsInKitQuery, {
+  const { data: toolsInKit, isLoading: isLoadingKitTools, error } = useCollection<WithDocId<Tool>>(toolsInKitQuery, {
       queryKey: ['kitTools', kit?.docId, Array.from(currentToolIds)],
       enabled: !!kit && currentToolIds.size > 0,
   });
