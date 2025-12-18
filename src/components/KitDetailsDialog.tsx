@@ -69,7 +69,8 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
       const lowercasedTerm = searchTerm.toLowerCase();
       return availableTools.filter(tool => 
           !currentToolIds.has(tool.docId) &&
-          (tool.descricao.toLowerCase().includes(lowercasedTerm) || tool.codigo.toLowerCase().includes(lowercasedTerm))
+          ((tool.descricao && tool.descricao.toLowerCase().includes(lowercasedTerm)) || 
+           (tool.codigo && tool.codigo.toLowerCase().includes(lowercasedTerm)))
       );
   }, [availableTools, searchTerm, currentToolIds]);
 
