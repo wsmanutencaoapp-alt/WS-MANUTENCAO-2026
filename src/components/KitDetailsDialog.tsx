@@ -50,7 +50,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
     return query(collection(firestore, 'tools'), where(documentId(), 'in', Array.from(currentToolIds)));
   }, [firestore, kit, currentToolIds]);
   
-  const { data: toolsInKit, isLoading: isLoadingKitTools, error } = useCollection<WithDocId<Tool>>(toolsInKitQuery, {
+  const { data: toolsInKit, isLoading: isLoadingKitTools, error: toolsInKitError } = useCollection<WithDocId<Tool>>(toolsInKitQuery, {
       queryKey: ['kitTools', kit?.docId, Array.from(currentToolIds)],
       enabled: !!kit && currentToolIds.size > 0,
   });
@@ -168,12 +168,12 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
   };
   
   const handleCancelEdit = () => {
-      // Reset changes
+      setIsEditing(false);
+      // Reset changes by re-applying the original kit data
       if (kit) {
           setCurrentToolIds(new Set(kit.toolIds || []));
           setEditableKit({ descricao: kit.descricao, enderecamento: kit.enderecamento });
       }
-      setIsEditing(false);
   }
 
   return (
@@ -245,7 +245,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
             <ScrollArea className="max-h-[60vh] h-96 border rounded-md">
             <div className="p-4 space-y-3">
                 {isLoadingKitTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
-                {error && <p className="text-destructive text-center">Erro ao carregar ferramentas.</p>}
+                {toolsInKitError && <p className="text-destructive text-center">Erro ao carregar ferramentas.</p>}
                 {!isLoadingKitTools && !toolsInKit?.length && (
                     <p className="text-muted-foreground text-center">Nenhuma ferramenta encontrada neste kit.</p>
                 )}
@@ -281,12 +281,12 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                     </Button>
                 </>
             ) : (
-                <>
+                <div className="flex w-full justify-between">
                     <Button variant="outline" onClick={() => setIsEditing(true)}>
                         <Edit className="mr-2 h-4 w-4"/> Editar Kit
                     </Button>
                     <Button onClick={onClose}>Fechar</Button>
-                </>
+                </div>
             )}
         </DialogFooter>
       </DialogContent>
