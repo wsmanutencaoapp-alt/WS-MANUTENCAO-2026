@@ -14,11 +14,12 @@ export function ToolingAlertHeader() {
 
   const toolsNeedingAttentionQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    // Query for all tools that are controllable and not in a state where calibration is irrelevant (like 'Inoperante' or 'Pendente')
+    // Firestore does not allow 'in' and 'not-in' on different fields.
+    // So we query for tools that have a controllable classification AND are in a state where calibration matters.
     return query(
       collection(firestore, 'tools'),
       where('classificacao', 'in', ['C', 'L', 'V']),
-      where('status', 'not-in', ['Bloqueado', 'Inoperante', 'Pendente', 'Em Manutenção'])
+      where('status', 'in', ['Disponível', 'Em Empréstimo', 'Em Aferição'])
     );
   }, [firestore]);
 
@@ -36,7 +37,10 @@ export function ToolingAlertHeader() {
       if (!tool.data_vencimento) return false;
       
       const dueDate = new Date(tool.data_vencimento);
-      if (!isFuture(dueDate)) return false; // Ignore already expired tools for this alert
+      
+      // Check if the due date is in the future. We don't want to show already expired tools in this specific alert.
+      // The calibration page will handle showing expired ones.
+      if (!isFuture(dueDate)) return false; 
 
       const daysUntilDue = differenceInDays(dueDate, today);
       
