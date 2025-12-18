@@ -26,7 +26,7 @@
     --radius: 0.5rem;
 
     /* Custom Sidebar Colors */
-    --sidebar-background: 240 10% 3.9%;
+    --sidebar-background: 240 6% 12%;
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 35 92% 55%;
     --sidebar-primary-foreground: 35 92% 15%;
@@ -58,7 +58,7 @@
     --ring: 240 10% 15%;
     
     /* Custom Sidebar Colors */
-    --sidebar-background: 240 10% 3.9%;
+    --sidebar-background: 240 6% 12%;
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 35 92% 55%;
     --sidebar-primary-foreground: 35 92% 15%;
