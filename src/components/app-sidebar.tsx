@@ -242,8 +242,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="group-[[data-variant=sidebar]]:border-r group-[[data-variant=sidebar]]:bg-sidebar">
       <SidebarHeader className="flex h-14 shrink-0 items-center justify-center rounded-none border-b bg-background px-4">
          <div className="flex items-center gap-2 text-lg font-semibold text-primary">
-          <img src="/logo.png" alt="APP WS Logo" className={cn("h-8 w-auto transition-all", state === 'collapsed' ? 'h-8' : 'h-8' )} />
-          <span className={cn("font-headline font-bold logo-styled", state === 'collapsed' && "hidden")}>APP WS</span>
+          <img src="/logo.png" alt="APP WS Logo" className={cn("h-8 w-auto transition-all", state === 'collapsed' ? 'h-8' : 'h-10' )} />
           <span className="sr-only">APP WS</span>
         </div>
       </SidebarHeader>
