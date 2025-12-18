@@ -35,7 +35,7 @@ export default function ManageNonConformingDialog({ isOpen, onClose, tool, onAct
   const firestore = useFirestore();
   const [selectedAction, setSelectedAction] = useState<Action | null>(null);
   const [conditionalNote, setConditionalNote] = useState('');
-  const [discardReason, setDiscardReason] = useState('');
+  const [discardReason, setDiscardReason] = useState(tool.observacao || '');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
