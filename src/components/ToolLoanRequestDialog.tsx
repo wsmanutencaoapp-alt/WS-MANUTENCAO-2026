@@ -44,6 +44,7 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
   const [selectedToolIds, setSelectedToolIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const filteredTools = useMemo(() => {
     if (!allAvailableTools) return [];
@@ -125,7 +126,7 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={resetAndClose}>
+    <Dialog open={isOpen} onOpenChange={resetAndClose} modal={!isCalendarOpen}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Solicitar Empréstimo de Ferramenta(s)</DialogTitle>
@@ -147,14 +148,24 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
             </div>
             <div className="space-y-1.5">
               <Label>Data Prev. Devolução <span className="text-destructive">*</span></Label>
-              <Popover>
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dueDate ? format(dueDate, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} /></PopoverContent>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar 
+                    mode="single" 
+                    selected={dueDate} 
+                    onSelect={(date) => {
+                        setDueDate(date);
+                        setIsCalendarOpen(false);
+                    }} 
+                    initialFocus 
+                  />
+                </PopoverContent>
               </Popover>
             </div>
           </div>
