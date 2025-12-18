@@ -49,7 +49,6 @@ const ToolMovementHistoryTable = forwardRef<ToolMovementHistoryTableRef, {}>((pr
     () => (firestore ? query(
         collection(firestore, 'tool_requests'), 
         where('status', 'in', ['Devolvida', 'Cancelada']),
-        orderBy('status'),
     ) : null),
     [firestore]
   );
