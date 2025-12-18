@@ -27,6 +27,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -39,43 +40,6 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 
-// O diálogo de confirmação agora é um componente separado dentro do arquivo.
-// Ele gerencia seu próprio estado de abertura e apenas chama a função onConfirm.
-function ConfirmationDialog({
-  isOpen,
-  onOpenChange,
-  onConfirm,
-  isSaving,
-  request,
-  toolCount
-}: {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-  isSaving: boolean;
-  request: WithDocId<ToolRequest>;
-  toolCount: number;
-}) {
-    return (
-        <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Confirmar Devolução</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Esta ação registrará a devolução de todos os {toolCount || 0} itens para a OS {request.osNumber} e atualizará o status deles para "Disponível". Deseja continuar?
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isSaving}>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={onConfirm} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Sim, confirmar devolução
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    );
-}
 
 interface ReturnLoanDialogProps {
   request: WithDocId<ToolRequest>;
@@ -89,8 +53,6 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
-  // O estado que controla o diálogo de confirmação agora está aqui.
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const toolsQuery = useMemoFirebase(() => {
     if (!firestore || !request.toolIds || request.toolIds.length === 0) return null;
@@ -109,7 +71,6 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
     }
     
     setIsSaving(true);
-    setIsConfirmOpen(false); // Fecha o diálogo de confirmação.
 
     try {
         const batch = writeBatch(firestore);
@@ -142,7 +103,6 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
   };
 
   return (
-    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
@@ -211,24 +171,31 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-          {/* Este botão agora apenas abre o diálogo de confirmação */}
-          <Button onClick={() => setIsConfirmOpen(true)} disabled={isSaving || isLoading}>
-            <Undo2 className="mr-2 h-4 w-4" />
-            Confirmar Devolução
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button disabled={isSaving || isLoading}>
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    Confirmar Devolução
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Devolução</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta ação registrará a devolução de todos os {tools?.length || 0} itens para a OS {request.osNumber} e atualizará o status deles para "Disponível". Deseja continuar?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isSaving}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleReturn} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Sim, confirmar devolução
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-
-    {/* O componente de confirmação é renderizado aqui, mas gerencia seu próprio estado de visibilidade */}
-    <ConfirmationDialog
-        isOpen={isConfirmOpen}
-        onOpenChange={setIsConfirmOpen}
-        onConfirm={handleReturn}
-        isSaving={isSaving}
-        request={request}
-        toolCount={tools?.length || 0}
-    />
-    </>
   );
 }
