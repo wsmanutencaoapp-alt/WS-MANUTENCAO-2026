@@ -9,12 +9,15 @@ import {
   DialogDescription
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
+import type { Tool } from '@/lib/types';
+import type { WithDocId } from '@/firebase/firestore/use-collection';
+
 
 interface ReprintDialogProps {
-  tool: { id: string; codigo?: string; descricao?: string; label_url?: string | null } | null;
+  tool: WithDocId<Tool> | null;
   isOpen: boolean;
   onClose: () => void;
-  onReprintConfirmed: (tool: any) => void;
+  onReprintConfirmed: (tools: WithDocId<Tool>[]) => void;
 }
 
 
@@ -22,7 +25,7 @@ export default function ReprintDialog({ tool, isOpen, onClose, onReprintConfirme
 
   const handleConfirm = () => {
     if (tool) {
-        onReprintConfirmed([tool]); // Pass as an array to match PrintDialog's expectation
+        onReprintConfirmed([tool]); // Pass the whole tool object in an array
     }
   }
   return (
@@ -31,7 +34,7 @@ export default function ReprintDialog({ tool, isOpen, onClose, onReprintConfirme
             <DialogHeader>
                 <DialogTitle>Reimprimir Etiqueta</DialogTitle>
                  <DialogDescription>
-                    Deseja gerar e imprimir novamente a etiqueta para o item abaixo? Uma nova etiqueta será gerada.
+                    Deseja gerar e imprimir novamente a etiqueta para o item abaixo? Uma nova etiqueta será gerada com os dados atuais.
                 </DialogDescription>
             </DialogHeader>
             {tool && (
@@ -48,5 +51,3 @@ export default function ReprintDialog({ tool, isOpen, onClose, onReprintConfirme
     </Dialog>
   );
 }
-
-    

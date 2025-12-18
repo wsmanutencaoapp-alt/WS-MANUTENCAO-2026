@@ -14,13 +14,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Printer, FileText } from 'lucide-react';
 import { useFirestore, useStorage } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadString, getDownloadURL, getString } from 'firebase/storage';
 import JsBarcode from 'jsbarcode';
 import type { Tool } from '@/lib/types';
+import type { WithDocId } from '@/firebase/firestore/use-collection';
 
-type ToolLabelData = Partial<Tool> & {
-  id: string;
-};
+type ToolLabelData = Partial<WithDocId<Tool>>;
 
 interface LabelPrintDialogProps {
   tools: ToolLabelData[];
@@ -57,7 +56,7 @@ const generateLabelSvgLocally = (tool: ToolLabelData): string => {
     
     const barcodeX = (labelWidth - barcodeWidth) / 2;
 
-    const truncatedName = descricao.length > 40 ? descricao.substring(0, 37) + '...' : descricao;
+    const truncatedName = (descricao || 'N/A').length > 40 ? (descricao || 'N/A').substring(0, 37) + '...' : (descricao || 'N/A');
     const vencimentoText = data_vencimento ? `VENC: ${new Date(data_vencimento).toLocaleDateString('pt-BR')}` : '';
 
     return `
@@ -102,19 +101,37 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
         let success = true;
 
         for (const tool of tools) {
-          if (!tool.id || !tool.codigo) continue;
+          if (!tool.docId || !tool.codigo) continue;
 
           try {
-            const svgContent = generateLabelSvgLocally(tool);
+            // REPRINT LOGIC: If a label_url exists, try to fetch it.
+            // Otherwise, generate a new one.
+            let svgContent: string;
+            if (tool.label_url) {
+                try {
+                    // Firebase Storage URLs from getDownloadURL contain the object path.
+                    // We need to extract the path to use with storageRef.
+                    const url = new URL(tool.label_url);
+                    const path = decodeURIComponent(url.pathname.split('/o/')[1].split('?')[0]);
+                    const labelRef = storageRef(storage, path);
+                    svgContent = await getString(labelRef);
+                } catch(fetchError) {
+                    console.warn(`Could not fetch existing label for ${tool.codigo}. Generating a new one.`, fetchError);
+                    svgContent = generateLabelSvgLocally(tool); // Fallback to generating
+                }
+            } else {
+                 svgContent = generateLabelSvgLocally(tool);
+            }
 
-            const svgRef = storageRef(storage, `tool-labels/${tool.id}.svg`);
+            // Always save/update the label in storage to ensure it's current
+            const svgRef = storageRef(storage, `tool-labels/${tool.docId}.svg`);
             await uploadString(svgRef, svgContent, 'raw', { contentType: 'image/svg+xml' });
             const downloadURL = await getDownloadURL(svgRef);
 
-            const toolDocRef = doc(firestore, 'tools', tool.id);
+            const toolDocRef = doc(firestore, 'tools', tool.docId);
             await updateDoc(toolDocRef, { label_url: downloadURL });
             
-            newLabels.set(tool.id, svgContent);
+            newLabels.set(tool.docId, svgContent);
 
           } catch (e) {
             console.error(`Failed to generate or save label for ${tool.codigo}:`, e);

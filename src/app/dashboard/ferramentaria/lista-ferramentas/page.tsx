@@ -46,10 +46,9 @@ const ListaFerramentasPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddQuantityDialogOpen, setIsAddQuantityDialogOpen] = useState(false);
   const [isLabelPrintDialogOpen, setIsLabelPrintDialogOpen] = useState(false);
-  const [isReprintDialogOpen, setIsReprintDialogOpen] = useState(false);
   const [toolsToPrint, setToolsToPrint] = useState<any[]>([]);
   const [selectedToolForDetails, setSelectedToolForDetails] = useState<Ferramenta | null>(null);
-  const [selectedToolForReprint, setSelectedToolForReprint] = useState<Ferramenta | null>(null);
+  const [selectedToolForReprint, setSelectedToolForReprint] = useState<WithDocId<Tool> | null>(null);
   
   const ferramentasQueryKey = 'ferramentas';
 
@@ -133,8 +132,8 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
       queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
   }
 
-  const handleReprintConfirmed = (tools: any[]) => {
-    setIsReprintDialogOpen(false);
+  const handleReprintConfirmed = (tools: WithDocId<Tool>[]) => {
+    setSelectedToolForReprint(null);
     setToolsToPrint(tools);
     setIsLabelPrintDialogOpen(true);
   }
