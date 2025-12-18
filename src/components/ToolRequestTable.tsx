@@ -2,7 +2,7 @@
 import { forwardRef, useImperativeHandle, useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import type { ToolRequest } from '@/lib/types';
+import type { ToolRequest, Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertCircle, Inbox, Send, Undo2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import FulfillRequestDialog from './FulfillRequestDialog';
-import ReturnLoanDialog from './ReturnLoanDialog';
+import ManualCheckInDialog from './ManualCheckInDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 
@@ -34,6 +34,7 @@ export interface ToolRequestTableRef {
 
 interface ToolRequestTableProps {
     onActionSuccess: () => void;
+    allLoanedTools: WithDocId<Tool>[];
 }
 
 const getStatusVariant = (status: ToolRequest['status']) => {
@@ -47,7 +48,7 @@ const getStatusVariant = (status: ToolRequest['status']) => {
     }
 }
 
-const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(({ onActionSuccess }, ref) => {
+const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(({ onActionSuccess, allLoanedTools }, ref) => {
   const firestore = useFirestore();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,6 +100,12 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
     setSelectedRequestForFulfillment(null);
     setSelectedRequestForReturn(null);
   }
+
+  const loanedToolsForRequest = useMemo(() => {
+    if (!selectedRequestForReturn || !allLoanedTools) return [];
+    return allLoanedTools.filter(tool => selectedRequestForReturn.toolIds.includes(tool.docId));
+  }, [selectedRequestForReturn, allLoanedTools]);
+
 
   return (
     <>
@@ -195,11 +202,13 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
     )}
 
     {selectedRequestForReturn && (
-        <ReturnLoanDialog
+        <ManualCheckInDialog
             isOpen={!!selectedRequestForReturn}
             onClose={() => setSelectedRequestForReturn(null)}
-            request={selectedRequestForReturn}
-            onSuccess={handleActionSuccess}
+            allLoanedTools={loanedToolsForRequest}
+            onActionSuccess={handleActionSuccess}
+            preselectedToolIds={selectedRequestForReturn.toolIds}
+            isRequestReturn={true}
         />
     )}
     </>

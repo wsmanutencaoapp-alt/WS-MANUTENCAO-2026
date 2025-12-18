@@ -37,9 +37,18 @@ interface ManualCheckInDialogProps {
   onClose: () => void;
   allLoanedTools: WithDocId<Tool>[];
   onActionSuccess: () => void;
+  preselectedToolIds?: string[];
+  isRequestReturn?: boolean;
 }
 
-export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, onActionSuccess }: ManualCheckInDialogProps) {
+export default function ManualCheckInDialog({ 
+    isOpen, 
+    onClose, 
+    allLoanedTools, 
+    onActionSuccess, 
+    preselectedToolIds = [],
+    isRequestReturn = false 
+}: ManualCheckInDialogProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const queryClient = useQueryClient();
@@ -50,19 +59,19 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
   const [isSaving, setIsSaving] = useState(false);
   
   useEffect(() => {
-    // Quando a seleção de ferramentas muda, inicializa o estado de inspeção para os novos itens.
-    const newInspectionData = { ...inspectionData };
-    let needsUpdate = false;
-    selectedToolIds.forEach(id => {
-      if (!newInspectionData[id]) {
-        newInspectionData[id] = { visual: null, funcional: null, observacao: '' };
-        needsUpdate = true;
-      }
-    });
-    if (needsUpdate) {
-      setInspectionData(newInspectionData);
+    if (isOpen) {
+        // If preselected IDs are provided (from a specific request), use them.
+        const initialIds = new Set(preselectedToolIds);
+        setSelectedToolIds(initialIds);
+
+        // Initialize inspection data for the preselected tools
+        const newInspectionData: Record<string, InspectionState> = {};
+        initialIds.forEach(id => {
+            newInspectionData[id] = { visual: null, funcional: null, observacao: '' };
+        });
+        setInspectionData(newInspectionData);
     }
-  }, [selectedToolIds]);
+}, [isOpen, preselectedToolIds]);
 
 
   const filteredTools = useMemo(() => {
@@ -77,16 +86,21 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
   }, [allLoanedTools, searchTerm]);
 
   const handleToolSelect = (toolId: string) => {
+    // Cannot deselect tools when returning from a specific request
+    if (isRequestReturn) return;
+
     setSelectedToolIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(toolId)) {
         newSet.delete(toolId);
-        // Também remove os dados de inspeção ao desmarcar
+        // Also remove inspection data when unchecking
         const newInspectionData = { ...inspectionData };
         delete newInspectionData[toolId];
         setInspectionData(newInspectionData);
       } else {
         newSet.add(toolId);
+         // Initialize inspection data for the new tool
+        setInspectionData(prevInsp => ({...prevInsp, [toolId]: { visual: null, funcional: null, observacao: '' }}));
       }
       return newSet;
     });
@@ -115,13 +129,13 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
 
   const isReturnDisabled = useMemo(() => {
     if (isSaving || selectedToolIds.size === 0) return true;
-    // Verifica se todos os checklists estão preenchidos para as ferramentas selecionadas
+    // Check if all checklists are filled for the selected tools
     for (const toolId of selectedToolIds) {
       const inspection = inspectionData[toolId];
       if (!inspection || !inspection.visual || !inspection.funcional) {
-        return true; // Desabilita se algum checklist não foi preenchido
+        return true; // Disable if any checklist is not filled
       }
-      // Se houver NOK, a observação é obrigatória
+      // If NOK, observation is mandatory
       if ((inspection.visual === 'nok' || inspection.funcional === 'nok') && !inspection.observacao) {
         return true;
       }
@@ -168,9 +182,10 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
       
       // Update requests and tools
       for(const [reqId, update] of requestUpdates.entries()) {
-          const allToolsReturned = update.returnedTools.length === update.allTools.length;
+          const allToolsForThisRequestReturned = update.allTools.every(id => update.returnedTools.includes(id));
           const requestRef = doc(firestore, 'tool_requests', reqId);
-          if (allToolsReturned) {
+
+          if (allToolsForThisRequestReturned) {
               batch.update(requestRef, { status: 'Devolvida', returnedAt: new Date().toISOString() });
           } else {
               // Partial return: remove returned tools from the request's list
@@ -226,7 +241,7 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
         <DialogHeader>
           <DialogTitle>Registrar Entrada (Devolução e Inspeção)</DialogTitle>
           <DialogDescription>
-            Selecione as ferramentas e realize o checklist de conformidade.
+            {isRequestReturn ? "Realize o checklist de conformidade para as ferramentas desta requisição." : "Selecione as ferramentas e realize o checklist de conformidade."}
           </DialogDescription>
         </DialogHeader>
 
@@ -243,6 +258,7 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-8"
+                    disabled={isRequestReturn}
                 />
                 </div>
             </div>
@@ -253,14 +269,16 @@ export default function ManualCheckInDialog({ isOpen, onClose, allLoanedTools, o
                 {filteredTools && filteredTools.map(tool => (
                     <div 
                     key={tool.docId}
-                    className="flex items-center gap-4 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer data-[state=checked]:bg-blue-100 dark:data-[state=checked]:bg-blue-900/30"
+                    className="flex items-center gap-4 p-2 border rounded-lg hover:bg-muted/50 data-[state=checked]:bg-blue-100 dark:data-[state=checked]:bg-blue-900/30"
                     data-state={selectedToolIds.has(tool.docId) ? 'checked' : 'unchecked'}
                     onClick={() => handleToolSelect(tool.docId)}
+                    style={{ cursor: isRequestReturn ? 'default' : 'pointer' }}
                     >
                     <Checkbox
                         checked={selectedToolIds.has(tool.docId)}
                         onCheckedChange={() => handleToolSelect(tool.docId)}
                         aria-label={`Selecionar ${tool.descricao}`}
+                        disabled={isRequestReturn}
                     />
                     <Image
                         src={tool.imageUrl || "https://picsum.photos/seed/tool/64/64"}

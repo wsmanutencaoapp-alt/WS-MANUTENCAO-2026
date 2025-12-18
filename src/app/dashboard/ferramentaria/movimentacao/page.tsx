@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import ToolMovementTable from '@/components/ToolMovementTable';
 import { Button } from '@/components/ui/button';
 import { ListChecks, Send, Wrench, Loader2, History, LogOut, LogIn } from 'lucide-react';
 import ToolLoanRequestDialog from '@/components/ToolLoanRequestDialog';
@@ -27,7 +26,7 @@ const MovimentacaoFerramentaria = () => {
   const requestTableRef = useRef<ToolRequestTableRef>(null);
   const historyTableRef = useRef<ToolMovementHistoryTableRef>(null);
 
-  // Consulta para ferramentas disponíveis
+  // Query for available tools
   const availableToolsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Disponível')) : null),
     [firestore]
@@ -37,7 +36,7 @@ const MovimentacaoFerramentaria = () => {
       queryKey: ['availableTools']
   });
 
-  // Consulta para ferramentas emprestadas
+  // Query for loaned tools
   const loanedToolsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Em Empréstimo')) : null),
     [firestore]
@@ -51,7 +50,9 @@ const MovimentacaoFerramentaria = () => {
   const handleActionSuccess = () => {
     requestTableRef.current?.refetchRequests();
     historyTableRef.current?.refetchHistory();
-    // Invalidação das queries de ferramentas será feita pelos hooks useCollection
+    // Invalidating queries is handled by useCollection, but we can be explicit if needed
+    // queryClient.invalidateQueries({ queryKey: ['availableTools'] });
+    // queryClient.invalidateQueries({ queryKey: ['loanedTools'] });
     toast({ title: "Sucesso!", description: "A operação foi concluída." });
     setIsRequestDialogOpen(false);
     setIsCheckoutDialogOpen(false);
@@ -99,6 +100,7 @@ const MovimentacaoFerramentaria = () => {
           <ToolRequestTable 
             ref={requestTableRef}
             onActionSuccess={handleActionSuccess}
+            allLoanedTools={loanedTools || []}
           />
         </TabsContent>
 
