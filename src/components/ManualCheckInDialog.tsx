@@ -228,7 +228,7 @@ export default function ManualCheckInDialog({
         
         if (isNonConforming) {
           batch.update(toolRef, { 
-            status: 'Em Manutenção',
+            status: 'Com Avaria', // Set to evaluation status, not maintenance
             observacao: inspection.observacao
           });
         } else {

@@ -118,6 +118,7 @@ export type Permissions = {
   planejamento?: boolean;
   manutencao?: boolean;
   contabilidade_classificacao?: boolean;
+  suprimentos_controle_almoxarifado?: boolean;
   [key: string]: boolean | undefined;
 };
 
