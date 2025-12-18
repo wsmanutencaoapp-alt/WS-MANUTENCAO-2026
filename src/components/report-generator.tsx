@@ -52,7 +52,7 @@ export function ReportGenerator() {
                       <span>Escolha uma data</span>
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                  <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <Calendar
                       mode="single"
                       initialFocus
@@ -76,7 +76,7 @@ export function ReportGenerator() {
                       <span>Escolha uma data</span>
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                  <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
                      <Calendar
                       mode="single"
                       initialFocus

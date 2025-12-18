@@ -114,10 +114,12 @@ export default function CalibrationDialog({ tool, isOpen, onClose }: Calibration
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {calibrationDate ? format(calibrationDate, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
+                    {calibrationDate ? format(calibrationDate, 'PPP') : <span>Escolha uma data</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={calibrationDate} onSelect={setCalibrationDate} initialFocus /></PopoverContent>
+                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+                  <Calendar mode="single" selected={calibrationDate} onSelect={setCalibrationDate} initialFocus />
+                </PopoverContent>
               </Popover>
             </div>
             <div>
@@ -126,10 +128,12 @@ export default function CalibrationDialog({ tool, isOpen, onClose }: Calibration
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {newDueDate ? format(newDueDate, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
+                    {newDueDate ? format(newDueDate, 'PPP') : <span>Escolha uma data</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={newDueDate} onSelect={setNewDueDate} initialFocus /></PopoverContent>
+                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+                  <Calendar mode="single" selected={newDueDate} onSelect={setNewDueDate} initialFocus />
+                </PopoverContent>
               </Popover>
             </div>
           </div>
