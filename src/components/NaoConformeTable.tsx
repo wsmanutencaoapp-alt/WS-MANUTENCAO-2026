@@ -19,13 +19,23 @@ import {
     CardTitle,
     CardDescription,
 } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Tool as ToolIcon, Edit, CheckSquare } from 'lucide-react';
+import { Loader2, Search, Tool as ToolIcon, Trash2, CheckSquare } from 'lucide-react';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import Image from 'next/image';
 import { Input } from './ui/input';
-import ManageNonConformingDialog from './ManageNonConformingDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 
@@ -46,7 +56,6 @@ const NaoConformeTable = () => {
     const queryClient = useQueryClient();
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedTool, setSelectedTool] = useState<NonConformingTool | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
     const nonConformingStatuses: Tool['status'][] = [
@@ -87,28 +96,44 @@ const NaoConformeTable = () => {
         );
     }, [tools, searchTerm]);
 
-    const handleSuccess = () => {
+    const handleSuccess = (message: string) => {
+        toast({
+            title: 'Sucesso!',
+            description: message,
+        });
         queryClient.invalidateQueries({ queryKey });
         queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
-        setSelectedTool(null);
     }
     
-    const handleFinishMaintenance = async (tool: NonConformingTool) => {
+    const handleAction = async (tool: NonConformingTool, action: 'repair' | 'discard') => {
         if (!firestore) return;
         setProcessingId(tool.docId);
         const toolRef = doc(firestore, 'tools', tool.docId);
+
         try {
-            await updateDoc(toolRef, {
-                status: 'Disponível',
-                observacao: '' // Limpa a observação de não conformidade
-            });
-            toast({
-                title: 'Manutenção Finalizada',
-                description: `A ferramenta ${tool.codigo} está disponível novamente.`,
-            });
-            handleSuccess();
+            let dataToUpdate: Partial<Tool> = {};
+            let successMessage = '';
+            
+            if (action === 'repair') {
+                dataToUpdate = {
+                    status: 'Disponível',
+                    observacao: '' // Limpa a observação de não conformidade
+                };
+                successMessage = `A ferramenta ${tool.codigo} foi reparada e está disponível.`;
+            } else { // discard
+                dataToUpdate = {
+                    status: 'Refugo',
+                    motivo_descarte: tool.observacao || 'Descartado por avaria/não conformidade.',
+                    data_descarte: new Date().toISOString()
+                };
+                successMessage = `A ferramenta ${tool.codigo} foi movida para refugo.`;
+            }
+            
+            await updateDoc(toolRef, dataToUpdate);
+            handleSuccess(successMessage);
+
         } catch(err) {
-            console.error("Erro ao finalizar manutenção: ", err);
+            console.error("Erro ao processar ação: ", err);
             toast({
                 variant: 'destructive',
                 title: 'Erro',
@@ -192,24 +217,45 @@ const NaoConformeTable = () => {
                                     </TableCell>
                                     <TableCell className="max-w-xs truncate">{tool.observacao || 'N/A'}</TableCell>
                                     <TableCell className="text-right space-x-2">
-                                        {tool.status === 'Em Manutenção' && (
+                                        {tool.status !== 'Refugo' && (
+                                            <>
                                             <Button 
                                                 variant="success" 
                                                 size="sm"
-                                                onClick={() => handleFinishMaintenance(tool)}
+                                                onClick={() => handleAction(tool, 'repair')}
                                                 disabled={processingId === tool.docId}
+                                                title="Finalizar manutenção e retornar ao estoque"
                                             >
                                                 {processingId === tool.docId 
-                                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
-                                                    : <CheckSquare className="mr-2 h-4 w-4"/>
+                                                    ? <Loader2 className="h-4 w-4 animate-spin"/>
+                                                    : <CheckSquare className="h-4 w-4"/>
                                                 }
-                                                Finalizar Manutenção
                                             </Button>
+
+                                             <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="destructive" size="sm" disabled={processingId === tool.docId} title="Descartar ferramenta">
+                                                        <Trash2 className="h-4 w-4"/>
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                    <AlertDialogTitle>Confirmar Descarte</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Tem certeza que deseja descartar a ferramenta <span className="font-bold">"{tool.codigo}"</span>? Esta ação mudará seu status para "Refugo" e não pode ser facilmente desfeita.
+                                                    </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                    <AlertDialogCancel disabled={processingId === tool.docId}>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleAction(tool, 'discard')} disabled={processingId === tool.docId}>
+                                                        {processingId === tool.docId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                                        Sim, Descartar
+                                                    </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                            </>
                                         )}
-                                        <Button variant="outline" size="sm" onClick={() => setSelectedTool(tool)}>
-                                            <Edit className="mr-2 h-4 w-4"/>
-                                            Gerenciar
-                                        </Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -217,12 +263,6 @@ const NaoConformeTable = () => {
                     </Table>
                 </CardContent>
             </Card>
-            <ManageNonConformingDialog
-                isOpen={!!selectedTool}
-                onClose={() => setSelectedTool(null)}
-                tool={selectedTool}
-                onSuccess={handleSuccess}
-            />
         </>
     );
 };
