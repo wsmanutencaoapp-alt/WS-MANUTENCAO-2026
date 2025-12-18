@@ -295,14 +295,15 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
                                 </Button>
                             </>
                          ) : (
-                              <>
-                                <Button variant="ghost" size="icon" title="Detalhes do Kit" onClick={() => setSelectedKitForDetails(item as KitComDocId)}>
-                                    <MoreHorizontal className="h-4 w-4" />
+                              <div className="flex justify-end items-center gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setSelectedKitForDetails(item as KitComDocId)}>
+                                  <ZoomIn className="mr-2 h-4 w-4" />
+                                  Ver Itens
                                 </Button>
                                 <Button variant="ghost" size="icon" title="Reimprimir Etiqueta do Kit" onClick={() => setSelectedItemForReprint(item as WithDocId<Kit>)}>
                                     <Repeat2 className="h-4 w-4" />
                                 </Button>
-                             </>
+                             </div>
                          )}
                       </TableCell>
                     </TableRow>

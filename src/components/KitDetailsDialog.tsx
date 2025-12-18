@@ -242,14 +242,26 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                 </div>
             </div>
         ) : (
-            <ScrollArea className="max-h-[60vh] h-96 border rounded-md">
+          <div className="flex flex-col gap-4" style={{ height: '60vh' }}>
+            <div className="relative">
+              <Label htmlFor="kitToolsSearchTermView">Pesquisar Itens no Kit</Label>
+              <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                id="kitToolsSearchTermView" 
+                placeholder="Buscar por código ou descrição..." 
+                value={kitToolsSearchTerm} 
+                onChange={(e) => setKitToolsSearchTerm(e.target.value)} 
+                className="pl-8" 
+              />
+            </div>
+            <ScrollArea className="flex-1 border rounded-md">
             <div className="p-4 space-y-3">
                 {isLoadingKitTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
                 {toolsInKitError && <p className="text-destructive text-center">Erro ao carregar ferramentas.</p>}
-                {!isLoadingKitTools && !toolsInKit?.length && (
+                {!isLoadingKitTools && filteredToolsInKit.length === 0 && (
                     <p className="text-muted-foreground text-center">Nenhuma ferramenta encontrada neste kit.</p>
                 )}
-                {!isLoadingKitTools && toolsInKit?.map(tool => (
+                {!isLoadingKitTools && filteredToolsInKit.map(tool => (
                     <div key={tool.docId} className="flex items-center gap-4 p-2 border rounded-md">
                         <Image
                             src={tool.imageUrl || "https://picsum.photos/seed/tool/40/40"}
@@ -267,6 +279,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                 ))}
             </div>
             </ScrollArea>
+          </div>
         )}
         
         <DialogFooter className="pt-4">
