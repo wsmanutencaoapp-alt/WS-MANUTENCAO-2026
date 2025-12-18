@@ -181,6 +181,10 @@
         "classificacao_contabil": {
             "type": "string",
             "description": "The specific accounting classification or account number."
+        },
+        "valor_estimado": {
+            "type": "number",
+            "description": "The estimated financial value of the tool."
         }
       },
       "required": [

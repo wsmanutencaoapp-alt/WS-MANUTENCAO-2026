@@ -62,6 +62,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
   const [quantityToAdd, setQuantityToAdd] = useState(1);
   const [enderecamento, setEnderecamento] = useState('');
   const [patrimonio, setPatrimonio] = useState('');
+  const [valorEstimado, setValorEstimado] = useState(0);
   const [allLogicTools, setAllLogicTools] = useState<ToolGroup[]>([]);
   const [filteredLogicTools, setFilteredLogicTools] = useState<ToolGroup[]>([]);
   const [selectedToolGroup, setSelectedToolGroup] = useState<ToolGroup | null>(null);
@@ -134,11 +135,13 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
   useEffect(() => {
     if (isOpen) {
         setDescricaoEspecifica(selectedToolGroup?.descricao || '');
+        setValorEstimado(selectedToolGroup?.valor_estimado || 0);
     } else {
       setSearchTerm('');
       setQuantityToAdd(1);
       setEnderecamento('');
       setPatrimonio('');
+      setValorEstimado(0);
       setAllLogicTools([]);
       setFilteredLogicTools([]);
       setSelectedToolGroup(null);
@@ -240,6 +243,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           sequencial: newSequencial,
           descricao: descricaoEspecifica || baseData.descricao,
           marca: marca || '',
+          valor_estimado: Number(valorEstimado) || 0,
           status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível', // Respect initial status
           enderecamento: enderecamento,
           patrimonio: patrimonio || '',
@@ -373,6 +377,10 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                     <div className="space-y-1.5">
                         <Label htmlFor="patrimonio">Nº Patrimônio (Opcional)</Label>
                         <Input id="patrimonio" value={patrimonio} onChange={(e) => setPatrimonio(e.target.value)} placeholder="Definido pela contabilidade" />
+                    </div>
+                     <div className="space-y-1.5">
+                        <Label htmlFor="valorEstimado">Valor Estimado (R$)</Label>
+                        <Input id="valorEstimado" type="number" value={valorEstimado} onChange={(e) => setValorEstimado(parseFloat(e.target.value) || 0)} placeholder="Ex: 150.00" />
                     </div>
                     <div className="flex items-center gap-4 md:col-span-2">
                         {toolImage ? <Image src={toolImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted-foreground/20 rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}

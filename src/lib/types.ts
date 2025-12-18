@@ -35,6 +35,7 @@ export type Tool = {
   imageUrl?: string;
   natureza_item?: string;
   classificacao_contabil?: string;
+  valor_estimado?: number;
 };
 
 export type CalibrationRecord = {

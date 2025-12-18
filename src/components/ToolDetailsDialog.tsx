@@ -84,9 +84,12 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target;
-    setEditableTool(prev => ({...prev, [id]: value}));
-  };
+    const { id, value, type } = e.target;
+    setEditableTool(prev => ({
+        ...prev,
+        [id]: type === 'number' ? (value === '' ? '' : parseFloat(value)) : value
+    }));
+};
 
   const handleSelectChange = (id: string, value: string) => {
     setEditableTool((prev) => ({ ...prev, [id]: value }));
@@ -123,11 +126,12 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
       const { docId, ...baseData } = editableTool;
       const dataToUpdate = {
         ...baseData,
+        valor_estimado: Number(editableTool.valor_estimado) || 0,
         imageUrl: imageUrl, // usa a nova URL ou a antiga
       };
 
       await updateDoc(toolRef, dataToUpdate);
-      onToolUpdated({ ...editableTool, imageUrl: imageUrl });
+      onToolUpdated({ ...editableTool, valor_estimado: dataToUpdate.valor_estimado, imageUrl: imageUrl });
       setIsEditing(false);
     } catch (error) {
       console.error("Erro ao atualizar ferramenta:", error);
@@ -212,6 +216,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                     <Label htmlFor="aeronave_aplicavel">Aeronave Aplicável</Label>
                     <Input id="aeronave_aplicavel" value={editableTool.aeronave_aplicavel || ''} onChange={handleInputChange} />
                 </div>
+                <div className="col-span-2 space-y-1">
+                    <Label htmlFor="valor_estimado">Valor Estimado (R$)</Label>
+                    <Input id="valor_estimado" type="number" value={editableTool.valor_estimado || ''} onChange={handleInputChange} />
+                </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -244,6 +252,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                 <div>
                   <p className="font-semibold text-muted-foreground">Vencimento</p>
                   <p>{tool.data_vencimento ? new Date(tool.data_vencimento).toLocaleDateString() : 'N/A'}</p>
+                </div>
+                 <div>
+                  <p className="font-semibold text-muted-foreground">Valor Estimado</p>
+                  <p>{(tool.valor_estimado ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                 </div>
             </div>
           )}
@@ -304,5 +316,3 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     </Dialog>
   );
 }
-
-    

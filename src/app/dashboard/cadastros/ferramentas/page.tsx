@@ -82,7 +82,7 @@ const CadastroLogicaFerramentas = () => {
   const [newFerramenta, setNewFerramenta] = useState<Partial<Tool>>({
       tipo: 'STD', familia: 'MEC', classificacao: 'N', descricao: '',
       pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '',
-      enderecamento: '', status: 'Disponível',
+      enderecamento: '', status: 'Disponível', valor_estimado: 0,
   });
 
   const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
@@ -123,9 +123,12 @@ const CadastroLogicaFerramentas = () => {
   }, [newFerramenta.familia]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target;
-     setNewFerramenta((prev) => ({ ...prev, [id]: value }));
-  };
+    const { id, value, type } = e.target;
+    setNewFerramenta(prev => ({
+        ...prev,
+        [id]: type === 'number' ? (value === '' ? '' : parseFloat(value)) : value
+    }));
+};
 
   const handleSelectChange = (id: keyof Tool, value: string) => {
     setNewFerramenta(prev => ({ ...prev, [id]: value }));
@@ -152,7 +155,7 @@ const CadastroLogicaFerramentas = () => {
     setNewFerramenta({
       tipo: 'STD', familia: 'MEC', classificacao: 'N', descricao: '',
       pn_fabricante: '', pn_referencia: '', aeronave_aplicavel: '',
-      enderecamento: '', status: 'Disponível',
+      enderecamento: '', status: 'Disponível', valor_estimado: 0,
     });
     setToolImage(null);
     setDocEngenhariaFile(null);
@@ -217,6 +220,7 @@ const CadastroLogicaFerramentas = () => {
         
         const baseToolData: Partial<Tool> = {
             ...newFerramenta,
+            valor_estimado: Number(newFerramenta.valor_estimado) || 0,
             imageUrl: imageUrl,
             doc_engenharia_url: docEngenhariaUrl
         };
@@ -422,6 +426,10 @@ const CadastroLogicaFerramentas = () => {
                             </div>
                          </>
                      )}
+                     <div className="md:col-span-1">
+                        <Label htmlFor="valor_estimado">Valor Estimado (R$)</Label>
+                        <Input id="valor_estimado" type="number" value={newFerramenta.valor_estimado || ''} onChange={handleInputChange} placeholder="Ex: 150.00" />
+                    </div>
                      {newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'GSE' || newFerramenta.tipo === 'EQV' ? (
                         <div>
                             <Label htmlFor="pn_fabricante">P/N Fabricante {newFerramenta.tipo !== 'STD' && <span className='text-destructive'>*</span>}</Label>
@@ -578,5 +586,3 @@ const CadastroLogicaFerramentas = () => {
 };
 
 export default CadastroLogicaFerramentas;
-
-    
