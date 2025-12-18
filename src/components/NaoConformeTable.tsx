@@ -53,8 +53,7 @@ const NaoConformeTable = () => {
     const toolsQuery = useMemoFirebase(
         () => (firestore ? query(
             collection(firestore, 'tools'),
-            where('status', 'in', nonConformingStatuses),
-            orderBy('codigo')
+            where('status', 'in', nonConformingStatuses)
         ) : null),
         [firestore]
     );
@@ -65,10 +64,14 @@ const NaoConformeTable = () => {
 
     const filteredTools = useMemo(() => {
         if (!tools) return [];
-        if (!searchTerm) return tools;
+        
+        // Client-side sorting
+        const sortedTools = [...tools].sort((a, b) => (a.codigo || '').localeCompare(b.codigo || ''));
+
+        if (!searchTerm) return sortedTools;
 
         const lowercasedTerm = searchTerm.toLowerCase();
-        return tools.filter(tool =>
+        return sortedTools.filter(tool =>
             (tool.codigo && tool.codigo.toLowerCase().includes(lowercasedTerm)) ||
             (tool.descricao && tool.descricao.toLowerCase().includes(lowercasedTerm)) ||
             (tool.observacao && tool.observacao.toLowerCase().includes(lowercasedTerm))
