@@ -11,8 +11,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +38,6 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
   const queryClient = useQueryClient();
 
   const [osNumber, setOsNumber] = useState('');
-  const [dueDate, setDueDate] = useState<Date | undefined>();
   const [selectedToolIds, setSelectedToolIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -70,7 +67,6 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
 
   const resetAndClose = () => {
     setOsNumber('');
-    setDueDate(undefined);
     setSelectedToolIds(new Set());
     setSearchTerm('');
     setIsSaving(false);
@@ -86,10 +82,6 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
       toast({ variant: 'destructive', title: 'Erro', description: 'O número da OS é obrigatório.' });
       return;
     }
-    if (!dueDate) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'A data de devolução prevista é obrigatória.' });
-      return;
-    }
     if (selectedToolIds.size === 0) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Selecione pelo menos uma ferramenta.' });
       return;
@@ -103,7 +95,6 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
         requesterName: user.displayName || user.email || 'Desconhecido',
         status: 'Pendente',
         requestedAt: new Date().toISOString(),
-        dueDate: dueDate.toISOString(),
         toolIds: Array.from(selectedToolIds),
       };
 
@@ -135,7 +126,7 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
         </DialogHeader>
 
         <div className="space-y-4 py-4 max-h-[70vh] flex flex-col">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="osNumber">Número da OS <span className="text-destructive">*</span></Label>
               <Input
@@ -144,25 +135,6 @@ export default function ToolLoanRequestDialog({ isOpen, onClose, allAvailableToo
                 value={osNumber}
                 onChange={(e) => setOsNumber(e.target.value)}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Data Prev. Devolução <span className="text-destructive">*</span></Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate ? format(dueDate, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
-                  <Calendar 
-                    mode="single" 
-                    selected={dueDate} 
-                    onSelect={setDueDate}
-                    initialFocus 
-                  />
-                </PopoverContent>
-              </Popover>
             </div>
           </div>
           <div className="space-y-1.5">

@@ -68,7 +68,7 @@ export type ToolRequest = {
   requesterName: string;
   status: 'Pendente' | 'Em Uso' | 'Devolvida' | 'Cancelada';
   requestedAt: string; // ISO date string
-  dueDate: string; // ISO date string
+  dueDate?: string; // ISO date string
   toolIds: string[];
   handledBy?: string; // UID of ferramentaria user
   handledAt?: string; // ISO date string

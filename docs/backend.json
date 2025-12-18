@@ -598,7 +598,6 @@
         "requesterName",
         "status",
         "requestedAt",
-        "dueDate",
         "toolIds"
       ]
     }
