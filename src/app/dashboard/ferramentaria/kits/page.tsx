@@ -39,11 +39,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Package, Trash2, Edit, ZoomIn } from 'lucide-react';
+import { Loader2, Package, Trash2, Edit, ZoomIn, PlusSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import KitDetailsDialog from '@/components/KitDetailsDialog';
+import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
+import CreateKitDialog from '@/components/CreateKitDialog';
 
 type KitWithDocId = WithDocId<Kit>;
 
@@ -52,6 +54,7 @@ const KitsPage = () => {
   const queryClient = useQueryClient();
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [selectedKit, setSelectedKit] = useState<KitWithDocId | null>(null);
+  const [isCreateKitOpen, setIsCreateKitOpen] = useState(false);
   const { toast } = useToast();
 
   const kitsQuery = useMemoFirebase(
@@ -62,6 +65,12 @@ const KitsPage = () => {
   const { data: kits, isLoading, error } = useCollection<KitWithDocId>(kitsQuery, {
       queryKey: ['kits']
   });
+  
+  const handleSuccess = () => {
+      queryClient.invalidateQueries({ queryKey: ['kits'] });
+      queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
+      setIsCreateKitOpen(false);
+  }
 
   const handleDisassembleKit = async (kit: KitWithDocId) => {
     if (!firestore) return;
@@ -86,8 +95,7 @@ const KitsPage = () => {
 
         toast({ title: "Sucesso!", description: `O kit ${kit.codigo} foi desmontado.` });
         
-        queryClient.invalidateQueries({ queryKey: ['kits'] });
-        queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
+        handleSuccess();
 
     } catch (err) {
         console.error("Erro ao desmontar o kit:", err);
@@ -99,10 +107,17 @@ const KitsPage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold flex items-center gap-2">
-        <Package />
-        Kits de Ferramentas
-      </h1>
+      <ToolingAlertHeader />
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Package />
+            Kits de Ferramentas
+        </h1>
+        <Button onClick={() => setIsCreateKitOpen(true)}>
+            <PlusSquare className="mr-2 h-4 w-4"/>
+            Criar Novo Kit
+        </Button>
+      </div>
 
       <Card>
         <CardHeader>
@@ -196,6 +211,12 @@ const KitsPage = () => {
             onClose={() => setSelectedKit(null)}
            />
       )}
+      
+       <CreateKitDialog
+        isOpen={isCreateKitOpen}
+        onClose={() => setIsCreateKitOpen(false)}
+        onSuccess={handleSuccess}
+      />
     </div>
   );
 };

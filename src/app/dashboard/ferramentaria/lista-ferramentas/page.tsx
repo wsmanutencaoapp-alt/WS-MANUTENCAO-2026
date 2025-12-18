@@ -35,6 +35,7 @@ import { differenceInDays } from 'date-fns';
 import CreateKitDialog from '@/components/CreateKitDialog';
 import { useRouter } from 'next/navigation';
 import KitDetailsDialog from '@/components/KitDetailsDialog';
+import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 
 interface Ferramenta extends Tool {
   docId: string;
@@ -198,12 +199,13 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
 
   return (
     <div className="space-y-6">
+      <ToolingAlertHeader />
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Lista de Ferramentas e Kits</h1>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsCreateKitDialogOpen(true)}>
+          <Button variant="outline" onClick={() => router.push('/dashboard/ferramentaria/kits')}>
               <PackagePlus className="mr-2 h-4 w-4" />
-              Criar Kit
+              Gerenciar Kits
           </Button>
           <Button variant="default" onClick={() => setIsAddQuantityDialogOpen(true)}>
               <PlusSquare className="mr-2 h-4 w-4" />

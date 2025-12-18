@@ -22,6 +22,7 @@ import HistoryDialog from '@/components/CalibrationHistoryDialog';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 
 const CalibracaoPage = () => {
   const firestore = useFirestore();
@@ -82,7 +83,7 @@ const CalibracaoPage = () => {
     if (daysUntilDue <= 15) {
       return { text: `Vence em ${daysUntilDue + 1} dias`, variant: 'warning' };
     }
-     if (daysUntilDue <= 30) {
+     if (daysUntilDue <= 60) {
       return { text: 'Vence em breve', variant: 'attention' };
     }
     return { text: 'Válido', variant: 'success' };
@@ -111,6 +112,7 @@ const CalibracaoPage = () => {
 
   return (
     <div className="space-y-6">
+      <ToolingAlertHeader />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center">
             <Thermometer className="mr-2"/>
@@ -142,7 +144,7 @@ const CalibracaoPage = () => {
                       <SelectItem value="todos">Todos os Tipos</SelectItem>
                       <SelectItem value="C">Calibrável (C)</SelectItem>
                       <SelectItem value="L">Teste de Carga (L)</SelectItem>
-                      <SelectItem value="V">Vencimento (V)</SelectItem>
+                      <SelectItem value="V" anç>Vencimento (V)</SelectItem>
                   </SelectContent>
               </Select>
             </div>

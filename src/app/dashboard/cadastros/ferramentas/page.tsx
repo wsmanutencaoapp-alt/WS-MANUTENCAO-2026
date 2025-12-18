@@ -53,6 +53,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
 import { useRouter } from 'next/navigation';
+import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 
 
 const familiaSuggestions: { [key in Tool['familia']]: Tool['classificacao'] } = {
@@ -339,6 +340,7 @@ const CadastroLogicaFerramentas = () => {
 
   return (
     <div className="space-y-6">
+      <ToolingAlertHeader />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Cadastro de Ferramentas</h1>
         <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {

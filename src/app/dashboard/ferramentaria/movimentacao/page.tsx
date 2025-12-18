@@ -11,6 +11,7 @@ import ToolLoanRequestDialog from '@/components/ToolLoanRequestDialog';
 import ToolRequestTable, { ToolRequestTableRef } from '@/components/ToolRequestTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Tool } from '@/lib/types';
+import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 
 const MovimentacaoFerramentaria = () => {
   const { toast } = useToast();
@@ -57,6 +58,7 @@ const MovimentacaoFerramentaria = () => {
 
   return (
     <div className="space-y-6">
+      <ToolingAlertHeader />
       <h1 className="text-2xl font-bold flex items-center">
         <Wrench className="h-6 w-6 mr-2" /> Controle de Entrada e Saída de Ferramentas
       </h1>
