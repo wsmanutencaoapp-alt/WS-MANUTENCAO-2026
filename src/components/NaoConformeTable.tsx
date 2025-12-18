@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc } from 'firebase/firestore';
 import type { Tool } from '@/lib/types';
 import {
   Table,
@@ -21,12 +21,13 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Tool as ToolIcon, Edit } from 'lucide-react';
+import { Loader2, Search, Tool as ToolIcon, Edit, CheckSquare } from 'lucide-react';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import Image from 'next/image';
 import { Input } from './ui/input';
 import ManageNonConformingDialog from './ManageNonConformingDialog';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 
 type NonConformingTool = WithDocId<Tool>;
 
@@ -43,8 +44,10 @@ const statusVariantMap: { [key: string]: 'default' | 'destructive' | 'secondary'
 const NaoConformeTable = () => {
     const firestore = useFirestore();
     const queryClient = useQueryClient();
+    const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTool, setSelectedTool] = useState<NonConformingTool | null>(null);
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
     const nonConformingStatuses: Tool['status'][] = [
         'Em Manutenção',
@@ -88,6 +91,32 @@ const NaoConformeTable = () => {
         queryClient.invalidateQueries({ queryKey });
         queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
         setSelectedTool(null);
+    }
+    
+    const handleFinishMaintenance = async (tool: NonConformingTool) => {
+        if (!firestore) return;
+        setProcessingId(tool.docId);
+        const toolRef = doc(firestore, 'tools', tool.docId);
+        try {
+            await updateDoc(toolRef, {
+                status: 'Disponível',
+                observacao: '' // Limpa a observação de não conformidade
+            });
+            toast({
+                title: 'Manutenção Finalizada',
+                description: `A ferramenta ${tool.codigo} está disponível novamente.`,
+            });
+            handleSuccess();
+        } catch(err) {
+            console.error("Erro ao finalizar manutenção: ", err);
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: 'Não foi possível atualizar o status da ferramenta.'
+            });
+        } finally {
+            setProcessingId(null);
+        }
     }
 
 
@@ -162,7 +191,21 @@ const NaoConformeTable = () => {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="max-w-xs truncate">{tool.observacao || 'N/A'}</TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right space-x-2">
+                                        {tool.status === 'Em Manutenção' && (
+                                            <Button 
+                                                variant="success" 
+                                                size="sm"
+                                                onClick={() => handleFinishMaintenance(tool)}
+                                                disabled={processingId === tool.docId}
+                                            >
+                                                {processingId === tool.docId 
+                                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
+                                                    : <CheckSquare className="mr-2 h-4 w-4"/>
+                                                }
+                                                Finalizar Manutenção
+                                            </Button>
+                                        )}
                                         <Button variant="outline" size="sm" onClick={() => setSelectedTool(tool)}>
                                             <Edit className="mr-2 h-4 w-4"/>
                                             Gerenciar
