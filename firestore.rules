@@ -2,12 +2,64 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: This is a completely permissive rule set.
-    // It allows anyone to read, write, and delete any data in your database.
-    // This is intended for initial development and MUST be replaced with
-    // secure rules before deploying to a production environment.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /supplies/{supplyId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /tools/{toolId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /tools/{toolId}/calibration_history/{calibrationId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /kits/{kitId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /suppliers/{supplierId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /operation_records/{operationRecordId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /images/{imageId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /employees/{employeeId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /expenses/{expenseId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /tool_requests/{requestId} {
+      allow list, get: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /counters/{counterId} {
+       allow list, get: if isAuthenticated();
+       allow write: if isAuthenticated();
     }
   }
 }
