@@ -4,7 +4,6 @@ export const allUserPermissions: { id: string; path: string }[] = [
     { id: 'suprimentos_movimentacao', path: '/dashboard/suprimentos/movimentacao' },
     { id: 'ferramentaria', path: '/dashboard/ferramentaria' },
     { id: 'ferramentaria_lista', path: '/dashboard/ferramentaria/lista-ferramentas' },
-    { id: 'ferramentaria_kits', path: '/dashboard/ferramentaria/kits' },
     { id: 'ferramentaria_movimentacao', path: '/dashboard/ferramentaria/movimentacao' },
     { id: 'calibracao', path: '/dashboard/calibracao' },
     { id: 'compras', path: '/dashboard/compras' },
@@ -35,7 +34,7 @@ export const allUserPermissions: { id: string; path: string }[] = [
 
 export const getRequiredPermissionForPath = (path: string): string | null => {
     // A rota /dashboard/ferramentaria é um alias, então tratamos como /lista-ferramentas
-    if (path === '/dashboard/ferramentaria') {
+    if (path === '/dashboard/ferramentaria' || path === '/dashboard/ferramentaria/kits') {
         path = '/dashboard/ferramentaria/lista-ferramentas';
     }
     // A rota /dashboard é a página principal e deve ser acessível se o usuário estiver logado.

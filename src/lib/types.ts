@@ -73,7 +73,6 @@ export type Permissions = {
   suprimentos_movimentacao?: boolean;
   ferramentaria_lista?: boolean;
   ferramentaria_movimentacao?: boolean;
-  ferramentaria_kits?: boolean;
   calibracao?: boolean;
   compras_aprovacoes?: boolean;
   compras_controle?: boolean;
