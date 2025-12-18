@@ -39,16 +39,23 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 
-interface ConfirmationDialogProps {
+// O diálogo de confirmação agora é um componente separado dentro do arquivo.
+// Ele gerencia seu próprio estado de abertura e apenas chama a função onConfirm.
+function ConfirmationDialog({
+  isOpen,
+  onOpenChange,
+  onConfirm,
+  isSaving,
+  request,
+  toolCount
+}: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   isSaving: boolean;
   request: WithDocId<ToolRequest>;
   toolCount: number;
-}
-
-function ConfirmationDialog({ isOpen, onOpenChange, onConfirm, isSaving, request, toolCount }: ConfirmationDialogProps) {
+}) {
     return (
         <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
             <AlertDialogContent>
@@ -82,6 +89,7 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
+  // O estado que controla o diálogo de confirmação agora está aqui.
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const toolsQuery = useMemoFirebase(() => {
@@ -101,7 +109,8 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
     }
     
     setIsSaving(true);
-    setIsConfirmOpen(false); // Close confirmation dialog
+    setIsConfirmOpen(false); // Fecha o diálogo de confirmação.
+
     try {
         const batch = writeBatch(firestore);
 
@@ -202,6 +211,7 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
+          {/* Este botão agora apenas abre o diálogo de confirmação */}
           <Button onClick={() => setIsConfirmOpen(true)} disabled={isSaving || isLoading}>
             <Undo2 className="mr-2 h-4 w-4" />
             Confirmar Devolução
@@ -210,6 +220,7 @@ export default function ReturnLoanDialog({ request, isOpen, onClose, onSuccess }
       </DialogContent>
     </Dialog>
 
+    {/* O componente de confirmação é renderizado aqui, mas gerencia seu próprio estado de visibilidade */}
     <ConfirmationDialog
         isOpen={isConfirmOpen}
         onOpenChange={setIsConfirmOpen}
