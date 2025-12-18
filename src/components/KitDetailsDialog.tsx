@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
-import { Loader2, Edit, Save, X, PlusCircle, MinusCircle, Search } from 'lucide-react';
+import { Loader2, Edit, Save, X, PlusCircle, MinusCircle, Search, ZoomIn } from 'lucide-react';
 import type { Kit, Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import Image from 'next/image';
@@ -123,8 +123,8 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
 
         // Update kit details
         batch.update(kitRef, {
-            descricao: editableKit.descricao,
-            enderecamento: editableKit.enderecamento,
+            descricao: editableKit.descricao || '',
+            enderecamento: editableKit.enderecamento || '',
             toolIds: Array.from(currentToolIds),
         });
 
@@ -185,7 +185,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         </DialogHeader>
 
         {isEditing ? (
-            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6" style={{ height: '60vh' }}>
+            <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-6 h-[60vh]">
                 {/* Coluna 1: Dados do kit e Ferramentas no Kit */}
                 <div className="flex flex-col gap-4 overflow-hidden">
                     <div className="space-y-4 p-1">
@@ -284,7 +284,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         
         <DialogFooter className="pt-4">
             {isEditing ? (
-                <div className="flex w-full justify-end gap-2">
+                <div className="flex w-full justify-end items-center gap-2">
                     <Button variant="ghost" onClick={handleCancelEdit} disabled={isSaving}>
                         <X className="mr-2 h-4 w-4" /> Cancelar
                     </Button>
