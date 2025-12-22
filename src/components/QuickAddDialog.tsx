@@ -62,10 +62,6 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
   const [calibrationDate, setCalibrationDate] = useState<Date | undefined>();
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
-
-  // State for Popover visibility
-  const [isCalDateOpen, setIsCalDateOpen] = useState(false);
-  const [isDueDateOpen, setIsDueDateOpen] = useState(false);
   
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -223,62 +219,22 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           certificateUrl = await getDownloadURL(certRef);
       }
       
-      await runTransaction(firestore, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        let lastId = 0;
-        if (counterDoc.exists()) {
-            lastId = counterDoc.data().lastId || 0;
-        } else {
-            // Se o contador não existir, criamos ele dentro da transação.
-            // A consulta anterior para obter o último sequencial pode ser usada como fallback se necessário.
-        }
-
-        const batch = writeBatch(firestore); // Usamos writeBatch dentro da transação para consistência
-
-        for (let i = 0; i < numQuantity; i++) {
-          const newSequencial = lastId + i + 1;
-          const newToolRef = doc(collection(firestore, 'tools'));
-          
-          const { docId, ...baseData } = selectedModel;
-          const finalToolData: Omit<Tool, 'id'> = {
-            ...baseData,
-            codigo: `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`,
-            sequencial: newSequencial,
-            status: 'Disponível', 
-            enderecamento: enderecamento,
-            descricao: descricao,
-            valor_estimado: Number(valorEstimado) || 0,
-            marca: marca,
-            patrimonio: patrimonio,
-            imageUrl: imageUrl,
-            data_referencia: isCalibratable && calibrationDate ? calibrationDate.toISOString() : undefined,
-            data_vencimento: isCalibratable && dueDate ? dueDate.toISOString() : undefined,
-            documento_anexo_url: isCalibratable ? certificateUrl : undefined,
-          };
-            
-          batch.set(newToolRef, finalToolData);
-          newToolsForPrinting.push({ ...finalToolData, docId: newToolRef.id });
-        }
-        
-        transaction.update(counterRef, { lastId: lastId + numQuantity });
-        
-        // Committing the batch should be done after the transaction logic that uses it.
-        // Since we are creating docs, we can't use the batch inside the transaction directly this way.
-        // Let's refactor to commit the batch outside, but the counter update must be atomic.
-      });
-
-      // The transaction only updates the counter. The batch write happens after.
-      const batch = writeBatch(firestore);
       const lastId = await runTransaction(firestore, async (transaction) => {
           const counterDoc = await transaction.get(counterRef);
           if (!counterDoc.exists()) {
-              transaction.set(counterRef, { lastId: numQuantity });
-              return 0;
+             // Fallback to query if counter doesn't exist yet
+             const q = query(collection(firestore, 'tools'), where('tipo', '==', tipo), where('familia', '==', familia), where('classificacao', '==', classificacao), orderBy('sequencial', 'desc'), limit(1));
+             const snapshot = await getDocs(q);
+             const lastSequencial = snapshot.empty ? 0 : (snapshot.docs[0].data().sequencial ?? 0);
+             transaction.set(counterRef, { lastId: lastSequencial + numQuantity });
+             return lastSequencial;
           }
           const newLastId = (counterDoc.data().lastId || 0);
           transaction.update(counterRef, { lastId: newLastId + numQuantity });
           return newLastId;
       });
+
+      const batch = writeBatch(firestore);
 
       for (let i = 0; i < numQuantity; i++) {
         const newSequencial = lastId + i + 1;
@@ -438,7 +394,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label>Data da Calibração</Label>
-                                <Popover open={isCalDateOpen} onOpenChange={setIsCalDateOpen}>
+                                <Popover>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -449,7 +405,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                                   <Calendar 
                                     mode="single" 
                                     selected={calibrationDate} 
-                                    onSelect={(day) => { setCalibrationDate(day); setIsCalDateOpen(false); }} 
+                                    onSelect={setCalibrationDate}
                                     initialFocus
                                   />
                                 </PopoverContent>
@@ -457,7 +413,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Data de Vencimento</Label>
-                                <Popover open={isDueDateOpen} onOpenChange={setIsDueDateOpen}>
+                                <Popover>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -468,7 +424,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                                   <Calendar 
                                     mode="single" 
                                     selected={dueDate} 
-                                    onSelect={(day) => { setDueDate(day); setIsDueDateOpen(false); }} 
+                                    onSelect={setDueDate}
                                     initialFocus
                                   />
                                 </PopoverContent>
