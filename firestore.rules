@@ -20,13 +20,14 @@ service cloud.firestore {
     
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      // Only Admins can create, update, or delete tools directly.
+      // Admins can do anything. Other users can't write directly.
       allow write: if isAdmin();
-    }
-    
-    match /tools/{toolId}/calibration_history/{calibrationId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      
+      // Allow admins to write to the calibration history subcollection.
+      match /calibration_history/{calibrationId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
     }
     
     match /kits/{kitId} {
@@ -67,9 +68,10 @@ service cloud.firestore {
       allow read, write: if request.resource.data.requesterId == request.auth.uid || isAdmin();
     }
 
-    // This collection is no longer used for sequential IDs. Only admins should access if needed.
+    // This collection is used for generating sequential IDs.
+    // Any authenticated user can read and write to it within a transaction.
     match /counters/{counterId} {
-        allow read, write: if isAdmin();
+        allow read, write: if isAuthenticated();
     }
   }
 }
