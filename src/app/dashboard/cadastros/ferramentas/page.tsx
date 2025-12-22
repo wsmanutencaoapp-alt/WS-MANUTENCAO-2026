@@ -591,5 +591,3 @@ const CadastroFerramentasPage = () => {
 };
 
 export default CadastroFerramentasPage;
-
-    
