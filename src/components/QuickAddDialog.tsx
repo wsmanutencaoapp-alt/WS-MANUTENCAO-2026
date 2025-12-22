@@ -32,6 +32,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface QuickAddDialogProps {
   isOpen: boolean;
@@ -228,10 +229,11 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
         if (counterDoc.exists()) {
             lastId = counterDoc.data().lastId || 0;
         } else {
-            transaction.set(counterRef, { lastId: 0 });
+            // Se o contador não existir, criamos ele dentro da transação.
+            // A consulta anterior para obter o último sequencial pode ser usada como fallback se necessário.
         }
 
-        const batch = writeBatch(firestore);
+        const batch = writeBatch(firestore); // Usamos writeBatch dentro da transação para consistência
 
         for (let i = 0; i < numQuantity; i++) {
           const newSequencial = lastId + i + 1;
@@ -260,8 +262,50 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
         
         transaction.update(counterRef, { lastId: lastId + numQuantity });
         
-        await batch.commit();
+        // Committing the batch should be done after the transaction logic that uses it.
+        // Since we are creating docs, we can't use the batch inside the transaction directly this way.
+        // Let's refactor to commit the batch outside, but the counter update must be atomic.
       });
+
+      // The transaction only updates the counter. The batch write happens after.
+      const batch = writeBatch(firestore);
+      const lastId = await runTransaction(firestore, async (transaction) => {
+          const counterDoc = await transaction.get(counterRef);
+          if (!counterDoc.exists()) {
+              transaction.set(counterRef, { lastId: numQuantity });
+              return 0;
+          }
+          const newLastId = (counterDoc.data().lastId || 0);
+          transaction.update(counterRef, { lastId: newLastId + numQuantity });
+          return newLastId;
+      });
+
+      for (let i = 0; i < numQuantity; i++) {
+        const newSequencial = lastId + i + 1;
+        const newToolRef = doc(collection(firestore, 'tools'));
+        
+        const { docId, ...baseData } = selectedModel;
+        const finalToolData: Omit<Tool, 'id'> = {
+          ...baseData,
+          codigo: `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`,
+          sequencial: newSequencial,
+          status: 'Disponível', 
+          enderecamento: enderecamento,
+          descricao: descricao,
+          valor_estimado: Number(valorEstimado) || 0,
+          marca: marca,
+          patrimonio: patrimonio,
+          imageUrl: imageUrl,
+          data_referencia: isCalibratable && calibrationDate ? calibrationDate.toISOString() : undefined,
+          data_vencimento: isCalibratable && dueDate ? dueDate.toISOString() : undefined,
+          documento_anexo_url: isCalibratable ? certificateUrl : undefined,
+        };
+          
+        batch.set(newToolRef, finalToolData);
+        newToolsForPrinting.push({ ...finalToolData, docId: newToolRef.id });
+      }
+
+      await batch.commit();
 
       toast({ title: 'Sucesso!', description: `${numQuantity} ferramenta(s) adicionada(s) ao estoque.` });
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
@@ -398,7 +442,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {calibrationDate ? format(calibrationDate, 'PPP') : <span>Escolha uma data</span>}
+                                    {calibrationDate ? format(calibrationDate, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -417,7 +461,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {dueDate ? format(dueDate, 'PPP') : <span>Escolha uma data</span>}
+                                    {dueDate ? format(dueDate, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
