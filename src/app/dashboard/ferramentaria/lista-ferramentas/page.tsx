@@ -187,6 +187,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
       setIsAddQuantityDialogOpen(false);
       setToolsToPrint(newTools);
       setIsLabelPrintDialogOpen(true);
+      queryClient.invalidateQueries({ queryKey: [ferramentasQueryKey] });
   }
 
   const isLoading = isLoadingTools || isLoadingKits;
@@ -198,7 +199,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Lista de Ferramentas e Kits</h1>
         <div className="flex gap-2">
-            <Button className="bg-green-600 hover:bg-green-700 text-white">
+            <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setIsAddQuantityDialogOpen(true)}>
               Adicionar Ferramenta!!
             </Button>
            <Button variant="secondary" onClick={() => setIsAddQuantityDialogOpen(true)}>
