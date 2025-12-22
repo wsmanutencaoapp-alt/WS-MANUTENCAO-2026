@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { doc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
-import { allUserPermissions, getRequiredPermissionForPath } from '@/lib/permissions';
+import { getModulePermissionForPath } from '@/lib/permissions';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -30,7 +30,34 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       router.push('/login');
       return;
     }
-  }, [user, isLoading, router]);
+
+    if (!isLoading && user && employeeData) {
+      const requiredModulePermission = getModulePermissionForPath(pathname);
+      const isAdmin = employeeData.accessLevel === 'Admin';
+      
+      // Admins can access everything.
+      if (isAdmin) {
+        return;
+      }
+      
+      // Allow access to the main dashboard page for all logged-in users.
+      if (pathname === '/dashboard' || pathname === '/dashboard/') {
+        return;
+      }
+      
+      // If no specific module permission is required, it's a public sub-page or the root dashboard.
+      if (!requiredModulePermission) {
+        return;
+      }
+
+      // Check if the user has permission for the required module.
+      if (!employeeData.permissions || !employeeData.permissions[requiredModulePermission]) {
+        // Redirect to the main dashboard as a fallback if they lack module access.
+        router.push('/dashboard');
+      }
+    }
+
+  }, [user, employeeData, isLoading, router, pathname]);
 
   if (isLoading || !user) {
     return (

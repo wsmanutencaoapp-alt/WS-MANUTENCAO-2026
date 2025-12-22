@@ -1,39 +1,20 @@
-export const allUserPermissions: { id: string; path: string }[] = [
-    { id: 'dashboard', path: '/dashboard' },
-    { id: 'suprimentos', path: '/dashboard/suprimentos' },
-    { id: 'suprimentos_movimentacao', path: '/dashboard/suprimentos/movimentacao' },
-    { id: 'ferramentaria', path: '/dashboard/ferramentaria' },
-    { id: 'ferramentaria_lista', path: '/dashboard/ferramentaria/lista-ferramentas' },
-    { id: 'ferramentaria_movimentacao', path: '/dashboard/ferramentaria/movimentacao' },
-    { id: 'ferramentaria_historico_nao_conformes', path: '/dashboard/ferramentaria/historico-nao-conformes' },
-    { id: 'ferramentaria_kits', path: '/dashboard/ferramentaria/kits' },
-    { id: 'calibracao', path: '/dashboard/calibracao' },
-    { id: 'compras', path: '/dashboard/compras' },
-    { id: 'compras_aprovacoes', path: '/dashboard/compras/aprovacoes' },
-    { id: 'compras_controle', path: '/dashboard/compras/controle' },
-    { id: 'financeiro', path: '/dashboard/financeiro' },
-    { id: 'financeiro_visao-geral', path: '/dashboard/financeiro/visao-geral' },
-    { id: 'financeiro_orcamento', path: '/dashboard/financeiro/orcamento' },
-    { id: 'financeiro_despesas', path: '/dashboard/financeiro/despesas' },
-    { id: 'contabilidade', path: '/dashboard/contabilidade' },
-    { id: 'contabilidade_balancete', path: '/dashboard/contabilidade/balancete' },
-    { id: 'contabilidade_relatorios', path: '/dashboard/contabilidade/relatorios' },
-    { id: 'contabilidade_classificacao', path: '/dashboard/contabilidade/classificacao' },
-    { id: 'userManagement', path: '/dashboard/user-management' },
-    { id: 'configurador', path: '/dashboard/configurador' },
-    { id: 'configurador_alcada-aprovacao', path: '/dashboard/configurador/alcada-aprovacao' },
-    { id: 'cadastros', path: '/dashboard/cadastros' },
-    { id 'cadastros_ferramentas', path: '/dashboard/cadastros/ferramentas' },
-    { id: 'cadastros_suprimentos', path: '/dashboard/cadastros/suprimentos' },
-    { id: 'cadastros_enderecos', path: '/dashboard/cadastros/enderecos' },
-    { id: 'engenharia', path: '/dashboard/engenharia' },
-    { id: 'engenharia_aprovacoes', path: '/dashboard/engenharia/aprovacoes' },
-    { id: 'engenharia_projetos', path: '/dashboard/engenharia/projetos' },
-    { id: 'comercial', path: '/dashboard/comercial' },
-    { id: 'qualidade', path: '/dashboard/qualidade' },
-    { id: 'gso', path: '/dashboard/gso' },
-    { id: 'planejamento', path: '/dashboard/planejamento' },
-    { id: 'manutencao', path: '/dashboard/manutencao' },
+export const allUserPermissions: { id: string; path: string, isModule?: boolean }[] = [
+    { id: 'dashboard', path: '/dashboard', isModule: true },
+    { id: 'suprimentos', path: '/dashboard/suprimentos', isModule: true },
+    { id: 'ferramentaria', path: '/dashboard/ferramentaria', isModule: true },
+    { id: 'calibracao', path: '/dashboard/calibracao', isModule: false }, // Part of ferramentaria
+    { id: 'cadastros', path: '/dashboard/cadastros', isModule: true },
+    { id: 'compras', path: '/dashboard/compras', isModule: true },
+    { id: 'engenharia', path: '/dashboard/engenharia', isModule: true },
+    { id: 'comercial', path: '/dashboard/comercial', isModule: true },
+    { id: 'financeiro', path: '/dashboard/financeiro', isModule: true },
+    { id: 'contabilidade', path: '/dashboard/contabilidade', isModule: true },
+    { id: 'qualidade', path: '/dashboard/qualidade', isModule: true },
+    { id: 'gso', path: '/dashboard/gso', isModule: true },
+    { id: 'planejamento', path: '/dashboard/planejamento', isModule: true },
+    { id: 'manutencao', path: '/dashboard/manutencao', isModule: true },
+    { id: 'userManagement', path: '/dashboard/user-management', isModule: true },
+    { id: 'configurador', path: '/dashboard/configurador', isModule: true },
 ];
 
 export const getRequiredPermissionForPath = (path: string): string | null => {
@@ -45,6 +26,30 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
     if (path === '/dashboard') {
         return 'dashboard';
     }
-    const permission = allUserPermissions.find(p => p.path === path);
-    return permission ? permission.id : null;
+    const matchingPermission = allUserPermissions.find(p => path.startsWith(p.path));
+    return matchingPermission ? matchingPermission.id : null;
+};
+
+
+/**
+ * Finds the required top-level module permission for a given URL path.
+ * @param path The URL path to check (e.g., /dashboard/ferramentaria/movimentacao).
+ * @returns The permission ID of the parent module (e.g., 'ferramentaria') or null.
+ */
+export const getModulePermissionForPath = (path: string): string | null => {
+    // Split the path into segments
+    const segments = path.split('/').filter(Boolean); // "dashboard", "ferramentaria", "movimentacao"
+
+    if (segments.length < 2) {
+        // Not a sub-page of the dashboard, or the dashboard itself
+        return null;
+    }
+
+    // The module name is typically the second segment
+    const moduleName = segments[1];
+
+    // Find the corresponding permission ID from the list
+    const modulePermission = allUserPermissions.find(p => p.isModule && p.path === `/dashboard/${moduleName}`);
+
+    return modulePermission ? modulePermission.id : null;
 };
