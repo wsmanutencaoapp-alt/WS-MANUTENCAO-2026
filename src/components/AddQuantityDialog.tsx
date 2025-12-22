@@ -204,7 +204,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     }
 
     setIsSaving(true);
-    const newTools: FoundTool[] = [];
     const { tipo, familia, classificacao } = selectedToolGroup;
     
     try {
@@ -223,27 +222,20 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         return currentLastId;
       });
 
-      // 2. Prepare all data and upload assets in parallel
-      const toolCreationPromises = [];
-      const tempToolsData = [];
+      // 2. Prepare all data and upload assets, then write to a batch
+      const newToolsForPrinting: FoundTool[] = [];
+      const batch = writeBatch(firestore);
+
       for (let i = 0; i < quantityToAdd; i++) {
         const newSequencial = lastId + 1 + i;
         const newCode = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
-        const tempId = doc(collection(firestore, 'temp')).id; // Unique ID for file paths
-        
-        const imageUrlPromise = toolImage ? uploadImage(toolImage, `tool_images/${tempId}.jpg`) : Promise.resolve(undefined);
-        const docAnexoUrlPromise = docAnexo ? uploadFile(docAnexo, `docs_anexos/${tempId}_${docAnexo.name}`) : Promise.resolve(undefined);
+        const newToolRef = doc(collection(firestore, 'tools')); // Get a new doc ref with a unique ID
 
-        tempToolsData.push({ newSequencial, newCode, imageUrlPromise, docAnexoUrlPromise });
-      }
+        // Prepare file uploads
+        const imageUrlPromise = toolImage ? uploadImage(toolImage, `tool_images/${newToolRef.id}.jpg`) : Promise.resolve(selectedToolGroup.imageUrl);
+        const docAnexoUrlPromise = docAnexo ? uploadFile(docAnexo, `docs_anexos/${newToolRef.id}_${docAnexo.name}`) : Promise.resolve(undefined);
 
-      // 3. Write all new tools to Firestore in a batch
-      const batch = writeBatch(firestore);
-      for (const tempData of tempToolsData) {
-        const { newSequencial, newCode, imageUrlPromise, docAnexoUrlPromise } = tempData;
-        
-        const imageUrl = await imageUrlPromise;
-        const docAnexoUrl = await docAnexoUrlPromise;
+        const [imageUrl, docAnexoUrl] = await Promise.all([imageUrlPromise, docAnexoUrlPromise]);
 
         // Exclude logic-specific fields from the new tool instance
         const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
@@ -264,16 +256,15 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           documento_anexo_url: docAnexoUrl,
         };
         
-        const newToolRef = doc(collection(firestore, 'tools'));
         batch.set(newToolRef, newToolData);
-        newTools.push({ ...newToolData, id: newToolRef.id });
+        newToolsForPrinting.push({ ...newToolData, id: newToolRef.id });
       }
       
       await batch.commit();
 
       toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.descricao} foram adicionadas.` });
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
-      onSuccess(newTools);
+      onSuccess(newToolsForPrinting);
 
     } catch (error) {
       console.error(error);
@@ -283,7 +274,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         requestResourceData: { info: `Transaction to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
       });
       errorEmitter.emit('permission-error', permissionError);
-      toast({ variant: 'destructive', title: 'Erro na Transação', description: 'Não foi possível concluir a operação. Verifique as permissões.' });
+      toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível concluir. Verifique as permissões e tente novamente.' });
     } finally {
       setIsSaving(false);
     }
@@ -446,3 +437,5 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
+
+    
