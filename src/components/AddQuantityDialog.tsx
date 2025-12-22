@@ -216,52 +216,48 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       const lastToolSnapshot = await getDocs(q);
       const lastSequencial = lastToolSnapshot.empty ? -1 : (lastToolSnapshot.docs[0].data().sequencial ?? -1);
 
-      // STEP 2: Prepare new tools data locally
-      const newToolsData = [];
       const newToolsForPrinting = [];
+      const batch = writeBatch(firestore);
+
+      // We perform uploads before batching writes
+      const uploadPromises: Promise<any>[] = [];
+      const imageDocId = doc(toolsCollectionRef).id; // Use one ID for shared images/docs
+      
+      let uploadedImageUrl: string | undefined;
+      if (toolImage) {
+          uploadPromises.push(
+              uploadImage(toolImage, `tool_images/${imageDocId}.jpg`).then(url => uploadedImageUrl = url)
+          );
+      }
+      
+      let uploadedDocAnexoUrl: string | undefined;
+      if (docAnexo) {
+           uploadPromises.push(
+              uploadFile(docAnexo, `docs_anexos/${imageDocId}_${docAnexo.name}`).then(url => uploadedDocAnexoUrl = url)
+           );
+      }
+
+      await Promise.all(uploadPromises);
+
+      // STEP 2: Batch write to Firestore with all data ready
       for (let i = 0; i < quantityToAdd; i++) {
         const newSequencial = lastSequencial + 1 + i;
         const newCode = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
-        const newDocId = doc(toolsCollectionRef).id;
+        const newToolRef = doc(toolsCollectionRef);
         
         const { docId, unitCount, lastSequencial: _, ...baseData } = selectedToolGroup;
-
-        newToolsData.push({
-          docId: newDocId,
-          baseData,
-          codigo: newCode,
-          sequencial: newSequencial,
-        });
-      }
-
-      // STEP 3: Upload files
-      let uploadedImageUrl: string | undefined;
-      let uploadedDocAnexoUrl: string | undefined;
-
-      if (toolImage) {
-        // Use a consistent ID for one of the new tools to store the image if adding multiple
-        uploadedImageUrl = await uploadImage(toolImage, `tool_images/${newToolsData[0].docId}.jpg`);
-      }
-      if (docAnexo) {
-        uploadedDocAnexoUrl = await uploadFile(docAnexo, `docs_anexos/${newToolsData[0].docId}_${docAnexo.name}`);
-      }
-
-      // STEP 4: Batch write to Firestore
-      const batch = writeBatch(firestore);
-      for (const tool of newToolsData) {
-        const newToolRef = doc(firestore, 'tools', tool.docId);
         
         const finalToolData: Omit<Tool, 'id'> = {
-          ...tool.baseData,
-          codigo: tool.codigo,
-          sequencial: tool.sequencial,
-          descricao: descricaoEspecifica || tool.baseData.descricao,
+          ...baseData,
+          codigo: newCode,
+          sequencial: newSequencial,
+          descricao: descricaoEspecifica || baseData.descricao,
           marca: marca || '',
           valor_estimado: Number(valorEstimado) || 0,
-          status: 'Disponível', // New tools are always available
+          status: 'Disponível', 
           enderecamento: enderecamento,
           patrimonio: patrimonio || '',
-          imageUrl: uploadedImageUrl || tool.baseData.imageUrl, // Use uploaded or fallback to template image
+          imageUrl: uploadedImageUrl || baseData.imageUrl,
           data_referencia: dataReferencia?.toISOString(),
           data_vencimento: dataVencimento?.toISOString(),
           documento_anexo_url: uploadedDocAnexoUrl,
@@ -442,5 +438,3 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
-
-    
