@@ -206,7 +206,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     setIsSaving(true);
     const newTools: FoundTool[] = [];
     const { tipo, familia, classificacao } = selectedToolGroup;
-    const baseCode = `${tipo}-${familia}-${classificacao}`;
     
     try {
       // 1. Get the next available ID from the counter in a transaction
@@ -226,50 +225,50 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
       // 2. Prepare all data and upload assets in parallel
       const toolCreationPromises = [];
+      const tempToolsData = [];
       for (let i = 0; i < quantityToAdd; i++) {
         const newSequencial = lastId + 1 + i;
-        const newCode = `${baseCode}-${newSequencial.toString().padStart(4, '0')}`;
-        const tempId = doc(collection(firestore, 'temp')).id;
-        const imagePath = `tool_images/${tempId}.jpg`;
-        const docPath = docAnexo ? `docs_anexos/${tempId}_${docAnexo.name}` : null;
+        const newCode = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
+        const tempId = doc(collection(firestore, 'temp')).id; // Unique ID for file paths
         
-        toolCreationPromises.push(
-          (async () => {
-            const imageUrl = await uploadImage(toolImage, imagePath);
-            const docAnexoUrl = docAnexo && docPath ? await uploadFile(docAnexo, docPath) : undefined;
-            
-            // Exclude logic-specific fields from the new tool instance
-            const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
-            
-            const newToolData: Omit<Tool, 'id'> = {
-              ...baseData,
-              codigo: newCode,
-              sequencial: newSequencial,
-              descricao: descricaoEspecifica || baseData.descricao,
-              marca: marca || '',
-              valor_estimado: Number(valorEstimado) || 0,
-              status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível',
-              enderecamento: enderecamento,
-              patrimonio: patrimonio || '',
-              imageUrl: imageUrl,
-              data_referencia: dataReferencia?.toISOString(),
-              data_vencimento: dataVencimento?.toISOString(),
-              documento_anexo_url: docAnexoUrl,
-            };
-            return newToolData;
-          })()
-        );
-      }
+        const imageUrlPromise = toolImage ? uploadImage(toolImage, `tool_images/${tempId}.jpg`) : Promise.resolve(undefined);
+        const docAnexoUrlPromise = docAnexo ? uploadFile(docAnexo, `docs_anexos/${tempId}_${docAnexo.name}`) : Promise.resolve(undefined);
 
-      const newToolsData = await Promise.all(toolCreationPromises);
+        tempToolsData.push({ newSequencial, newCode, imageUrlPromise, docAnexoUrlPromise });
+      }
 
       // 3. Write all new tools to Firestore in a batch
       const batch = writeBatch(firestore);
-      for (const toolData of newToolsData) {
+      for (const tempData of tempToolsData) {
+        const { newSequencial, newCode, imageUrlPromise, docAnexoUrlPromise } = tempData;
+        
+        const imageUrl = await imageUrlPromise;
+        const docAnexoUrl = await docAnexoUrlPromise;
+
+        // Exclude logic-specific fields from the new tool instance
+        const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
+
+        const newToolData: Omit<Tool, 'id'> = {
+          ...baseData,
+          codigo: newCode,
+          sequencial: newSequencial,
+          descricao: descricaoEspecifica || baseData.descricao,
+          marca: marca || '',
+          valor_estimado: Number(valorEstimado) || 0,
+          status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível',
+          enderecamento: enderecamento,
+          patrimonio: patrimonio || '',
+          imageUrl: imageUrl,
+          data_referencia: dataReferencia?.toISOString(),
+          data_vencimento: dataVencimento?.toISOString(),
+          documento_anexo_url: docAnexoUrl,
+        };
+        
         const newToolRef = doc(collection(firestore, 'tools'));
-        batch.set(newToolRef, toolData);
-        newTools.push({ ...toolData, id: newToolRef.id });
+        batch.set(newToolRef, newToolData);
+        newTools.push({ ...newToolData, id: newToolRef.id });
       }
+      
       await batch.commit();
 
       toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.descricao} foram adicionadas.` });
@@ -292,7 +291,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Adicionar Ferramenta ao Estoque</DialogTitle>
@@ -412,13 +411,13 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                                 {selectedToolGroup.classificacao === 'C' ? 'Data Última Calibração' : selectedToolGroup.classificacao === 'L' ? 'Data Último Teste' : 'Data Fabricação/Insp.'}
                            </Label>
                             <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataReferencia ? format(dataReferencia, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={dataReferencia} onSelect={setDataReferencia} initialFocus /></PopoverContent>
+                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataReferencia} onSelect={setDataReferencia} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
                         <div>
                            <Label>Data de Vencimento <span className='text-destructive'>*</span></Label>
                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{dataVencimento ? format(dataVencimento, 'PPP') : <span>Escolha uma data</span>}</Button></PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}><Calendar mode="single" selected={dataVencimento} onSelect={setDataVencimento} initialFocus /></PopoverContent>
+                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dataVencimento} onSelect={setDataVencimento} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
                         {(selectedToolGroup.classificacao === 'C' || selectedToolGroup.classificacao === 'L') && (
