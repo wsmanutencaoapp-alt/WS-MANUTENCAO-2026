@@ -11,7 +11,8 @@ import {
   doc,
   limit,
   orderBy,
-  addDoc
+  addDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import {
@@ -208,48 +209,38 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     const baseCode = `${tipo}-${familia}-${classificacao}`;
     
     try {
-      // First, upload all assets to get their URLs
-      const assetUploads = [];
+      // 1. Get the next available ID from the counter in a transaction
+      const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
+      const lastId = await runTransaction(firestore, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        let currentLastId = 0;
+        if (!counterDoc.exists()) {
+          transaction.set(counterRef, { lastId: quantityToAdd });
+          currentLastId = 0;
+        } else {
+          currentLastId = counterDoc.data().lastId || 0;
+          transaction.update(counterRef, { lastId: currentLastId + quantityToAdd });
+        }
+        return currentLastId;
+      });
+
+      // 2. Prepare all data and upload assets in parallel
+      const toolCreationPromises = [];
       for (let i = 0; i < quantityToAdd; i++) {
+        const newSequencial = lastId + 1 + i;
+        const newCode = `${baseCode}-${newSequencial.toString().padStart(4, '0')}`;
         const tempId = doc(collection(firestore, 'temp')).id;
-        const imagePath = `tool_images/${baseCode}_${tempId}.jpg`;
-        const docPath = docAnexo ? `docs_anexos/${baseCode}_${tempId}_${docAnexo.name}` : null;
+        const imagePath = `tool_images/${tempId}.jpg`;
+        const docPath = docAnexo ? `docs_anexos/${tempId}_${docAnexo.name}` : null;
         
-        assetUploads.push({
-          imageUrlPromise: uploadImage(toolImage, imagePath),
-          docAnexoUrlPromise: docAnexo && docPath ? uploadFile(docAnexo, docPath) : Promise.resolve(undefined),
-        });
-      }
-
-      const uploadedAssetUrls = await Promise.all(assetUploads.map(async (upload) => ({
-        imageUrl: await upload.imageUrlPromise,
-        docAnexoUrl: await upload.docAnexoUrlPromise,
-      })));
-
-      // Now, run the transaction to update counter and create tools
-      await runTransaction(firestore, async (transaction) => {
-          const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
-          const counterDoc = await transaction.get(counterRef);
-          
-          let lastId = 0;
-          if (!counterDoc.exists()) {
-              // If it doesn't exist, we will create it.
-              lastId = 0;
-          } else {
-              lastId = counterDoc.data().lastId || 0;
-          }
-          
-          const newLastId = lastId + quantityToAdd;
-          transaction.set(counterRef, { lastId: newLastId }, { merge: true });
-
-          // Exclude logic-specific fields from the new tool instance
-          const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
-
-          for (let i = 0; i < quantityToAdd; i++) {
-            const newSequencial = lastId + 1 + i;
-            const newCode = `${baseCode}-${newSequencial.toString().padStart(4, '0')}`;
-            const { imageUrl, docAnexoUrl } = uploadedAssetUrls[i];
-
+        toolCreationPromises.push(
+          (async () => {
+            const imageUrl = await uploadImage(toolImage, imagePath);
+            const docAnexoUrl = docAnexo && docPath ? await uploadFile(docAnexo, docPath) : undefined;
+            
+            // Exclude logic-specific fields from the new tool instance
+            const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
+            
             const newToolData: Omit<Tool, 'id'> = {
               ...baseData,
               codigo: newCode,
@@ -265,17 +256,24 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
               data_vencimento: dataVencimento?.toISOString(),
               documento_anexo_url: docAnexoUrl,
             };
-            
-            const newToolRef = doc(collection(firestore, 'tools'));
-            transaction.set(newToolRef, newToolData);
-            newTools.push({ ...newToolData, id: newToolRef.id });
-          }
-      });
-      
+            return newToolData;
+          })()
+        );
+      }
+
+      const newToolsData = await Promise.all(toolCreationPromises);
+
+      // 3. Write all new tools to Firestore in a batch
+      const batch = writeBatch(firestore);
+      for (const toolData of newToolsData) {
+        const newToolRef = doc(collection(firestore, 'tools'));
+        batch.set(newToolRef, toolData);
+        newTools.push({ ...toolData, id: newToolRef.id });
+      }
+      await batch.commit();
+
       toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.descricao} foram adicionadas.` });
-      
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
-      
       onSuccess(newTools);
 
     } catch (error) {
