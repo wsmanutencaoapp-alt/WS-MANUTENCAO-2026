@@ -25,7 +25,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, Upload, ImageIcon, CalendarIcon, FileText } from 'lucide-react';
-import type { Tool } from '@/lib/types';
+import type { Tool, CalibrationRecord } from '@/lib/types';
 import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
 import { useQueryClient } from '@tanstack/react-query';
@@ -259,6 +259,20 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           
         batch.set(newToolRef, finalToolData);
         newToolsForPrinting.push({ ...finalToolData, docId: newToolRef.id });
+
+        // If calibratable, add initial record to history subcollection
+        if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
+            const historyRef = doc(collection(firestore, newToolRef.path, 'calibration_history'));
+            const historyRecord: Omit<CalibrationRecord, 'id'> = {
+                toolId: newToolRef.id,
+                calibrationDate: calibrationDate.toISOString(),
+                dueDate: dueDate.toISOString(),
+                certificateUrl: certificateUrl,
+                calibratedBy: 'Registro Inicial', // Or some other signifier
+                timestamp: new Date().toISOString(),
+            };
+            batch.set(historyRef, historyRecord);
+        }
       }
 
       await batch.commit();
