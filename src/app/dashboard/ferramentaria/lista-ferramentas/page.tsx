@@ -36,7 +36,7 @@ import KitDetailsDialog from '@/components/KitDetailsDialog';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import NaoConformeTable from '@/components/NaoConformeTable';
-import AddQuantityDialog from '@/components/AddQuantityDialog';
+import QuickAddDialog from '@/components/QuickAddDialog';
 
 interface Ferramenta extends Tool {
   docId: string;
@@ -202,10 +202,6 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
             <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setIsAddQuantityDialogOpen(true)}>
               Adicionar Ferramenta!!
             </Button>
-           <Button variant="secondary" onClick={() => setIsAddQuantityDialogOpen(true)}>
-              <PlusSquare className="mr-2 h-4 w-4" />
-              Adicionar Ferramenta ao Estoque
-          </Button>
           <Button variant="outline" onClick={() => router.push('/dashboard/ferramentaria/kits')}>
               <PackagePlus className="mr-2 h-4 w-4" />
               Gerenciar Kits
@@ -340,7 +336,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
         </TabsContent>
       </Tabs>
       
-       <AddQuantityDialog
+       <QuickAddDialog
         isOpen={isAddQuantityDialogOpen}
         onClose={() => setIsAddQuantityDialogOpen(false)}
         onSuccess={handleAddSuccess}
