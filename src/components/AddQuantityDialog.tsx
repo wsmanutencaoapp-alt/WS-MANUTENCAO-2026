@@ -207,7 +207,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     const { tipo, familia, classificacao } = selectedToolGroup;
     
     try {
-      // 1. Get the next available ID from the counter in a transaction
       const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
       const lastId = await runTransaction(firestore, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
@@ -222,22 +221,19 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         return currentLastId;
       });
 
-      // 2. Prepare all data and upload assets, then write to a batch
       const newToolsForPrinting: FoundTool[] = [];
       const batch = writeBatch(firestore);
 
       for (let i = 0; i < quantityToAdd; i++) {
         const newSequencial = lastId + 1 + i;
         const newCode = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
-        const newToolRef = doc(collection(firestore, 'tools')); // Get a new doc ref with a unique ID
-
-        // Prepare file uploads
+        const newToolRef = doc(collection(firestore, 'tools')); 
+        
         const imageUrlPromise = toolImage ? uploadImage(toolImage, `tool_images/${newToolRef.id}.jpg`) : Promise.resolve(selectedToolGroup.imageUrl);
         const docAnexoUrlPromise = docAnexo ? uploadFile(docAnexo, `docs_anexos/${newToolRef.id}_${docAnexo.name}`) : Promise.resolve(undefined);
 
         const [imageUrl, docAnexoUrl] = await Promise.all([imageUrlPromise, docAnexoUrlPromise]);
 
-        // Exclude logic-specific fields from the new tool instance
         const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
 
         const newToolData: Omit<Tool, 'id'> = {
