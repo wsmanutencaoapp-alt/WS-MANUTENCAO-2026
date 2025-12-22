@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Loader2, Package, Trash2, Edit, ZoomIn, PlusSquare } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import KitDetailsDialog from '@/components/KitDetailsDialog';
