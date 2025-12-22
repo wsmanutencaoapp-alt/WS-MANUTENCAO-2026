@@ -32,7 +32,7 @@ import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
 import { useQueryClient } from '@tanstack/react-query';
 import { Calendar } from './ui/calendar';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -65,7 +65,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   
-  // State for Collapsible controls
+  // State for Popover controls
   const [isCalDateOpen, setIsCalDateOpen] = useState(false);
   const [isDueDateOpen, setIsDueDateOpen] = useState(false);
 
@@ -204,98 +204,102 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
     setIsSaving(true);
     
     try {
-      const { tipo, familia, classificacao } = selectedModel;
-      const numQuantity = parseInt(quantidade, 10) || 1;
-      const toolsRef = collection(firestore, "tools");
+        const { tipo, familia, classificacao } = selectedModel;
+        const numQuantity = parseInt(quantidade, 10) || 1;
+        const toolsRef = collection(firestore, "tools");
+        const counterRef = doc(firestore, 'counters', `${tipo}-${familia}-${classificacao}`);
 
-      const q = query(
-        toolsRef,
-        where('tipo', '==', tipo),
-        where('familia', '==', familia),
-        where('classificacao', '==', classificacao),
-        orderBy('sequencial', 'desc'),
-        limit(1)
-      );
+        // Get all sequential numbers in one transaction
+        const seqNumbers = await runTransaction(firestore, async (transaction) => {
+            const counterDoc = await transaction.get(counterRef);
+            let lastId = -1;
+            if (counterDoc.exists()) {
+                lastId = counterDoc.data()?.lastId ?? -1;
+            } else {
+                transaction.set(counterRef, { lastId: numQuantity - 1 });
+            }
+            
+            const newLastId = lastId + numQuantity;
+            transaction.update(counterRef, { lastId: newLastId });
 
-      const lastToolSnapshot = await getDocs(q);
-      const lastSequencial = lastToolSnapshot.empty ? -1 : (lastToolSnapshot.docs[0].data().sequencial ?? -1);
-      const startSequencial = lastSequencial + 1;
+            const numbers: number[] = [];
+            for (let i = 0; i < numQuantity; i++) {
+                numbers.push(lastId + 1 + i);
+            }
+            return numbers;
+        });
 
+        const newToolsForPrinting = [];
+        const toolRefsAndData = [];
+        const batch = writeBatch(firestore);
 
-      const newToolsForPrinting = [];
-      const toolRefsAndData = [];
-      const batch = writeBatch(firestore);
+        let imageUrl = selectedModel.imageUrl || '';
+        if (toolImage && toolImage.startsWith('data:')) {
+            const imageRef = storageRef(storage, `tool_images/${doc(collection(firestore, 'temp')).id}.jpg`);
+            const snapshot = await uploadString(imageRef, toolImage, 'data_url');
+            imageUrl = await getDownloadURL(snapshot.ref);
+        }
 
-      // Upload files ONCE
-      let imageUrl = selectedModel.imageUrl || '';
-      if (toolImage && toolImage.startsWith('data:')) {
-          const imageRef = storageRef(storage, `tool_images/${doc(collection(firestore, 'temp')).id}.jpg`);
-          const snapshot = await uploadString(imageRef, toolImage, 'data_url');
-          imageUrl = await getDownloadURL(snapshot.ref);
-      }
+        let certificateUrl = '';
+        if (isCalibratable && certificateFile) {
+            const certRef = storageRef(storage, `calibration_certificates/${doc(collection(firestore, 'temp')).id}_${certificateFile.name}`);
+            await uploadBytes(certRef, certificateFile);
+            certificateUrl = await getDownloadURL(certRef);
+        }
 
-      let certificateUrl = '';
-      if (isCalibratable && certificateFile) {
-          const certRef = storageRef(storage, `calibration_certificates/${doc(collection(firestore, 'temp')).id}_${certificateFile.name}`);
-          await uploadBytes(certRef, certificateFile);
-          certificateUrl = await getDownloadURL(certRef);
-      }
+        for (const sequencial of seqNumbers) {
+            const newToolRef = doc(toolsRef);
+            const { docId, ...baseData } = selectedModel;
+            
+            const finalToolData: Omit<Tool, 'id'> = {
+                ...baseData,
+                codigo: `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`,
+                sequencial: sequencial,
+                status: 'Disponível',
+                enderecamento: enderecamento,
+                descricao: descricao,
+                valor_estimado: Number(valorEstimado) || 0,
+                marca: marca,
+                patrimonio: patrimonio,
+                imageUrl: imageUrl,
+            };
+            
+            if (isCalibratable && calibrationDate && dueDate) {
+              finalToolData.data_referencia = calibrationDate.toISOString();
+              finalToolData.data_vencimento = dueDate.toISOString();
+              if (certificateUrl) {
+                finalToolData.documento_anexo_url = certificateUrl;
+              }
+            }
+            
+            batch.set(newToolRef, finalToolData);
+            const toolForPrinting = { ...finalToolData, docId: newToolRef.id };
+            newToolsForPrinting.push(toolForPrinting);
+            toolRefsAndData.push({ ref: newToolRef, data: toolForPrinting });
+        }
 
-      for (let i = 0; i < numQuantity; i++) {
-          const newToolRef = doc(toolsRef);
-          const sequencial = startSequencial + i;
+        await batch.commit();
 
-          const { docId, ...baseData } = selectedModel;
-          
-          const finalToolData: Omit<Tool, 'id'> = {
-              ...baseData,
-              codigo: `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`,
-              sequencial: sequencial,
-              status: 'Disponível',
-              enderecamento: enderecamento,
-              descricao: descricao,
-              valor_estimado: Number(valorEstimado) || 0,
-              marca: marca,
-              patrimonio: patrimonio,
-              imageUrl: imageUrl,
-          };
+        if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
+            const historyBatch = writeBatch(firestore);
+            for (const { ref: toolRef } of toolRefsAndData) {
+                const historyRef = doc(collection(toolRef, 'calibration_history'));
+                const historyRecord: Omit<CalibrationRecord, 'id'> = {
+                    toolId: toolRef.id,
+                    calibrationDate: calibrationDate.toISOString(),
+                    dueDate: dueDate.toISOString(),
+                    certificateUrl: certificateUrl,
+                    calibratedBy: 'Registro Inicial',
+                    timestamp: new Date().toISOString(),
+                };
+                historyBatch.set(historyRef, historyRecord);
+            }
+            await historyBatch.commit();
+        }
 
-          if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
-            finalToolData.data_referencia = calibrationDate.toISOString();
-            finalToolData.data_vencimento = dueDate.toISOString();
-            finalToolData.documento_anexo_url = certificateUrl;
-          }
-
-          batch.set(newToolRef, finalToolData);
-          const toolForPrinting = { ...finalToolData, docId: newToolRef.id };
-          newToolsForPrinting.push(toolForPrinting);
-          toolRefsAndData.push({ ref: newToolRef, data: toolForPrinting });
-      }
-
-      // Commit the first batch to create tools
-      await batch.commit();
-
-      // If calibratable, create history records in a second batch
-      if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
-          const historyBatch = writeBatch(firestore);
-          for (const { ref: toolRef } of toolRefsAndData) {
-              const historyRef = doc(collection(toolRef, 'calibration_history'));
-              const historyRecord: Omit<CalibrationRecord, 'id'> = {
-                  toolId: toolRef.id,
-                  calibrationDate: calibrationDate.toISOString(),
-                  dueDate: dueDate.toISOString(),
-                  certificateUrl: certificateUrl,
-                  calibratedBy: 'Registro Inicial',
-                  timestamp: new Date().toISOString(),
-              };
-              historyBatch.set(historyRef, historyRecord);
-          }
-          await historyBatch.commit();
-      }
-
-      toast({ title: 'Sucesso!', description: `${numQuantity} ferramenta(s) adicionada(s) ao estoque.` });
-      queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
-      onSuccess(newToolsForPrinting);
+        toast({ title: 'Sucesso!', description: `${numQuantity} ferramenta(s) adicionada(s) ao estoque.` });
+        queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
+        onSuccess(newToolsForPrinting);
 
     } catch (error: any) {
         console.error("Erro ao salvar:", error);
@@ -422,44 +426,44 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                    <div className="space-y-4 pt-4 border-t mt-4">
                         <h3 className="text-sm font-semibold text-primary">Dados de Calibração (Obrigatório)</h3>
                         <div className="grid grid-cols-2 gap-4">
-                             <Collapsible open={isCalDateOpen} onOpenChange={setIsCalDateOpen}>
+                             <Popover open={isCalDateOpen} onOpenChange={setIsCalDateOpen}>
                                <div className="space-y-2">
                                  <Label>Data da Calibração</Label>
-                                 <CollapsibleTrigger asChild>
+                                  <PopoverTrigger asChild>
                                    <Button variant="outline" className="w-full justify-start text-left font-normal">
                                      <CalendarIcon className="mr-2 h-4 w-4" />
                                      {calibrationDate ? format(calibrationDate, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
                                    </Button>
-                                 </CollapsibleTrigger>
+                                  </PopoverTrigger>
                                </div>
-                               <CollapsibleContent>
+                               <PopoverContent className="w-auto p-0">
                                    <Calendar
                                        mode="single"
                                        selected={calibrationDate}
                                        onSelect={(day) => { setCalibrationDate(day); setIsCalDateOpen(false); }}
                                        initialFocus
                                    />
-                               </CollapsibleContent>
-                             </Collapsible>
-                             <Collapsible open={isDueDateOpen} onOpenChange={setIsDueDateOpen}>
+                               </PopoverContent>
+                             </Popover>
+                             <Popover open={isDueDateOpen} onOpenChange={setIsDueDateOpen}>
                                <div className="space-y-2">
                                  <Label>Data de Vencimento</Label>
-                                 <CollapsibleTrigger asChild>
+                                  <PopoverTrigger asChild>
                                    <Button variant="outline" className="w-full justify-start text-left font-normal">
                                      <CalendarIcon className="mr-2 h-4 w-4" />
                                      {dueDate ? format(dueDate, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
                                    </Button>
-                                 </CollapsibleTrigger>
+                                  </PopoverTrigger>
                                </div>
-                               <CollapsibleContent>
+                               <PopoverContent className="w-auto p-0">
                                    <Calendar
                                        mode="single"
                                        selected={dueDate}
                                        onSelect={(day) => { setDueDate(day); setIsDueDateOpen(false); }}
                                        initialFocus
                                    />
-                               </CollapsibleContent>
-                             </Collapsible>
+                               </PopoverContent>
+                             </Popover>
                         </div>
                         <div className="space-y-1.5">
                             <Label>Certificado / Laudo</Label>

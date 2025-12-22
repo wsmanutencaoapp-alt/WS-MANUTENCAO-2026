@@ -239,20 +239,25 @@ const CadastroFerramentasPage = () => {
         
         if (!editingTool) { // Creating new tool
             const { tipo, familia, classificacao } = newFerramenta;
+            if (!tipo || !familia || !classificacao) {
+                toast({ variant: "destructive", description: "Tipo, Família e Classificação são obrigatórios." });
+                setIsSaving(false);
+                return;
+            }
             
             let sequencial = 0;
             if(!isTemplate) {
-              const q = query(
-                collection(firestore, 'tools'),
-                where('tipo', '==', tipo),
-                where('familia', '==', familia),
-                where('classificacao', '==', classificacao),
-                orderBy('sequencial', 'desc'),
-                limit(1)
-              );
-              const snapshot = await getDocs(q);
-              const lastSequencial = snapshot.empty ? -1 : (snapshot.docs[0].data().sequencial ?? -1);
-              sequencial = lastSequencial + 1;
+              const counterRef = doc(firestore, 'counters', `${tipo}-${familia}-${classificacao}`);
+              sequencial = await runTransaction(firestore, async (transaction) => {
+                  const counterDoc = await transaction.get(counterRef);
+                  if (!counterDoc.exists()) {
+                      transaction.set(counterRef, { lastId: 0 });
+                      return 0;
+                  }
+                  const newId = (counterDoc.data()?.lastId ?? 0) + 1;
+                  transaction.update(counterRef, { lastId: newId });
+                  return newId;
+              });
             }
            
             const codigoCompleto = `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;

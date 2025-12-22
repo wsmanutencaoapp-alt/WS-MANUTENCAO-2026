@@ -20,9 +20,11 @@ service cloud.firestore {
     
     match /tools/{toolId} {
       allow read: if isAuthenticated();
+      // Allow create for any authenticated user, but restrict update/delete to admins.
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
       
+      // Allow any authenticated user to create calibration history records (needed for new tool creation).
       match /calibration_history/{calibrationId} {
         allow read: if isAuthenticated();
         allow create: if isAuthenticated();
