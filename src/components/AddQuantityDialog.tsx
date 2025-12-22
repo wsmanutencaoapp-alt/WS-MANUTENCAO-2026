@@ -215,7 +215,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         limit(1)
       );
       const lastToolSnapshot = await getDocs(q);
-      const lastSequencial = lastToolSnapshot.empty ? 0 : (lastToolSnapshot.docs[0].data().sequencial || 0);
+      const lastSequencial = lastToolSnapshot.empty ? -1 : (lastToolSnapshot.docs[0].data().sequencial ?? -1);
 
       // STEP 2: Prepare new tools data locally
       const newToolsData = [];
@@ -443,5 +443,4 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
-
     
