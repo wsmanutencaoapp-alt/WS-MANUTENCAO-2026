@@ -30,8 +30,6 @@ import { Loader2, Search, Upload, Paperclip, CalendarIcon, ImageIcon, FileText }
 import type { Tool } from '@/lib/types';
 import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -283,19 +281,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     } catch (error: any) {
         console.error("Erro ao salvar:", error);
         toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível concluir. Verifique as permissões e tente novamente.' });
-      
-        // Emit a permission error if that's what's detected
-        if (error.code && error.code.includes('permission-denied')) {
-             errorEmitter.emit(
-                'permission-error',
-                new FirestorePermissionError({
-                    path: `tools/{newToolId}`,
-                    operation: 'write', 
-                    requestResourceData: { info: `Failed to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
-                })
-            );
-        }
-
     } finally {
       setIsSaving(false);
     }
@@ -458,3 +443,5 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
+
+    
