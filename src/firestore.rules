@@ -6,55 +6,65 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
+    
+    function isAdmin() {
+      // Check if the user's UID exists in the employees collection and has the 'Admin' accessLevel.
+      return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
+    }
 
     match /supplies/{supplyId} {
-      allow list, get: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     
     match /tools/{toolId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      // Only Admins can create, update, or delete tools directly.
+      allow write: if isAdmin();
     }
     
     match /tools/{toolId}/calibration_history/{calibrationId} {
-      allow list, get: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     
     match /kits/{kitId} {
-      allow list, get: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     
     match /suppliers/{supplierId} {
-      allow list, get: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     
     match /operation_records/{operationRecordId} {
-      allow list, get: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     
     match /images/{imageId} {
-      allow list, get: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     
     match /employees/{employeeId} {
-      allow list, get: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      // Allow a user to edit their own data, or allow an admin to edit any user's data.
+      allow write: if request.auth.uid == employeeId || isAdmin();
     }
     
     match /expenses/{expenseId} {
-      allow list, get: if isAuthenticated();
-      allow write: if isAuthenticated();
+      // Allow any authenticated user to create an expense record.
+      allow create: if isAuthenticated();
+      // Only admins can read, update, or delete expense records.
+      allow read, update, delete: if isAdmin();
     }
 
     match /tool_requests/{requestId} {
-      allow read, write: if isAuthenticated();
+      // Allow a user to read/write their own requests, or allow an admin to manage all requests.
+      allow read, write: if request.resource.data.requesterId == request.auth.uid || isAdmin();
     }
   }
 }
-
-    
