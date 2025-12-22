@@ -56,11 +56,11 @@ import { useRouter } from 'next/navigation';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 
 
-const familiaSuggestions: { [key in Tool['familia']]: Tool['classificacao'] } = {
+const familiaSuggestions: { [key in Tool['familia']]?: Tool['classificacao'] } = {
     TRQ: 'C', PRE: 'C', ELE: 'C', RIG: 'L', MET: 'C', SEG: 'V', MEC: 'N',
 };
 
-const CadastroLogicaFerramentas = () => {
+const CadastroFerramentasPage = () => {
   const { user } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
@@ -116,7 +116,7 @@ const CadastroLogicaFerramentas = () => {
 
   useEffect(() => {
     if (newFerramenta.familia) {
-      const suggestedClassificacao = familiaSuggestions[newFerramenta.familia];
+      const suggestedClassificacao = familiaSuggestions[newFerramenta.familia as keyof typeof familiaSuggestions];
       if (suggestedClassificacao) {
         setNewFerramenta(prev => ({ ...prev, classificacao: suggestedClassificacao }));
       }
@@ -230,9 +230,9 @@ const CadastroLogicaFerramentas = () => {
         
         if (isDirectCreation && !editingLogic) { // Only for new ESP or EQV tools
             const { tipo, familia, classificacao } = newFerramenta;
-            const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
             
             const newSequencial = await runTransaction(firestore, async (transaction) => {
+                const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
                 const counterDoc = await transaction.get(counterRef);
                  if (!counterDoc.exists()) {
                     transaction.set(counterRef, { lastId: 1 });
@@ -254,7 +254,7 @@ const CadastroLogicaFerramentas = () => {
             };
             
             const docRef = await addDoc(collection(firestore, 'tools'), toolData);
-            setToolsToPrint([{...toolData, id: docRef.id}]);
+            setToolsToPrint([{...toolData, docId: docRef.id}]);
             setIsLabelPrintOpen(true);
             toast({ title: "Sucesso!", description: `Ferramenta ${codigoCompleto} criada.` });
 
@@ -266,7 +266,7 @@ const CadastroLogicaFerramentas = () => {
         } else {
             // Add new logic template (STD or GSE)
             const sequencial = 0;
-            const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${sequencial.toString().padStart(4, '0')}`;
+            const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;
             const toolData: Partial<Tool> = {
                 ...baseToolData,
                 codigo: codigoCompleto,
@@ -587,4 +587,4 @@ const CadastroLogicaFerramentas = () => {
   );
 };
 
-export default CadastroLogicaFerramentas;
+export default CadastroFerramentasPage;

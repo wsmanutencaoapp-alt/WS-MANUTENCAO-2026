@@ -47,7 +47,7 @@ interface AddQuantityDialogProps {
 }
 
 type FoundTool = Tool & {
-  id: string;
+  docId: string;
 };
 
 // Represents a group of tools with the same 'codigo' base
@@ -96,8 +96,8 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
             const q = query(toolsRef, where('enderecamento', '==', 'LOGICA'), where('tipo', 'in', ['STD', 'GSE']));
             const querySnapshot = await getDocs(q);
             const logics: ToolGroup[] = querySnapshot.docs.map(doc => ({
-                id: doc.id,
                 ...(doc.data() as Tool),
+                docId: doc.id,
                 unitCount: 0,
                 lastSequencial: 0,
             }));
@@ -207,23 +207,23 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     const toolsCollectionRef = collection(firestore, 'tools');
     
     try {
-      // Find the last sequencial number for this tool type in a transaction
-      const lastId = await runTransaction(firestore, async (transaction) => {
-          const q = query(
-              toolsCollectionRef,
-              where('tipo', '==', tipo),
-              where('familia', '==', familia),
-              where('classificacao', '==', classificacao),
-              orderBy('sequencial', 'desc'),
-              limit(1)
-          );
-          const snapshot = await getDocs(q);
-          if (snapshot.empty) {
-              return 0; // No tools of this type yet
-          }
-          const lastTool = snapshot.docs[0].data() as Tool;
-          return lastTool.sequencial || 0;
-      });
+        // Find the last sequencial number for this tool type in a transaction
+        const lastId = await runTransaction(firestore, async (transaction) => {
+            const q = query(
+                toolsCollectionRef,
+                where('tipo', '==', tipo),
+                where('familia', '==', familia),
+                where('classificacao', '==', classificacao),
+                orderBy('sequencial', 'desc'),
+                limit(1)
+            );
+            const snapshot = await getDocs(q); // Use getDocs, not transaction.get
+            if (snapshot.empty) {
+                return 0; // No tools of this type yet
+            }
+            const lastTool = snapshot.docs[0].data() as Tool;
+            return lastTool.sequencial || 0;
+        });
 
       // Now create the new tools in a batch
       const batch = writeBatch(firestore);
@@ -239,7 +239,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
         const [imageUrl, docAnexoUrl] = await Promise.all([imageUrlPromise, docAnexoUrlPromise]);
 
-        const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
+        const { docId, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
         const newToolData: Omit<Tool, 'id'> = {
           ...baseData,
           codigo: newCode,
@@ -256,7 +256,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           documento_anexo_url: docAnexoUrl,
         };
         batch.set(newToolRef, newToolData);
-        newToolsForPrinting.push({ ...newToolData, id: newToolRef.id });
+        newToolsForPrinting.push({ ...newToolData, docId: newToolRef.id });
       }
 
       await batch.commit();
@@ -312,7 +312,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
                     <div className="space-y-2">
                         {filteredLogicTools.map((group) => (
                             <button
-                                key={group.id}
+                                key={group.docId}
                                 onClick={() => setSelectedToolGroup(group)}
                                 className="flex items-start gap-4 p-2 border rounded-lg hover:bg-muted/80 w-full text-left"
                             >
@@ -437,5 +437,3 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
-
-    

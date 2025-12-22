@@ -144,7 +144,11 @@
             "Bloqueado",
             "Inoperante",
             "Pendente",
-            "Em Kit"
+            "Em Kit",
+            "Em Conserto",
+            "Refugo",
+            "Com Avaria",
+            "Liberado Condicional"
           ]
         },
         "status_inicial": {
@@ -186,6 +190,23 @@
         "valor_estimado": {
             "type": "number",
             "description": "The estimated financial value of the tool."
+        },
+        "observacao": {
+            "type": "string",
+            "description": "Observations about the tool's condition or non-conformity."
+        },
+        "observacao_condicional": {
+            "type": "string",
+            "description": "The condition for a conditional release."
+        },
+        "data_descarte": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the tool was discarded."
+        },
+        "motivo_descarte": {
+            "type": "string",
+            "description": "The reason for discarding the tool."
         }
       },
       "required": [
@@ -534,6 +555,85 @@
         "status",
         "enderecamento"
       ]
+    },
+    "ToolRequest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ToolRequest",
+      "type": "object",
+      "description": "Represents a request to loan one or more tools for a specific work order.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the tool request."
+        },
+        "osNumber": {
+          "type": "string",
+          "description": "The work order number associated with the request."
+        },
+        "requesterId": {
+          "type": "string",
+          "description": "The Firebase UID of the employee who made the request."
+        },
+        "requesterName": {
+          "type": "string",
+          "description": "The name of the employee who made the request."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the request.",
+          "enum": ["Pendente", "Em Uso", "Devolvida", "Cancelada"]
+        },
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the request was created."
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The expected return date for the tools."
+        },
+        "toolIds": {
+          "type": "array",
+          "description": "An array of document IDs of the requested tools.",
+          "items": { "type": "string" }
+        },
+        "handledBy": {
+          "type": "string",
+          "description": "The UID of the ferramentaria user who handled the withdrawal."
+        },
+        "handledAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the tools were withdrawn."
+        },
+        "returnedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the tools were returned."
+        },
+        "returnConditions": {
+            "type": "object",
+            "description": "A map of tool IDs to their inspection results upon return.",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "visual": { "type": "string", "enum": ["ok", "nok"] },
+                    "funcional": { "type": "string", "enum": ["ok", "nok"] },
+                    "observacao": { "type": "string" }
+                },
+                "required": ["visual", "funcional", "observacao"]
+            }
+        }
+      },
+      "required": [
+        "osNumber",
+        "requesterId",
+        "requesterName",
+        "status",
+        "requestedAt",
+        "toolIds"
+      ]
     }
   },
   "auth": {
@@ -675,6 +775,22 @@
           ]
         }
       },
+       {
+        "path": "/counters/{counterId}",
+        "definition": {
+          "entityName": "Counter",
+          "schema": {
+            "$ref": "#/backend/entities/Counter"
+          },
+          "description": "Stores sequential counters for generating unique IDs.",
+          "params": [
+            {
+              "name": "counterId",
+              "description": "Unique identifier for the counter (e.g., 'employees', 'tools')."
+            }
+          ]
+        }
+      },
       {
         "path": "/expenses/{expenseId}",
         "definition": {
@@ -687,6 +803,22 @@
             {
               "name": "expenseId",
               "description": "Unique identifier for the expense record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tool_requests/{requestId}",
+        "definition": {
+          "entityName": "ToolRequest",
+          "schema": {
+            "$ref": "#/backend/entities/ToolRequest"
+          },
+          "description": "Stores requests for tool loans.",
+          "params": [
+            {
+              "name": "requestId",
+              "description": "Unique identifier for the tool loan request."
             }
           ]
         }
