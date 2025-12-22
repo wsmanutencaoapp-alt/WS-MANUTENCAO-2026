@@ -221,45 +221,50 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           await uploadBytes(certRef, certificateFile);
           certificateUrl = await getDownloadURL(certRef);
       }
-
-      const batch = writeBatch(firestore);
-
-      for (let i = 0; i < numQuantity; i++) {
-        const newSequencial = await runTransaction(firestore, async (transaction) => {
-            const counterDoc = await transaction.get(counterRef);
-            if (!counterDoc.exists()) {
-              transaction.set(counterRef, { lastId: 0 });
-              return 0;
-            }
-            const newId = (counterDoc.data().lastId || 0) + 1;
-            transaction.update(counterRef, { lastId: newId });
-            return newId;
-        });
-
-        const newToolRef = doc(collection(firestore, 'tools'));
-        
-        const { docId, ...baseData } = selectedModel;
-        const finalToolData: Omit<Tool, 'id'> = {
-          ...baseData,
-          codigo: `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`,
-          sequencial: newSequencial,
-          status: 'Disponível', 
-          enderecamento: enderecamento,
-          descricao: descricao,
-          valor_estimado: Number(valorEstimado) || 0,
-          marca: marca,
-          patrimonio: patrimonio,
-          imageUrl: imageUrl,
-          data_referencia: isCalibratable && calibrationDate ? calibrationDate.toISOString() : undefined,
-          data_vencimento: isCalibratable && dueDate ? dueDate.toISOString() : undefined,
-          documento_anexo_url: isCalibratable ? certificateUrl : undefined,
-        };
-          
-        batch.set(newToolRef, finalToolData);
-        newToolsForPrinting.push({ ...finalToolData, docId: newToolRef.id });
-      }
       
-      await batch.commit();
+      await runTransaction(firestore, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        let lastId = 0;
+        if (counterDoc.exists()) {
+            lastId = counterDoc.data().lastId || 0;
+        } else {
+            // Se o contador não existe, vamos criá-lo na transação
+            transaction.set(counterRef, { lastId: 0 });
+        }
+
+        const batch = writeBatch(firestore);
+
+        for (let i = 0; i < numQuantity; i++) {
+          const newSequencial = lastId + i + 1;
+          const newToolRef = doc(collection(firestore, 'tools'));
+          
+          const { docId, ...baseData } = selectedModel;
+          const finalToolData: Omit<Tool, 'id'> = {
+            ...baseData,
+            codigo: `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`,
+            sequencial: newSequencial,
+            status: 'Disponível', 
+            enderecamento: enderecamento,
+            descricao: descricao,
+            valor_estimado: Number(valorEstimado) || 0,
+            marca: marca,
+            patrimonio: patrimonio,
+            imageUrl: imageUrl,
+            data_referencia: isCalibratable && calibrationDate ? calibrationDate.toISOString() : undefined,
+            data_vencimento: isCalibratable && dueDate ? dueDate.toISOString() : undefined,
+            documento_anexo_url: isCalibratable ? certificateUrl : undefined,
+          };
+            
+          batch.set(newToolRef, finalToolData);
+          newToolsForPrinting.push({ ...finalToolData, docId: newToolRef.id });
+        }
+        
+        // Em vez de usar batch.commit, usamos o commit da transação ao final
+        transaction.update(counterRef, { lastId: lastId + numQuantity });
+        
+        // O batch commit é feito fora, aqui só preparamos.
+        await batch.commit();
+      });
 
       toast({ title: 'Sucesso!', description: `${numQuantity} ferramenta(s) adicionada(s) ao estoque.` });
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
@@ -399,7 +404,14 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                                     {calibrationDate ? format(calibrationDate, 'PPP') : <span>Escolha uma data</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={calibrationDate} onSelect={(day) => { setCalibrationDate(day); setIsCalDateOpen(false); }} initialFocus/></PopoverContent>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar 
+                                    mode="single" 
+                                    selected={calibrationDate} 
+                                    onSelect={(day) => { setCalibrationDate(day); setIsCalDateOpen(false); }} 
+                                    initialFocus
+                                  />
+                                </PopoverContent>
                                 </Popover>
                             </div>
                             <div className="space-y-1.5">
@@ -411,7 +423,14 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                                     {dueDate ? format(dueDate, 'PPP') : <span>Escolha uma data</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={(day) => { setDueDate(day); setIsDueDateOpen(false); }} initialFocus/></PopoverContent>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar 
+                                    mode="single" 
+                                    selected={dueDate} 
+                                    onSelect={(day) => { setDueDate(day); setIsDueDateOpen(false); }} 
+                                    initialFocus
+                                  />
+                                </PopoverContent>
                                 </Popover>
                             </div>
                         </div>
