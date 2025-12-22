@@ -7,11 +7,10 @@ import {
   query,
   where,
   getDocs,
-  runTransaction,
   doc,
+  writeBatch,
   limit,
-  orderBy,
-  writeBatch
+  orderBy
 } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import {
@@ -131,10 +130,10 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
   // Reset state when dialog opens/closes
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && selectedToolGroup) {
         setDescricaoEspecifica(selectedToolGroup?.descricao || '');
         setValorEstimado(selectedToolGroup?.valor_estimado || 0);
-    } else {
+    } else if (!isOpen) {
       setSearchTerm('');
       setQuantityToAdd(1);
       setEnderecamento('');
@@ -293,55 +292,55 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         <DialogHeader>
           <DialogTitle>Adicionar Ferramenta ao Estoque (Clonar Modelo)</DialogTitle>
           <DialogDescription>
-            Pesquise por um modelo (STD/GSE) e adicione novas unidades ao inventário. Para cadastrar um item único (ESP/EQV), vá para Cadastros {"->"} Ferramentas.
+            Pesquise por um modelo (STD/GSE) e adicione novas unidades ao inventário.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
-          <div className="relative">
-            <Label htmlFor="searchTerm">Pesquisar Modelo (STD/GSE)</Label>
-            <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="searchTerm"
-              placeholder="Digite a descrição ou código do modelo (ex: Torquímetro, STD-TRQ...)"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8"
-              disabled={!!selectedToolGroup}
-            />
-             {isSearching && <Loader2 className="absolute right-2.5 bottom-2.5 h-4 w-4 animate-spin" />}
-          </div>
-
-          {!isSearching && !selectedToolGroup && (
-            <ScrollArea className="h-[200px] border rounded-md p-2">
-                {filteredLogicTools.length > 0 ? (
-                    <div className="space-y-2">
-                        {filteredLogicTools.map((group) => (
-                            <button
-                                key={group.docId}
-                                onClick={() => setSelectedToolGroup(group)}
-                                className="flex items-start gap-4 p-2 border rounded-lg hover:bg-muted/80 w-full text-left"
-                            >
-                                <Image
-                                    src={group.imageUrl || "https://picsum.photos/seed/tool/64/64"}
-                                    alt={group.descricao}
-                                    width={48}
-                                    height={48}
-                                    className="aspect-square rounded-md object-cover"
-                                />
-                                <div className="text-sm">
-                                    <p className="font-bold">{group.descricao}</p>
-                                    <p><strong>Código Base:</strong> {group.codigo.substring(0, group.codigo.lastIndexOf('-'))}</p>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="p-4 text-center text-sm text-muted-foreground">
-                        <p>Nenhum modelo encontrado.</p>
-                    </div>
-                )}
-            </ScrollArea>
+          {!selectedToolGroup && (
+            <>
+              <div className="relative">
+                <Label htmlFor="searchTerm">Pesquisar Modelo (STD/GSE)</Label>
+                <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="searchTerm"
+                  placeholder="Digite a descrição ou código do modelo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+                {isSearching && <Loader2 className="absolute right-2.5 bottom-2.5 h-4 w-4 animate-spin" />}
+              </div>
+              <ScrollArea className="h-[200px] border rounded-md p-2">
+                  {filteredLogicTools.length > 0 ? (
+                      <div className="space-y-2">
+                          {filteredLogicTools.map((group) => (
+                              <button
+                                  key={group.docId}
+                                  onClick={() => setSelectedToolGroup(group)}
+                                  className="flex items-start gap-4 p-2 border rounded-lg hover:bg-muted/80 w-full text-left"
+                              >
+                                  <Image
+                                      src={group.imageUrl || "https://picsum.photos/seed/tool/64/64"}
+                                      alt={group.descricao}
+                                      width={48}
+                                      height={48}
+                                      className="aspect-square rounded-md object-cover"
+                                  />
+                                  <div className="text-sm">
+                                      <p className="font-bold">{group.descricao}</p>
+                                      <p><strong>Código Base:</strong> {group.codigo.substring(0, group.codigo.lastIndexOf('-'))}</p>
+                                  </div>
+                              </button>
+                          ))}
+                      </div>
+                  ) : (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                          <p>Nenhum modelo encontrado.</p>
+                      </div>
+                  )}
+              </ScrollArea>
+            </>
           )}
 
           {selectedToolGroup && (
@@ -443,4 +442,5 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
+
     

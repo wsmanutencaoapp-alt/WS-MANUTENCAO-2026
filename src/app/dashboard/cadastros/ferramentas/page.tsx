@@ -240,7 +240,8 @@ const CadastroFerramentasPage = () => {
         if (!editingTool) { // Creating new tool
             const { tipo, familia, classificacao } = newFerramenta;
             
-            const sequencial = await runTransaction(firestore, async (transaction) => {
+            let sequencial = 0;
+            if(!isTemplate) {
               const q = query(
                 collection(firestore, 'tools'),
                 where('tipo', '==', tipo),
@@ -249,17 +250,11 @@ const CadastroFerramentasPage = () => {
                 orderBy('sequencial', 'desc'),
                 limit(1)
               );
-              // Transaction read
-              const snapshot = await getDocs(q); 
+              const snapshot = await getDocs(q);
               const lastSequencial = snapshot.empty ? -1 : (snapshot.docs[0].data().sequencial ?? -1);
-              
-              if(isTemplate) return 0; // Templates always have sequencial 0
-              
-              return lastSequencial + 1;
-            });
-
-            if (sequencial < 0) throw new Error("Falha ao gerar sequencial.");
-
+              sequencial = lastSequencial + 1;
+            }
+           
             const codigoCompleto = `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;
             const status: Tool['status'] = tipo === 'EQV' ? 'Pendente' : 'Disponível';
 
@@ -548,7 +543,7 @@ const CadastroFerramentasPage = () => {
                  {(newFerramenta.tipo === 'STD' || newFerramenta.tipo === 'GSE') && !editingTool && (
                     <div className="col-span-full bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-md flex items-center gap-3">
                         <AlertTriangle className="h-5 w-5" />
-                        <p className="text-sm">Você está criando um <span className="font-bold">Modelo (template)</span>. Ele não aparecerá no inventário, mas servirá de base para adicionar ferramentas em massa.</p>
+                        <p className="text-sm">Você está criando um <span className="font-bold">Modelo (template)</span>. Ele não aparecerá no inventário, mas servirá de base para adicionar ferramentas ao estoque.</p>
                     </div>
                 )}
             </div>
@@ -640,3 +635,5 @@ const CadastroFerramentasPage = () => {
 };
 
 export default CadastroFerramentasPage;
+
+    

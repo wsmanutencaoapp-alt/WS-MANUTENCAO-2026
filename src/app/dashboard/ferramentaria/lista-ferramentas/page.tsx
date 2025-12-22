@@ -36,6 +36,7 @@ import KitDetailsDialog from '@/components/KitDetailsDialog';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import NaoConformeTable from '@/components/NaoConformeTable';
+import AddQuantityDialog from '@/components/AddQuantityDialog';
 
 interface Ferramenta extends Tool {
   docId: string;
@@ -54,6 +55,7 @@ const ListaFerramentasPage = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isLabelPrintDialogOpen, setIsLabelPrintDialogOpen] = useState(false);
+  const [isAddQuantityDialogOpen, setIsAddQuantityDialogOpen] = useState(false);
   const [toolsToPrint, setToolsToPrint] = useState<any[]>([]);
   const [selectedToolForDetails, setSelectedToolForDetails] = useState<Ferramenta | null>(null);
   const [selectedKitForDetails, setSelectedKitForDetails] = useState<KitComDocId | null>(null);
@@ -180,6 +182,12 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
     toast({ title: "Sucesso", description: "Ferramenta excluída." });
     setSelectedToolForDetails(null);
   }
+  
+  const handleAddSuccess = (newTools: any[]) => {
+      setIsAddQuantityDialogOpen(false);
+      setToolsToPrint(newTools);
+      setIsLabelPrintDialogOpen(true);
+  }
 
   const isLoading = isLoadingTools || isLoadingKits;
   const anyError = firestoreError || kitsError;
@@ -190,13 +198,17 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Lista de Ferramentas e Kits</h1>
         <div className="flex gap-2">
+           <Button variant="secondary" onClick={() => setIsAddQuantityDialogOpen(true)}>
+              <PlusSquare className="mr-2 h-4 w-4" />
+              Adicionar Ferramenta ao Estoque
+          </Button>
           <Button variant="outline" onClick={() => router.push('/dashboard/ferramentaria/kits')}>
               <PackagePlus className="mr-2 h-4 w-4" />
               Gerenciar Kits
           </Button>
           <Button variant="default" onClick={() => router.push('/dashboard/cadastros/ferramentas')}>
               <PlusSquare className="mr-2 h-4 w-4" />
-              Cadastrar Ferramenta/Modelo
+              Cadastrar Modelo
           </Button>
         </div>
       </div>
@@ -323,6 +335,12 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
            <NaoConformeTable />
         </TabsContent>
       </Tabs>
+      
+       <AddQuantityDialog
+        isOpen={isAddQuantityDialogOpen}
+        onClose={() => setIsAddQuantityDialogOpen(false)}
+        onSuccess={handleAddSuccess}
+      />
 
       <LabelPrintDialog
         isOpen={isLabelPrintDialogOpen}
