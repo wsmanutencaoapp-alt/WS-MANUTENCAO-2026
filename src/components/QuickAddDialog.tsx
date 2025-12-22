@@ -9,8 +9,7 @@ import {
   getDocs,
   doc,
   writeBatch,
-  limit,
-  orderBy
+  runTransaction
 } from 'firebase/firestore';
 import {
   Dialog,
@@ -125,25 +124,28 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
     
     try {
       const { tipo, familia, classificacao } = selectedModel;
-      const toolsCollectionRef = collection(firestore, 'tools');
+      // Define a unique ID for the counter document based on the tool's characteristics
+      const counterId = `${tipo}-${familia}-${classificacao}`;
+      const counterRef = doc(firestore, 'counters', counterId);
 
-      // STEP 1: Find the last sequencial number using a simple query
-      const q = query(
-        toolsCollectionRef,
-        where('tipo', '==', tipo),
-        where('familia', '==', familia),
-        where('classificacao', '==', classificacao),
-        orderBy('sequencial', 'desc'),
-        limit(1)
-      );
-      const lastToolSnapshot = await getDocs(q);
-      const lastSequencial = lastToolSnapshot.empty ? -1 : (lastToolSnapshot.docs[0].data().sequencial ?? -1);
-      const newSequencial = lastSequencial + 1;
+      // Use a transaction to safely increment the counter
+      const newSequencial = await runTransaction(firestore, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        if (!counterDoc.exists()) {
+          // If the counter doesn't exist, start from 1
+          transaction.set(counterRef, { lastId: 1 });
+          return 0; // The first item will be 0000
+        }
+        const lastId = counterDoc.data().lastId || 0;
+        const newId = lastId + 1;
+        transaction.update(counterRef, { lastId: newId });
+        return newId;
+      });
 
-      // STEP 2: Batch write to Firestore
-      const newToolRef = doc(toolsCollectionRef);
+      // Now create the new tool document with the guaranteed unique sequential number
       const batch = writeBatch(firestore);
-
+      const newToolRef = doc(collection(firestore, 'tools'));
+      
       const { docId, ...baseData } = selectedModel;
       const finalToolData: Omit<Tool, 'id'> = {
         ...baseData,

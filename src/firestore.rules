@@ -20,7 +20,7 @@ service cloud.firestore {
     
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      // Only Admins can create, update, or delete tools directly.
+      // Admins can do anything. Other users can't write directly.
       allow write: if isAdmin();
     }
     
@@ -65,6 +65,12 @@ service cloud.firestore {
     match /tool_requests/{requestId} {
       // Allow a user to read/write their own requests, or allow an admin to manage all requests.
       allow read, write: if request.resource.data.requesterId == request.auth.uid || isAdmin();
+    }
+
+    // This collection is used for generating sequential IDs.
+    // Any authenticated user can read and write to it within a transaction.
+    match /counters/{counterId} {
+        allow read, write: if isAuthenticated();
     }
   }
 }
