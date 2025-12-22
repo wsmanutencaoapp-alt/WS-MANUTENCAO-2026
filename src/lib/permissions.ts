@@ -23,6 +23,8 @@ export const allUserPermissions: { id: string; path: string }[] = [
     { id: 'configurador_alcada-aprovacao', path: '/dashboard/configurador/alcada-aprovacao' },
     { id: 'cadastros', path: '/dashboard/cadastros' },
     { id: 'cadastros_ferramentas', path: '/dashboard/cadastros/ferramentas' },
+    { id: 'cadastros_suprimentos', path: '/dashboard/cadastros/suprimentos' },
+    { id: 'cadastros_enderecos', path: '/dashboard/cadastros/enderecos' },
     { id: 'engenharia', path: '/dashboard/engenharia' },
     { id: 'engenharia_aprovacoes', path: '/dashboard/engenharia/aprovacoes' },
     { id: 'engenharia_projetos', path: '/dashboard/engenharia/projetos' },

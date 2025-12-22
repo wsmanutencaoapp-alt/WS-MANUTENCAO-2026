@@ -109,6 +109,8 @@ export type Permissions = {
   'configurador_alcada-aprovacao'?: boolean;
   cadastros?: boolean;
   cadastros_ferramentas?: boolean;
+  cadastros_suprimentos?: boolean;
+  cadastros_enderecos?: boolean;
   engenharia?: boolean;
   engenharia_aprovacoes?: boolean;
   engenharia_projetos?: boolean;

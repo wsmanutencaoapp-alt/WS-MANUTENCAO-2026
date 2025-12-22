@@ -81,6 +81,17 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/ferramentaria/historico-nao-conformes', icon: History, label: 'Histórico Não Conformes', permission: 'ferramentaria_historico_nao_conformes' },
     ]
   },
+  {
+    href: '/dashboard/cadastros',
+    icon: FilePlus2,
+    label: 'Cadastros',
+    permission: 'cadastros',
+    subItems: [
+        { href: '/dashboard/cadastros/ferramentas', label: 'Ferramentas', permission: 'cadastros_ferramentas' },
+        { href: '/dashboard/cadastros/suprimentos', label: 'Suprimentos', permission: 'cadastros_suprimentos' },
+        { href: '/dashboard/cadastros/enderecos', label: 'Endereços', permission: 'cadastros_enderecos' },
+    ]
+  },
   { 
     href: '/dashboard/compras',
     icon: ShoppingCart, 
@@ -152,12 +163,6 @@ const allNavItems: NavItem[] = [
     icon: HardHat,
     label: 'Manutenção',
     permission: 'manutencao',
-  },
-  { 
-    href: '/dashboard/cadastros/ferramentas', 
-    icon: FilePlus2, 
-    label: 'Cadastros',
-    permission: 'cadastros',
   },
   { 
     href: '/dashboard/user-management', 
