@@ -32,7 +32,7 @@ import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
 import { useQueryClient } from '@tanstack/react-query';
 import { Calendar } from './ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -65,7 +65,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   
-  // State for Popover controls
+  // State for Collapsible controls
   const [isCalDateOpen, setIsCalDateOpen] = useState(false);
   const [isDueDateOpen, setIsDueDateOpen] = useState(false);
 
@@ -209,7 +209,6 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
         const toolsRef = collection(firestore, "tools");
         const counterRef = doc(firestore, 'counters', `${tipo}-${familia}-${classificacao}`);
 
-        // Get all sequential numbers in one transaction
         const seqNumbers = await runTransaction(firestore, async (transaction) => {
             const counterDoc = await transaction.get(counterRef);
             let lastId = -1;
@@ -239,19 +238,12 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
             const snapshot = await uploadString(imageRef, toolImage, 'data_url');
             imageUrl = await getDownloadURL(snapshot.ref);
         }
-
-        let certificateUrl = '';
-        if (isCalibratable && certificateFile) {
-            const certRef = storageRef(storage, `calibration_certificates/${doc(collection(firestore, 'temp')).id}_${certificateFile.name}`);
-            await uploadBytes(certRef, certificateFile);
-            certificateUrl = await getDownloadURL(certRef);
-        }
-
+        
         for (const sequencial of seqNumbers) {
             const newToolRef = doc(toolsRef);
             const { docId, ...baseData } = selectedModel;
             
-            const finalToolData: Omit<Tool, 'id'> = {
+            const finalToolData: Partial<Tool> = {
                 ...baseData,
                 codigo: `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`,
                 sequencial: sequencial,
@@ -267,9 +259,6 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
             if (isCalibratable && calibrationDate && dueDate) {
               finalToolData.data_referencia = calibrationDate.toISOString();
               finalToolData.data_vencimento = dueDate.toISOString();
-              if (certificateUrl) {
-                finalToolData.documento_anexo_url = certificateUrl;
-              }
             }
             
             batch.set(newToolRef, finalToolData);
@@ -280,9 +269,16 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
 
         await batch.commit();
 
-        if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
+        if (isCalibratable && calibrationDate && dueDate && certificateFile) {
             const historyBatch = writeBatch(firestore);
-            for (const { ref: toolRef } of toolRefsAndData) {
+            
+            for (const { ref: toolRef, data: toolData } of toolRefsAndData) {
+                const certRef = storageRef(storage, `calibration_certificates/${toolRef.id}/${Date.now()}_${certificateFile.name}`);
+                const certSnapshot = await uploadBytes(certRef, certificateFile);
+                const certificateUrl = await getDownloadURL(certSnapshot.ref);
+
+                await updateDoc(toolRef, { documento_anexo_url: certificateUrl });
+
                 const historyRef = doc(collection(toolRef, 'calibration_history'));
                 const historyRecord: Omit<CalibrationRecord, 'id'> = {
                     toolId: toolRef.id,
@@ -426,44 +422,44 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                    <div className="space-y-4 pt-4 border-t mt-4">
                         <h3 className="text-sm font-semibold text-primary">Dados de Calibração (Obrigatório)</h3>
                         <div className="grid grid-cols-2 gap-4">
-                             <Popover open={isCalDateOpen} onOpenChange={setIsCalDateOpen}>
-                               <div className="space-y-2">
-                                 <Label>Data da Calibração</Label>
-                                  <PopoverTrigger asChild>
-                                   <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                     {calibrationDate ? format(calibrationDate, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
-                                   </Button>
-                                  </PopoverTrigger>
-                               </div>
-                               <PopoverContent className="w-auto p-0">
-                                   <Calendar
-                                       mode="single"
-                                       selected={calibrationDate}
-                                       onSelect={(day) => { setCalibrationDate(day); setIsCalDateOpen(false); }}
-                                       initialFocus
-                                   />
-                               </PopoverContent>
-                             </Popover>
-                             <Popover open={isDueDateOpen} onOpenChange={setIsDueDateOpen}>
+                            <Collapsible open={isCalDateOpen} onOpenChange={setIsCalDateOpen}>
+                              <div className="space-y-2">
+                                <Label>Data da Calibração</Label>
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {calibrationDate ? format(calibrationDate, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
+                                  </Button>
+                                </CollapsibleTrigger>
+                              </div>
+                              <CollapsibleContent>
+                                  <Calendar
+                                      mode="single"
+                                      selected={calibrationDate}
+                                      onSelect={(day) => { setCalibrationDate(day); setIsCalDateOpen(false); }}
+                                      initialFocus
+                                  />
+                              </CollapsibleContent>
+                            </Collapsible>
+                             <Collapsible open={isDueDateOpen} onOpenChange={setIsDueDateOpen}>
                                <div className="space-y-2">
                                  <Label>Data de Vencimento</Label>
-                                  <PopoverTrigger asChild>
+                                 <CollapsibleTrigger asChild>
                                    <Button variant="outline" className="w-full justify-start text-left font-normal">
                                      <CalendarIcon className="mr-2 h-4 w-4" />
                                      {dueDate ? format(dueDate, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
                                    </Button>
-                                  </PopoverTrigger>
+                                 </CollapsibleTrigger>
                                </div>
-                               <PopoverContent className="w-auto p-0">
+                               <CollapsibleContent>
                                    <Calendar
                                        mode="single"
                                        selected={dueDate}
                                        onSelect={(day) => { setDueDate(day); setIsDueDateOpen(false); }}
                                        initialFocus
                                    />
-                               </PopoverContent>
-                             </Popover>
+                               </CollapsibleContent>
+                             </Collapsible>
                         </div>
                         <div className="space-y-1.5">
                             <Label>Certificado / Laudo</Label>
