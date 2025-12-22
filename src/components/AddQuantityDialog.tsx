@@ -295,6 +295,14 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     } catch (error) {
       console.error("Erro ao salvar:", error);
       toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível concluir. Verifique as permissões e tente novamente.' });
+      
+      const permissionError = new FirestorePermissionError({
+        path: 'tools/{newToolId}',
+        operation: 'write', 
+        requestResourceData: { info: `Failed to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
+      });
+      errorEmitter.emit('permission-error', permissionError);
+
     } finally {
       setIsSaving(false);
     }
