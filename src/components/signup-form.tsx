@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, runTransaction, getDocs, collection, query, orderBy, limit } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -71,27 +71,12 @@ export function SignUpForm() {
       );
       const user = userCredential.user;
 
-      // 2. Get new sequential ID and save user info in a transaction
-      const counterRef = doc(firestore, 'counters', 'employees');
-      const newEmployeeId = await runTransaction(firestore, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        if (!counterDoc.exists()) {
-          throw new Error("Documento do contador não existe!");
-        }
-        const newId = counterDoc.data().lastId + 1;
-        transaction.update(counterRef, { lastId: newId });
-        return newId;
-      }).catch(error => {
-          // Emite um erro contextual se a transação falhar (ex: regras de segurança)
-          const permissionError = new FirestorePermissionError({
-            path: counterRef.path,
-            operation: 'write', 
-            requestResourceData: { lastId: 'newId' }
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          // Re-lança para interromper a execução e ser pego pelo catch principal
-          throw permissionError;
-      });
+      // 2. Get new sequential ID
+      const employeesRef = collection(firestore, 'employees');
+      const q = query(employeesRef, orderBy('id', 'desc'), limit(1));
+      const lastEmployeeSnapshot = await getDocs(q);
+      const lastId = lastEmployeeSnapshot.empty ? 1000 : (lastEmployeeSnapshot.docs[0].data().id || 1000);
+      const newEmployeeId = lastId + 1;
 
       const userDocRef = doc(firestore, 'employees', user.uid);
       
@@ -249,3 +234,5 @@ export function SignUpForm() {
     </Card>
   );
 }
+
+    

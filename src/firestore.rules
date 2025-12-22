@@ -13,8 +13,7 @@ service cloud.firestore {
     }
     
     match /tools/{toolId} {
-      allow list, get: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read, write: if isAuthenticated();
     }
     
     match /tools/{toolId}/calibration_history/{calibrationId} {
@@ -47,10 +46,6 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
     
-    match /counters/{counterId} {
-      allow read, write: if isAuthenticated();
-    }
-    
     match /expenses/{expenseId} {
       allow list, get: if isAuthenticated();
       allow write: if isAuthenticated();
@@ -61,3 +56,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
