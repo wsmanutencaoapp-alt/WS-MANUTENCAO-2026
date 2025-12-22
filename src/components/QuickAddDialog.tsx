@@ -207,7 +207,23 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       const numQuantity = parseInt(quantidade, 10) || 1;
       const newToolsForPrinting = [];
 
-      // Upload files once, before the loop
+      // Step 1: Reserve all sequential numbers in a single transaction
+      const counterRef = doc(firestore, 'counters', counterId);
+      const newSequentials = await runTransaction(firestore, async (transaction) => {
+          const counterDoc = await transaction.get(counterRef);
+          const currentLastId = counterDoc.exists() ? (counterDoc.data().lastId || 0) : 0;
+          const newLastId = currentLastId + numQuantity;
+          
+          if (!counterDoc.exists()) {
+              transaction.set(counterRef, { lastId: newLastId });
+          } else {
+              transaction.update(counterRef, { lastId: newLastId });
+          }
+          
+          return Array.from({ length: numQuantity }, (_, i) => currentLastId + i + 1);
+      });
+
+      // Step 2: Upload files (if any)
       let imageUrl = selectedModel.imageUrl || '';
       if (toolImage && toolImage.startsWith('data:')) {
           const imageRef = storageRef(storage, `tool_images/${doc(collection(firestore, 'temp')).id}.jpg`);
@@ -222,22 +238,10 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           certificateUrl = await getDownloadURL(certRef);
       }
       
+      // Step 3: Create all documents in a single batch
       const batch = writeBatch(firestore);
 
-      for (let i = 0; i < numQuantity; i++) {
-        const counterRef = doc(firestore, 'counters', counterId);
-        const lastId = await runTransaction(firestore, async (transaction) => {
-            const counterDoc = await transaction.get(counterRef);
-            if (!counterDoc.exists()) {
-                transaction.set(counterRef, { lastId: 1 });
-                return 0;
-            }
-            const currentLastId = counterDoc.data().lastId || 0;
-            transaction.update(counterRef, { lastId: currentLastId + 1 });
-            return currentLastId;
-        });
-        
-        const newSequencial = lastId + 1;
+      for (const newSequencial of newSequentials) {
         const newToolRef = doc(collection(firestore, 'tools'));
         
         const { docId, ...baseData } = selectedModel;
@@ -260,7 +264,6 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
         batch.set(newToolRef, finalToolData);
         newToolsForPrinting.push({ ...finalToolData, docId: newToolRef.id });
 
-        // If calibratable, add initial record to history subcollection
         if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
             const historyRef = doc(collection(firestore, newToolRef.path, 'calibration_history'));
             const historyRecord: Omit<CalibrationRecord, 'id'> = {
@@ -268,7 +271,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                 calibrationDate: calibrationDate.toISOString(),
                 dueDate: dueDate.toISOString(),
                 certificateUrl: certificateUrl,
-                calibratedBy: 'Registro Inicial', // Or some other signifier
+                calibratedBy: 'Registro Inicial',
                 timestamp: new Date().toISOString(),
             };
             batch.set(historyRef, historyRecord);
