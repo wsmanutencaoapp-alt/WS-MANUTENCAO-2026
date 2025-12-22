@@ -23,11 +23,11 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import type { Tool } from '@/lib/types';
-import { Edit, ZoomIn, Save, Trash2, X, Loader2, Upload, AlertTriangle } from 'lucide-react';
+import { Edit, ZoomIn, Save, Trash2, X, Loader2, Upload, AlertTriangle, FileText } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useFirestore, useStorage } from '@/firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -145,7 +145,7 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   };
   
   const handleDeleteTool = async () => {
-     if (!firestore || !tool.docId) {
+     if (!firestore || !storage || !tool.docId) {
       toast({ variant: "destructive", title: "Erro", description: "Serviço indisponível ou ID da ferramenta ausente." });
       return;
     }
@@ -153,6 +153,22 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
      try {
       const toolRef = doc(firestore, 'tools', tool.docId);
       await deleteDoc(toolRef);
+
+      if (tool.imageUrl) {
+          try {
+              await deleteObject(storageRef(storage, tool.imageUrl));
+          } catch (e: any) {
+              if (e.code !== 'storage/object-not-found') console.warn("Could not delete image:", e);
+          }
+      }
+      if (tool.doc_engenharia_url) {
+           try {
+              await deleteObject(storageRef(storage, tool.doc_engenharia_url));
+          } catch (e: any) {
+              if (e.code !== 'storage/object-not-found') console.warn("Could not delete eng doc:", e);
+          }
+      }
+
       onToolDeleted(tool.docId);
     } catch (error) {
       console.error("Erro ao excluir ferramenta:", error);
@@ -180,9 +196,9 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
               src={previewImage || tool.imageUrl || "https://picsum.photos/seed/tool/400/250"}
               width="400"
             />
-            {!isEditing && (
+            {!isEditing && tool.imageUrl && (
               <a 
-                  href={tool.imageUrl || "#"} 
+                  href={tool.imageUrl} 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
@@ -193,7 +209,7 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
           </div>
 
           {isEditing ? (
-             <div className="grid grid-cols-2 gap-4 text-sm">
+             <div className="grid grid-cols-2 gap-4 text-sm max-h-[40vh] overflow-y-auto pr-4">
                 <div className="col-span-2">
                     <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                         <Upload className="mr-2 h-4 w-4" />
@@ -222,6 +238,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                 <div className="col-span-2 space-y-1">
                     <Label htmlFor="valor_estimado">Valor Estimado (R$)</Label>
                     <Input id="valor_estimado" type="number" value={editableTool.valor_estimado || ''} onChange={handleInputChange} />
+                </div>
+                 <div className="col-span-2 space-y-1">
+                    <Label htmlFor="pn_fabricante">P/N Fabricante</Label>
+                    <Input id="pn_fabricante" value={editableTool.pn_fabricante || ''} onChange={handleInputChange} />
                 </div>
             </div>
           ) : (
@@ -270,6 +290,17 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                   <p className="font-semibold text-muted-foreground">Valor Estimado</p>
                   <p>{(tool.valor_estimado ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                 </div>
+                {tool.doc_engenharia_url && (
+                    <div className="col-span-2">
+                         <p className="font-semibold text-muted-foreground">Documento de Engenharia</p>
+                         <Button asChild variant="link" className="p-0 h-auto">
+                            <a href={tool.doc_engenharia_url} target="_blank" rel="noopener noreferrer" className="text-sm">
+                                <FileText className="mr-2 h-4 w-4"/>
+                                Visualizar Documento
+                            </a>
+                         </Button>
+                    </div>
+                )}
             </div>
             </>
           )}

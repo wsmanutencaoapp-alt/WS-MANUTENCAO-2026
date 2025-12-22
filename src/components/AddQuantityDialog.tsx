@@ -261,7 +261,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           descricao: descricaoEspecifica || tool.baseData.descricao,
           marca: marca || '',
           valor_estimado: Number(valorEstimado) || 0,
-          status: tool.baseData.status === 'Pendente' ? 'Pendente' : 'Disponível',
+          status: 'Disponível', // New tools are always available
           enderecamento: enderecamento,
           patrimonio: patrimonio || '',
           imageUrl: uploadedImageUrl || tool.baseData.imageUrl, // Use uploaded or fallback to template image
@@ -280,16 +280,21 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
       onSuccess(newToolsForPrinting);
 
-    } catch (error) {
-      console.error("Erro ao salvar:", error);
-      toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível concluir. Verifique as permissões e tente novamente.' });
+    } catch (error: any) {
+        console.error("Erro ao salvar:", error);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível concluir. Verifique as permissões e tente novamente.' });
       
-      const permissionError = new FirestorePermissionError({
-        path: 'tools/{newToolId}',
-        operation: 'write', 
-        requestResourceData: { info: `Failed to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
-      });
-      errorEmitter.emit('permission-error', permissionError);
+        // Emit a permission error if that's what's detected
+        if (error.code && error.code.includes('permission-denied')) {
+            errorEmitter.emit(
+                'permission-error',
+                new FirestorePermissionError({
+                    path: 'tools/{newToolId}',
+                    operation: 'write', 
+                    requestResourceData: { info: `Failed to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
+                })
+            );
+        }
 
     } finally {
       setIsSaving(false);
@@ -303,7 +308,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         <DialogHeader>
           <DialogTitle>Adicionar Ferramenta ao Estoque</DialogTitle>
           <DialogDescription>
-            Pesquise por um modelo (STD/GSE) e adicione novas unidades ao inventário.
+            Pesquise por um modelo (STD/GSE) e adicione novas unidades ao inventário. Para cadastrar um item único (ESP/EQV), vá para Cadastros {"->"} Ferramentas.
           </DialogDescription>
         </DialogHeader>
         
@@ -453,5 +458,3 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
-
-    
