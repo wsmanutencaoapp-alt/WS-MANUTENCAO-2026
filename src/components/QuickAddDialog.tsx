@@ -205,7 +205,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       const { tipo, familia, classificacao } = selectedModel;
       const counterId = `${tipo}-${familia}-${classificacao}`;
       const numQuantity = parseInt(quantidade, 10) || 1;
-      const newToolsForPrinting = [];
+      let newToolsForPrinting = [];
 
       // Step 1: Reserve all sequential numbers in a single transaction
       const counterRef = doc(firestore, 'counters', counterId);
@@ -238,8 +238,9 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           certificateUrl = await getDownloadURL(certRef);
       }
       
-      // Step 3: Create all documents in a single batch
-      const batch = writeBatch(firestore);
+      // Step 3: Batch create all tool documents
+      const toolsBatch = writeBatch(firestore);
+      const toolRefsAndData = [];
 
       for (const newSequencial of newSequentials) {
         const newToolRef = doc(collection(firestore, 'tools'));
@@ -260,25 +261,31 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           data_vencimento: isCalibratable && dueDate ? dueDate.toISOString() : undefined,
           documento_anexo_url: isCalibratable ? certificateUrl : undefined,
         };
-          
-        batch.set(newToolRef, finalToolData);
-        newToolsForPrinting.push({ ...finalToolData, docId: newToolRef.id });
-
-        if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
-            const historyRef = doc(collection(firestore, newToolRef.path, 'calibration_history'));
-            const historyRecord: Omit<CalibrationRecord, 'id'> = {
-                toolId: newToolRef.id,
-                calibrationDate: calibrationDate.toISOString(),
-                dueDate: dueDate.toISOString(),
-                certificateUrl: certificateUrl,
-                calibratedBy: 'Registro Inicial',
-                timestamp: new Date().toISOString(),
-            };
-            batch.set(historyRef, historyRecord);
-        }
+        
+        toolsBatch.set(newToolRef, finalToolData);
+        const toolForPrinting = { ...finalToolData, docId: newToolRef.id };
+        newToolsForPrinting.push(toolForPrinting);
+        toolRefsAndData.push({ ref: newToolRef, data: toolForPrinting });
       }
-
-      await batch.commit();
+      await toolsBatch.commit();
+      
+      // Step 4: If calibratable, batch create history records for the newly created tools
+      if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
+          const historyBatch = writeBatch(firestore);
+          for (const { ref: toolRef, data: toolData } of toolRefsAndData) {
+              const historyRef = doc(collection(firestore, toolRef.path, 'calibration_history'));
+              const historyRecord: Omit<CalibrationRecord, 'id'> = {
+                  toolId: toolRef.id,
+                  calibrationDate: calibrationDate.toISOString(),
+                  dueDate: dueDate.toISOString(),
+                  certificateUrl: certificateUrl,
+                  calibratedBy: 'Registro Inicial',
+                  timestamp: new Date().toISOString(),
+              };
+              historyBatch.set(historyRef, historyRecord);
+          }
+          await historyBatch.commit();
+      }
 
       toast({ title: 'Sucesso!', description: `${numQuantity} ferramenta(s) adicionada(s) ao estoque.` });
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
