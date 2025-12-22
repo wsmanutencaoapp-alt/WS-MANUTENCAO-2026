@@ -160,7 +160,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     const uploadFile = async (file: File, path: string): Promise<string> => {
         if (!storage) throw new Error("Storage service not available.");
         const fileRef = storageRef(storage, path);
-        // We use 'data_url' for both image and file now for simplicity
         const fileAsDataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
