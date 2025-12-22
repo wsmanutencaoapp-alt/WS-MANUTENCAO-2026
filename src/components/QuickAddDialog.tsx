@@ -61,6 +61,10 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
   const [calibrationDate, setCalibrationDate] = useState<Date | undefined>();
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
+
+  // State for Popover visibility
+  const [isCalDateOpen, setIsCalDateOpen] = useState(false);
+  const [isDueDateOpen, setIsDueDateOpen] = useState(false);
   
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -388,26 +392,26 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label>Data da Calibração</Label>
-                                <Popover>
+                                <Popover open={isCalDateOpen} onOpenChange={setIsCalDateOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {calibrationDate ? format(calibrationDate, 'PPP') : <span>Escolha uma data</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={calibrationDate} onSelect={setCalibrationDate} initialFocus/></PopoverContent>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={calibrationDate} onSelect={(day) => { setCalibrationDate(day); setIsCalDateOpen(false); }} initialFocus/></PopoverContent>
                                 </Popover>
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Data de Vencimento</Label>
-                                <Popover>
+                                <Popover open={isDueDateOpen} onOpenChange={setIsDueDateOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {dueDate ? format(dueDate, 'PPP') : <span>Escolha uma data</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus/></PopoverContent>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={(day) => { setDueDate(day); setIsDueDateOpen(false); }} initialFocus/></PopoverContent>
                                 </Popover>
                             </div>
                         </div>
