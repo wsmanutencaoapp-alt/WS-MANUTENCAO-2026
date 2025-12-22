@@ -116,13 +116,13 @@ const CadastroFerramentasPage = () => {
   }, [newFerramenta.tipo, newFerramenta.familia, newFerramenta.classificacao]);
 
   useEffect(() => {
-    if (newFerramenta.familia) {
+    if (newFerramenta.familia && !editingLogic) {
       const suggestedClassificacao = familiaSuggestions[newFerramenta.familia as keyof typeof familiaSuggestions];
       if (suggestedClassificacao) {
         setNewFerramenta(prev => ({ ...prev, classificacao: suggestedClassificacao }));
       }
     }
-  }, [newFerramenta.familia]);
+  }, [newFerramenta.familia, editingLogic]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target;
@@ -269,7 +269,7 @@ const CadastroFerramentasPage = () => {
         } else {
             // Add new logic template (STD or GSE)
             const sequencial = 0; // Logic templates have a sequencial of 0
-            const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;
+            const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${sequencial.toString().padStart(4, '0')}`;
             const toolData: Partial<Tool> = {
                 ...baseToolData,
                 codigo: codigoCompleto,
@@ -582,7 +582,7 @@ const CadastroFerramentasPage = () => {
         onClose={() => {
             setIsLabelPrintOpen(false);
             setToolsToPrint([]);
-            router.push('/dashboard/ferramentaria/lista-ferramentas');
+            // Don't redirect, stay on the same page
         }}
         tools={toolsToPrint}
       />
