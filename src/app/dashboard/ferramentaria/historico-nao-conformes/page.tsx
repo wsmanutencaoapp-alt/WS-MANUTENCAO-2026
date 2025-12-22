@@ -51,10 +51,10 @@ export default function HistoricoNaoConformesPage() {
     // 2. Get all returned requests to find the origin of non-conformity
     const requestsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
+        // REMOVED orderBy to avoid needing a composite index. Sorting will be done client-side.
         return query(
             collection(firestore, 'tool_requests'), 
-            where('status', '==', 'Devolvida'),
-            orderBy('returnedAt', 'desc')
+            where('status', '==', 'Devolvida')
         );
     }, [firestore]);
     const { data: allRequests, isLoading: isLoadingRequests, error: requestsError } = useCollection<WithDocId<ToolRequest>>(requestsQuery, { queryKey: ['allReturnedRequestsForHistoryNC'] });
@@ -104,6 +104,7 @@ export default function HistoricoNaoConformesPage() {
             }
         }
         
+        // Sort client-side now
         return history.sort((a,b) => new Date(b.identifiedAt).getTime() - new Date(a.identifiedAt).getTime());
 
     }, [allTools, allRequests]);
