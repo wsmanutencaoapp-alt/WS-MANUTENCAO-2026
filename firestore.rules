@@ -8,7 +8,9 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
+      // Check if the user's UID exists in the employees collection and has the 'Admin' accessLevel.
+      return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
     }
 
     match /supplies/{supplyId} {
@@ -18,6 +20,7 @@ service cloud.firestore {
     
     match /tools/{toolId} {
       allow read: if isAuthenticated();
+      // Only Admins can create, update, or delete tools directly.
       allow write: if isAdmin();
     }
     
@@ -48,21 +51,23 @@ service cloud.firestore {
     
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
-      // Allow user to edit their own data, or if the user is an admin
+      // Allow a user to edit their own data, or allow an admin to edit any user's data.
       allow write: if request.auth.uid == employeeId || isAdmin();
     }
     
     match /expenses/{expenseId} {
-      // Allow any authenticated user to create, but only admin to modify/delete
+      // Allow any authenticated user to create an expense record.
       allow create: if isAuthenticated();
+      // Only admins can read, update, or delete expense records.
       allow read, update, delete: if isAdmin();
     }
 
     match /tool_requests/{requestId} {
-      // Allow user to manage their own requests, or if the user is an admin
+      // Allow a user to read/write their own requests, or allow an admin to manage all requests.
       allow read, write: if request.resource.data.requesterId == request.auth.uid || isAdmin();
     }
 
+    // This collection is no longer used for sequential IDs. Only admins should access if needed.
     match /counters/{counterId} {
         allow read, write: if isAdmin();
     }
