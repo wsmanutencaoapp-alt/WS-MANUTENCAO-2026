@@ -295,7 +295,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     } catch (error) {
       console.error("Erro ao salvar:", error);
       toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível concluir. Verifique as permissões e tente novamente.' });
-      
     } finally {
       setIsSaving(false);
     }
