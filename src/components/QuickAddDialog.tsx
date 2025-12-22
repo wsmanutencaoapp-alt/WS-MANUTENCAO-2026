@@ -11,7 +11,8 @@ import {
   writeBatch,
   runTransaction,
   limit,
-  orderBy
+  orderBy,
+  updateDoc,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, uploadString } from 'firebase/storage';
 import {
@@ -215,11 +216,18 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
             if (counterDoc.exists()) {
                 lastId = counterDoc.data()?.lastId ?? -1;
             } else {
+                // If the counter doesn't exist, we can't assume lastId is -1 if we start with numQuantity
                 transaction.set(counterRef, { lastId: numQuantity - 1 });
+                lastId = -1; // so the first id is 0
             }
             
             const newLastId = lastId + numQuantity;
-            transaction.update(counterRef, { lastId: newLastId });
+            if (counterDoc.exists()) {
+              transaction.update(counterRef, { lastId: newLastId });
+            } else {
+              transaction.set(counterRef, { lastId: newLastId });
+            }
+
 
             const numbers: number[] = [];
             for (let i = 0; i < numQuantity; i++) {
