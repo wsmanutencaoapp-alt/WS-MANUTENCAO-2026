@@ -63,6 +63,10 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   
+  // State for Popover controls
+  const [isCalDateOpen, setIsCalDateOpen] = useState(false);
+  const [isDueDateOpen, setIsDueDateOpen] = useState(false);
+
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -222,16 +226,12 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       const lastId = await runTransaction(firestore, async (transaction) => {
           const counterDoc = await transaction.get(counterRef);
           if (!counterDoc.exists()) {
-             // Fallback to query if counter doesn't exist yet
-             const q = query(collection(firestore, 'tools'), where('tipo', '==', tipo), where('familia', '==', familia), where('classificacao', '==', classificacao), orderBy('sequencial', 'desc'), limit(1));
-             const snapshot = await getDocs(q);
-             const lastSequencial = snapshot.empty ? 0 : (snapshot.docs[0].data().sequencial ?? 0);
-             transaction.set(counterRef, { lastId: lastSequencial + numQuantity });
-             return lastSequencial;
+             transaction.set(counterRef, { lastId: numQuantity });
+             return 0;
           }
-          const newLastId = (counterDoc.data().lastId || 0);
-          transaction.update(counterRef, { lastId: newLastId + numQuantity });
-          return newLastId;
+          const currentLastId = counterDoc.data().lastId || 0;
+          transaction.update(counterRef, { lastId: currentLastId + numQuantity });
+          return currentLastId;
       });
 
       const batch = writeBatch(firestore);
@@ -394,7 +394,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label>Data da Calibração</Label>
-                                <Popover>
+                                <Popover open={isCalDateOpen} onOpenChange={setIsCalDateOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -405,7 +405,10 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                                   <Calendar 
                                     mode="single" 
                                     selected={calibrationDate} 
-                                    onSelect={setCalibrationDate}
+                                    onSelect={(date) => {
+                                        setCalibrationDate(date);
+                                        setIsCalDateOpen(false);
+                                    }}
                                     initialFocus
                                   />
                                 </PopoverContent>
@@ -413,7 +416,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Data de Vencimento</Label>
-                                <Popover>
+                                <Popover open={isDueDateOpen} onOpenChange={setIsDueDateOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -424,7 +427,10 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                                   <Calendar 
                                     mode="single" 
                                     selected={dueDate} 
-                                    onSelect={setDueDate}
+                                    onSelect={(date) => {
+                                        setDueDate(date);
+                                        setIsDueDateOpen(false);
+                                    }}
                                     initialFocus
                                   />
                                 </PopoverContent>
