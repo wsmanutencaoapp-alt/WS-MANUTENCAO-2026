@@ -47,6 +47,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import KitDetailsDialog from '@/components/KitDetailsDialog';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import CreateKitDialog from '@/components/CreateKitDialog';
+import Image from 'next/image';
 
 type KitWithDocId = WithDocId<Kit>;
 
@@ -131,6 +132,7 @@ const KitsPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-16">Foto</TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Nº de Itens</TableHead>
@@ -141,27 +143,36 @@ const KitsPage = () => {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                   </TableCell>
                 </TableRow>
               )}
               {error && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-destructive">
+                  <TableCell colSpan={6} className="text-center text-destructive">
                     Erro ao carregar kits: {error.message}
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && kits?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">
+                  <TableCell colSpan={6} className="text-center h-24">
                     Nenhum kit cadastrado.
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && kits?.map(kit => (
                 <TableRow key={kit.docId}>
+                   <TableCell>
+                      <Image
+                        src={kit.imageUrl || "https://picsum.photos/seed/kit/64/64"}
+                        alt={kit.descricao}
+                        width={48}
+                        height={48}
+                        className="aspect-square rounded-md object-cover"
+                      />
+                   </TableCell>
                   <TableCell className="font-mono">{kit.codigo}</TableCell>
                   <TableCell>{kit.descricao}</TableCell>
                   <TableCell>{kit.toolIds?.length || 0}</TableCell>

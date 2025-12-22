@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useFirestore, useCollection, useMemoFirebase, useStorage } from '@/firebase';
 import { collection, query, where, documentId, doc, writeBatch } from 'firebase/firestore';
+import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
-import { Loader2, Edit, Save, X, PlusCircle, MinusCircle, Search, ZoomIn } from 'lucide-react';
+import { Loader2, Edit, Save, X, PlusCircle, MinusCircle, Search, ZoomIn, Upload, ImageIcon } from 'lucide-react';
 import type { Kit, Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import Image from 'next/image';
@@ -32,6 +33,7 @@ interface KitDetailsDialogProps {
 
 export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDialogProps) {
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -42,6 +44,8 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
   const [currentToolIds, setCurrentToolIds] = useState<Set<string>>(new Set());
   const [availableToolsSearchTerm, setAvailableToolsSearchTerm] = useState('');
   const [kitToolsSearchTerm, setKitToolsSearchTerm] = useState('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
 
   // Fetch tools currently IN this kit
@@ -93,6 +97,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
         enderecamento: kit.enderecamento,
       });
       setCurrentToolIds(new Set(kit.toolIds || []));
+      setPreviewImage(kit.imageUrl || null);
     }
     // Reset states when dialog opens or kit changes
     setIsEditing(false);
@@ -112,20 +117,37 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
           return newSet;
       });
   };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setPreviewImage(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
   
   const handleSaveChanges = async () => {
-    if (!firestore || !kit) return;
+    if (!firestore || !kit || !storage) return;
     setIsSaving(true);
     
     try {
         const batch = writeBatch(firestore);
         const kitRef = doc(firestore, 'kits', kit.docId);
 
+        let imageUrl = kit.imageUrl;
+        if (previewImage && previewImage !== kit.imageUrl) {
+            const imageRef = storageRef(storage, `kit_images/${kit.docId}.jpg`);
+            const snapshot = await uploadString(imageRef, previewImage, 'data_url');
+            imageUrl = await getDownloadURL(snapshot.ref);
+        }
+
         // Update kit details
         batch.update(kitRef, {
             descricao: editableKit.descricao || '',
             enderecamento: editableKit.enderecamento || '',
             toolIds: Array.from(currentToolIds),
+            imageUrl: imageUrl,
         });
 
         const originalToolIds = new Set(kit.toolIds || []);
@@ -173,6 +195,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
       if (kit) {
           setCurrentToolIds(new Set(kit.toolIds || []));
           setEditableKit({ descricao: kit.descricao, enderecamento: kit.enderecamento });
+          setPreviewImage(kit.imageUrl || null);
       }
   }
 
@@ -196,6 +219,11 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                         <div className="space-y-1">
                             <Label htmlFor="enderecamento">Endereçamento do Kit</Label>
                             <Input id="enderecamento" value={editableKit.enderecamento || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="flex items-center gap-4">
+                            {previewImage ? <Image src={previewImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}
+                            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Trocar Foto</Button>
+                            <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
                         </div>
                     </div>
                     <Separator />
@@ -243,9 +271,35 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
             </div>
         ) : (
           <div className="flex flex-col gap-4" style={{ height: '60vh' }}>
-            <div className="relative">
+            <div className="flex gap-4 items-start">
+              <Image
+                src={kit?.imageUrl || "https://picsum.photos/seed/kit/128/128"}
+                alt={kit?.descricao || 'Kit'}
+                width={128}
+                height={128}
+                className="aspect-square rounded-lg object-cover"
+              />
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm flex-1">
+                 <div className="col-span-2">
+                  <p className="font-semibold text-muted-foreground">Código</p>
+                  <p className="font-mono text-base">{kit?.codigo || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-muted-foreground">Status</p>
+                  <Badge variant='secondary'>
+                    {kit?.status || 'N/A'}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="font-semibold text-muted-foreground">Endereçamento</p>
+                  <p>{kit?.enderecamento || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+            <Separator/>
+            <div className="relative flex-1 flex flex-col gap-2">
               <Label htmlFor="kitToolsSearchTermView">Pesquisar Itens no Kit</Label>
-              <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute top-[2.4rem] left-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
                 id="kitToolsSearchTermView" 
                 placeholder="Buscar por código ou descrição..." 
@@ -253,7 +307,6 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                 onChange={(e) => setKitToolsSearchTerm(e.target.value)} 
                 className="pl-8" 
               />
-            </div>
             <ScrollArea className="flex-1 border rounded-md">
             <div className="p-4 space-y-3">
                 {isLoadingKitTools && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
@@ -279,6 +332,7 @@ export default function KitDetailsDialog({ kit, isOpen, onClose }: KitDetailsDia
                 ))}
             </div>
             </ScrollArea>
+            </div>
           </div>
         )}
         

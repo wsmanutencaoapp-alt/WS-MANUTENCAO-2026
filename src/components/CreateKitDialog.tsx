@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useState, useMemo, useRef } from 'react';
+import { useFirestore, useCollection, useMemoFirebase, useStorage } from '@/firebase';
 import {
   collection,
   runTransaction,
@@ -10,6 +10,7 @@ import {
   query,
   where
 } from 'firebase/firestore';
+import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, Upload, ImageIcon } from 'lucide-react';
 import type { Tool } from '@/lib/types';
 import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
@@ -38,6 +39,7 @@ interface CreateKitDialogProps {
 
 export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKitDialogProps) {
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   
   const [kitDescription, setKitDescription] = useState('');
@@ -45,6 +47,8 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedToolIds, setSelectedToolIds] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
+  const [kitImage, setKitImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // This query correctly gets all tools that could POTENTIALLY be in a kit.
   const availableToolsQuery = useMemoFirebase(
@@ -81,12 +85,23 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
     });
   };
 
+   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setKitImage(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
   const resetState = () => {
     setKitDescription('');
     setKitEnderecamento('');
     setSearchTerm('');
     setSelectedToolIds(new Set());
     setIsSaving(false);
+    setKitImage(null);
+    if(fileInputRef.current) fileInputRef.current.value = '';
   };
   
   const handleClose = () => {
@@ -95,7 +110,7 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
   };
 
   const handleSave = async () => {
-    if (!firestore) {
+    if (!firestore || !storage) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Serviço indisponível.' });
       return;
     }
@@ -133,6 +148,14 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
       const batch = writeBatch(firestore);
 
       const kitRef = doc(collection(firestore, 'kits'));
+
+      let imageUrl;
+      if (kitImage) {
+        const imageRef = storageRef(storage, `kit_images/${kitRef.id}.jpg`);
+        const snapshot = await uploadString(imageRef, kitImage, 'data_url');
+        imageUrl = await getDownloadURL(snapshot.ref);
+      }
+
       batch.set(kitRef, {
         codigo: kitCode,
         descricao: kitDescription,
@@ -140,7 +163,7 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
         toolIds: Array.from(selectedToolIds),
         createdAt: new Date().toISOString(),
         status: 'Disponível',
-        imageUrl: "https://picsum.photos/seed/kit/400/400", // Generic kit image
+        imageUrl: imageUrl || "https://picsum.photos/seed/kit/400/400", // Placeholder if no image
       });
 
       selectedToolIds.forEach(toolId => {
@@ -181,7 +204,7 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
         </DialogHeader>
         
         <div className="space-y-4 py-4 max-h-[70vh] flex flex-col">
-           <div className="grid grid-cols-2 gap-4">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div className="space-y-1.5">
                 <Label htmlFor="kitDescription">Descrição do Kit</Label>
                 <Input
@@ -199,6 +222,11 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
                   value={kitEnderecamento}
                   onChange={(e) => setKitEnderecamento(e.target.value)}
                 />
+            </div>
+             <div className="col-span-1 md:col-span-2 flex items-center gap-4">
+                {kitImage ? <Image src={kitImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Foto do Kit (Opcional)</Button>
+                <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
             </div>
            </div>
 
