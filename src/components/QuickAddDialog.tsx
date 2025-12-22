@@ -11,7 +11,7 @@ import {
   writeBatch,
   runTransaction
 } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   Dialog,
   DialogContent,
@@ -24,11 +24,14 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Upload, ImageIcon } from 'lucide-react';
+import { Loader2, Search, Upload, ImageIcon, CalendarIcon, FileText } from 'lucide-react';
 import type { Tool } from '@/lib/types';
 import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
 import { useQueryClient } from '@tanstack/react-query';
+import { Calendar } from './ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { format } from 'date-fns';
 
 interface QuickAddDialogProps {
   isOpen: boolean;
@@ -53,15 +56,26 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
   const [marca, setMarca] = useState('');
   const [patrimonio, setPatrimonio] = useState('');
   const [quantidade, setQuantidade] = useState('1');
+
+  // State for calibration fields
+  const [calibrationDate, setCalibrationDate] = useState<Date | undefined>();
+  const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [certificateFile, setCertificateFile] = useState<File | null>(null);
   
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const certificateInputRef = useRef<HTMLInputElement>(null);
   const firestore = useFirestore();
   const storage = useStorage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const isCalibratable = useMemo(() => {
+    if (!selectedModel) return false;
+    return ['C', 'L', 'V'].includes(selectedModel.classificacao);
+  }, [selectedModel]);
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -112,12 +126,14 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       setEnderecamento('');
       setPatrimonio('');
       setQuantidade('1');
+      setCalibrationDate(undefined);
+      setDueDate(undefined);
+      setCertificateFile(null);
     }
   }, [selectedModel]);
 
 
-  useEffect(() => {
-    if (!isOpen) {
+  const resetFormState = () => {
       setSearchTerm('');
       setAllModels([]);
       setFilteredModels([]);
@@ -129,9 +145,18 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       setMarca('');
       setPatrimonio('');
       setQuantidade('1');
+      setCalibrationDate(undefined);
+      setDueDate(undefined);
+      setCertificateFile(null);
       setIsSearching(false);
       setIsSaving(false);
       if(fileInputRef.current) fileInputRef.current.value = '';
+      if(certificateInputRef.current) certificateInputRef.current.value = '';
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetFormState();
     }
   }, [isOpen]);
   
@@ -143,6 +168,11 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       reader.readAsDataURL(file);
     }
   };
+
+  const handleCertificateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setCertificateFile(file);
+  }
 
   const handleSave = async () => {
     if (!firestore || !storage || !selectedModel) {
@@ -157,6 +187,12 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
         toast({ variant: 'destructive', title: 'Erro', description: 'A Descrição é obrigatória.' });
         return;
     }
+    if (isCalibratable) {
+        if (!calibrationDate || !dueDate || !certificateFile) {
+            toast({ variant: 'destructive', title: 'Erro de Calibração', description: 'Para itens calibráveis, as datas e o certificado são obrigatórios.' });
+            return;
+        }
+    }
 
     setIsSaving(true);
     
@@ -166,6 +202,21 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       const counterRef = doc(firestore, 'counters', counterId);
       const numQuantity = parseInt(quantidade, 10) || 1;
       const newToolsForPrinting = [];
+
+      // Upload files once, before the loop
+      let imageUrl = selectedModel.imageUrl || '';
+      if (toolImage && toolImage.startsWith('data:')) {
+          const imageRef = storageRef(storage, `tool_images/${doc(collection(firestore, 'temp')).id}.jpg`);
+          const snapshot = await uploadString(imageRef, toolImage, 'data_url');
+          imageUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      let certificateUrl = '';
+      if (isCalibratable && certificateFile) {
+          const certRef = storageRef(storage, `calibration_certificates/${doc(collection(firestore, 'temp')).id}_${certificateFile.name}`);
+          await uploadBytes(certRef, certificateFile);
+          certificateUrl = await getDownloadURL(certRef);
+      }
 
       const batch = writeBatch(firestore);
 
@@ -183,13 +234,6 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
 
         const newToolRef = doc(collection(firestore, 'tools'));
         
-        let imageUrl = selectedModel.imageUrl || '';
-        if (toolImage && toolImage.startsWith('data:') && i === 0) { // Upload image only once
-            const imageRef = storageRef(storage, `tool_images/${newToolRef.id}.jpg`);
-            const snapshot = await uploadString(imageRef, toolImage, 'data_url');
-            imageUrl = await getDownloadURL(snapshot.ref);
-        }
-        
         const { docId, ...baseData } = selectedModel;
         const finalToolData: Omit<Tool, 'id'> = {
           ...baseData,
@@ -202,6 +246,9 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           marca: marca,
           patrimonio: patrimonio,
           imageUrl: imageUrl,
+          data_referencia: isCalibratable && calibrationDate ? calibrationDate.toISOString() : undefined,
+          data_vencimento: isCalibratable && dueDate ? dueDate.toISOString() : undefined,
+          documento_anexo_url: isCalibratable ? certificateUrl : undefined,
         };
           
         batch.set(newToolRef, finalToolData);
@@ -233,7 +280,8 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
+        <ScrollArea className="max-h-[70vh] -mr-3 pr-6">
+        <div className="space-y-4 py-4">
           {!selectedModel ? (
             <>
               <div className="relative">
@@ -334,9 +382,51 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                         <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
                     </div>
                 </div>
+                 {isCalibratable && (
+                   <div className="space-y-4 pt-4 border-t mt-4">
+                        <h3 className="text-sm font-semibold text-primary">Dados de Calibração (Obrigatório)</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label>Data da Calibração</Label>
+                                <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {calibrationDate ? format(calibrationDate, 'PPP') : <span>Escolha uma data</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={calibrationDate} onSelect={setCalibrationDate} initialFocus/></PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Data de Vencimento</Label>
+                                <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {dueDate ? format(dueDate, 'PPP') : <span>Escolha uma data</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus/></PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Certificado / Laudo</Label>
+                            <Button asChild variant="outline" className="w-full">
+                                <label className="cursor-pointer flex items-center">
+                                    {certificateFile ? <FileText className="mr-2 h-4 w-4 text-green-600" /> : <Upload className="mr-2 h-4 w-4" />}
+                                    <span className="truncate max-w-xs">{certificateFile ? certificateFile.name : 'Anexar certificado'}</span>
+                                    <Input type="file" className="sr-only" ref={certificateInputRef} onChange={handleCertificateChange} />
+                                </label>
+                            </Button>
+                        </div>
+                   </div>
+                )}
             </div>
           )}
         </div>
+        </ScrollArea>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
