@@ -228,7 +228,6 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
         if (counterDoc.exists()) {
             lastId = counterDoc.data().lastId || 0;
         } else {
-            // Se o contador não existe, vamos criá-lo na transação
             transaction.set(counterRef, { lastId: 0 });
         }
 
@@ -259,10 +258,8 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           newToolsForPrinting.push({ ...finalToolData, docId: newToolRef.id });
         }
         
-        // Em vez de usar batch.commit, usamos o commit da transação ao final
         transaction.update(counterRef, { lastId: lastId + numQuantity });
         
-        // O batch commit é feito fora, aqui só preparamos.
         await batch.commit();
       });
 
