@@ -55,6 +55,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
 import { useRouter } from 'next/navigation';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 const familiaSuggestions: { [key in Tool['familia']]?: Tool['classificacao'] } = {
@@ -71,13 +72,13 @@ const CadastroFerramentasPage = () => {
   const router = useRouter();
   
   const queryClient = useQueryClient();
-  const logicasQueryKey = 'logicasFerramentas';
+  const allToolsQueryKey = 'allToolsForCadastroPage';
 
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  const [editingLogic, setEditingLogic] = useState<WithDocId<Tool> | null>(null);
+  const [editingTool, setEditingTool] = useState<WithDocId<Tool> | null>(null);
   const [toolsToPrint, setToolsToPrint] = useState<any[]>([]);
   const [isLabelPrintOpen, setIsLabelPrintOpen] = useState(false);
 
@@ -92,21 +93,28 @@ const CadastroFerramentasPage = () => {
   const [docEngenhariaFile, setDocEngenhariaFile] = useState<File | null>(null);
 
 
-  const toolsQuery = useMemoFirebase(() => (
+  const allToolsQuery = useMemoFirebase(() => (
     firestore ? query(collection(firestore, 'tools'), orderBy('codigo')) : null
   ), [firestore]);
   
-  const { data: allTools, isLoading: isLoadingTools, error: toolsError } = useCollection<Tool>(toolsQuery, {
-    queryKey: ['allToolsForLogicPage']
+  const { data: allTools, isLoading: isLoadingTools, error: toolsError } = useCollection<Tool>(allToolsQuery, {
+    queryKey: [allToolsQueryKey]
   });
 
-  const logicas = useMemo(() => {
-    return allTools?.filter(tool => tool.enderecamento === 'LOGICA') || [];
+  const [modelos, ferramentasUnicas] = useMemo(() => {
+    if (!allTools) return [[], []];
+    const modelos: WithDocId<Tool>[] = [];
+    const unicas: WithDocId<Tool>[] = [];
+    allTools.forEach(tool => {
+        if (tool.enderecamento === 'LOGICA') {
+            modelos.push(tool);
+        } else {
+            unicas.push(tool);
+        }
+    });
+    return [modelos, unicas];
   }, [allTools]);
   
-  const isLoadingLogicas = isLoadingTools;
-  const logicasError = toolsError;
-
 
   useEffect(() => {
     const { tipo, familia, classificacao } = newFerramenta;
@@ -116,13 +124,13 @@ const CadastroFerramentasPage = () => {
   }, [newFerramenta.tipo, newFerramenta.familia, newFerramenta.classificacao]);
 
   useEffect(() => {
-    if (newFerramenta.familia && !editingLogic) {
+    if (newFerramenta.familia && !editingTool) {
       const suggestedClassificacao = familiaSuggestions[newFerramenta.familia as keyof typeof familiaSuggestions];
       if (suggestedClassificacao) {
         setNewFerramenta(prev => ({ ...prev, classificacao: suggestedClassificacao }));
       }
     }
-  }, [newFerramenta.familia, editingLogic]);
+  }, [newFerramenta.familia, editingTool]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target;
@@ -161,7 +169,7 @@ const CadastroFerramentasPage = () => {
     });
     setToolImage(null);
     setDocEngenhariaFile(null);
-    setEditingLogic(null);
+    setEditingTool(null);
     if(fileInputRef.current) fileInputRef.current.value = '';
     if(docEngenhariaInputRef.current) docEngenhariaInputRef.current.value = '';
   };
@@ -181,12 +189,12 @@ const CadastroFerramentasPage = () => {
     return getDownloadURL(snapshot.ref);
   };
 
-  const handleSaveToolLogic = async () => {
+  const handleSaveTool = async () => {
     if (!user || !firestore || !storage) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado ou falha na conexão.' });
         return;
     }
-    const isDirectCreation = newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'EQV';
+    const isTemplate = newFerramenta.tipo === 'STD' || newFerramenta.tipo === 'GSE';
     
     if (newFerramenta.tipo === 'ESP' && !newFerramenta.pn_fabricante) {
       toast({ variant: "destructive", description: "P/N Fabricante é obrigatório para tipo 'Especial'." }); return;
@@ -194,30 +202,30 @@ const CadastroFerramentasPage = () => {
     if (newFerramenta.tipo === 'EQV' && !newFerramenta.pn_referencia) {
       toast({ variant: "destructive", description: "P/N Referência é obrigatório para tipo 'Equivalente'." }); return;
     }
-     if (newFerramenta.tipo === 'EQV' && !docEngenhariaFile && !editingLogic?.doc_engenharia_url) {
+     if (newFerramenta.tipo === 'EQV' && !docEngenhariaFile && !editingTool?.doc_engenharia_url) {
       toast({ variant: "destructive", description: "Doc. Engenharia é obrigatório para tipo 'Equivalente'." }); return;
     }
-     if (!toolImage && !editingLogic?.imageUrl) {
+     if (!toolImage && !editingTool?.imageUrl) {
       toast({ variant: "destructive", description: "A imagem de referência é obrigatória." }); return;
     }
-    if (isDirectCreation && !newFerramenta.enderecamento) {
-        toast({ variant: "destructive", description: "Endereçamento é obrigatório para cadastro direto." }); return;
+    if (!isTemplate && !newFerramenta.enderecamento) {
+        toast({ variant: "destructive", description: "Endereçamento é obrigatório para cadastro de ferramenta única (ESP/EQV)." }); return;
     }
   
     setIsSaving(true);
   
     try {
         const tempId = doc(collection(firestore, 'temp')).id;
-        const logicId = editingLogic?.docId || tempId;
+        const toolDocId = editingTool?.docId || tempId;
         
-        let imageUrl = editingLogic?.imageUrl;
+        let imageUrl = editingTool?.imageUrl;
         if (toolImage && toolImage.startsWith('data:')) {
-            imageUrl = await uploadImageAsDataUrl(toolImage, `tool_images/${logicId}.jpg`);
+            imageUrl = await uploadImageAsDataUrl(toolImage, `tool_images/${toolDocId}.jpg`);
         }
 
-        let docEngenhariaUrl = editingLogic?.doc_engenharia_url;
+        let docEngenhariaUrl = editingTool?.doc_engenharia_url;
         if (docEngenhariaFile) {
-            docEngenhariaUrl = await uploadFile(docEngenhariaFile, `doc_engenharia/${logicId}_${docEngenhariaFile.name}`);
+            docEngenhariaUrl = await uploadFile(docEngenhariaFile, `doc_engenharia/${toolDocId}_${docEngenhariaFile.name}`);
         }
         
         const baseToolData: Partial<Tool> = {
@@ -229,10 +237,10 @@ const CadastroFerramentasPage = () => {
         // Remove undefined properties to avoid overwriting existing data with nothing
         Object.keys(baseToolData).forEach(key => baseToolData[key as keyof Partial<Tool>] === undefined && delete baseToolData[key as keyof Partial<Tool>]);
         
-        if (isDirectCreation && !editingLogic) { // Only for new ESP or EQV tools
+        if (!editingTool) { // Creating new tool
             const { tipo, familia, classificacao } = newFerramenta;
             
-            const newSequencial = await runTransaction(firestore, async (transaction) => {
+            const sequencial = await runTransaction(firestore, async (transaction) => {
               const q = query(
                 collection(firestore, 'tools'),
                 where('tipo', '==', tipo),
@@ -241,50 +249,45 @@ const CadastroFerramentasPage = () => {
                 orderBy('sequencial', 'desc'),
                 limit(1)
               );
-              const snapshot = await getDocs(q);
-              const lastSequencial = snapshot.empty ? 0 : (snapshot.docs[0].data().sequencial || 0);
+              // Transaction read
+              const snapshot = await getDocs(q); 
+              const lastSequencial = snapshot.empty ? -1 : (snapshot.docs[0].data().sequencial ?? -1);
+              
+              if(isTemplate) return 0; // Templates always have sequencial 0
+              
               return lastSequencial + 1;
             });
-            
-            const codigoCompleto = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
+
+            if (sequencial < 0) throw new Error("Falha ao gerar sequencial.");
+
+            const codigoCompleto = `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;
             const status: Tool['status'] = tipo === 'EQV' ? 'Pendente' : 'Disponível';
 
             const toolData: Omit<Tool, 'id'> = {
-                ...(baseToolData as Omit<Tool, 'id' | 'codigo' | 'sequencial' | 'status'>),
+                ...(baseToolData as Omit<Tool, 'id' | 'codigo' | 'sequencial' | 'status' | 'enderecamento'>),
                 codigo: codigoCompleto,
-                sequencial: newSequencial,
+                sequencial: sequencial,
                 status: status,
+                enderecamento: isTemplate ? 'LOGICA' : (baseToolData.enderecamento || ''),
             };
             
             const docRef = await addDoc(collection(firestore, 'tools'), toolData);
-            setToolsToPrint([{...toolData, docId: docRef.id}]);
-            setIsLabelPrintOpen(true);
-            toast({ title: "Sucesso!", description: `Ferramenta ${codigoCompleto} criada.` });
+            
+            if (!isTemplate) {
+              setToolsToPrint([{...toolData, docId: docRef.id}]);
+              setIsLabelPrintOpen(true);
+            }
+            toast({ title: "Sucesso!", description: `Ferramenta/Modelo ${codigoCompleto} criada.` });
 
-        } else if (editingLogic) {
-            // Update existing logic OR existing unique tool
-            const logicRef = doc(firestore, 'tools', editingLogic.docId);
-            await updateDoc(logicRef, baseToolData);
-            toast({ title: "Sucesso!", description: `Ferramenta/Lógica atualizada.` });
-        } else {
-            // Add new logic template (STD or GSE)
-            const sequencial = 0; // Logic templates have a sequencial of 0
-            const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${newFerramenta.classificacao}-${sequencial.toString().padStart(4, '0')}`;
-            const toolData: Partial<Tool> = {
-                ...baseToolData,
-                codigo: codigoCompleto,
-                sequencial: sequencial,
-                status: 'Disponível', // Status for a logic is just a default
-                enderecamento: 'LOGICA', // Mark this as a logic template
-            };
-
-            await addDoc(collection(firestore, 'tools'), toolData);
-            toast({ title: "Sucesso!", description: `Nova lógica de ferramenta cadastrada.` });
+        } else { // Updating existing tool
+            const toolRef = doc(firestore, 'tools', editingTool.docId);
+            await updateDoc(toolRef, baseToolData);
+            toast({ title: "Sucesso!", description: `Ferramenta/Modelo atualizada.` });
         }
         
         resetForm();
         setIsFormDialogOpen(false);
-        queryClient.invalidateQueries({ queryKey: [logicasQueryKey, 'allToolsForLogicPage'] });
+        queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
 
     } catch (error) {
       console.error("Erro ao salvar:", error);
@@ -294,36 +297,36 @@ const CadastroFerramentasPage = () => {
     }
   };
 
-  const handleDelete = async (logica: WithDocId<Tool>) => {
+  const handleDelete = async (tool: WithDocId<Tool>) => {
     if (!firestore || !storage) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Serviço indisponível.' });
         return;
     }
     setIsDeleting(true);
     try {
-        const docRef = doc(firestore, 'tools', logica.docId);
+        const docRef = doc(firestore, 'tools', tool.docId);
         await deleteDoc(docRef);
 
-        if (logica.imageUrl) {
+        if (tool.imageUrl) {
             try {
-              const imageRef = storageRef(storage, logica.imageUrl);
+              const imageRef = storageRef(storage, tool.imageUrl);
               await deleteObject(imageRef);
             } catch(err: any) {
                if (err.code !== 'storage/object-not-found') console.warn("Could not delete image:", err)
             }
         }
 
-        if (logica.doc_engenharia_url) {
+        if (tool.doc_engenharia_url) {
             try {
-              const docUrlRef = storageRef(storage, logica.doc_engenharia_url);
+              const docUrlRef = storageRef(storage, tool.doc_engenharia_url);
               await deleteObject(docUrlRef);
             } catch(err: any) {
                if (err.code !== 'storage/object-not-found') console.warn("Could not delete engineering doc:", err)
             }
         }
 
-        toast({ title: 'Sucesso', description: 'Lógica/Ferramenta excluída.' });
-        queryClient.invalidateQueries({ queryKey: [logicasQueryKey, 'allToolsForLogicPage'] });
+        toast({ title: 'Sucesso', description: 'Modelo/Ferramenta excluído.' });
+        queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
     } catch (error) {
         console.error("Erro ao excluir:", error);
         toast({ variant: 'destructive', title: 'Erro ao Excluir', description: 'Não foi possível excluir o item.' });
@@ -332,35 +335,94 @@ const CadastroFerramentasPage = () => {
     }
   };
 
-  const handleOpenEditDialog = (logic: WithDocId<Tool>) => {
-    setEditingLogic(logic);
-    setNewFerramenta(logic);
-    setToolImage(logic.imageUrl || null);
+  const handleOpenEditDialog = (tool: WithDocId<Tool>) => {
+    setEditingTool(tool);
+    setNewFerramenta(tool);
+    setToolImage(tool.imageUrl || null);
     setDocEngenhariaFile(null); // Reset file input
     setIsFormDialogOpen(true);
   };
+  
+  const renderToolList = (list: WithDocId<Tool>[], emptyMessage: string) => {
+    if (list.length === 0) {
+        return (
+             <div className="p-4 border-2 border-dashed rounded-lg bg-muted/20">
+                <p className="text-sm text-center text-muted-foreground">{emptyMessage}</p>
+            </div>
+        );
+    }
+    
+    return (
+      <div className="space-y-3">
+          {list.map(item => (
+              <div key={item.docId} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <Image 
+                      src={item.imageUrl || 'https://picsum.photos/seed/default-tool/64/64'} 
+                      alt={item.descricao}
+                      width={64}
+                      height={64}
+                      className="rounded-md aspect-square object-cover"
+                  />
+                  <div className="flex-1 text-sm">
+                      <p className="font-bold text-base">{item.descricao}</p>
+                      <p className="font-mono text-muted-foreground">{item.codigo}</p>
+                      {item.enderecamento !== 'LOGICA' && <p className="text-xs text-muted-foreground">Endereço: {item.enderecamento}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" onClick={() => handleOpenEditDialog(item)}>
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Editar</span>
+                      </Button>
+                      <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="icon" disabled={isDeleting}>
+                                  <Trash2 className="h-4 w-4" />
+                              </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                              <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                  Tem certeza que deseja excluir <span className="font-bold">"{item.descricao}"</span>? Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(item)} disabled={isDeleting}>
+                                  {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                  Sim, Excluir
+                              </AlertDialogAction>
+                              </AlertDialogFooter>
+                          </AlertDialogContent>
+                      </AlertDialog>
+                  </div>
+              </div>
+          ))}
+      </div>
+    );
+  }
 
 
   return (
     <div className="space-y-6">
       <ToolingAlertHeader />
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Cadastro de Ferramentas</h1>
+        <h1 className="text-2xl font-bold">Cadastro de Ferramentas e Modelos</h1>
         <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
             if (!isOpen) resetForm();
             setIsFormDialogOpen(isOpen);
         }}>
           <DialogTrigger asChild>
-            <Button onClick={() => { setEditingLogic(null); resetForm(); }}>
+            <Button onClick={() => { setEditingTool(null); resetForm(); }}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Adicionar
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>{editingLogic ? 'Editar Ferramenta/Lógica' : 'Cadastrar Nova Ferramenta ou Lógica'}</DialogTitle>
+              <DialogTitle>{editingTool ? 'Editar Ferramenta/Modelo' : 'Cadastrar Nova Ferramenta ou Modelo'}</DialogTitle>
               <DialogDescription>
-                Use para cadastrar novas ferramentas <span className="font-bold">ESP/EQV</span> diretamente, ou criar modelos <span className="font-bold">STD/GSE</span> para adição em massa.
+                Use para cadastrar novas ferramentas únicas (<span className="font-bold">ESP/EQV</span>), ou criar modelos para adição em massa (<span className="font-bold">STD/GSE</span>).
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
@@ -371,10 +433,10 @@ const CadastroFerramentasPage = () => {
                     <Label htmlFor="tipo">Tipo</Label>
                     <Select value={newFerramenta.tipo} onValueChange={(v) => handleSelectChange('tipo', v)}><SelectTrigger id="tipo"><SelectValue/></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="STD">STD (Standard - Modelo)</SelectItem>
-                        <SelectItem value="ESP">ESP (Específico - Cadastro Direto)</SelectItem>
-                        <SelectItem value="GSE">GSE (Apoio de Solo - Modelo)</SelectItem>
-                        <SelectItem value="EQV">EQV (Equivalente - Cadastro Direto)</SelectItem>
+                        <SelectItem value="STD">STD (Modelo Standard)</SelectItem>
+                        <SelectItem value="ESP">ESP (Ferramenta Específica)</SelectItem>
+                        <SelectItem value="GSE">GSE (Modelo Apoio de Solo)</SelectItem>
+                        <SelectItem value="EQV">EQV (Ferramenta Equivalente)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -460,7 +522,7 @@ const CadastroFerramentasPage = () => {
                     </div>
                     {newFerramenta.tipo === 'EQV' && (
                        <div className="col-span-2 flex items-center gap-4">
-                           {docEngenhariaFile ? <FileText className="h-10 w-10 text-muted-foreground"/> : (editingLogic?.doc_engenharia_url && <a href={editingLogic.doc_engenharia_url} target="_blank" rel="noopener noreferrer"><FileText className="h-10 w-10 text-blue-500 hover:text-blue-700"/></a>) || <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
+                           {docEngenhariaFile ? <FileText className="h-10 w-10 text-muted-foreground"/> : (editingTool?.doc_engenharia_url && <a href={editingTool.doc_engenharia_url} target="_blank" rel="noopener noreferrer"><FileText className="h-10 w-10 text-blue-500 hover:text-blue-700"/></a>) || <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><Paperclip className="h-6 w-6 text-muted-foreground" /></div>}
                            <div className='flex-1'>
                              <Button type="button" variant="outline" size="sm" onClick={() => docEngenhariaInputRef.current?.click()}><Upload className="mr-2"/>Doc. Engenharia<span className='text-destructive ml-1'>*</span></Button>
                              <Input type="file" ref={docEngenhariaInputRef} onChange={handleDocEngenhariaChange} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"/>
@@ -477,105 +539,92 @@ const CadastroFerramentasPage = () => {
                         <p className="text-sm">O status inicial para ferramentas 'EQV' será <span className="font-bold">"Pendente"</span> e aguardará aprovação da engenharia.</p>
                     </div>
                 )}
-                 {(newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'EQV') && !editingLogic && (
+                 {(newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'EQV') && !editingTool && (
                     <div className="col-span-full bg-green-100 dark:bg-green-900/30 border border-green-400 text-green-800 dark:text-green-200 px-4 py-3 rounded-md flex items-center gap-3">
                         <AlertTriangle className="h-5 w-5" />
-                        <p className="text-sm">Esta ferramenta será cadastrada diretamente. Após salvar, você poderá imprimir a etiqueta.</p>
+                        <p className="text-sm">Esta ferramenta será cadastrada diretamente no inventário. Após salvar, você poderá imprimir a etiqueta.</p>
+                    </div>
+                )}
+                 {(newFerramenta.tipo === 'STD' || newFerramenta.tipo === 'GSE') && !editingTool && (
+                    <div className="col-span-full bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-md flex items-center gap-3">
+                        <AlertTriangle className="h-5 w-5" />
+                        <p className="text-sm">Você está criando um <span className="font-bold">Modelo (template)</span>. Ele não aparecerá no inventário, mas servirá de base para adicionar ferramentas em massa.</p>
                     </div>
                 )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsFormDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={handleSaveToolLogic} disabled={isSaving}>
+              <Button onClick={handleSaveTool} disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editingLogic ? 'Salvar Alterações' : 'Salvar'}
+                {editingTool ? 'Salvar Alterações' : 'Salvar'}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-       <Card>
-        <CardHeader>
-            <CardTitle>Modelos Cadastrados (STD/GSE)</CardTitle>
-            <CardDescription>Gerencie os modelos (templates) para ferramentas STD e GSE.</CardDescription>
-        </CardHeader>
-        <CardContent>
-             {isLoadingLogicas && (
-                <div className="space-y-4">
-                    {[...Array(3)].map((_, i) => (
-                        <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
-                            <Skeleton className="h-16 w-16 rounded-md" />
-                            <div className="space-y-2 flex-1">
-                                <Skeleton className="h-4 w-3/4" />
-                                <Skeleton className="h-4 w-1/2" />
+        <Tabs defaultValue="modelos">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="modelos">Modelos (STD/GSE)</TabsTrigger>
+                <TabsTrigger value="unicas">Ferramentas Únicas (ESP/EQV)</TabsTrigger>
+            </TabsList>
+            <TabsContent value="modelos">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Modelos Cadastrados (Templates)</CardTitle>
+                        <CardDescription>Gerencie os modelos para ferramentas STD e GSE. Use-os para adicionar múltiplas ferramentas ao estoque de uma vez.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {isLoadingTools ? (
+                             <div className="space-y-4">
+                                {[...Array(3)].map((_, i) => (
+                                    <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
+                                        <Skeleton className="h-16 w-16 rounded-md" />
+                                        <div className="space-y-2 flex-1">
+                                            <Skeleton className="h-4 w-3/4" />
+                                            <Skeleton className="h-4 w-1/2" />
+                                        </div>
+                                        <Skeleton className="h-8 w-8 rounded-full" />
+                                    </div>
+                                ))}
                             </div>
-                            <Skeleton className="h-8 w-8 rounded-full" />
-                        </div>
-                    ))}
-                </div>
-             )}
-             {logicasError && (
-                <div className="p-4 border rounded-lg bg-destructive/10 text-destructive text-center">
-                    <p>Erro ao carregar os modelos de ferramentas. Verifique suas permissões.</p>
-                </div>
-             )}
-             {!isLoadingLogicas && !logicasError && logicas && logicas.length > 0 && (
-                <div className="space-y-3">
-                    {logicas.map(logica => (
-                        <div key={logica.docId} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                            <Image 
-                                src={logica.imageUrl || 'https://picsum.photos/seed/default-tool/64/64'} 
-                                alt={logica.descricao}
-                                width={64}
-                                height={64}
-                                className="rounded-md aspect-square object-cover"
-                            />
-                            <div className="flex-1 text-sm">
-                                <p className="font-bold text-base">{logica.descricao}</p>
-                                <p className="font-mono text-muted-foreground">{logica.codigo}</p>
+                        ) : toolsError ? (
+                            <div className="p-4 border rounded-lg bg-destructive/10 text-destructive text-center">
+                                <p>Erro ao carregar os modelos. Verifique suas permissões.</p>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" size="icon" onClick={() => handleOpenEditDialog(logica)}>
-                                    <Edit className="h-4 w-4" />
-                                    <span className="sr-only">Editar</span>
-                                </Button>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" size="icon" disabled={isDeleting}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                        <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Tem certeza que deseja excluir o modelo <span className="font-bold">"{logica.descricao}"</span>? Esta ação não pode ser desfeita.
-                                        </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDelete(logica)} disabled={isDeleting}>
-                                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                            Sim, Excluir
-                                        </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
+                        ) : renderToolList(modelos, 'Nenhum modelo de ferramenta cadastrado. Clique em "Adicionar" para criar um.')}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="unicas">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Ferramentas Únicas Cadastradas</CardTitle>
+                        <CardDescription>Gerencie ferramentas específicas ou equivalentes que foram cadastradas diretamente no inventário.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       {isLoadingTools ? (
+                             <div className="space-y-4">
+                                {[...Array(3)].map((_, i) => (
+                                    <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
+                                        <Skeleton className="h-16 w-16 rounded-md" />
+                                        <div className="space-y-2 flex-1">
+                                            <Skeleton className="h-4 w-3/4" />
+                                            <Skeleton className="h-4 w-1/2" />
+                                        </div>
+                                        <Skeleton className="h-8 w-8 rounded-full" />
+                                    </div>
+                                ))}
                             </div>
-                        </div>
-                    ))}
-                </div>
-             )}
-             {!isLoadingLogicas && !logicasError && (!logicas || logicas.length === 0) && (
-                <div className="p-4 border-2 border-dashed rounded-lg bg-muted/20">
-                    <p className="text-sm text-center text-muted-foreground">
-                        Nenhum modelo de ferramenta cadastrado ainda. Clique em "Adicionar" para criar um.
-                    </p>
-                </div>
-             )}
-        </CardContent>
-      </Card>
+                        ) : toolsError ? (
+                             <div className="p-4 border rounded-lg bg-destructive/10 text-destructive text-center">
+                                <p>Erro ao carregar as ferramentas. Verifique suas permissões.</p>
+                            </div>
+                        ) : renderToolList(ferramentasUnicas, 'Nenhuma ferramenta única (ESP/EQV) cadastrada. Clique em "Adicionar" para criar uma.')}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
       
        <LabelPrintDialog
         isOpen={isLabelPrintOpen}

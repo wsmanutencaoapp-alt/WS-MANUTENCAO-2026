@@ -105,7 +105,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
             setFilteredLogicTools(logics); // Show all logics initially
         } catch (error) {
             console.error('Erro ao buscar lógicas:', error);
-            toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível carregar as lógicas de ferramentas.' });
+            toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível carregar os modelos de ferramentas.' });
         } finally {
             setIsSearching(false);
         }
@@ -179,7 +179,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
   const handleSave = async () => {
     if (!firestore || !selectedToolGroup || !storage) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Nenhuma lógica de ferramenta selecionada ou serviço indisponível.' });
+      toast({ variant: 'destructive', title: 'Erro', description: 'Nenhum modelo de ferramenta selecionado ou serviço indisponível.' });
       return;
     }
     if (quantityToAdd <= 0) {
@@ -286,10 +286,10 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
       
         // Emit a permission error if that's what's detected
         if (error.code && error.code.includes('permission-denied')) {
-            errorEmitter.emit(
+             errorEmitter.emit(
                 'permission-error',
                 new FirestorePermissionError({
-                    path: 'tools/{newToolId}',
+                    path: `tools/{newToolId}`,
                     operation: 'write', 
                     requestResourceData: { info: `Failed to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
                 })
@@ -306,7 +306,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Adicionar Ferramenta ao Estoque</DialogTitle>
+          <DialogTitle>Adicionar Ferramenta ao Estoque (Clonar Modelo)</DialogTitle>
           <DialogDescription>
             Pesquise por um modelo (STD/GSE) e adicione novas unidades ao inventário. Para cadastrar um item único (ESP/EQV), vá para Cadastros {"->"} Ferramentas.
           </DialogDescription>
@@ -314,7 +314,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         
         <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
           <div className="relative">
-            <Label htmlFor="searchTerm">Pesquisar Modelo</Label>
+            <Label htmlFor="searchTerm">Pesquisar Modelo (STD/GSE)</Label>
             <Search className="absolute bottom-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               id="searchTerm"
