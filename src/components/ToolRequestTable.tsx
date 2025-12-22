@@ -1,7 +1,7 @@
 'use client';
 import { forwardRef, useImperativeHandle, useState, useMemo, useEffect } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, documentId } from 'firebase/firestore';
 import type { ToolRequest, Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -21,12 +21,14 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, Inbox, Send, Undo2, Search } from 'lucide-react';
+import { Loader2, AlertCircle, Inbox, Send, Undo2, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import FulfillRequestDialog from './FulfillRequestDialog';
 import ManualCheckInDialog from './ManualCheckInDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import Image from 'next/image';
 
 export interface ToolRequestTableRef {
   refetchRequests: () => void;
@@ -38,6 +40,7 @@ interface ToolRequestTableProps {
     requests: WithDocId<ToolRequest>[] | undefined;
     isLoading: boolean;
     error: Error | null;
+    allTools: WithDocId<Tool>[] | undefined;
 }
 
 const getStatusVariant = (status: ToolRequest['status']) => {
@@ -51,9 +54,82 @@ const getStatusVariant = (status: ToolRequest['status']) => {
     }
 }
 
-const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(({ onActionSuccess, loanedTools, requests, isLoading, error }, ref) => {
+const RequestRow = ({ request, onFulfill, onReturn, allTools, openCollapsibleId, setOpenCollapsibleId }: { request: WithDocId<ToolRequest>, onFulfill: (req: WithDocId<ToolRequest>) => void, onReturn: (req: WithDocId<ToolRequest>) => void, allTools: WithDocId<Tool>[] | undefined, openCollapsibleId: string | null, setOpenCollapsibleId: (id: string | null) => void }) => {
+    const isOpen = openCollapsibleId === request.docId;
+    const toolsInRequest = useMemo(() => {
+        if (!allTools || !request.toolIds) return [];
+        const requestToolIds = new Set(request.toolIds);
+        return allTools.filter(tool => requestToolIds.has(tool.docId));
+    }, [allTools, request.toolIds]);
+    
+    return (
+        <>
+            <TableRow 
+                onClick={() => setOpenCollapsibleId(isOpen ? null : request.docId)}
+                className="cursor-pointer"
+            >
+                <TableCell>
+                    <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
+                </TableCell>
+                <TableCell className="font-mono">{request.osNumber}</TableCell>
+                <TableCell>{request.requesterName}</TableCell>
+                <TableCell>{format(new Date(request.requestedAt), 'dd/MM/yyyy HH:mm')}</TableCell>
+                <TableCell className="text-center">
+                    {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </TableCell>
+                <TableCell className="text-right">
+                    {request.status === 'Pendente' && (
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onFulfill(request); }}>
+                            <Send className="mr-2 h-4 w-4" />
+                            Atender
+                        </Button>
+                    )}
+                    {request.status === 'Em Uso' && (
+                        <Button variant="default" size="sm" onClick={(e) => { e.stopPropagation(); onReturn(request); }}>
+                            <Undo2 className="mr-2 h-4 w-4" />
+                            Devolver
+                        </Button>
+                    )}
+                </TableCell>
+            </TableRow>
+            {isOpen && (
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableCell colSpan={6} className="p-0">
+                       <div className="p-4">
+                           <h4 className="font-semibold text-sm mb-2">Ferramentas na Requisição:</h4>
+                           <div className="space-y-2 max-h-48 overflow-y-auto">
+                               {toolsInRequest.length > 0 ? toolsInRequest.map(tool => (
+                                   <div key={tool.docId} className="flex items-center gap-3 p-2 border rounded-md bg-background">
+                                       <Image
+                                           src={tool.imageUrl || "https://picsum.photos/seed/tool/40/40"}
+                                           alt={tool.descricao}
+                                           width={40}
+                                           height={40}
+                                           className="aspect-square rounded-md object-cover"
+                                       />
+                                       <div className="flex-1 text-sm">
+                                           <p className="font-bold">{tool.descricao}</p>
+                                           <p className="font-mono text-xs text-muted-foreground">{tool.codigo}</p>
+                                       </div>
+                                       <Badge variant="outline">{tool.enderecamento}</Badge>
+                                   </div>
+                               )) : (
+                                   <p className="text-xs text-muted-foreground text-center">Detalhes das ferramentas não encontrados.</p>
+                               )}
+                           </div>
+                       </div>
+                    </TableCell>
+                </TableRow>
+            )}
+        </>
+    );
+};
+
+
+const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(({ onActionSuccess, loanedTools, requests, isLoading, error, allTools }, ref) => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [openCollapsibleId, setOpenCollapsibleId] = useState<string | null>(null);
   const [selectedRequestForFulfillment, setSelectedRequestForFulfillment] = useState<WithDocId<ToolRequest> | null>(null);
   const [selectedRequestForReturn, setSelectedRequestForReturn] = useState<WithDocId<ToolRequest> | null>(null);
 
@@ -63,7 +139,7 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
     let sortedRequests = [...requests].sort((a, b) => {
       if (a.status === 'Pendente' && b.status !== 'Pendente') return -1;
       if (a.status !== 'Pendente' && b.status === 'Pendente') return 1;
-      return new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime();
+      return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
     });
 
     if (!searchTerm) {
@@ -103,7 +179,7 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
         <CardHeader>
              <CardTitle>Requisições Ativas</CardTitle>
              <CardDescription>
-                Requisições de ferramentas pendentes de atendimento ou atualmente em uso.
+                Requisições de ferramentas pendentes de atendimento ou atualmente em uso. Clique em uma linha para ver os itens.
              </CardDescription>
              <div className="relative pt-4">
                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -123,7 +199,7 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
                     <TableHead>Nº da OS</TableHead>
                     <TableHead>Solicitante</TableHead>
                     <TableHead>Data da Solicitação</TableHead>
-                    <TableHead>Itens</TableHead>
+                    <TableHead className="text-center w-16">Ferramentas</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -151,31 +227,15 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
                     </TableRow>
                   )}
                   {!isLoading && filteredRequests.map(request => (
-                    <TableRow key={request.docId}>
-                      <TableCell>
-                          <Badge variant={getStatusVariant(request.status)}>{request.status}</Badge>
-                      </TableCell>
-                      <TableCell className="font-mono">{request.osNumber}</TableCell>
-                      <TableCell>{request.requesterName}</TableCell>
-                      <TableCell>{format(new Date(request.requestedAt), 'dd/MM/yyyy HH:mm')}</TableCell>
-                      <TableCell>
-                          <Badge variant="outline">{request.toolIds.length}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                          {request.status === 'Pendente' && (
-                            <Button variant="outline" size="sm" onClick={() => setSelectedRequestForFulfillment(request)}>
-                                <Send className="mr-2 h-4 w-4" />
-                                Atender
-                            </Button>
-                          )}
-                          {request.status === 'Em Uso' && (
-                            <Button variant="default" size="sm" onClick={() => setSelectedRequestForReturn(request)}>
-                                <Undo2 className="mr-2 h-4 w-4" />
-                                Devolver
-                            </Button>
-                          )}
-                      </TableCell>
-                    </TableRow>
+                    <RequestRow
+                        key={request.docId}
+                        request={request}
+                        onFulfill={setSelectedRequestForFulfillment}
+                        onReturn={setSelectedRequestForReturn}
+                        allTools={allTools}
+                        openCollapsibleId={openCollapsibleId}
+                        setOpenCollapsibleId={setOpenCollapsibleId}
+                    />
                   ))}
                 </TableBody>
             </Table>

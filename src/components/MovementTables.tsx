@@ -117,6 +117,7 @@ const MovementTables = ({ availableTools, loanedTools }: MovementTablesProps) =>
             requests={activeRequests}
             isLoading={isLoadingActive}
             error={activeError}
+            allTools={allTools}
           />
         </TabsContent>
 
