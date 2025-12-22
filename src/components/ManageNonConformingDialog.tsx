@@ -92,7 +92,7 @@ export default function ManageNonConformingDialog({ isOpen, onClose, tool, onAct
     }
   };
   
-  const isFromMaintenance = tool.status === 'Em Manutenção' || tool.status === 'Em Conserto';
+  const isInitialEvaluation = tool.status === 'Com Avaria';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -108,27 +108,16 @@ export default function ManageNonConformingDialog({ isOpen, onClose, tool, onAct
             <div className="p-3 rounded-md bg-muted/50 border">
                 <p className="text-sm font-semibold">{tool.descricao}</p>
                 <p className="text-xs text-muted-foreground">Status Atual: <span className="font-medium">{tool.status}</span></p>
-                {tool.observacao && <p className="text-xs text-muted-foreground mt-1">Observação: {tool.observacao}</p>}
+                {tool.observacao && <p className="text-xs text-red-600 dark:text-red-400 mt-1">Motivo da Avaria: {tool.observacao}</p>}
             </div>
         
             <RadioGroup onValueChange={(value) => setSelectedAction(value as Action)} value={selectedAction || ''}>
                 <p className="font-medium text-sm mb-2">Ações Disponíveis:</p>
-                {isFromMaintenance ? (
+                {isInitialEvaluation ? (
                     <>
-                        <div className="flex items-center space-x-2">
-                           <RadioGroupItem value="repair_complete" id="repair_complete" />
-                           <Label htmlFor="repair_complete" className="font-normal flex items-center gap-2"><CheckCircle className="text-green-600"/> Finalizar Manutenção (Voltar ao estoque)</Label>
-                       </div>
-                        <div className="flex items-center space-x-2">
-                           <RadioGroupItem value="discard" id="discard_from_maint" />
-                           <Label htmlFor="discard_from_maint" className="font-normal flex items-center gap-2"><Trash2 className="text-destructive"/> Descartar Ferramenta</Label>
-                       </div>
-                    </>
-                ) : (
-                     <>
                        <div className="flex items-center space-x-2">
                            <RadioGroupItem value="conditional_release" id="conditional_release" />
-                           <Label htmlFor="conditional_release" className="font-normal flex items-center gap-2"><AlertTriangle className="text-orange-500"/> Liberar sob Condição (Desvio)</Label>
+                           <Label htmlFor="conditional_release" className="font-normal flex items-center gap-2"><AlertTriangle className="text-orange-500"/> Liberar com Desvio (Condicional)</Label>
                        </div>
                        <div className="flex items-center space-x-2">
                            <RadioGroupItem value="send_to_maintenance" id="send_to_maintenance" />
@@ -139,6 +128,17 @@ export default function ManageNonConformingDialog({ isOpen, onClose, tool, onAct
                            <Label htmlFor="discard" className="font-normal flex items-center gap-2"><Trash2 className="text-destructive"/> Descartar Ferramenta</Label>
                        </div>
                      </>
+                ) : ( // Actions for tools "Em Manutenção" or "Em Conserto"
+                     <>
+                        <div className="flex items-center space-x-2">
+                           <RadioGroupItem value="repair_complete" id="repair_complete" />
+                           <Label htmlFor="repair_complete" className="font-normal flex items-center gap-2"><CheckCircle className="text-green-600"/> Manutenção Concluída (Disponível)</Label>
+                       </div>
+                        <div className="flex items-center space-x-2">
+                           <RadioGroupItem value="discard" id="discard_from_maint" />
+                           <Label htmlFor="discard_from_maint" className="font-normal flex items-center gap-2"><Trash2 className="text-destructive"/> Descartar Ferramenta</Label>
+                       </div>
+                    </>
                 )}
 
             </RadioGroup>
