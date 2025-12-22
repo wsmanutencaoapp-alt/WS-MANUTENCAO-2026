@@ -24,6 +24,7 @@ import {
   LayoutDashboard,
   Search,
   Package,
+  History,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,7 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/ferramentaria/lista-ferramentas', icon: List, label: 'Lista de Ferramentas', permission: 'ferramentaria_lista' },
         { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
         { href: '/dashboard/calibracao', label: 'Controle/Calibração', permission: 'calibracao' },
+        { href: '/dashboard/ferramentaria/historico-nao-conformes', icon: History, label: 'Histórico Não Conformes', permission: 'ferramentaria_historico_nao_conformes' },
     ]
   },
   { 

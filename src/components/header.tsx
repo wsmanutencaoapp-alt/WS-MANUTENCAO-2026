@@ -27,6 +27,7 @@ import {
   HardHat,
   LayoutDashboard,
   Package,
+  History,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -77,6 +78,7 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/ferramentaria/lista-ferramentas', icon: List, label: 'Lista de Ferramentas', permission: 'ferramentaria_lista' },
         { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
         { href: '/dashboard/calibracao', label: 'Controle/Calibração', permission: 'calibracao' },
+        { href: '/dashboard/ferramentaria/historico-nao-conformes', icon: History, label: 'Histórico Não Conformes', permission: 'ferramentaria_historico_nao_conformes' },
     ]
   },
   { 
