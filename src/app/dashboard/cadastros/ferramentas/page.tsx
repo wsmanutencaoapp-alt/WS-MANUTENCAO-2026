@@ -14,6 +14,7 @@ import {
   deleteDoc,
   runTransaction,
   getDoc,
+  limit,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject, uploadString } from 'firebase/storage';
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
@@ -232,15 +233,17 @@ const CadastroFerramentasPage = () => {
             const { tipo, familia, classificacao } = newFerramenta;
             
             const newSequencial = await runTransaction(firestore, async (transaction) => {
-                const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
-                const counterDoc = await transaction.get(counterRef);
-                 if (!counterDoc.exists()) {
-                    transaction.set(counterRef, { lastId: 1 });
-                    return 1;
-                }
-                const newId = (counterDoc.data().lastId || 0) + 1;
-                transaction.update(counterRef, { lastId: newId });
-                return newId;
+              const q = query(
+                collection(firestore, 'tools'),
+                where('tipo', '==', tipo),
+                where('familia', '==', familia),
+                where('classificacao', '==', classificacao),
+                orderBy('sequencial', 'desc'),
+                limit(1)
+              );
+              const snapshot = await getDocs(q);
+              const lastSequencial = snapshot.empty ? 0 : (snapshot.docs[0].data().sequencial || 0);
+              return lastSequencial + 1;
             });
             
             const codigoCompleto = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
@@ -265,7 +268,7 @@ const CadastroFerramentasPage = () => {
             toast({ title: "Sucesso!", description: `Ferramenta/Lógica atualizada.` });
         } else {
             // Add new logic template (STD or GSE)
-            const sequencial = 0;
+            const sequencial = 0; // Logic templates have a sequencial of 0
             const codigoCompleto = `${newFerramenta.tipo}-${newFerramenta.familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;
             const toolData: Partial<Tool> = {
                 ...baseToolData,
@@ -588,3 +591,5 @@ const CadastroFerramentasPage = () => {
 };
 
 export default CadastroFerramentasPage;
+
+    
