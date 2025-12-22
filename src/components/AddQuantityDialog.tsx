@@ -203,10 +203,12 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     }
 
     setIsSaving(true);
-    const { tipo, familia, classificacao } = selectedToolGroup;
-    const toolsCollectionRef = collection(firestore, 'tools');
     
     try {
+        const { tipo, familia, classificacao } = selectedToolGroup;
+        const toolsCollectionRef = collection(firestore, 'tools');
+        
+        // 1. Find the last sequencial number for this tool type
         const q = query(
             toolsCollectionRef,
             where('tipo', '==', tipo),
@@ -215,10 +217,11 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
             orderBy('sequencial', 'desc'),
             limit(1)
         );
+        
+        const lastToolSnapshot = await getDocs(q);
+        const lastSequencial = lastToolSnapshot.empty ? 0 : (lastToolSnapshot.docs[0].data().sequencial || 0);
 
-        const snapshot = await getDocs(q);
-        const lastSequencial = snapshot.empty ? 0 : (snapshot.docs[0].data().sequencial || 0);
-
+        // 2. Prepare the batch write
         const batch = writeBatch(firestore);
         const newToolsForPrinting: FoundTool[] = [];
 
@@ -227,6 +230,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
             const newCode = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
             const newToolRef = doc(toolsCollectionRef);
             
+            // Upload files before committing the batch
             const imageUrl = toolImage ? await uploadImage(toolImage, `tool_images/${newToolRef.id}.jpg`) : selectedToolGroup.imageUrl;
             const docAnexoUrl = docAnexo ? await uploadFile(docAnexo, `docs_anexos/${newToolRef.id}_${docAnexo.name}`) : undefined;
 
@@ -250,6 +254,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
             newToolsForPrinting.push({ ...newToolData, docId: newToolRef.id });
         }
 
+        // 3. Commit the batch
         await batch.commit();
 
         toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.descricao} foram adicionadas.` });
@@ -428,5 +433,3 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
-
-    
