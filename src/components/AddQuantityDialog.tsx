@@ -208,54 +208,69 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     const baseCode = `${tipo}-${familia}-${classificacao}`;
     
     try {
-      const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
-
-      const newLastId = await runTransaction(firestore, async (transaction) => {
-          const counterDoc = await transaction.get(counterRef);
-          if (!counterDoc.exists()) {
-              // If it doesn't exist, create it starting from 0. The first tool will be 1.
-              transaction.set(counterRef, { lastId: quantityToAdd });
-              return 0;
-          }
-          const currentId = counterDoc.data().lastId || 0;
-          const newId = currentId + quantityToAdd;
-          transaction.update(counterRef, { lastId: newId });
-          return currentId;
-      });
-
-      // Exclude logic-specific fields from the new tool instance
-      const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
-
+      // First, upload all assets to get their URLs
+      const assetUploads = [];
       for (let i = 0; i < quantityToAdd; i++) {
-        const newSequencial = newLastId + 1 + i;
-        const newCode = `${baseCode}-${newSequencial.toString().padStart(4, '0')}`;
-        
-        // Upload assets for each tool instance if needed (or once if they are shared)
-        // For simplicity, we assume they are unique per new tool for now.
         const tempId = doc(collection(firestore, 'temp')).id;
-        const imageUrl = await uploadImage(toolImage, `tool_images/${newCode}_${tempId}.jpg`);
-        let docAnexoUrl;
-        if (docAnexo) docAnexoUrl = await uploadFile(docAnexo, `docs_anexos/${newCode}_${tempId}_${docAnexo.name}`);
+        const imagePath = `tool_images/${baseCode}_${tempId}.jpg`;
+        const docPath = docAnexo ? `docs_anexos/${baseCode}_${tempId}_${docAnexo.name}` : null;
         
-        const newToolData: Omit<Tool, 'id'> = {
-          ...baseData,
-          codigo: newCode,
-          sequencial: newSequencial,
-          descricao: descricaoEspecifica || baseData.descricao,
-          marca: marca || '',
-          valor_estimado: Number(valorEstimado) || 0,
-          status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível', // Respect initial status
-          enderecamento: enderecamento,
-          patrimonio: patrimonio || '',
-          imageUrl: imageUrl,
-          data_referencia: dataReferencia?.toISOString(),
-          data_vencimento: dataVencimento?.toISOString(),
-          documento_anexo_url: docAnexoUrl,
-        };
-        
-        const docRef = await addDoc(collection(firestore, 'tools'), newToolData);
-        newTools.push({ ...newToolData, id: docRef.id });
+        assetUploads.push({
+          imageUrlPromise: uploadImage(toolImage, imagePath),
+          docAnexoUrlPromise: docAnexo && docPath ? uploadFile(docAnexo, docPath) : Promise.resolve(undefined),
+        });
       }
+
+      const uploadedAssetUrls = await Promise.all(assetUploads.map(async (upload) => ({
+        imageUrl: await upload.imageUrlPromise,
+        docAnexoUrl: await upload.docAnexoUrlPromise,
+      })));
+
+      // Now, run the transaction to update counter and create tools
+      await runTransaction(firestore, async (transaction) => {
+          const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
+          const counterDoc = await transaction.get(counterRef);
+          
+          let lastId = 0;
+          if (!counterDoc.exists()) {
+              // If it doesn't exist, we will create it.
+              lastId = 0;
+          } else {
+              lastId = counterDoc.data().lastId || 0;
+          }
+          
+          const newLastId = lastId + quantityToAdd;
+          transaction.set(counterRef, { lastId: newLastId }, { merge: true });
+
+          // Exclude logic-specific fields from the new tool instance
+          const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
+
+          for (let i = 0; i < quantityToAdd; i++) {
+            const newSequencial = lastId + 1 + i;
+            const newCode = `${baseCode}-${newSequencial.toString().padStart(4, '0')}`;
+            const { imageUrl, docAnexoUrl } = uploadedAssetUrls[i];
+
+            const newToolData: Omit<Tool, 'id'> = {
+              ...baseData,
+              codigo: newCode,
+              sequencial: newSequencial,
+              descricao: descricaoEspecifica || baseData.descricao,
+              marca: marca || '',
+              valor_estimado: Number(valorEstimado) || 0,
+              status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível',
+              enderecamento: enderecamento,
+              patrimonio: patrimonio || '',
+              imageUrl: imageUrl,
+              data_referencia: dataReferencia?.toISOString(),
+              data_vencimento: dataVencimento?.toISOString(),
+              documento_anexo_url: docAnexoUrl,
+            };
+            
+            const newToolRef = doc(collection(firestore, 'tools'));
+            transaction.set(newToolRef, newToolData);
+            newTools.push({ ...newToolData, id: newToolRef.id });
+          }
+      });
       
       toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.descricao} foram adicionadas.` });
       
@@ -266,12 +281,12 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     } catch (error) {
       console.error(error);
       const permissionError = new FirestorePermissionError({
-        path: 'tools/{newToolId}',
-        operation: 'create', 
+        path: 'tools/{newToolId} or counters/{counterId}',
+        operation: 'write', 
         requestResourceData: { info: `Transaction to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
       });
       errorEmitter.emit('permission-error', permissionError);
-      toast({ variant: 'destructive', title: 'Erro na Transação', description: (error as Error).message });
+      toast({ variant: 'destructive', title: 'Erro na Transação', description: 'Não foi possível concluir a operação. Verifique as permissões.' });
     } finally {
       setIsSaving(false);
     }
