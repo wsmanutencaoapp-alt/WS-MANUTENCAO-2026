@@ -208,19 +208,19 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       const numQuantity = parseInt(quantidade, 10) || 1;
       const toolsRef = collection(firestore, "tools");
 
-      // Use a transaction to get the next sequential ID safely
-      const counterRef = doc(firestore, 'counters', `${tipo}-${familia}-${classificacao}`);
-      const startSequencial = await runTransaction(firestore, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        if (!counterDoc.exists()) {
-          transaction.set(counterRef, { lastId: numQuantity - 1 });
-          return 0;
-        }
-        const lastId = counterDoc.data().lastId || 0;
-        const newLastId = lastId + numQuantity;
-        transaction.update(counterRef, { lastId: newLastId });
-        return lastId + 1;
-      });
+      const q = query(
+        toolsRef,
+        where('tipo', '==', tipo),
+        where('familia', '==', familia),
+        where('classificacao', '==', classificacao),
+        orderBy('sequencial', 'desc'),
+        limit(1)
+      );
+
+      const lastToolSnapshot = await getDocs(q);
+      const lastSequencial = lastToolSnapshot.empty ? -1 : (lastToolSnapshot.docs[0].data().sequencial ?? -1);
+      const startSequencial = lastSequencial + 1;
+
 
       const newToolsForPrinting = [];
       const toolRefsAndData = [];
@@ -246,6 +246,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           const sequencial = startSequencial + i;
 
           const { docId, ...baseData } = selectedModel;
+          
           const finalToolData: Omit<Tool, 'id'> = {
               ...baseData,
               codigo: `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`,
@@ -257,10 +258,13 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
               marca: marca,
               patrimonio: patrimonio,
               imageUrl: imageUrl,
-              data_referencia: isCalibratable && calibrationDate ? calibrationDate.toISOString() : undefined,
-              data_vencimento: isCalibratable && dueDate ? dueDate.toISOString() : undefined,
-              documento_anexo_url: isCalibratable ? certificateUrl : undefined,
           };
+
+          if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
+            finalToolData.data_referencia = calibrationDate.toISOString();
+            finalToolData.data_vencimento = dueDate.toISOString();
+            finalToolData.documento_anexo_url = certificateUrl;
+          }
 
           batch.set(newToolRef, finalToolData);
           const toolForPrinting = { ...finalToolData, docId: newToolRef.id };
