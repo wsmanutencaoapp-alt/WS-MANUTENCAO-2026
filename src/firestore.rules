@@ -20,14 +20,13 @@ service cloud.firestore {
     
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      // Admins and authenticated users can create. Only Admins can update/delete.
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
       
       match /calibration_history/{calibrationId} {
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated(); // Allow creation for initial setup
-        allow update, delete: if isAdmin();
+        allow create: if isAuthenticated();
+        allow write: if isAdmin();
       }
     }
     
@@ -69,9 +68,10 @@ service cloud.firestore {
       allow read, write: if request.resource.data.requesterId == request.auth.uid || isAdmin();
     }
 
-    // COUNTERS collection is no longer needed and can be removed.
-    // match /counters/{counterId} {
-    //     allow read, write: if isAuthenticated();
-    // }
+    // This collection is used for generating sequential IDs.
+    // Any authenticated user can read and write to it within a transaction.
+    match /counters/{counterId} {
+        allow read, write: if isAuthenticated();
+    }
   }
 }

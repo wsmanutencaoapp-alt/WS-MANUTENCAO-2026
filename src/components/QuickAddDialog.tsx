@@ -13,7 +13,7 @@ import {
   limit,
   orderBy
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL, uploadString } from 'firebase/storage';
 import {
   Dialog,
   DialogContent,
@@ -204,93 +204,94 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
     setIsSaving(true);
     
     try {
-        const { tipo, familia, classificacao } = selectedModel;
-        const numQuantity = parseInt(quantidade, 10) || 1;
-        const toolsRef = collection(firestore, "tools");
+      const { tipo, familia, classificacao } = selectedModel;
+      const numQuantity = parseInt(quantidade, 10) || 1;
+      const toolsRef = collection(firestore, "tools");
 
-        // Get the last sequencial number for this combination
-        const q = query(
-            toolsRef,
-            where("tipo", "==", tipo),
-            where("familia", "==", familia),
-            where("classificacao", "==", classificacao),
-            orderBy("sequencial", "desc"),
-            limit(1)
-        );
-        const lastDocSnapshot = await getDocs(q);
-        const lastSequencial = lastDocSnapshot.empty ? -1 : (lastDocSnapshot.docs[0].data().sequencial ?? -1);
-        let currentSequencial = lastSequencial + 1;
-
-        const newToolsForPrinting = [];
-        const toolRefsAndData = [];
-        const batch = writeBatch(firestore);
-
-        // Upload files ONCE
-        let imageUrl = selectedModel.imageUrl || '';
-        if (toolImage && toolImage.startsWith('data:')) {
-            const imageRef = storageRef(storage, `tool_images/${doc(collection(firestore, 'temp')).id}.jpg`);
-            const snapshot = await uploadString(imageRef, toolImage, 'data_url');
-            imageUrl = await getDownloadURL(snapshot.ref);
+      // Use a transaction to get the next sequential ID safely
+      const counterRef = doc(firestore, 'counters', `${tipo}-${familia}-${classificacao}`);
+      const startSequencial = await runTransaction(firestore, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        if (!counterDoc.exists()) {
+          transaction.set(counterRef, { lastId: numQuantity - 1 });
+          return 0;
         }
+        const lastId = counterDoc.data().lastId || 0;
+        const newLastId = lastId + numQuantity;
+        transaction.update(counterRef, { lastId: newLastId });
+        return lastId + 1;
+      });
 
-        let certificateUrl = '';
-        if (isCalibratable && certificateFile) {
-            const certRef = storageRef(storage, `calibration_certificates/${doc(collection(firestore, 'temp')).id}_${certificateFile.name}`);
-            await uploadBytes(certRef, certificateFile);
-            certificateUrl = await getDownloadURL(certRef);
-        }
+      const newToolsForPrinting = [];
+      const toolRefsAndData = [];
+      const batch = writeBatch(firestore);
 
-        for (let i = 0; i < numQuantity; i++) {
-            const newToolRef = doc(toolsRef);
-            const sequencial = currentSequencial + i;
+      // Upload files ONCE
+      let imageUrl = selectedModel.imageUrl || '';
+      if (toolImage && toolImage.startsWith('data:')) {
+          const imageRef = storageRef(storage, `tool_images/${doc(collection(firestore, 'temp')).id}.jpg`);
+          const snapshot = await uploadString(imageRef, toolImage, 'data_url');
+          imageUrl = await getDownloadURL(snapshot.ref);
+      }
 
-            const { docId, ...baseData } = selectedModel;
-            const finalToolData: Omit<Tool, 'id'> = {
-                ...baseData,
-                codigo: `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`,
-                sequencial: sequencial,
-                status: 'Disponível',
-                enderecamento: enderecamento,
-                descricao: descricao,
-                valor_estimado: Number(valorEstimado) || 0,
-                marca: marca,
-                patrimonio: patrimonio,
-                imageUrl: imageUrl,
-                data_referencia: isCalibratable && calibrationDate ? calibrationDate.toISOString() : undefined,
-                data_vencimento: isCalibratable && dueDate ? dueDate.toISOString() : undefined,
-                documento_anexo_url: isCalibratable ? certificateUrl : undefined,
-            };
+      let certificateUrl = '';
+      if (isCalibratable && certificateFile) {
+          const certRef = storageRef(storage, `calibration_certificates/${doc(collection(firestore, 'temp')).id}_${certificateFile.name}`);
+          await uploadBytes(certRef, certificateFile);
+          certificateUrl = await getDownloadURL(certRef);
+      }
 
-            batch.set(newToolRef, finalToolData);
-            const toolForPrinting = { ...finalToolData, docId: newToolRef.id };
-            newToolsForPrinting.push(toolForPrinting);
-            toolRefsAndData.push({ ref: newToolRef, data: toolForPrinting });
-        }
+      for (let i = 0; i < numQuantity; i++) {
+          const newToolRef = doc(toolsRef);
+          const sequencial = startSequencial + i;
 
-        // Commit the first batch to create tools
-        await batch.commit();
+          const { docId, ...baseData } = selectedModel;
+          const finalToolData: Omit<Tool, 'id'> = {
+              ...baseData,
+              codigo: `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`,
+              sequencial: sequencial,
+              status: 'Disponível',
+              enderecamento: enderecamento,
+              descricao: descricao,
+              valor_estimado: Number(valorEstimado) || 0,
+              marca: marca,
+              patrimonio: patrimonio,
+              imageUrl: imageUrl,
+              data_referencia: isCalibratable && calibrationDate ? calibrationDate.toISOString() : undefined,
+              data_vencimento: isCalibratable && dueDate ? dueDate.toISOString() : undefined,
+              documento_anexo_url: isCalibratable ? certificateUrl : undefined,
+          };
 
-        // If calibratable, create history records in a second batch
-        if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
-            const historyBatch = writeBatch(firestore);
-            for (const { ref: toolRef } of toolRefsAndData) {
-                const historyRef = doc(collection(toolRef, 'calibration_history'));
-                const historyRecord: Omit<CalibrationRecord, 'id'> = {
-                    toolId: toolRef.id,
-                    calibrationDate: calibrationDate.toISOString(),
-                    dueDate: dueDate.toISOString(),
-                    certificateUrl: certificateUrl,
-                    calibratedBy: 'Registro Inicial',
-                    timestamp: new Date().toISOString(),
-                };
-                historyBatch.set(historyRef, historyRecord);
-            }
-            await historyBatch.commit();
-        }
+          batch.set(newToolRef, finalToolData);
+          const toolForPrinting = { ...finalToolData, docId: newToolRef.id };
+          newToolsForPrinting.push(toolForPrinting);
+          toolRefsAndData.push({ ref: newToolRef, data: toolForPrinting });
+      }
 
-        toast({ title: 'Sucesso!', description: `${numQuantity} ferramenta(s) adicionada(s) ao estoque.` });
-        queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
-        onSuccess(newToolsForPrinting);
+      // Commit the first batch to create tools
+      await batch.commit();
+
+      // If calibratable, create history records in a second batch
+      if (isCalibratable && calibrationDate && dueDate && certificateUrl) {
+          const historyBatch = writeBatch(firestore);
+          for (const { ref: toolRef } of toolRefsAndData) {
+              const historyRef = doc(collection(toolRef, 'calibration_history'));
+              const historyRecord: Omit<CalibrationRecord, 'id'> = {
+                  toolId: toolRef.id,
+                  calibrationDate: calibrationDate.toISOString(),
+                  dueDate: dueDate.toISOString(),
+                  certificateUrl: certificateUrl,
+                  calibratedBy: 'Registro Inicial',
+                  timestamp: new Date().toISOString(),
+              };
+              historyBatch.set(historyRef, historyRecord);
+          }
+          await historyBatch.commit();
+      }
+
+      toast({ title: 'Sucesso!', description: `${numQuantity} ferramenta(s) adicionada(s) ao estoque.` });
+      queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
+      onSuccess(newToolsForPrinting);
 
     } catch (error: any) {
         console.error("Erro ao salvar:", error);
