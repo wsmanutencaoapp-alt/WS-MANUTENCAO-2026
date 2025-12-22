@@ -208,26 +208,26 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     
     try {
       const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
+      
       const lastId = await runTransaction(firestore, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         let currentLastId = 0;
         if (!counterDoc.exists()) {
           transaction.set(counterRef, { lastId: quantityToAdd });
-          currentLastId = 0;
         } else {
           currentLastId = counterDoc.data().lastId || 0;
           transaction.update(counterRef, { lastId: currentLastId + quantityToAdd });
         }
         return currentLastId;
       });
-
-      const newToolsForPrinting: FoundTool[] = [];
+      
       const batch = writeBatch(firestore);
+      const newToolsForPrinting: FoundTool[] = [];
 
       for (let i = 0; i < quantityToAdd; i++) {
         const newSequencial = lastId + 1 + i;
         const newCode = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
-        const newToolRef = doc(collection(firestore, 'tools')); 
+        const newToolRef = doc(collection(firestore, 'tools'));
         
         const imageUrlPromise = toolImage ? uploadImage(toolImage, `tool_images/${newToolRef.id}.jpg`) : Promise.resolve(selectedToolGroup.imageUrl);
         const docAnexoUrlPromise = docAnexo ? uploadFile(docAnexo, `docs_anexos/${newToolRef.id}_${docAnexo.name}`) : Promise.resolve(undefined);
@@ -235,7 +235,6 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         const [imageUrl, docAnexoUrl] = await Promise.all([imageUrlPromise, docAnexoUrlPromise]);
 
         const { id, unitCount, lastSequencial, ...baseData } = selectedToolGroup;
-
         const newToolData: Omit<Tool, 'id'> = {
           ...baseData,
           codigo: newCode,
@@ -251,11 +250,10 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
           data_vencimento: dataVencimento?.toISOString(),
           documento_anexo_url: docAnexoUrl,
         };
-        
         batch.set(newToolRef, newToolData);
         newToolsForPrinting.push({ ...newToolData, id: newToolRef.id });
       }
-      
+
       await batch.commit();
 
       toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.descricao} foram adicionadas.` });
@@ -433,3 +431,5 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
+
+    
