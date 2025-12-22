@@ -209,10 +209,12 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     try {
       const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
       
+      // Step 1: Run transaction ONLY for the counter
       const lastId = await runTransaction(firestore, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         let currentLastId = 0;
         if (!counterDoc.exists()) {
+          // If counter doesn't exist, start from 0 and set it to quantityToAdd
           transaction.set(counterRef, { lastId: quantityToAdd });
         } else {
           currentLastId = counterDoc.data().lastId || 0;
@@ -221,6 +223,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         return currentLastId;
       });
       
+      // Step 2: Use a write batch for creating the new tools
       const batch = writeBatch(firestore);
       const newToolsForPrinting: FoundTool[] = [];
 
@@ -263,6 +266,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     } catch (error) {
       console.error("Erro ao salvar:", error);
       toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível concluir. Verifique as permissões e tente novamente.' });
+      // The error might be from the transaction or the batch, so the path is more generic
       const permissionError = new FirestorePermissionError({
         path: 'tools/{newToolId} or counters/{counterId}',
         operation: 'write', 
