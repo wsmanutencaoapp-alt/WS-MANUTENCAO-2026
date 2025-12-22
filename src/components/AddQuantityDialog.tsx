@@ -207,7 +207,7 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         const { tipo, familia, classificacao } = selectedToolGroup;
         const toolsCollectionRef = collection(firestore, 'tools');
         
-        // 1. Find the last sequencial number for this tool type
+        // 1. Find the last sequencial number for this tool type in a simple query
         const q = query(
             toolsCollectionRef,
             where('tipo', '==', tipo),
@@ -220,40 +220,72 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
         const lastToolSnapshot = await getDocs(q);
         const lastSequencial = lastToolSnapshot.empty ? 0 : (lastToolSnapshot.docs[0].data().sequencial || 0);
 
-        // 2. Prepare the batch write
-        const batch = writeBatch(firestore);
         const newToolsForPrinting: FoundTool[] = [];
+        const toolDataList: (Omit<Tool, 'id'> & { tempId: string })[] = [];
+        const fileUploads: { tempId: string, image?: string, doc?: File }[] = [];
 
+        // 2. Prepare data for all new tools
         for (let i = 0; i < quantityToAdd; i++) {
-            const newSequencial = lastSequencial + 1 + i;
-            const newCode = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
-            const newToolRef = doc(toolsCollectionRef);
-            
-            // Upload files before committing the batch
-            const imageUrl = toolImage ? await uploadImage(toolImage, `tool_images/${newToolRef.id}.jpg`) : selectedToolGroup.imageUrl;
-            const docAnexoUrl = docAnexo ? await uploadFile(docAnexo, `docs_anexos/${newToolRef.id}_${docAnexo.name}`) : undefined;
+          const newSequencial = lastSequencial + 1 + i;
+          const newCode = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
+          const tempId = doc(toolsCollectionRef).id; // Generate a temporary ID for local use
+          
+          const { docId, unitCount, lastSequencial: _, ...baseData } = selectedToolGroup;
 
-            const { docId, unitCount, lastSequencial: _, ...baseData } = selectedToolGroup;
-            const newToolData: Omit<Tool, 'id'> = {
-              ...baseData,
-              codigo: newCode,
-              sequencial: newSequencial,
-              descricao: descricaoEspecifica || baseData.descricao,
-              marca: marca || '',
-              valor_estimado: Number(valorEstimado) || 0,
-              status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível',
-              enderecamento: enderecamento,
-              patrimonio: patrimonio || '',
-              imageUrl: imageUrl,
-              data_referencia: dataReferencia?.toISOString(),
-              data_vencimento: dataVencimento?.toISOString(),
-              documento_anexo_url: docAnexoUrl,
-            };
-            batch.set(newToolRef, newToolData);
-            newToolsForPrinting.push({ ...newToolData, docId: newToolRef.id });
+          toolDataList.push({
+            tempId,
+            ...baseData,
+            codigo: newCode,
+            sequencial: newSequencial,
+            descricao: descricaoEspecifica || baseData.descricao,
+            marca: marca || '',
+            valor_estimado: Number(valorEstimado) || 0,
+            status: baseData.status === 'Pendente' ? 'Pendente' : 'Disponível',
+            enderecamento: enderecamento,
+            patrimonio: patrimonio || '',
+            imageUrl: '', // Will be replaced after upload
+            data_referencia: dataReferencia?.toISOString(),
+            data_vencimento: dataVencimento?.toISOString(),
+            documento_anexo_url: undefined, // Will be replaced after upload
+          });
+
+          fileUploads.push({ tempId, image: toolImage, doc: docAnexo });
         }
 
-        // 3. Commit the batch
+        // 3. Upload all files and get their URLs
+        const urlsMap = new Map<string, { imageUrl?: string, docAnexoUrl?: string }>();
+        for (const upload of fileUploads) {
+            let imageUrl: string | undefined;
+            let docAnexoUrl: string | undefined;
+
+            if (upload.image) {
+                imageUrl = await uploadImage(upload.image, `tool_images/${upload.tempId}.jpg`);
+            }
+            if (upload.doc) {
+                docAnexoUrl = await uploadFile(upload.doc, `docs_anexos/${upload.tempId}_${upload.doc.name}`);
+            }
+            urlsMap.set(upload.tempId, { imageUrl, docAnexoUrl });
+        }
+        
+        // 4. Create a batch write with all new tools
+        const batch = writeBatch(firestore);
+        for (const toolData of toolDataList) {
+            const newToolRef = doc(firestore, 'tools', toolData.tempId);
+            const finalUrls = urlsMap.get(toolData.tempId);
+
+            const { tempId, ...dataToSave } = toolData;
+
+            const finalData = {
+                ...dataToSave,
+                imageUrl: finalUrls?.imageUrl || selectedToolGroup.imageUrl,
+                documento_anexo_url: finalUrls?.docAnexoUrl,
+            };
+
+            batch.set(newToolRef, finalData);
+            newToolsForPrinting.push({ ...finalData, docId: newToolRef.id });
+        }
+
+        // 5. Commit the batch
         await batch.commit();
 
         toast({ title: 'Sucesso!', description: `${quantityToAdd} nova(s) unidade(s) de ${selectedToolGroup.descricao} foram adicionadas.` });
@@ -432,3 +464,5 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     </Dialog>
   );
 }
+
+    
