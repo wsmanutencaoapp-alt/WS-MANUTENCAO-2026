@@ -11,7 +11,6 @@ import {
   doc,
   limit,
   orderBy,
-  addDoc,
   writeBatch
 } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
@@ -205,32 +204,35 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
 
     setIsSaving(true);
     const { tipo, familia, classificacao } = selectedToolGroup;
+    const toolsCollectionRef = collection(firestore, 'tools');
     
     try {
-      const counterRef = doc(firestore, 'counters', `tool_${tipo}_${familia}_${classificacao}`);
-      
-      // Step 1: Run transaction ONLY for the counter
+      // Find the last sequencial number for this tool type in a transaction
       const lastId = await runTransaction(firestore, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        let currentLastId = 0;
-        if (!counterDoc.exists()) {
-          // If counter doesn't exist, start from 0 and set it to quantityToAdd
-          transaction.set(counterRef, { lastId: quantityToAdd });
-        } else {
-          currentLastId = counterDoc.data().lastId || 0;
-          transaction.update(counterRef, { lastId: currentLastId + quantityToAdd });
-        }
-        return currentLastId;
+          const q = query(
+              toolsCollectionRef,
+              where('tipo', '==', tipo),
+              where('familia', '==', familia),
+              where('classificacao', '==', classificacao),
+              orderBy('sequencial', 'desc'),
+              limit(1)
+          );
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) {
+              return 0; // No tools of this type yet
+          }
+          const lastTool = snapshot.docs[0].data() as Tool;
+          return lastTool.sequencial || 0;
       });
-      
-      // Step 2: Use a write batch for creating the new tools
+
+      // Now create the new tools in a batch
       const batch = writeBatch(firestore);
       const newToolsForPrinting: FoundTool[] = [];
 
       for (let i = 0; i < quantityToAdd; i++) {
         const newSequencial = lastId + 1 + i;
         const newCode = `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`;
-        const newToolRef = doc(collection(firestore, 'tools'));
+        const newToolRef = doc(toolsCollectionRef);
         
         const imageUrlPromise = toolImage ? uploadImage(toolImage, `tool_images/${newToolRef.id}.jpg`) : Promise.resolve(selectedToolGroup.imageUrl);
         const docAnexoUrlPromise = docAnexo ? uploadFile(docAnexo, `docs_anexos/${newToolRef.id}_${docAnexo.name}`) : Promise.resolve(undefined);
@@ -266,11 +268,11 @@ export default function AddQuantityDialog({ isOpen, onClose, onSuccess }: AddQua
     } catch (error) {
       console.error("Erro ao salvar:", error);
       toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível concluir. Verifique as permissões e tente novamente.' });
-      // The error might be from the transaction or the batch, so the path is more generic
+      
       const permissionError = new FirestorePermissionError({
-        path: 'tools/{newToolId} or counters/{counterId}',
+        path: 'tools/{newToolId}',
         operation: 'write', 
-        requestResourceData: { info: `Transaction to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
+        requestResourceData: { info: `Failed to add ${quantityToAdd} tools for code ${selectedToolGroup.codigo}.` }
       });
       errorEmitter.emit('permission-error', permissionError);
     } finally {

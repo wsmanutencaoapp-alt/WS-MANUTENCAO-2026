@@ -55,10 +55,7 @@ service cloud.firestore {
     match /tool_requests/{requestId} {
       allow read, write: if isAuthenticated();
     }
-
-    match /counters/{counterId} {
-       allow list, get: if isAuthenticated();
-       allow write: if isAuthenticated();
-    }
   }
 }
+
+    
