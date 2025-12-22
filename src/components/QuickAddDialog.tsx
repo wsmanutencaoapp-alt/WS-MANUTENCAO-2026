@@ -46,11 +46,13 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
   const [filteredModels, setFilteredModels] = useState<ModelTool[]>([]);
   const [selectedModel, setSelectedModel] = useState<ModelTool | null>(null);
   
-  // State for new fields
   const [descricao, setDescricao] = useState('');
   const [valorEstimado, setValorEstimado] = useState('');
   const [toolImage, setToolImage] = useState<string | null>(null);
   const [enderecamento, setEnderecamento] = useState('');
+  const [marca, setMarca] = useState('');
+  const [patrimonio, setPatrimonio] = useState('');
+  const [quantidade, setQuantidade] = useState('1');
   
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -101,18 +103,19 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
     setFilteredModels(filtered);
   }, [searchTerm, allModels]);
   
-  // Efeito para resetar os campos quando o modelo selecionado mudar
   useEffect(() => {
     if (selectedModel) {
-      setDescricao(selectedModel.descricao); // Preenche com a descrição do modelo como base
-      setValorEstimado('');
+      setDescricao(selectedModel.descricao);
       setToolImage(selectedModel.imageUrl || null);
+      setMarca(selectedModel.marca || '');
+      setValorEstimado('');
       setEnderecamento('');
+      setPatrimonio('');
+      setQuantidade('1');
     }
   }, [selectedModel]);
 
 
-  // Reset state when dialog closes
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm('');
@@ -123,6 +126,9 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       setDescricao('');
       setValorEstimado('');
       setToolImage(null);
+      setMarca('');
+      setPatrimonio('');
+      setQuantidade('1');
       setIsSearching(false);
       setIsSaving(false);
       if(fileInputRef.current) fileInputRef.current.value = '';
@@ -158,48 +164,55 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       const { tipo, familia, classificacao } = selectedModel;
       const counterId = `${tipo}-${familia}-${classificacao}`;
       const counterRef = doc(firestore, 'counters', counterId);
-
-      const newSequencial = await runTransaction(firestore, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        if (!counterDoc.exists()) {
-          transaction.set(counterRef, { lastId: 0 });
-          return 0;
-        }
-        const newId = (counterDoc.data().lastId || 0) + 1;
-        transaction.update(counterRef, { lastId: newId });
-        return newId;
-      });
+      const numQuantity = parseInt(quantidade, 10) || 1;
+      const newToolsForPrinting = [];
 
       const batch = writeBatch(firestore);
-      const newToolRef = doc(collection(firestore, 'tools'));
-      
-      let imageUrl = selectedModel.imageUrl || '';
-      if (toolImage && toolImage.startsWith('data:')) {
-          const imageRef = storageRef(storage, `tool_images/${newToolRef.id}.jpg`);
-          const snapshot = await uploadString(imageRef, toolImage, 'data_url');
-          imageUrl = await getDownloadURL(snapshot.ref);
-      }
-      
-      const { docId, ...baseData } = selectedModel;
-      const finalToolData: Omit<Tool, 'id'> = {
-        ...baseData,
-        codigo: `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`,
-        sequencial: newSequencial,
-        status: 'Disponível', 
-        enderecamento: enderecamento,
-        descricao: descricao,
-        valor_estimado: Number(valorEstimado) || 0,
-        imageUrl: imageUrl,
-      };
+
+      for (let i = 0; i < numQuantity; i++) {
+        const newSequencial = await runTransaction(firestore, async (transaction) => {
+            const counterDoc = await transaction.get(counterRef);
+            if (!counterDoc.exists()) {
+              transaction.set(counterRef, { lastId: 0 });
+              return 0;
+            }
+            const newId = (counterDoc.data().lastId || 0) + 1;
+            transaction.update(counterRef, { lastId: newId });
+            return newId;
+        });
+
+        const newToolRef = doc(collection(firestore, 'tools'));
         
-      batch.set(newToolRef, finalToolData);
+        let imageUrl = selectedModel.imageUrl || '';
+        if (toolImage && toolImage.startsWith('data:') && i === 0) { // Upload image only once
+            const imageRef = storageRef(storage, `tool_images/${newToolRef.id}.jpg`);
+            const snapshot = await uploadString(imageRef, toolImage, 'data_url');
+            imageUrl = await getDownloadURL(snapshot.ref);
+        }
+        
+        const { docId, ...baseData } = selectedModel;
+        const finalToolData: Omit<Tool, 'id'> = {
+          ...baseData,
+          codigo: `${tipo}-${familia}-${classificacao}-${newSequencial.toString().padStart(4, '0')}`,
+          sequencial: newSequencial,
+          status: 'Disponível', 
+          enderecamento: enderecamento,
+          descricao: descricao,
+          valor_estimado: Number(valorEstimado) || 0,
+          marca: marca,
+          patrimonio: patrimonio,
+          imageUrl: imageUrl,
+        };
+          
+        batch.set(newToolRef, finalToolData);
+        newToolsForPrinting.push({ ...finalToolData, docId: newToolRef.id });
+      }
       
       await batch.commit();
 
-      const newToolForPrinting = { ...finalToolData, docId: newToolRef.id };
-      toast({ title: 'Sucesso!', description: `Ferramenta ${finalToolData.codigo} adicionada ao estoque.` });
+      toast({ title: 'Sucesso!', description: `${numQuantity} ferramenta(s) adicionada(s) ao estoque.` });
       queryClient.invalidateQueries({ queryKey: ['ferramentas'] });
-      onSuccess([newToolForPrinting]);
+      onSuccess(newToolsForPrinting);
 
     } catch (error: any) {
         console.error("Erro ao salvar:", error);
@@ -295,10 +308,24 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                         <Input id="enderecamento" value={enderecamento} onChange={(e) => setEnderecamento(e.target.value)} placeholder="Ex: GAV-01-A" />
                     </div>
                     <div className="space-y-1.5">
+                        <Label htmlFor="marca">Marca</Label>
+                        <Input id="marca" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ex: Gedore" />
+                    </div>
+                </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
                         <Label htmlFor="valorEstimado">Valor Estimado (R$)</Label>
                         <Input id="valorEstimado" type="number" value={valorEstimado} onChange={(e) => setValorEstimado(e.target.value)} placeholder="Ex: 150.00" />
                     </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="patrimonio">Patrimônio</Label>
+                        <Input id="patrimonio" value={patrimonio} onChange={(e) => setPatrimonio(e.target.value)} placeholder="Ex: 123456" />
+                    </div>
                 </div>
+                 <div className="space-y-1.5">
+                    <Label htmlFor="quantidade">Quantidade a Adicionar</Label>
+                    <Input id="quantidade" type="number" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} placeholder="1" min="1" />
+                 </div>
                  <div className="space-y-1.5">
                     <Label>Foto da Ferramenta</Label>
                     <div className="flex items-center gap-4">
@@ -315,7 +342,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button onClick={handleSave} disabled={!selectedModel || isSaving || isSearching || !enderecamento || !descricao}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Adicionar e Imprimir Etiqueta
+            Adicionar e Imprimir Etiqueta(s)
           </Button>
         </DialogFooter>
       </DialogContent>
