@@ -9,7 +9,7 @@ import {
   doc,
   updateDoc,
   deleteDoc,
-  serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import type { Budget } from '@/lib/types';
 import {
@@ -55,6 +55,7 @@ import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { addMonths, format } from 'date-fns';
 
 const BudgetPage = () => {
   const firestore = useFirestore();
@@ -71,6 +72,7 @@ const BudgetPage = () => {
     spentAmount: 0,
     period: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
   });
+  const [repeatFor, setRepeatFor] = useState(1);
   
   const budgetsQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'budgets')) : null),
@@ -99,12 +101,14 @@ const BudgetPage = () => {
       period: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
     });
     setEditingBudget(null);
+    setRepeatFor(1);
   };
   
   const handleOpenDialog = (budget: WithDocId<Budget> | null) => {
     if (budget) {
       setEditingBudget(budget);
       setFormData(budget);
+      setRepeatFor(1);
     } else {
       resetForm();
     }
@@ -120,15 +124,35 @@ const BudgetPage = () => {
     setIsSaving(true);
     
     try {
-        const dataToSave = { ...formData, spentAmount: formData.spentAmount || 0 };
         if (editingBudget) {
+            const dataToSave = { ...formData, spentAmount: formData.spentAmount || 0 };
             const budgetRef = doc(firestore, 'budgets', editingBudget.docId);
             await updateDoc(budgetRef, dataToSave);
             toast({ title: 'Sucesso!', description: 'Orçamento atualizado.' });
         } else {
-            await addDoc(collection(firestore, 'budgets'), dataToSave);
-            toast({ title: 'Sucesso!', description: 'Novo orçamento cadastrado.' });
+            // Logic for creating new budgets, potentially in a batch
+            const batch = writeBatch(firestore);
+            const dataToSave = { 
+                costCenter: formData.costCenter,
+                sector: formData.sector,
+                totalAmount: formData.totalAmount,
+                spentAmount: formData.spentAmount || 0,
+            };
+
+            const [startYear, startMonth] = (formData.period || '').split('-').map(Number);
+            const startDate = new Date(startYear, startMonth - 1, 15); // Use mid-month to avoid timezone issues
+
+            for (let i = 0; i < repeatFor; i++) {
+                const targetDate = addMonths(startDate, i);
+                const period = format(targetDate, 'yyyy-MM');
+                const newDocRef = doc(collection(firestore, 'budgets'));
+                batch.set(newDocRef, { ...dataToSave, period });
+            }
+            
+            await batch.commit();
+            toast({ title: 'Sucesso!', description: `${repeatFor} orçamento(s) cadastrado(s).` });
         }
+
         queryClient.invalidateQueries({ queryKey: ['budgets'] });
         setIsDialogOpen(false);
         resetForm();
@@ -236,9 +260,17 @@ const BudgetPage = () => {
             <DialogTitle>{editingBudget ? 'Editar Orçamento' : 'Adicionar Novo Orçamento'}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="space-y-1">
-                <Label htmlFor="period">Período (YYYY-MM)</Label>
-                <Input id="period" value={formData.period || ''} onChange={handleInputChange} placeholder="Ex: 2024-08"/>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                    <Label htmlFor="period">Período Inicial (YYYY-MM)</Label>
+                    <Input id="period" value={formData.period || ''} onChange={handleInputChange} placeholder="Ex: 2024-08"/>
+                </div>
+                 {!editingBudget && (
+                    <div className="space-y-1">
+                        <Label htmlFor="repeatFor">Repetir por (meses)</Label>
+                        <Input id="repeatFor" type="number" value={repeatFor} onChange={(e) => setRepeatFor(Math.max(1, Number(e.target.value)))} min="1"/>
+                    </div>
+                 )}
             </div>
             <div className="space-y-1">
                 <Label htmlFor="costCenter">Centro de Custo</Label>
@@ -264,7 +296,7 @@ const BudgetPage = () => {
             </div>
              <div className="space-y-1">
                 <Label htmlFor="spentAmount">Valor Gasto (R$)</Label>
-                <Input id="spentAmount" type="number" value={formData.spentAmount || ''} onChange={handleInputChange} />
+                <Input id="spentAmount" type="number" value={formData.spentAmount || ''} onChange={handleInputChange} disabled={!editingBudget} />
             </div>
           </div>
           <DialogFooter>
@@ -282,5 +314,3 @@ const BudgetPage = () => {
 };
 
 export default BudgetPage;
-
-    
