@@ -287,6 +287,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                   <p>{tool.enderecamento || 'N/A'}</p>
                 </div>
                 <div>
+                  <p className="font-semibold text-muted-foreground">Marca</p>
+                  <p>{tool.marca || 'N/A'}</p>
+                </div>
+                <div>
                   <p className="font-semibold text-muted-foreground">P/N Fabricante</p>
                   <p>{tool.pn_fabricante || 'N/A'}</p>
                 </div>
