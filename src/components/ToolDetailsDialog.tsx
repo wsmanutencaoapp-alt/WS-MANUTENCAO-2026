@@ -121,7 +121,7 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
       let imageUrl = tool.imageUrl;
       // Se a imagem de preview foi alterada, faz o upload da nova imagem
       if (previewImage && previewImage !== tool.imageUrl) {
-        const imageRef = storageRef(storage, `tool_images/${tool.docId}`);
+        const imageRef = storageRef(storage, `tool_images/${tool.docId}.jpg`);
         const snapshot = await uploadString(imageRef, previewImage, 'data_url');
         imageUrl = await getDownloadURL(snapshot.ref);
       }
@@ -225,23 +225,35 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                 </div>
                 <div className="col-span-2 space-y-1">
                     <Label htmlFor="descricao">Descrição</Label>
-                    <Input id="descricao" value={editableTool.descricao} onChange={handleInputChange} />
+                    <Input id="descricao" value={editableTool.descricao || ''} onChange={handleInputChange} />
                 </div>
-                <div className="col-span-2 space-y-1">
+                <div className="space-y-1">
                     <Label htmlFor="enderecamento">Endereçamento</Label>
                     <Input id="enderecamento" value={editableTool.enderecamento || ''} onChange={handleInputChange} />
                 </div>
-                 <div className="col-span-2 space-y-1">
-                    <Label htmlFor="aeronave_aplicavel">Aeronave Aplicável</Label>
-                    <Input id="aeronave_aplicavel" value={editableTool.aeronave_aplicavel || ''} onChange={handleInputChange} />
+                <div className="space-y-1">
+                    <Label htmlFor="marca">Marca</Label>
+                    <Input id="marca" value={editableTool.marca || ''} onChange={handleInputChange} />
                 </div>
-                <div className="col-span-2 space-y-1">
+                <div className="space-y-1">
+                    <Label htmlFor="pn_fabricante">P/N Fabricante</Label>
+                    <Input id="pn_fabricante" value={editableTool.pn_fabricante || ''} onChange={handleInputChange} />
+                </div>
+                 <div className="space-y-1">
+                    <Label htmlFor="pn_referencia">P/N Referência</Label>
+                    <Input id="pn_referencia" value={editableTool.pn_referencia || ''} onChange={handleInputChange} />
+                </div>
+                <div className="space-y-1">
                     <Label htmlFor="valor_estimado">Valor Estimado (R$)</Label>
                     <Input id="valor_estimado" type="number" value={editableTool.valor_estimado || ''} onChange={handleInputChange} />
                 </div>
-                 <div className="col-span-2 space-y-1">
-                    <Label htmlFor="pn_fabricante">P/N Fabricante</Label>
-                    <Input id="pn_fabricante" value={editableTool.pn_fabricante || ''} onChange={handleInputChange} />
+                <div className="space-y-1">
+                    <Label htmlFor="patrimonio">Patrimônio</Label>
+                    <Input id="patrimonio" value={editableTool.patrimonio || ''} onChange={handleInputChange} />
+                </div>
+                <div className="col-span-2 space-y-1">
+                    <Label htmlFor="aeronave_aplicavel">Aeronave Aplicável</Label>
+                    <Input id="aeronave_aplicavel" value={editableTool.aeronave_aplicavel || ''} onChange={handleInputChange} />
                 </div>
             </div>
           ) : (
