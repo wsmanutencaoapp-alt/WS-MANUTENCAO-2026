@@ -120,12 +120,13 @@ const BudgetPage = () => {
     setIsSaving(true);
     
     try {
+        const dataToSave = { ...formData, spentAmount: formData.spentAmount || 0 };
         if (editingBudget) {
             const budgetRef = doc(firestore, 'budgets', editingBudget.docId);
-            await updateDoc(budgetRef, formData);
+            await updateDoc(budgetRef, dataToSave);
             toast({ title: 'Sucesso!', description: 'Orçamento atualizado.' });
         } else {
-            await addDoc(collection(firestore, 'budgets'), formData);
+            await addDoc(collection(firestore, 'budgets'), dataToSave);
             toast({ title: 'Sucesso!', description: 'Novo orçamento cadastrado.' });
         }
         queryClient.invalidateQueries({ queryKey: ['budgets'] });
@@ -281,3 +282,5 @@ const BudgetPage = () => {
 };
 
 export default BudgetPage;
+
+    

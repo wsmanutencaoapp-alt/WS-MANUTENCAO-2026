@@ -157,3 +157,5 @@ export type Budget = {
     spentAmount: number;
     period: string; // YYYY-MM
 };
+
+    
