@@ -102,6 +102,7 @@ export type Permissions = {
   compras_controle?: boolean;
   financeiro_visao-geral?: boolean;
   financeiro_orcamento?: boolean;
+  financeiro_budget?: boolean;
   financeiro_despesas?: boolean;
   contabilidade?: boolean;
   contabilidade_balancete?: boolean;
@@ -146,4 +147,13 @@ export type Despesa = {
   paymentProofUrl: string;
   employeeId: string;
   employeeName: string;
+};
+
+export type Budget = {
+    id?: string;
+    costCenter: string;
+    sector: string;
+    totalAmount: number;
+    spentAmount: number;
+    period: string; // YYYY-MM
 };

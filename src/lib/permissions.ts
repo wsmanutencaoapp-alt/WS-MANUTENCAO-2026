@@ -8,6 +8,7 @@ export const allUserPermissions: { id: string; path: string, isModule?: boolean 
     { id: 'engenharia', path: '/dashboard/engenharia', isModule: true },
     { id: 'comercial', path: '/dashboard/comercial', isModule: true },
     { id: 'financeiro', path: '/dashboard/financeiro', isModule: true },
+    { id: 'financeiro_budget', path: '/dashboard/financeiro/budget', isModule: false },
     { id: 'contabilidade', path: '/dashboard/contabilidade', isModule: true },
     { id: 'qualidade', path: '/dashboard/qualidade', isModule: true },
     { id: 'gso', path: '/dashboard/gso', isModule: true },

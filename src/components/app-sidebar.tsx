@@ -109,7 +109,7 @@ const allNavItems: NavItem[] = [
     permission: 'financeiro',
     subItems: [
         { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral', permission: 'financeiro_visao-geral' },
-        { href: '/dashboard/financeiro/orcamento', label: 'Orçamento', permission: 'financeiro_orcamento' },
+        { href: '/dashboard/financeiro/budget', label: 'Budget', permission: 'financeiro_budget' },
         { href: '/dashboard/financeiro/despesas', label: 'Despesas', permission: 'financeiro_despesas' },
     ]
   },

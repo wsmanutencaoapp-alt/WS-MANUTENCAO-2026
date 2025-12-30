@@ -37,6 +37,7 @@ import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import NaoConformeTable from '@/components/NaoConformeTable';
 import QuickAddDialog from '@/components/QuickAddDialog';
+import SectorBudgetStatus from '@/components/SectorBudgetStatus';
 
 interface Ferramenta extends Tool {
   docId: string;
@@ -196,6 +197,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
   return (
     <div className="space-y-6">
       <ToolingAlertHeader />
+      <SectorBudgetStatus sector="Ferramentaria" />
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Lista de Ferramentas e Kits</h1>
         <div className="flex gap-2">

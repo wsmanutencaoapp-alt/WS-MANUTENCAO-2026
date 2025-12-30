@@ -1,5 +1,38 @@
 {
   "entities": {
+    "Budget": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Budget",
+      "type": "object",
+      "description": "Represents a budget allocation for a specific sector or cost center.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Budget entity."
+        },
+        "costCenter": {
+          "type": "string",
+          "description": "The name or code of the cost center."
+        },
+        "sector": {
+          "type": "string",
+          "description": "The specific sector the budget is allocated to (e.g., 'Ferramentaria', 'Suprimentos')."
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total amount allocated for the budget period."
+        },
+        "spentAmount": {
+          "type": "number",
+          "description": "The amount of the budget that has already been spent."
+        },
+        "period": {
+          "type": "string",
+          "description": "The budget period, e.g., 'YYYY-MM'."
+        }
+      },
+      "required": ["costCenter", "sector", "totalAmount", "spentAmount", "period"]
+    },
     "Supply": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Supply",
@@ -643,6 +676,22 @@
   },
   "firestore": {
     "structure": [
+      {
+        "path": "/budgets/{budgetId}",
+        "definition": {
+          "entityName": "Budget",
+          "schema": {
+            "$ref": "#/backend/entities/Budget"
+          },
+          "description": "Stores budget allocations for different sectors.",
+          "params": [
+            {
+              "name": "budgetId",
+              "description": "Unique identifier for the budget record."
+            }
+          ]
+        }
+      },
       {
         "path": "/supplies/{supplyId}",
         "definition": {
