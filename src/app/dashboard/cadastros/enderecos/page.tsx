@@ -59,6 +59,7 @@ const CadastroEnderecosPage = () => {
 
   const [formState, setFormState] = useState({
     unidade: '',
+    unidadeOutro: '', // Novo campo para quando "Outra" for selecionada
     setor: '',
     rua: '',
     movel: '',
@@ -77,14 +78,19 @@ const CadastroEnderecosPage = () => {
       queryKey: ['addresses']
   });
 
-  const states = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'], []);
+  const predefinedStates = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'], []);
   
   const generatedCode = useMemo(() => {
-    const { unidade, setor, rua, movel, nivel, detalhe } = formState;
+    // A unidade a ser usada no código é a digitada se "Outra" for selecionada, senão é a da lista.
+    const activeUnidade = formState.unidade === 'OUTRA' ? formState.unidadeOutro : formState.unidade;
+    const { setor, rua, movel, nivel, detalhe } = formState;
 
-    // Use a letter from the alphabet. If not in the pre-defined list, just use the input.
-    const stateIndex = states.indexOf(unidade.toUpperCase());
-    const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : unidade.toUpperCase().charAt(0) || null;
+    // A lista para encontrar o índice agora é a lista predefinida.
+    const stateIndex = predefinedStates.indexOf(activeUnidade.toUpperCase());
+    // Se a unidade digitada não está na lista, calculamos um código para ela.
+    const unidadeCode = stateIndex !== -1 
+        ? String.fromCharCode(65 + stateIndex) 
+        : activeUnidade ? activeUnidade.toUpperCase().charAt(0) : null;
 
     const parts = [
         unidadeCode,
@@ -97,15 +103,17 @@ const CadastroEnderecosPage = () => {
     const detailCode = detalhe ? `-D${detalhe.replace(/\D/g, '').padStart(2, '0')}` : '';
 
     return mainCode + detailCode || 'Aguardando preenchimento...';
-  }, [formState, states]);
+  }, [formState, predefinedStates]);
   
   const resetForm = () => {
-    setFormState({ unidade: '', setor: '', rua: '', movel: '', nivel: '', detalhe: '' });
+    setFormState({ unidade: '', unidadeOutro: '', setor: '', rua: '', movel: '', nivel: '', detalhe: '' });
   }
 
   const handleSave = async () => {
-    const { unidade, setor, rua, movel, nivel } = formState;
-    if (!unidade || !setor || !rua || !movel || !nivel) {
+    const activeUnidade = formState.unidade === 'OUTRA' ? formState.unidadeOutro : formState.unidade;
+    const { setor, rua, movel, nivel } = formState;
+
+    if (!activeUnidade || !setor || !rua || !movel || !nivel) {
         toast({
             variant: 'destructive',
             title: 'Campos Obrigatórios',
@@ -117,12 +125,12 @@ const CadastroEnderecosPage = () => {
 
     setIsSaving(true);
     try {
-        const stateIndex = states.indexOf(unidade.toUpperCase());
-        const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : unidade.toUpperCase().charAt(0);
+        const stateIndex = predefinedStates.indexOf(activeUnidade.toUpperCase());
+        const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : activeUnidade.toUpperCase().charAt(0);
 
         const newAddress: Omit<Address, 'id'> = {
             ...formState,
-            unidade: unidadeCode, // Salva o código da letra
+            unidade: activeUnidade.toUpperCase(), // Salva a sigla do estado, não o código da letra
             rua: `R${formState.rua.padStart(2, '0')}`,
             movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
             nivel: `N${formState.nivel.padStart(2, '0')}`,
@@ -130,8 +138,10 @@ const CadastroEnderecosPage = () => {
             codigoCompleto: generatedCode,
             createdAt: new Date().toISOString(),
         };
+        // Remove a propriedade 'unidadeOutro' do objeto a ser salvo
+        const { unidadeOutro, ...addressToSave } = newAddress as any;
 
-        await addDoc(collection(firestore, 'addresses'), newAddress);
+        await addDoc(collection(firestore, 'addresses'), addressToSave);
         toast({ title: 'Sucesso!', description: 'Novo endereço cadastrado.' });
         queryClient.invalidateQueries({ queryKey: ['addresses'] });
         resetForm();
@@ -170,16 +180,31 @@ const CadastroEnderecosPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
              <div>
                 <Label>Nível 1: Unidade (Estado)</Label>
-                 <Input 
-                   value={formState.unidade} 
-                   onChange={(e) => setFormState(p => ({...p, unidade: e.target.value.toUpperCase()}))} 
-                   placeholder="Digite a sigla do estado (Ex: PR)" 
-                   maxLength={2}
-                 />
+                 <Select value={formState.unidade} onValueChange={(v) => setFormState(p => ({...p, unidade: v}))}>
+                     <SelectTrigger><SelectValue placeholder="Selecione a unidade..." /></SelectTrigger>
+                     <SelectContent>
+                        {predefinedStates.map(state => (
+                            <SelectItem key={state} value={state}>{state}</SelectItem>
+                        ))}
+                         <SelectItem value="OUTRA">Outra (Digitar)...</SelectItem>
+                     </SelectContent>
+                 </Select>
             </div>
+            {formState.unidade === 'OUTRA' && (
+                <div className="animate-in fade-in-50">
+                    <Label htmlFor="unidadeOutro">Nova Unidade (Sigla)</Label>
+                    <Input 
+                        id="unidadeOutro"
+                        value={formState.unidadeOutro} 
+                        onChange={(e) => setFormState(p => ({...p, unidadeOutro: e.target.value.toUpperCase()}))} 
+                        placeholder="Ex: GO" 
+                        maxLength={2}
+                    />
+                </div>
+            )}
              <div>
                 <Label>Nível 2: Setor</Label>
                  <Select value={formState.setor} onValueChange={(v) => setFormState(p => ({...p, setor: v}))}>
@@ -285,3 +310,5 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
+
+    
