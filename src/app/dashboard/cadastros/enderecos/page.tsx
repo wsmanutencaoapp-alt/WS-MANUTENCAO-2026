@@ -284,10 +284,10 @@ const CadastroEnderecosPage = () => {
   const executePrint = () => {
     const printableContent = document.getElementById('printable-label-area');
     if (printableContent) {
-      const printWindow = window.open('', '', 'height=100,width=400');
+      const printWindow = window.open('', '', 'height=60,width=300');
       if (printWindow) {
         printWindow.document.write('<html><head><title>Imprimir Etiqueta</title>');
-        printWindow.document.write('<style>@media print { @page { size: 30mm 6mm; margin: 0; } body { margin: 0; display: flex; align-items: center; justify-content: center; } }</style>');
+        printWindow.document.write('<style>@media print { @page { size: 30mm 6mm; margin: 0; } body { margin: 0; display: flex; align-items: center; justify-content: center; font-family: sans-serif; } }</style>');
         printWindow.document.write('</head><body style="margin: 0;">');
         printWindow.document.write(printableContent.innerHTML);
         printWindow.document.write('</body></html>');
@@ -316,7 +316,7 @@ const CadastroEnderecosPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
              <div>
                 <Label>Nível 1: Unidade (Estado)</Label>
-                 <Select value={formState.unidade} onValueChange={(v) => setFormState(p => ({...p, unidade: v}))}>
+                 <Select value={formState.unidade} onValueChange={(v) => setFormState(p => ({...p, unidade: v, unidadeOutro: ''}))}>
                      <SelectTrigger><SelectValue placeholder="Selecione a unidade..." /></SelectTrigger>
                      <SelectContent>
                         {predefinedStates.map(state => (
@@ -466,8 +466,8 @@ const CadastroEnderecosPage = () => {
                         Confirme a etiqueta e clique em imprimir.
                     </DialogDescription>
                 </DialogHeader>
-                <div id="printable-label-area" className="flex items-center justify-between p-1 border rounded-lg" style={{ width: '113px', height: '23px' }}>
-                   <div style={{ width: '20px', height: '20px' }}>
+                <div id="printable-label-area" className="flex items-center justify-between p-1 border rounded-lg" style={{ width: '113px', height: '23px', boxSizing: 'content-box' }}>
+                   <div style={{ width: '20px', height: '20px', flexShrink: 0 }}>
                         <Image
                             src={`https://api.qrserver.com/v1/create-qr-code/?size=20x20&data=${encodeURIComponent(selectedAddressForPrint.codigoCompleto)}`}
                             alt={`QR Code for ${selectedAddressForPrint.codigoCompleto}`}
@@ -475,7 +475,7 @@ const CadastroEnderecosPage = () => {
                             height={20}
                         />
                    </div>
-                   <p className="text-center font-mono font-bold text-[8px]">
+                   <p className="text-center font-mono font-bold text-[8px] leading-tight">
                        {selectedAddressForPrint.movel}.{selectedAddressForPrint.nivel}{selectedAddressForPrint.detalhe || ''}
                    </p>
                 </div>
@@ -495,3 +495,5 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
+
+    
