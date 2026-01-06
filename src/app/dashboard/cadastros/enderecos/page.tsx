@@ -30,8 +30,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, Printer } from 'lucide-react';
 import type { Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
@@ -55,6 +63,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Checkbox } from '@/components/ui/checkbox';
+import Image from 'next/image';
 
 const CadastroEnderecosPage = () => {
   const firestore = useFirestore();
@@ -73,6 +82,8 @@ const CadastroEnderecosPage = () => {
   const [generatedDetalhe, setGeneratedDetalhe] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [selectedAddressForPrint, setSelectedAddressForPrint] = useState<WithDocId<Address> | null>(null);
+
 
   const addressesQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'addresses'), orderBy('createdAt', 'desc')) : null),
@@ -92,7 +103,6 @@ const CadastroEnderecosPage = () => {
         return;
       }
       
-      // Simplified query to only filter by sector
       const q = query(
         collection(firestore, 'addresses'), 
         where('setor', '==', formState.setor)
@@ -101,14 +111,13 @@ const CadastroEnderecosPage = () => {
       const querySnapshot = await getDocs(q);
       let lastNumber = 0;
       
-      // Client-side filtering and processing
       querySnapshot.forEach(doc => {
           const data = doc.data();
-          // Check if 'detalhe' exists and is not null/undefined
           if (data.detalhe) {
               const detalhe = data.detalhe as string;
+              // Extrai o número do detalhe (ex: "-D004" -> 4)
               const currentNumber = parseInt(detalhe.replace('-D', ''), 10);
-              if (currentNumber > lastNumber) {
+              if (!isNaN(currentNumber) && currentNumber > lastNumber) {
                   lastNumber = currentNumber;
               }
           }
@@ -207,6 +216,34 @@ const CadastroEnderecosPage = () => {
         toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível excluir o endereço.' });
     } finally {
         setIsDeleting(null);
+    }
+  };
+
+  const handlePrint = (address: WithDocId<Address>) => {
+    setSelectedAddressForPrint(address);
+  };
+  
+  const closePrintDialog = () => {
+    setSelectedAddressForPrint(null);
+  };
+
+  const executePrint = () => {
+    const printableContent = document.getElementById('printable-label-area');
+    if (printableContent) {
+      const printWindow = window.open('', '', 'height=400,width=600');
+      if (printWindow) {
+        printWindow.document.write('<html><head><title>Imprimir Etiqueta</title>');
+        printWindow.document.write('<style>@media print { @page { size: 55mm 35mm; margin: 0; } body { margin: 0; } }</style>');
+        printWindow.document.write('</head><body style="margin: 0;">');
+        printWindow.document.write(printableContent.innerHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 250);
+      }
     }
   };
 
@@ -317,7 +354,11 @@ const CadastroEnderecosPage = () => {
                             <TableCell>{address.unidade}</TableCell>
                             <TableCell>{address.setor}</TableCell>
                             <TableCell>{new Date(address.createdAt).toLocaleDateString()}</TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right space-x-2">
+                                <Button variant="ghost" size="icon" onClick={() => handlePrint(address)}>
+                                    <Printer className="h-4 w-4" />
+                                    <span className="sr-only">Imprimir Etiqueta</span>
+                                </Button>
                                  <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                         <Button variant="ghost" size="icon" disabled={isDeleting === address.docId}>
@@ -346,6 +387,39 @@ const CadastroEnderecosPage = () => {
             </Table>
         </CardContent>
       </Card>
+      
+      {selectedAddressForPrint && (
+        <Dialog open={!!selectedAddressForPrint} onOpenChange={closePrintDialog}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Etiqueta de Endereçamento</DialogTitle>
+                    <DialogDescription>
+                        Confirme a etiqueta e clique em imprimir.
+                    </DialogDescription>
+                </DialogHeader>
+                <div id="printable-label-area" className="flex flex-col items-center justify-center p-4 border rounded-lg aspect-[55/35] w-full">
+                   <div style={{ width: '100px', height: '100px' }}>
+                        <Image
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(selectedAddressForPrint.codigoCompleto)}`}
+                            alt={`QR Code for ${selectedAddressForPrint.codigoCompleto}`}
+                            width={100}
+                            height={100}
+                        />
+                   </div>
+                   <p className="mt-2 text-center font-mono font-bold text-lg">
+                       {selectedAddressForPrint.movel}.{selectedAddressForPrint.nivel}{selectedAddressForPrint.detalhe || ''}
+                   </p>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={closePrintDialog}>Cancelar</Button>
+                    <Button onClick={executePrint}>
+                        <Printer className="mr-2 h-4 w-4"/>
+                        Imprimir
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
 
     </div>
   );
