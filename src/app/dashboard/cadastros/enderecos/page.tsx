@@ -174,87 +174,102 @@ const CadastroEnderecosPage = () => {
   const handleSave = async () => {
     const activeUnidade = formState.unidade === 'OUTRA' ? formState.unidadeOutro : formState.unidade;
     const { setor, rua, movel, nivel } = formState;
-
+  
     if (!activeUnidade || !setor || !rua || !movel || !nivel) {
-        toast({
-            variant: 'destructive',
-            title: 'Campos Obrigatórios',
-            description: 'Unidade, Setor, Rua, Móvel e Nível são obrigatórios.'
-        });
-        return;
+      toast({
+        variant: 'destructive',
+        title: 'Campos Obrigatórios',
+        description: 'Unidade, Setor, Rua, Móvel e Nível são obrigatórios.',
+      });
+      return;
     }
-     if (!/^[A-Z]/i.test(movel)) {
+    if (!/^[A-Z]/i.test(movel)) {
       toast({
         variant: 'destructive',
         title: 'Formato Inválido',
-        description: 'O campo "Móvel" deve começar com uma letra (A-Z).'
+        description: 'O campo "Móvel" deve começar com uma letra (A-Z).',
       });
       return;
     }
     if (!firestore) return;
-
+  
     setIsSaving(true);
+  
     try {
+      const addressesCollection = collection(firestore, 'addresses');
+      const baseCodeParts = [
+          predefinedStates.includes(activeUnidade.toUpperCase()) ? String.fromCharCode(65 + predefinedStates.indexOf(activeUnidade.toUpperCase())) : activeUnidade.toUpperCase().charAt(0),
+          setor.padStart(2, '0'),
+          `R${rua.padStart(2, '0')}`,
+          `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`,
+          `N${nivel.padStart(2, '0')}`
+      ];
+      const baseCodigo = baseCodeParts.join('.');
+  
+      if (useDetalhe) {
         const batch = writeBatch(firestore);
-        const addressesCollection = collection(firestore, 'addresses');
-        const numQuantity = useDetalhe ? Number(quantity) : 1;
+        const numQuantity = Number(quantity);
         
         let currentStartDetalheNum = startDetalheNum;
-        if (useDetalhe && currentStartDetalheNum === null) {
-            // Recalculate just in case it wasn't ready
-             const q = query(collection(firestore, 'addresses'), where('setor', '==', formState.setor));
-             const querySnapshot = await getDocs(q);
-             let lastNumber = 0;
-             querySnapshot.forEach(doc => {
-                 const data = doc.data();
-                 if (data.detalhe) {
-                     const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
-                     if (!isNaN(currentNumber) && currentNumber > lastNumber) {
-                         lastNumber = currentNumber;
-                     }
-                 }
-             });
-             currentStartDetalheNum = lastNumber + 1;
+        if (currentStartDetalheNum === null) {
+          const q = query(collection(firestore, 'addresses'), where('setor', '==', formState.setor));
+          const querySnapshot = await getDocs(q);
+          let lastNumber = 0;
+          querySnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.detalhe) {
+              const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
+              if (!isNaN(currentNumber) && currentNumber > lastNumber) {
+                lastNumber = currentNumber;
+              }
+            }
+          });
+          currentStartDetalheNum = lastNumber + 1;
         }
-
+  
         for (let i = 0; i < numQuantity; i++) {
-            const detalheNum = useDetalhe && currentStartDetalheNum !== null ? currentStartDetalheNum + i : null;
-            const detalheCode = detalheNum !== null ? `-D${String(detalheNum).padStart(3, '0')}` : undefined;
-
-            const baseCodeParts = [
-                predefinedStates.includes(activeUnidade.toUpperCase()) ? String.fromCharCode(65 + predefinedStates.indexOf(activeUnidade.toUpperCase())) : activeUnidade.toUpperCase().charAt(0),
-                setor.padStart(2, '0'),
-                `R${rua.padStart(2, '0')}`,
-                `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`,
-                `N${nivel.padStart(2, '0')}`
-            ];
-            const codigoCompleto = baseCodeParts.join('.') + (detalheCode || '');
-
-            const newAddress: Omit<Address, 'id'> = {
-                unidade: activeUnidade.toUpperCase(), 
-                setor: formState.setor,
-                rua: `R${formState.rua.padStart(2, '0')}`,
-                movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
-                nivel: `N${formState.nivel.padStart(2, '0')}`,
-                detalhe: detalheCode,
-                codigoCompleto: codigoCompleto,
-                createdAt: new Date().toISOString(),
-            };
-            
-            const newDocRef = doc(addressesCollection);
-            batch.set(newDocRef, newAddress);
+          const detalheNum = currentStartDetalheNum + i;
+          const detalheCode = `-D${String(detalheNum).padStart(3, '0')}`;
+          const codigoCompleto = baseCodigo + detalheCode;
+  
+          const newAddress: Omit<Address, 'id'> = {
+            unidade: activeUnidade.toUpperCase(),
+            setor: formState.setor,
+            rua: `R${formState.rua.padStart(2, '0')}`,
+            movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
+            nivel: `N${formState.nivel.padStart(2, '0')}`,
+            detalhe: detalheCode,
+            codigoCompleto: codigoCompleto,
+            createdAt: new Date().toISOString(),
+          };
+          const newDocRef = doc(addressesCollection);
+          batch.set(newDocRef, newAddress);
         }
-
         await batch.commit();
-
         toast({ title: 'Sucesso!', description: `${numQuantity} novo(s) endereço(s) cadastrado(s).` });
-        queryClient.invalidateQueries({ queryKey: ['addresses'] });
-        resetForm();
+      } else {
+        // Salva um único endereço sem detalhe
+        const newAddress: Omit<Address, 'id'> = {
+          unidade: activeUnidade.toUpperCase(),
+          setor: formState.setor,
+          rua: `R${formState.rua.padStart(2, '0')}`,
+          movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
+          nivel: `N${formState.nivel.padStart(2, '0')}`,
+          detalhe: undefined, // Garante que detalhe seja undefined
+          codigoCompleto: baseCodigo,
+          createdAt: new Date().toISOString(),
+        };
+        await addDoc(addressesCollection, newAddress);
+        toast({ title: 'Sucesso!', description: `Novo endereço cadastrado.` });
+      }
+  
+      queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      resetForm();
     } catch (err) {
-        console.error("Erro ao salvar endereço:", err);
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar o endereço.' });
+      console.error("Erro ao salvar endereço:", err);
+      toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar o endereço.' });
     } finally {
-        setIsSaving(false);
+      setIsSaving(false);
     }
   };
 
@@ -495,5 +510,3 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
-
-    
