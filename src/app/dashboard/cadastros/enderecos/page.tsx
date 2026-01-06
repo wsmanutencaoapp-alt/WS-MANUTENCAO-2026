@@ -77,13 +77,14 @@ const CadastroEnderecosPage = () => {
       queryKey: ['addresses']
   });
 
-  const states = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'].sort(), []);
+  const states = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'], []);
   
   const generatedCode = useMemo(() => {
     const { unidade, setor, rua, movel, nivel, detalhe } = formState;
 
-    const stateIndex = states.indexOf(unidade);
-    const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : null;
+    // Use a letter from the alphabet. If not in the pre-defined list, just use the input.
+    const stateIndex = states.indexOf(unidade.toUpperCase());
+    const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : unidade.toUpperCase().charAt(0) || null;
 
     const parts = [
         unidadeCode,
@@ -116,8 +117,8 @@ const CadastroEnderecosPage = () => {
 
     setIsSaving(true);
     try {
-        const stateIndex = states.indexOf(unidade);
-        const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : unidade;
+        const stateIndex = states.indexOf(unidade.toUpperCase());
+        const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : unidade.toUpperCase().charAt(0);
 
         const newAddress: Omit<Address, 'id'> = {
             ...formState,
@@ -172,12 +173,12 @@ const CadastroEnderecosPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <div>
                 <Label>Nível 1: Unidade (Estado)</Label>
-                 <Select value={formState.unidade} onValueChange={(v) => setFormState(p => ({...p, unidade: v}))}>
-                     <SelectTrigger><SelectValue placeholder="Selecione o estado..." /></SelectTrigger>
-                     <SelectContent>
-                         {states.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                     </SelectContent>
-                 </Select>
+                 <Input 
+                   value={formState.unidade} 
+                   onChange={(e) => setFormState(p => ({...p, unidade: e.target.value.toUpperCase()}))} 
+                   placeholder="Digite a sigla do estado (Ex: PR)" 
+                   maxLength={2}
+                 />
             </div>
              <div>
                 <Label>Nível 2: Setor</Label>
