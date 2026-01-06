@@ -13,6 +13,8 @@ import {
   getDocs,
   limit,
   writeBatch,
+  DocumentData,
+  DocumentReference,
 } from 'firebase/firestore';
 import {
   Card,
@@ -84,7 +86,7 @@ const CadastroEnderecosPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  const [selectedAddressForPrint, setSelectedAddressForPrint] = useState<WithDocId<Address> | null>(null);
+  const [addressesToPrint, setAddressesToPrint] = useState<WithDocId<Address>[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
 
@@ -209,27 +211,25 @@ const CadastroEnderecosPage = () => {
   
     try {
       const addressesCollection = collection(firestore, 'addresses');
-      const stateIndex = predefinedStates.indexOf(activeUnidade.toUpperCase());
-      const unidadeCode = stateIndex !== -1 
-          ? String.fromCharCode(65 + stateIndex) 
-          : activeUnidade.toUpperCase().charAt(0);
-          
-      const baseCodeParts = [
-          unidadeCode,
-          setor.padStart(2, '0'),
-          `R${rua.padStart(2, '0')}`,
-          `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`,
-          `N${nivel.padStart(2, '0')}`
-      ];
-      const baseCodigo = baseCodeParts.join('.');
-  
+      const newAddressesForPrinting: WithDocId<Address>[] = [];
+
       if (useDetalhe) {
         const batch = writeBatch(firestore);
         const numQuantity = Number(quantity);
+        const stateIndex = predefinedStates.indexOf(activeUnidade.toUpperCase());
+        const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : activeUnidade.toUpperCase().charAt(0);
         
+        const baseCodeParts = [
+            unidadeCode,
+            setor.padStart(2, '0'),
+            `R${rua.padStart(2, '0')}`,
+            `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`,
+            `N${nivel.padStart(2, '0')}`
+        ];
+        const baseCodigo = baseCodeParts.join('.');
+
         let currentStartDetalheNum = startDetalheNum;
         if (currentStartDetalheNum === null) {
-          // Recalculate if it wasn't ready
           const q = query(collection(firestore, 'addresses'), where('setor', '==', formState.setor));
           const querySnapshot = await getDocs(q);
           let lastNumber = 0;
@@ -250,7 +250,7 @@ const CadastroEnderecosPage = () => {
           const detalheCode = `-D${String(detalheNum).padStart(3, '0')}`;
           const codigoCompleto = baseCodigo + detalheCode;
   
-          const newAddress: Omit<Address, 'id'> = {
+          const newAddressData: Omit<Address, 'id'> = {
             unidade: activeUnidade.toUpperCase(),
             setor: formState.setor,
             rua: `R${formState.rua.padStart(2, '0')}`,
@@ -261,29 +261,43 @@ const CadastroEnderecosPage = () => {
             createdAt: new Date().toISOString(),
           };
           const newDocRef = doc(addressesCollection);
-          batch.set(newDocRef, newAddress);
+          batch.set(newDocRef, newAddressData);
+          newAddressesForPrinting.push({ docId: newDocRef.id, ...newAddressData });
         }
         await batch.commit();
         toast({ title: 'Sucesso!', description: `${numQuantity} novo(s) endereço(s) cadastrado(s).` });
 
       } else {
-        // Salva um único endereço sem detalhe
+        const stateIndex = predefinedStates.indexOf(activeUnidade.toUpperCase());
+        const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : activeUnidade.toUpperCase().charAt(0);
+        const baseCodeParts = [
+            unidadeCode,
+            setor.padStart(2, '0'),
+            `R${rua.padStart(2, '0')}`,
+            `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`,
+            `N${nivel.padStart(2, '0')}`
+        ];
+        const codigoCompleto = baseCodeParts.join('.');
+        
         const newAddress: Omit<Address, 'id'> = {
           unidade: activeUnidade.toUpperCase(),
           setor: formState.setor,
           rua: `R${formState.rua.padStart(2, '0')}`,
           movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
           nivel: `N${formState.nivel.padStart(2, '0')}`,
-          detalhe: '', // Ensure detalhe is an empty string, not undefined
-          codigoCompleto: baseCodigo,
+          detalhe: '',
+          codigoCompleto: codigoCompleto,
           createdAt: new Date().toISOString(),
         };
-        await addDoc(addressesCollection, newAddress);
+        const docRef = await addDoc(addressesCollection, newAddress);
+        newAddressesForPrinting.push({ docId: docRef.id, ...newAddress });
         toast({ title: 'Sucesso!', description: `Novo endereço cadastrado.` });
       }
   
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
       resetForm();
+      setAddressesToPrint(newAddressesForPrinting);
+
     } catch (err) {
       console.error("Erro ao salvar endereço:", err);
       toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar o endereço.' });
@@ -308,30 +322,30 @@ const CadastroEnderecosPage = () => {
   };
 
   const handlePrint = (address: WithDocId<Address>) => {
-    setSelectedAddressForPrint(address);
+    setAddressesToPrint([address]);
   };
   
   const closePrintDialog = () => {
-    setSelectedAddressForPrint(null);
+    setAddressesToPrint([]);
   };
 
   const executePrint = () => {
-    const printableContent = document.getElementById('printable-label-area');
-    if (printableContent) {
-      const printWindow = window.open('', '', 'height=60,width=300');
-      if (printWindow) {
-        printWindow.document.write('<html><head><title>Imprimir Etiqueta</title>');
-        printWindow.document.write('<style>@media print { @page { size: 30mm 6mm; margin: 0; } body { margin: 0; display: flex; align-items: center; justify-content: center; font-family: sans-serif; } }</style>');
+    const printableArea = document.getElementById('printable-label-area');
+    if (!printableArea) return;
+
+    const printWindow = window.open('', '', 'height=600,width=800');
+    if (printWindow) {
+        printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
+        printWindow.document.write('<style>@media print { @page { size: 30mm 6mm; margin: 0; } body { margin: 0; } .label-container { width: 30mm; height: 6mm; display: flex; align-items: center; justify-content: center; font-family: sans-serif; box-sizing: border-box; page-break-after: always; } .label-container:last-child { page-break-after: auto; } }</style>');
         printWindow.document.write('</head><body style="margin: 0;">');
-        printWindow.document.write(printableContent.innerHTML);
+        printWindow.document.write(printableArea.innerHTML);
         printWindow.document.write('</body></html>');
         printWindow.document.close();
         printWindow.focus();
         setTimeout(() => {
-          printWindow.print();
-          printWindow.close();
+            printWindow.print();
+            printWindow.close();
         }, 250);
-      }
     }
   };
 
@@ -501,27 +515,31 @@ const CadastroEnderecosPage = () => {
         </CardContent>
       </Card>
       
-      {selectedAddressForPrint && (
-        <Dialog open={!!selectedAddressForPrint} onOpenChange={closePrintDialog}>
+      {addressesToPrint.length > 0 && (
+        <Dialog open={addressesToPrint.length > 0} onOpenChange={closePrintDialog}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Etiqueta de Endereçamento</DialogTitle>
+                    <DialogTitle>Etiqueta(s) de Endereçamento</DialogTitle>
                     <DialogDescription>
-                        Confirme a etiqueta e clique em imprimir.
+                        Confirme a(s) etiqueta(s) e clique em imprimir.
                     </DialogDescription>
                 </DialogHeader>
-                <div id="printable-label-area" className="flex items-center justify-between p-1 border rounded-lg" style={{ width: '113px', height: '23px', boxSizing: 'content-box' }}>
-                   <div style={{ width: '20px', height: '20px', flexShrink: 0 }}>
-                        <Image
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=20x20&data=${encodeURIComponent(selectedAddressForPrint.codigoCompleto)}`}
-                            alt={`QR Code for ${selectedAddressForPrint.codigoCompleto}`}
-                            width={20}
-                            height={20}
-                        />
-                   </div>
-                   <p className="text-center font-mono font-bold text-[8px] leading-tight">
-                       {selectedAddressForPrint.movel}.{selectedAddressForPrint.nivel}{selectedAddressForPrint.detalhe || ''}
-                   </p>
+                <div id="printable-label-area" className="flex flex-col items-center gap-2 max-h-60 overflow-y-auto p-4 bg-muted/50 rounded-md">
+                   {addressesToPrint.map(address => (
+                        <div key={address.docId} className="label-container flex items-center justify-between p-1 border rounded-lg bg-white" style={{ width: '113px', height: '23px', boxSizing: 'content-box' }}>
+                           <div style={{ width: '20px', height: '20px', flexShrink: 0 }}>
+                                <Image
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=20x20&data=${encodeURIComponent(address.codigoCompleto)}`}
+                                    alt={`QR Code for ${address.codigoCompleto}`}
+                                    width={20}
+                                    height={20}
+                                />
+                           </div>
+                           <p className="text-center font-mono font-bold text-black text-[8px] leading-tight">
+                               {address.movel}.{address.nivel}{address.detalhe || ''}
+                           </p>
+                        </div>
+                    ))}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={closePrintDialog}>Cancelar</Button>
@@ -539,3 +557,4 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
+    
