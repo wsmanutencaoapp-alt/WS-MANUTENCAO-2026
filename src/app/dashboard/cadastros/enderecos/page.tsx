@@ -198,10 +198,27 @@ const CadastroEnderecosPage = () => {
         const batch = writeBatch(firestore);
         const addressesCollection = collection(firestore, 'addresses');
         const numQuantity = useDetalhe ? Number(quantity) : 1;
-        const currentStartDetalheNum = startDetalheNum !== null ? startDetalheNum : 1;
+        
+        let currentStartDetalheNum = startDetalheNum;
+        if (useDetalhe && currentStartDetalheNum === null) {
+            // Recalculate just in case it wasn't ready
+             const q = query(collection(firestore, 'addresses'), where('setor', '==', formState.setor));
+             const querySnapshot = await getDocs(q);
+             let lastNumber = 0;
+             querySnapshot.forEach(doc => {
+                 const data = doc.data();
+                 if (data.detalhe) {
+                     const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
+                     if (!isNaN(currentNumber) && currentNumber > lastNumber) {
+                         lastNumber = currentNumber;
+                     }
+                 }
+             });
+             currentStartDetalheNum = lastNumber + 1;
+        }
 
         for (let i = 0; i < numQuantity; i++) {
-            const detalheNum = useDetalhe ? currentStartDetalheNum + i : null;
+            const detalheNum = useDetalhe && currentStartDetalheNum !== null ? currentStartDetalheNum + i : null;
             const detalheCode = detalheNum !== null ? `-D${String(detalheNum).padStart(3, '0')}` : undefined;
 
             const baseCodeParts = [
