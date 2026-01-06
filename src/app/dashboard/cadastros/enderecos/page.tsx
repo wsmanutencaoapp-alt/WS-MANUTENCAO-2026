@@ -92,29 +92,30 @@ const CadastroEnderecosPage = () => {
         return;
       }
       
+      // Simplified query to only filter by sector
       const q = query(
         collection(firestore, 'addresses'), 
-        where('setor', '==', formState.setor),
-        where('detalhe', '!=', null)
+        where('setor', '==', formState.setor)
       );
 
       const querySnapshot = await getDocs(q);
-      if (querySnapshot.empty) {
-        setGeneratedDetalhe('-D001');
-      } else {
-        let lastNumber = 0;
-        querySnapshot.forEach(doc => {
-            const detalhe = doc.data().detalhe as string;
-            if (detalhe) {
-                const currentNumber = parseInt(detalhe.replace('-D', ''), 10);
-                if (currentNumber > lastNumber) {
-                    lastNumber = currentNumber;
-                }
-            }
-        });
-        const nextNumber = lastNumber + 1;
-        setGeneratedDetalhe(`-D${String(nextNumber).padStart(3, '0')}`);
-      }
+      let lastNumber = 0;
+      
+      // Client-side filtering and processing
+      querySnapshot.forEach(doc => {
+          const data = doc.data();
+          // Check if 'detalhe' exists and is not null/undefined
+          if (data.detalhe) {
+              const detalhe = data.detalhe as string;
+              const currentNumber = parseInt(detalhe.replace('-D', ''), 10);
+              if (currentNumber > lastNumber) {
+                  lastNumber = currentNumber;
+              }
+          }
+      });
+      
+      const nextNumber = lastNumber + 1;
+      setGeneratedDetalhe(`-D${String(nextNumber).padStart(3, '0')}`);
     };
     generateNextDetalhe();
   }, [useDetalhe, formState.setor, firestore]);
