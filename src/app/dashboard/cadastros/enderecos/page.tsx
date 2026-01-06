@@ -40,7 +40,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Trash2, Printer } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, Printer, Search } from 'lucide-react';
 import type { Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
@@ -85,6 +85,7 @@ const CadastroEnderecosPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedAddressForPrint, setSelectedAddressForPrint] = useState<WithDocId<Address> | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
 
   const addressesQuery = useMemoFirebase(
@@ -95,6 +96,17 @@ const CadastroEnderecosPage = () => {
   const { data: addresses, isLoading, error } = useCollection<WithDocId<Address>>(addressesQuery, {
       queryKey: ['addresses']
   });
+
+  const filteredAddresses = useMemo(() => {
+    if (!addresses) return [];
+    if (!searchTerm) return addresses;
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return addresses.filter(address => 
+        address.codigoCompleto.toLowerCase().includes(lowercasedTerm) ||
+        address.unidade.toLowerCase().includes(lowercasedTerm)
+    );
+  }, [addresses, searchTerm]);
+
 
   const predefinedStates = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'], []);
   
@@ -424,6 +436,16 @@ const CadastroEnderecosPage = () => {
       <Card>
         <CardHeader>
             <CardTitle>Endereços Cadastrados</CardTitle>
+            <CardDescription>Visualize e gerencie os endereços existentes.</CardDescription>
+            <div className="relative pt-4">
+               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+               <Input
+                   placeholder="Pesquisar por código ou unidade..."
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+               />
+            </div>
         </CardHeader>
         <CardContent>
             <Table>
@@ -438,8 +460,8 @@ const CadastroEnderecosPage = () => {
                 </TableHeader>
                 <TableBody>
                     {isLoading && <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                    {!isLoading && addresses?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum endereço cadastrado.</TableCell></TableRow>}
-                    {!isLoading && addresses?.map(address => (
+                    {!isLoading && filteredAddresses?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum endereço encontrado.</TableCell></TableRow>}
+                    {!isLoading && filteredAddresses?.map(address => (
                         <TableRow key={address.docId}>
                             <TableCell className="font-mono">{address.codigoCompleto}</TableCell>
                             <TableCell>{address.unidade}</TableCell>
