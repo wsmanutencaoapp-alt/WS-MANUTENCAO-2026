@@ -197,8 +197,13 @@ const CadastroEnderecosPage = () => {
   
     try {
       const addressesCollection = collection(firestore, 'addresses');
+      const stateIndex = predefinedStates.indexOf(activeUnidade.toUpperCase());
+      const unidadeCode = stateIndex !== -1 
+          ? String.fromCharCode(65 + stateIndex) 
+          : activeUnidade.toUpperCase().charAt(0);
+          
       const baseCodeParts = [
-          predefinedStates.includes(activeUnidade.toUpperCase()) ? String.fromCharCode(65 + predefinedStates.indexOf(activeUnidade.toUpperCase())) : activeUnidade.toUpperCase().charAt(0),
+          unidadeCode,
           setor.padStart(2, '0'),
           `R${rua.padStart(2, '0')}`,
           `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`,
@@ -212,6 +217,7 @@ const CadastroEnderecosPage = () => {
         
         let currentStartDetalheNum = startDetalheNum;
         if (currentStartDetalheNum === null) {
+          // Recalculate if it wasn't ready
           const q = query(collection(firestore, 'addresses'), where('setor', '==', formState.setor));
           const querySnapshot = await getDocs(q);
           let lastNumber = 0;
@@ -247,6 +253,7 @@ const CadastroEnderecosPage = () => {
         }
         await batch.commit();
         toast({ title: 'Sucesso!', description: `${numQuantity} novo(s) endereço(s) cadastrado(s).` });
+
       } else {
         // Salva um único endereço sem detalhe
         const newAddress: Omit<Address, 'id'> = {
@@ -255,7 +262,7 @@ const CadastroEnderecosPage = () => {
           rua: `R${formState.rua.padStart(2, '0')}`,
           movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
           nivel: `N${formState.nivel.padStart(2, '0')}`,
-          detalhe: undefined, // Garante que detalhe seja undefined
+          detalhe: '', // Ensure detalhe is an empty string, not undefined
           codigoCompleto: baseCodigo,
           createdAt: new Date().toISOString(),
         };
