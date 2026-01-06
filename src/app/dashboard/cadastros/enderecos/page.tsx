@@ -9,6 +9,9 @@ import {
   deleteDoc,
   doc,
   orderBy,
+  where,
+  getDocs,
+  limit,
 } from 'firebase/firestore';
 import {
   Card,
@@ -51,6 +54,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Checkbox } from '@/components/ui/checkbox';
 
 const CadastroEnderecosPage = () => {
   const firestore = useFirestore();
@@ -59,13 +63,14 @@ const CadastroEnderecosPage = () => {
 
   const [formState, setFormState] = useState({
     unidade: '',
-    unidadeOutro: '', // Novo campo para quando "Outra" for selecionada
+    unidadeOutro: '',
     setor: '',
     rua: '',
     movel: '',
     nivel: '',
-    detalhe: '',
   });
+  const [useDetalhe, setUseDetalhe] = useState(false);
+  const [generatedDetalhe, setGeneratedDetalhe] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
@@ -80,9 +85,37 @@ const CadastroEnderecosPage = () => {
 
   const predefinedStates = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'], []);
   
+  useEffect(() => {
+    const generateNextDetalhe = async () => {
+      if (!firestore || !useDetalhe || !formState.setor) {
+        setGeneratedDetalhe(null);
+        return;
+      }
+      
+      const q = query(
+        collection(firestore, 'addresses'), 
+        where('setor', '==', formState.setor),
+        where('detalhe', '!=', null),
+        orderBy('detalhe', 'desc'),
+        limit(1)
+      );
+
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.empty) {
+        setGeneratedDetalhe('-D001');
+      } else {
+        const lastDetalhe = querySnapshot.docs[0].data().detalhe as string; // e.g., "-D001"
+        const lastNumber = parseInt(lastDetalhe.replace('-D', ''), 10);
+        const nextNumber = lastNumber + 1;
+        setGeneratedDetalhe(`-D${String(nextNumber).padStart(3, '0')}`);
+      }
+    };
+    generateNextDetalhe();
+  }, [useDetalhe, formState.setor, firestore]);
+  
   const generatedCode = useMemo(() => {
     const activeUnidade = formState.unidade === 'OUTRA' ? formState.unidadeOutro : formState.unidade;
-    const { setor, rua, movel, nivel, detalhe } = formState;
+    const { setor, rua, movel, nivel } = formState;
 
     const stateIndex = predefinedStates.indexOf(activeUnidade.toUpperCase());
     const unidadeCode = stateIndex !== -1 
@@ -97,13 +130,15 @@ const CadastroEnderecosPage = () => {
         nivel ? `N${nivel.padStart(2, '0')}` : null,
     ];
     const mainCode = parts.filter(Boolean).join('.');
-    const detailCode = detalhe ? `-D${detalhe.replace(/\D/g, '').padStart(3, '0')}` : '';
+    const detailCode = useDetalhe && generatedDetalhe ? generatedDetalhe : '';
 
     return mainCode + detailCode || 'Aguardando preenchimento...';
-  }, [formState, predefinedStates]);
+  }, [formState, predefinedStates, useDetalhe, generatedDetalhe]);
   
   const resetForm = () => {
-    setFormState({ unidade: '', unidadeOutro: '', setor: '', rua: '', movel: '', nivel: '', detalhe: '' });
+    setFormState({ unidade: '', unidadeOutro: '', setor: '', rua: '', movel: '', nivel: '' });
+    setUseDetalhe(false);
+    setGeneratedDetalhe(null);
   }
 
   const handleSave = async () => {
@@ -130,22 +165,18 @@ const CadastroEnderecosPage = () => {
 
     setIsSaving(true);
     try {
-        const stateIndex = predefinedStates.indexOf(activeUnidade.toUpperCase());
-        const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : activeUnidade.toUpperCase().charAt(0);
-
         const newAddress: Omit<Address, 'id'> = {
-            ...formState,
             unidade: activeUnidade.toUpperCase(), 
+            setor: formState.setor,
             rua: `R${formState.rua.padStart(2, '0')}`,
             movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
             nivel: `N${formState.nivel.padStart(2, '0')}`,
-            detalhe: formState.detalhe ? `-D${formState.detalhe.replace(/\D/g, '').padStart(3, '0')}`: undefined,
+            detalhe: useDetalhe && generatedDetalhe ? generatedDetalhe : undefined,
             codigoCompleto: generatedCode,
             createdAt: new Date().toISOString(),
         };
-        const { unidadeOutro, ...addressToSave } = newAddress as any;
 
-        await addDoc(collection(firestore, 'addresses'), addressToSave);
+        await addDoc(collection(firestore, 'addresses'), newAddress);
         toast({ title: 'Sucesso!', description: 'Novo endereço cadastrado.' });
         queryClient.invalidateQueries({ queryKey: ['addresses'] });
         resetForm();
@@ -223,7 +254,7 @@ const CadastroEnderecosPage = () => {
                  </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
              <div>
                 <Label>Nível 3: Rua / Corredor</Label>
                 <Input value={formState.rua} onChange={(e) => setFormState(p => ({...p, rua: e.target.value.replace(/\D/g, '')}))} placeholder="Ex: 01" maxLength={2}/>
@@ -236,9 +267,9 @@ const CadastroEnderecosPage = () => {
                 <Label>Nível 5: Nível / Vão</Label>
                 <Input value={formState.nivel} onChange={(e) => setFormState(p => ({...p, nivel: e.target.value.replace(/\D/g, '')}))} placeholder="Ex: 03" maxLength={2}/>
             </div>
-            <div>
-                <Label>Detalhe (Opcional)</Label>
-                <Input value={formState.detalhe} onChange={(e) => setFormState(p => ({...p, detalhe: e.target.value.toUpperCase()}))} placeholder="Ex: 004" maxLength={3}/>
+             <div className="flex items-center space-x-2 h-10">
+                <Checkbox id="useDetalhe" checked={useDetalhe} onCheckedChange={(checked) => setUseDetalhe(!!checked)} disabled={!formState.setor} />
+                <Label htmlFor="useDetalhe" className="font-normal cursor-pointer">Adicionar Detalhe Sequencial</Label>
             </div>
           </div>
            <div className="pt-4 space-y-2">
@@ -314,4 +345,3 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
-
