@@ -338,7 +338,7 @@ const CadastroEnderecosPage = () => {
     if (printWindow) {
         printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
         printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: 1fr 21mm; align-items: center; box-sizing: border-box; padding: 2mm; page-break-inside: avoid !important; break-inside: avoid !important; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; } .qr-code { width: 21mm; height: 21mm; } }</style>');
-        printWindow.document.write('</head><body style="margin: 0;">');
+        printWindow.document.write('</head><body>');
         printWindow.document.write(printableArea.innerHTML);
         printWindow.document.write('</body></html>');
         printWindow.document.close();
