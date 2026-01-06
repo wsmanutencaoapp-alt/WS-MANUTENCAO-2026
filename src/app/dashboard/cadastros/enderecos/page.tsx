@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -78,20 +77,26 @@ const CadastroEnderecosPage = () => {
       queryKey: ['addresses']
   });
 
+  const states = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'].sort(), []);
+  
   const generatedCode = useMemo(() => {
     const { unidade, setor, rua, movel, nivel, detalhe } = formState;
+
+    const stateIndex = states.indexOf(unidade);
+    const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : null;
+
     const parts = [
-        unidade,
+        unidadeCode,
         setor ? setor.padStart(2, '0') : null,
         rua ? `R${rua.padStart(2, '0')}` : null,
         movel ? `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}` : null,
         nivel ? `N${nivel.padStart(2, '0')}` : null,
     ];
     const mainCode = parts.filter(Boolean).join('.');
-    const detailCode = detalhe ? `-${detalhe.charAt(0).toUpperCase()}${detalhe.substring(1).padStart(2, '0')}` : '';
+    const detailCode = detalhe ? `-D${detalhe.replace(/\D/g, '').padStart(2, '0')}` : '';
 
     return mainCode + detailCode || 'Aguardando preenchimento...';
-  }, [formState]);
+  }, [formState, states]);
   
   const resetForm = () => {
     setFormState({ unidade: '', setor: '', rua: '', movel: '', nivel: '', detalhe: '' });
@@ -111,12 +116,16 @@ const CadastroEnderecosPage = () => {
 
     setIsSaving(true);
     try {
+        const stateIndex = states.indexOf(unidade);
+        const unidadeCode = stateIndex !== -1 ? String.fromCharCode(65 + stateIndex) : unidade;
+
         const newAddress: Omit<Address, 'id'> = {
             ...formState,
+            unidade: unidadeCode, // Salva o código da letra
             rua: `R${formState.rua.padStart(2, '0')}`,
             movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
             nivel: `N${formState.nivel.padStart(2, '0')}`,
-            detalhe: formState.detalhe ? `-${formState.detalhe.charAt(0).toUpperCase()}${formState.detalhe.substring(1).padStart(2, '0')}`: undefined,
+            detalhe: formState.detalhe ? `-D${formState.detalhe.replace(/\D/g, '').padStart(2, '0')}`: undefined,
             codigoCompleto: generatedCode,
             createdAt: new Date().toISOString(),
         };
@@ -166,7 +175,7 @@ const CadastroEnderecosPage = () => {
                  <Select value={formState.unidade} onValueChange={(v) => setFormState(p => ({...p, unidade: v}))}>
                      <SelectTrigger><SelectValue placeholder="Selecione o estado..." /></SelectTrigger>
                      <SelectContent>
-                         {['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                         {states.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                      </SelectContent>
                  </Select>
             </div>
@@ -199,7 +208,7 @@ const CadastroEnderecosPage = () => {
             </div>
             <div>
                 <Label>Detalhe (Opcional)</Label>
-                <Input value={formState.detalhe} onChange={(e) => setFormState(p => ({...p, detalhe: e.target.value.toUpperCase()}))} placeholder="Ex: P04, G01" maxLength={3}/>
+                <Input value={formState.detalhe} onChange={(e) => setFormState(p => ({...p, detalhe: e.target.value.toUpperCase()}))} placeholder="Ex: 04" maxLength={2}/>
             </div>
           </div>
            <div className="pt-4 space-y-2">
