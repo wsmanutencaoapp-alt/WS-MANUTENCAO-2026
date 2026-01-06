@@ -12,6 +12,7 @@ import {
   where,
   getDocs,
   limit,
+  writeBatch,
 } from 'firebase/firestore';
 import {
   Card,
@@ -79,7 +80,8 @@ const CadastroEnderecosPage = () => {
     nivel: '',
   });
   const [useDetalhe, setUseDetalhe] = useState(false);
-  const [generatedDetalhe, setGeneratedDetalhe] = useState<string | null>(null);
+  const [startDetalheNum, setStartDetalheNum] = useState<number | null>(null);
+  const [quantity, setQuantity] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedAddressForPrint, setSelectedAddressForPrint] = useState<WithDocId<Address> | null>(null);
@@ -99,7 +101,7 @@ const CadastroEnderecosPage = () => {
   useEffect(() => {
     const generateNextDetalhe = async () => {
       if (!firestore || !useDetalhe || !formState.setor) {
-        setGeneratedDetalhe(null);
+        setStartDetalheNum(null);
         return;
       }
       
@@ -124,7 +126,7 @@ const CadastroEnderecosPage = () => {
       });
       
       const nextNumber = lastNumber + 1;
-      setGeneratedDetalhe(`-D${String(nextNumber).padStart(3, '0')}`);
+      setStartDetalheNum(nextNumber);
     };
     generateNextDetalhe();
   }, [useDetalhe, formState.setor, firestore]);
@@ -146,15 +148,27 @@ const CadastroEnderecosPage = () => {
         nivel ? `N${nivel.padStart(2, '0')}` : null,
     ];
     const mainCode = parts.filter(Boolean).join('.');
-    const detailCode = useDetalhe && generatedDetalhe ? generatedDetalhe : '';
-
-    return mainCode + detailCode || 'Aguardando preenchimento...';
-  }, [formState, predefinedStates, useDetalhe, generatedDetalhe]);
+    
+    if (useDetalhe && startDetalheNum !== null) {
+      const numQuantity = Number(quantity);
+      if (numQuantity > 1) {
+          const endDetalheNum = startDetalheNum + numQuantity - 1;
+          const startCode = `-D${String(startDetalheNum).padStart(3, '0')}`;
+          const endCode = `-D${String(endDetalheNum).padStart(3, '0')}`;
+          return `${mainCode}${startCode} até ${endCode}`;
+      }
+      const detailCode = `-D${String(startDetalheNum).padStart(3, '0')}`;
+      return mainCode + detailCode;
+    }
+    
+    return mainCode || 'Aguardando preenchimento...';
+  }, [formState, predefinedStates, useDetalhe, startDetalheNum, quantity]);
   
   const resetForm = () => {
     setFormState({ unidade: '', unidadeOutro: '', setor: '', rua: '', movel: '', nivel: '' });
     setUseDetalhe(false);
-    setGeneratedDetalhe(null);
+    setStartDetalheNum(null);
+    setQuantity(1);
   }
 
   const handleSave = async () => {
@@ -181,19 +195,42 @@ const CadastroEnderecosPage = () => {
 
     setIsSaving(true);
     try {
-        const newAddress: Omit<Address, 'id'> = {
-            unidade: activeUnidade.toUpperCase(), 
-            setor: formState.setor,
-            rua: `R${formState.rua.padStart(2, '0')}`,
-            movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
-            nivel: `N${formState.nivel.padStart(2, '0')}`,
-            detalhe: useDetalhe && generatedDetalhe ? generatedDetalhe : undefined,
-            codigoCompleto: generatedCode,
-            createdAt: new Date().toISOString(),
-        };
+        const batch = writeBatch(firestore);
+        const addressesCollection = collection(firestore, 'addresses');
+        const numQuantity = useDetalhe ? Number(quantity) : 1;
+        const currentStartDetalheNum = startDetalheNum !== null ? startDetalheNum : 1;
 
-        await addDoc(collection(firestore, 'addresses'), newAddress);
-        toast({ title: 'Sucesso!', description: 'Novo endereço cadastrado.' });
+        for (let i = 0; i < numQuantity; i++) {
+            const detalheNum = useDetalhe ? currentStartDetalheNum + i : null;
+            const detalheCode = detalheNum !== null ? `-D${String(detalheNum).padStart(3, '0')}` : undefined;
+
+            const baseCodeParts = [
+                predefinedStates.includes(activeUnidade.toUpperCase()) ? String.fromCharCode(65 + predefinedStates.indexOf(activeUnidade.toUpperCase())) : activeUnidade.toUpperCase().charAt(0),
+                setor.padStart(2, '0'),
+                `R${rua.padStart(2, '0')}`,
+                `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`,
+                `N${nivel.padStart(2, '0')}`
+            ];
+            const codigoCompleto = baseCodeParts.join('.') + (detalheCode || '');
+
+            const newAddress: Omit<Address, 'id'> = {
+                unidade: activeUnidade.toUpperCase(), 
+                setor: formState.setor,
+                rua: `R${formState.rua.padStart(2, '0')}`,
+                movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
+                nivel: `N${formState.nivel.padStart(2, '0')}`,
+                detalhe: detalheCode,
+                codigoCompleto: codigoCompleto,
+                createdAt: new Date().toISOString(),
+            };
+            
+            const newDocRef = doc(addressesCollection);
+            batch.set(newDocRef, newAddress);
+        }
+
+        await batch.commit();
+
+        toast({ title: 'Sucesso!', description: `${numQuantity} novo(s) endereço(s) cadastrado(s).` });
         queryClient.invalidateQueries({ queryKey: ['addresses'] });
         resetForm();
     } catch (err) {
@@ -316,6 +353,21 @@ const CadastroEnderecosPage = () => {
                 <Label htmlFor="useDetalhe" className="font-normal cursor-pointer">Adicionar Detalhe Sequencial</Label>
             </div>
           </div>
+           {useDetalhe && (
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end animate-in fade-in-50">
+               <div>
+                  <Label htmlFor="quantity">Quantidade de Itens</Label>
+                  <Input 
+                      id="quantity"
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+                      min="1"
+                      placeholder="1"
+                  />
+               </div>
+             </div>
+           )}
            <div className="pt-4 space-y-2">
                <Label className="font-semibold">Código Gerado</Label>
                <div className="p-3 rounded-md bg-muted font-mono text-lg">{generatedCode}</div>
@@ -324,7 +376,7 @@ const CadastroEnderecosPage = () => {
                <Button onClick={handleSave} disabled={isSaving}>
                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                    <PlusCircle className="mr-2 h-4 w-4"/>
-                   Salvar Endereço
+                   Salvar Endereço(s)
                </Button>
            </div>
         </CardContent>
