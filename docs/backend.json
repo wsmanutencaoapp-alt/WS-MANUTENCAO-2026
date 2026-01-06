@@ -1,5 +1,52 @@
+
 {
   "entities": {
+    "Address": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Address",
+      "type": "object",
+      "description": "Represents a hierarchical storage address within the facility.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Address entity."
+        },
+        "unidade": {
+          "type": "string",
+          "description": "The geographical unit or state (e.g., PR, SP)."
+        },
+        "setor": {
+          "type": "string",
+          "description": "The sector code (e.g., 01 for Ferramentaria)."
+        },
+        "rua": {
+          "type": "string",
+          "description": "The macro location, like a corridor or room (e.g., R01)."
+        },
+        "movel": {
+          "type": "string",
+          "description": "The medium location, like a shelf or cabinet (e.g., E05)."
+        },
+        "nivel": {
+          "type": "string",
+          "description": "The micro location, like a shelf level or drawer (e.g., N03)."
+        },
+        "detalhe": {
+          "type": "string",
+          "description": "Optional detail suffix for containers within a level (e.g., -P04)."
+        },
+        "codigoCompleto": {
+          "type": "string",
+          "description": "The full, concatenated address code."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the address was created."
+        }
+      },
+      "required": ["unidade", "setor", "rua", "movel", "nivel", "codigoCompleto", "createdAt"]
+    },
     "Budget": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Budget",
@@ -677,6 +724,22 @@
   "firestore": {
     "structure": [
       {
+        "path": "/addresses/{addressId}",
+        "definition": {
+          "entityName": "Address",
+          "schema": {
+            "$ref": "#/backend/entities/Address"
+          },
+          "description": "Stores hierarchical storage addresses.",
+          "params": [
+            {
+              "name": "addressId",
+              "description": "Unique identifier for the address."
+            }
+          ]
+        }
+      },
+      {
         "path": "/budgets/{budgetId}",
         "definition": {
           "entityName": "Budget",
@@ -860,5 +923,3 @@
     "reasoning": "This Firestore data structure is designed to support AeroTrack's aircraft maintenance management features, focusing on supply and tool control, operation recording, and image storage. The structure prioritizes authorization independence through denormalization where needed and adheres to structural segregation principles to ensure consistent security postures within collections.  Path-based ownership is used for user-related data (none explicitly defined, but included for future expansion). Collaborative data patterns, utilizing membership maps, are employed where applicable. \n\nSpecifically, authorization independence is achieved by denormalizing necessary authorization data (like supplier or employee IDs) directly into subcollections when access needs to be controlled at the subcollection level without relying on `get()` calls to parent documents.  For example, the OperationRecord collection includes the employeeId to track which employee performed the operation and use it for authorization.  This denormalization is critical for atomic operations and simplifies security rule implementation. QAPs (Rules are not Filters) are supported through structural segregation. Each top-level collection is treated as having homogeneous security requirements. Additionally, the use of employeeId as a foreign key in relevant collections like OperationRecord allows for efficient querying and filtering based on employee-specific operations. This design facilitates secure list operations because rules can be written based on the contents of the document itself, not on related documents."
   }
 }
-
-    

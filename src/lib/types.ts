@@ -1,3 +1,4 @@
+
 export type Supply = {
   id: string;
   name: string;
@@ -158,4 +159,14 @@ export type Budget = {
     period: string; // YYYY-MM
 };
 
-    
+export type Address = {
+  id?: string;
+  unidade: string;
+  setor: string;
+  rua: string;
+  movel: string;
+  nivel: string;
+  detalhe?: string;
+  codigoCompleto: string;
+  createdAt: string; // ISO date string
+};

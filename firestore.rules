@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -76,6 +77,11 @@ service cloud.firestore {
       // Only admins can create, update, or delete budget records.
       allow write: if isAdmin();
     }
+    
+    match /addresses/{addressId} {
+        // Any authenticated user can manage addresses
+        allow read, write: if isAuthenticated();
+    }
 
     // This collection is used for generating sequential IDs.
     // Any authenticated user can read and write to it within a transaction.
@@ -84,5 +90,3 @@ service cloud.firestore {
     }
   }
 }
-
-    

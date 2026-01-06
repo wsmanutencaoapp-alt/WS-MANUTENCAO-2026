@@ -1,62 +1,277 @@
+
 'use client';
 
+import { useState, useMemo, useEffect } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import {
+  collection,
+  query,
+  addDoc,
+  deleteDoc,
+  doc,
+  orderBy,
+} from 'firebase/firestore';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Wrench, Box, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, PlusCircle, Trash2 } from 'lucide-react';
+import type { Address } from '@/lib/types';
+import type { WithDocId } from '@/firebase/firestore/use-collection';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
-export default function CadastroEnderecosPage() {
+const CadastroEnderecosPage = () => {
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [formState, setFormState] = useState({
+    unidade: '',
+    setor: '',
+    rua: '',
+    movel: '',
+    nivel: '',
+    detalhe: '',
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const addressesQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'addresses'), orderBy('createdAt', 'desc')) : null),
+    [firestore]
+  );
+
+  const { data: addresses, isLoading, error } = useCollection<WithDocId<Address>>(addressesQuery, {
+      queryKey: ['addresses']
+  });
+
+  const generatedCode = useMemo(() => {
+    const { unidade, setor, rua, movel, nivel, detalhe } = formState;
+    const parts = [
+        unidade,
+        setor ? setor.padStart(2, '0') : null,
+        rua ? `R${rua.padStart(2, '0')}` : null,
+        movel ? `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}` : null,
+        nivel ? `N${nivel.padStart(2, '0')}` : null,
+    ];
+    const mainCode = parts.filter(Boolean).join('.');
+    const detailCode = detalhe ? `-${detalhe.charAt(0).toUpperCase()}${detalhe.substring(1).padStart(2, '0')}` : '';
+
+    return mainCode + detailCode || 'Aguardando preenchimento...';
+  }, [formState]);
+  
+  const resetForm = () => {
+    setFormState({ unidade: '', setor: '', rua: '', movel: '', nivel: '', detalhe: '' });
+  }
+
+  const handleSave = async () => {
+    const { unidade, setor, rua, movel, nivel } = formState;
+    if (!unidade || !setor || !rua || !movel || !nivel) {
+        toast({
+            variant: 'destructive',
+            title: 'Campos Obrigatórios',
+            description: 'Unidade, Setor, Rua, Móvel e Nível são obrigatórios.'
+        });
+        return;
+    }
+    if (!firestore) return;
+
+    setIsSaving(true);
+    try {
+        const newAddress: Omit<Address, 'id'> = {
+            ...formState,
+            rua: `R${formState.rua.padStart(2, '0')}`,
+            movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
+            nivel: `N${formState.nivel.padStart(2, '0')}`,
+            detalhe: formState.detalhe ? `-${formState.detalhe.charAt(0).toUpperCase()}${formState.detalhe.substring(1).padStart(2, '0')}`: undefined,
+            codigoCompleto: generatedCode,
+            createdAt: new Date().toISOString(),
+        };
+
+        await addDoc(collection(firestore, 'addresses'), newAddress);
+        toast({ title: 'Sucesso!', description: 'Novo endereço cadastrado.' });
+        queryClient.invalidateQueries({ queryKey: ['addresses'] });
+        resetForm();
+    } catch (err) {
+        console.error("Erro ao salvar endereço:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar o endereço.' });
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (addressId: string) => {
+    if (!firestore) return;
+    setIsDeleting(addressId);
+    try {
+        await deleteDoc(doc(firestore, 'addresses', addressId));
+        toast({ title: 'Sucesso!', description: 'Endereço excluído.' });
+        queryClient.invalidateQueries({ queryKey: ['addresses'] });
+    } catch (err) {
+        console.error("Erro ao excluir endereço:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível excluir o endereço.' });
+    } finally {
+        setIsDeleting(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Cadastro de Endereços</h1>
+      <h1 className="text-2xl font-bold">Cadastro de Endereçamento Físico</h1>
       
       <Card>
         <CardHeader>
-          <CardTitle>Gerenciamento de Endereçamento</CardTitle>
+          <CardTitle>Criar Novo Endereço</CardTitle>
           <CardDescription>
-            Selecione a área para gerenciar o endereçamento de estoque.
+            Preencha os níveis para gerar o código de endereçamento hierárquico.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid md:grid-cols-2 gap-6">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-lg font-medium">
-                        Ferramentaria
-                    </CardTitle>
-                    <Wrench className="h-6 w-6 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Gerencie as localizações de prateleiras, gavetas e armários para ferramentas e kits.
-                    </p>
-                    <Button asChild>
-                        <Link href="/dashboard/cadastros/enderecos/ferramentaria">
-                            Endereços Ferramentaria <ArrowRight className="ml-2 h-4 w-4" />
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
-
-             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-lg font-medium">
-                        Suprimentos
-                    </CardTitle>
-                    <Box className="h-6 w-6 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Gerencie as localizações de estoque para os itens de suprimento e consumíveis.
-                    </p>
-                    <Button asChild>
-                        <Link href="/dashboard/cadastros/enderecos/suprimentos">
-                            Endereços Suprimentos <ArrowRight className="ml-2 h-4 w-4" />
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <div>
+                <Label>Nível 1: Unidade (Estado)</Label>
+                 <Select value={formState.unidade} onValueChange={(v) => setFormState(p => ({...p, unidade: v}))}>
+                     <SelectTrigger><SelectValue placeholder="Selecione o estado..." /></SelectTrigger>
+                     <SelectContent>
+                         {['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                     </SelectContent>
+                 </Select>
+            </div>
+             <div>
+                <Label>Nível 2: Setor</Label>
+                 <Select value={formState.setor} onValueChange={(v) => setFormState(p => ({...p, setor: v}))}>
+                     <SelectTrigger><SelectValue placeholder="Selecione o setor..." /></SelectTrigger>
+                     <SelectContent>
+                         <SelectItem value="01">Ferramentaria</SelectItem>
+                         <SelectItem value="02">Suprimentos</SelectItem>
+                         <SelectItem value="03">Administrativo</SelectItem>
+                         <SelectItem value="04">Financeiro</SelectItem>
+                         <SelectItem value="05">Engenharia</SelectItem>
+                     </SelectContent>
+                 </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+             <div>
+                <Label>Nível 3: Rua / Corredor</Label>
+                <Input value={formState.rua} onChange={(e) => setFormState(p => ({...p, rua: e.target.value.replace(/\D/g, '')}))} placeholder="Ex: 01" maxLength={2}/>
+            </div>
+            <div>
+                <Label>Nível 4: Móvel / Estante</Label>
+                <Input value={formState.movel} onChange={(e) => setFormState(p => ({...p, movel: e.target.value.toUpperCase()}))} placeholder="Ex: E05" maxLength={3}/>
+            </div>
+            <div>
+                <Label>Nível 5: Nível / Vão</Label>
+                <Input value={formState.nivel} onChange={(e) => setFormState(p => ({...p, nivel: e.target.value.replace(/\D/g, '')}))} placeholder="Ex: 03" maxLength={2}/>
+            </div>
+            <div>
+                <Label>Detalhe (Opcional)</Label>
+                <Input value={formState.detalhe} onChange={(e) => setFormState(p => ({...p, detalhe: e.target.value.toUpperCase()}))} placeholder="Ex: P04, G01" maxLength={3}/>
+            </div>
+          </div>
+           <div className="pt-4 space-y-2">
+               <Label className="font-semibold">Código Gerado</Label>
+               <div className="p-3 rounded-md bg-muted font-mono text-lg">{generatedCode}</div>
+           </div>
+           <div className="flex justify-end">
+               <Button onClick={handleSave} disabled={isSaving}>
+                   {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                   <PlusCircle className="mr-2 h-4 w-4"/>
+                   Salvar Endereço
+               </Button>
+           </div>
         </CardContent>
       </Card>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle>Endereços Cadastrados</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Código Completo</TableHead>
+                        <TableHead>Unidade</TableHead>
+                        <TableHead>Setor</TableHead>
+                        <TableHead>Data de Criação</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {isLoading && <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
+                    {!isLoading && addresses?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum endereço cadastrado.</TableCell></TableRow>}
+                    {!isLoading && addresses?.map(address => (
+                        <TableRow key={address.docId}>
+                            <TableCell className="font-mono">{address.codigoCompleto}</TableCell>
+                            <TableCell>{address.unidade}</TableCell>
+                            <TableCell>{address.setor}</TableCell>
+                            <TableCell>{new Date(address.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell className="text-right">
+                                 <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" disabled={isDeleting === address.docId}>
+                                            {isDeleting === address.docId ? <Loader2 className="animate-spin h-4 w-4"/> : <Trash2 className="h-4 w-4 text-destructive"/>}
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                        <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Tem certeza que deseja excluir o endereço <span className="font-bold">{address.codigoCompleto}</span>?
+                                        </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDelete(address.docId)}>
+                                            Sim, Excluir
+                                        </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
+
+export default CadastroEnderecosPage;
