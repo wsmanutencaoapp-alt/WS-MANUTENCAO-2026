@@ -267,10 +267,10 @@ const CadastroEnderecosPage = () => {
   const executePrint = () => {
     const printableContent = document.getElementById('printable-label-area');
     if (printableContent) {
-      const printWindow = window.open('', '', 'height=400,width=600');
+      const printWindow = window.open('', '', 'height=100,width=400');
       if (printWindow) {
         printWindow.document.write('<html><head><title>Imprimir Etiqueta</title>');
-        printWindow.document.write('<style>@media print { @page { size: 55mm 35mm; margin: 0; } body { margin: 0; } }</style>');
+        printWindow.document.write('<style>@media print { @page { size: 30mm 6mm; margin: 0; } body { margin: 0; display: flex; align-items: center; justify-content: center; } }</style>');
         printWindow.document.write('</head><body style="margin: 0;">');
         printWindow.document.write(printableContent.innerHTML);
         printWindow.document.write('</body></html>');
@@ -449,16 +449,16 @@ const CadastroEnderecosPage = () => {
                         Confirme a etiqueta e clique em imprimir.
                     </DialogDescription>
                 </DialogHeader>
-                <div id="printable-label-area" className="flex flex-col items-center justify-center p-4 border rounded-lg aspect-[55/35] w-full">
-                   <div style={{ width: '100px', height: '100px' }}>
+                <div id="printable-label-area" className="flex items-center justify-between p-1 border rounded-lg" style={{ width: '113px', height: '23px' }}>
+                   <div style={{ width: '20px', height: '20px' }}>
                         <Image
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(selectedAddressForPrint.codigoCompleto)}`}
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=20x20&data=${encodeURIComponent(selectedAddressForPrint.codigoCompleto)}`}
                             alt={`QR Code for ${selectedAddressForPrint.codigoCompleto}`}
-                            width={100}
-                            height={100}
+                            width={20}
+                            height={20}
                         />
                    </div>
-                   <p className="mt-2 text-center font-mono font-bold text-lg">
+                   <p className="text-center font-mono font-bold text-[8px]">
                        {selectedAddressForPrint.movel}.{selectedAddressForPrint.nivel}{selectedAddressForPrint.detalhe || ''}
                    </p>
                 </div>
