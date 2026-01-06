@@ -95,17 +95,23 @@ const CadastroEnderecosPage = () => {
       const q = query(
         collection(firestore, 'addresses'), 
         where('setor', '==', formState.setor),
-        where('detalhe', '!=', null),
-        orderBy('detalhe', 'desc'),
-        limit(1)
+        where('detalhe', '!=', null)
       );
 
       const querySnapshot = await getDocs(q);
       if (querySnapshot.empty) {
         setGeneratedDetalhe('-D001');
       } else {
-        const lastDetalhe = querySnapshot.docs[0].data().detalhe as string; // e.g., "-D001"
-        const lastNumber = parseInt(lastDetalhe.replace('-D', ''), 10);
+        let lastNumber = 0;
+        querySnapshot.forEach(doc => {
+            const detalhe = doc.data().detalhe as string;
+            if (detalhe) {
+                const currentNumber = parseInt(detalhe.replace('-D', ''), 10);
+                if (currentNumber > lastNumber) {
+                    lastNumber = currentNumber;
+                }
+            }
+        });
         const nextNumber = lastNumber + 1;
         setGeneratedDetalhe(`-D${String(nextNumber).padStart(3, '0')}`);
       }
