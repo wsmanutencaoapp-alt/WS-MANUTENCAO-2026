@@ -81,13 +81,10 @@ const CadastroEnderecosPage = () => {
   const predefinedStates = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'], []);
   
   const generatedCode = useMemo(() => {
-    // A unidade a ser usada no código é a digitada se "Outra" for selecionada, senão é a da lista.
     const activeUnidade = formState.unidade === 'OUTRA' ? formState.unidadeOutro : formState.unidade;
     const { setor, rua, movel, nivel, detalhe } = formState;
 
-    // A lista para encontrar o índice agora é a lista predefinida.
     const stateIndex = predefinedStates.indexOf(activeUnidade.toUpperCase());
-    // Se a unidade digitada não está na lista, calculamos um código para ela.
     const unidadeCode = stateIndex !== -1 
         ? String.fromCharCode(65 + stateIndex) 
         : activeUnidade ? activeUnidade.toUpperCase().charAt(0) : null;
@@ -100,7 +97,7 @@ const CadastroEnderecosPage = () => {
         nivel ? `N${nivel.padStart(2, '0')}` : null,
     ];
     const mainCode = parts.filter(Boolean).join('.');
-    const detailCode = detalhe ? `-D${detalhe.replace(/\D/g, '').padStart(2, '0')}` : '';
+    const detailCode = detalhe ? `-D${detalhe.replace(/\D/g, '').padStart(3, '0')}` : '';
 
     return mainCode + detailCode || 'Aguardando preenchimento...';
   }, [formState, predefinedStates]);
@@ -121,6 +118,14 @@ const CadastroEnderecosPage = () => {
         });
         return;
     }
+     if (!/^[A-Z]/i.test(movel)) {
+      toast({
+        variant: 'destructive',
+        title: 'Formato Inválido',
+        description: 'O campo "Móvel" deve começar com uma letra (A-Z).'
+      });
+      return;
+    }
     if (!firestore) return;
 
     setIsSaving(true);
@@ -130,15 +135,14 @@ const CadastroEnderecosPage = () => {
 
         const newAddress: Omit<Address, 'id'> = {
             ...formState,
-            unidade: activeUnidade.toUpperCase(), // Salva a sigla do estado, não o código da letra
+            unidade: activeUnidade.toUpperCase(), 
             rua: `R${formState.rua.padStart(2, '0')}`,
             movel: `${formState.movel.charAt(0).toUpperCase()}${formState.movel.substring(1).padStart(2, '0')}`,
             nivel: `N${formState.nivel.padStart(2, '0')}`,
-            detalhe: formState.detalhe ? `-D${formState.detalhe.replace(/\D/g, '').padStart(2, '0')}`: undefined,
+            detalhe: formState.detalhe ? `-D${formState.detalhe.replace(/\D/g, '').padStart(3, '0')}`: undefined,
             codigoCompleto: generatedCode,
             createdAt: new Date().toISOString(),
         };
-        // Remove a propriedade 'unidadeOutro' do objeto a ser salvo
         const { unidadeOutro, ...addressToSave } = newAddress as any;
 
         await addDoc(collection(firestore, 'addresses'), addressToSave);
@@ -234,7 +238,7 @@ const CadastroEnderecosPage = () => {
             </div>
             <div>
                 <Label>Detalhe (Opcional)</Label>
-                <Input value={formState.detalhe} onChange={(e) => setFormState(p => ({...p, detalhe: e.target.value.toUpperCase()}))} placeholder="Ex: 04" maxLength={2}/>
+                <Input value={formState.detalhe} onChange={(e) => setFormState(p => ({...p, detalhe: e.target.value.toUpperCase()}))} placeholder="Ex: 004" maxLength={3}/>
             </div>
           </div>
            <div className="pt-4 space-y-2">
@@ -311,4 +315,3 @@ const CadastroEnderecosPage = () => {
 
 export default CadastroEnderecosPage;
 
-    
