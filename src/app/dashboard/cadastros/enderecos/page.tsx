@@ -276,7 +276,7 @@ const CadastroEnderecosPage = () => {
             setor.padStart(2, '0'),
             `R${rua.padStart(2, '0')}`,
             `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`,
-            `N${nivel.padStart(2, '0')}`
+            `${nivel.padStart(2, '0')}`
         ];
         const codigoCompleto = baseCodeParts.join('.');
         
@@ -529,7 +529,7 @@ const CadastroEnderecosPage = () => {
                    {addressesToPrint.map(address => (
                         <div key={address.docId} className="label-container grid grid-cols-[1fr_auto] items-center gap-2 p-1 border rounded-lg bg-white" style={{ width: '452px', height: '87px', boxSizing: 'content-box' }}>
                            <p className="address-text text-center font-mono font-bold text-black text-3xl leading-tight">
-                               {address.codigoCompleto.replace(/^[A-Z]\.\\d{2}\\./, '')}
+                               {address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
                            </p>
                            <div className="qr-code" style={{width: '80px', height: '80px'}}>
                                 <Image
