@@ -337,7 +337,7 @@ const CadastroEnderecosPage = () => {
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
         printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
-        printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; font-family: sans-serif; } .label-container { width: 120mm; height: 23mm; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; padding: 2mm; page-break-after: always; } .label-container:last-child { page-break-after: auto; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; flex-grow: 1; } .qr-code { width: 21mm; height: 21mm; flex-shrink: 0; } }</style>');
+        printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; font-family: sans-serif; } .label-container { width: 120mm; height: 23mm; display: flex; align-items: center; justify-content: start; gap: 8px; box-sizing: border-box; padding: 2mm; page-break-inside: avoid; break-inside: avoid; page-break-after: always; } .label-container:last-child { page-break-after: auto; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; flex-grow: 1; } .qr-code { width: 21mm; height: 21mm; flex-shrink: 0; } }</style>');
         printWindow.document.write('</head><body style="margin: 0;">');
         printWindow.document.write(printableArea.innerHTML);
         printWindow.document.write('</body></html>');
@@ -527,7 +527,7 @@ const CadastroEnderecosPage = () => {
                 </DialogHeader>
                 <div id="printable-label-area" className="flex flex-col items-center gap-2 max-h-60 overflow-y-auto p-4 bg-muted/50 rounded-md">
                    {addressesToPrint.map(address => (
-                        <div key={address.docId} className="label-container flex items-center justify-between p-1 border rounded-lg bg-white" style={{ width: '452px', height: '87px', boxSizing: 'content-box' }}>
+                        <div key={address.docId} className="label-container flex items-center justify-start gap-2 p-1 border rounded-lg bg-white" style={{ width: '452px', height: '87px', boxSizing: 'content-box' }}>
                            <p className="address-text text-center font-mono font-bold text-black text-3xl leading-tight flex-grow px-2">
                                {address.movel}.{address.nivel}{address.detalhe || ''}
                            </p>
