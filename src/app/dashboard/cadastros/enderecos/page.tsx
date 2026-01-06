@@ -337,7 +337,7 @@ const CadastroEnderecosPage = () => {
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
         printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
-        printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; font-family: sans-serif; } .label-container { width: 120mm; height: 23mm; display: flex; align-items: center; justify-content: start; gap: 8px; box-sizing: border-box; padding: 2mm; page-break-inside: avoid; break-inside: avoid; page-break-after: always; } .label-container:last-child { page-break-after: auto; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; flex-grow: 1; } .qr-code { width: 21mm; height: 21mm; flex-shrink: 0; } }</style>');
+        printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: start; gap: 8px; box-sizing: border-box; padding: 2mm; page-break-inside: avoid !important; break-inside: avoid !important; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; flex-grow: 1; } .qr-code { width: 21mm; height: 21mm; flex-shrink: 0; } }</style>');
         printWindow.document.write('</head><body style="margin: 0;">');
         printWindow.document.write(printableArea.innerHTML);
         printWindow.document.write('</body></html>');
