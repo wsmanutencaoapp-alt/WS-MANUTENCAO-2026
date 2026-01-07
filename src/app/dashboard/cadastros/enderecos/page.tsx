@@ -276,7 +276,7 @@ const CadastroEnderecosPage = () => {
             setor.padStart(2, '0'),
             `R${rua.padStart(2, '0')}`,
             `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`,
-            `${nivel.padStart(2, '0')}`
+            `N${nivel.padStart(2, '0')}`
         ];
         const codigoCompleto = baseCodeParts.join('.');
         
