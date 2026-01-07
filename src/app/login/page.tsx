@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -29,6 +28,7 @@ import { useAuth, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
+import Image from 'next/image';
 
 const formSchema = z.object({
   email: z.string().email('Endereço de e-mail inválido'),
@@ -169,6 +169,15 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background sm:bg-muted/40 p-4">
+      <div className="mb-8">
+        <Image
+            src="/logo.png"
+            alt="APP WS Logo"
+            width={150}
+            height={150}
+            priority
+        />
+      </div>
       <LoginForm />
     </div>
   );
