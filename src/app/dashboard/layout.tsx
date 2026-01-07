@@ -7,7 +7,7 @@ import { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { doc, getDoc, writeBatch, query, collection, where, limit, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import type { Employee } from '@/lib/types';
 import { getModulePermissionForPath } from '@/lib/permissions';
@@ -53,7 +53,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         accessLevel: 'Admin'
                     });
                     toast({ title: 'Conta Master Ativada', description: 'Sua conta de administrador foi ativada.' });
-                    router.refresh(); // Refresh to re-evaluate permissions with the correct status
+                    // No need to refresh, the useDoc hook will pick up the change
                 } catch (e) {
                     console.error("Failed to activate master admin:", e);
                     toast({ variant: 'destructive', title: 'Falha na Ativação', description: 'Não foi possível ativar a conta master.' });
@@ -62,10 +62,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
     };
     
-    if (user) {
+    if (user && firestore) {
         ensureMasterAdminIsActive();
     }
-  }, [user, firestore, toast, router]);
+  }, [user, firestore, toast]);
 
 
   useEffect(() => {
