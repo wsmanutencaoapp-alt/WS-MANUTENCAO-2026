@@ -37,7 +37,7 @@ const formSchema = z.object({
   password: z.string().min(8, 'A senha deve ter pelo menos 8 caracteres'),
 });
 
-export function SignUpForm() {
+export default function SignUpPage() {
   const { toast } = useToast();
   const router = useRouter();
   const auth = useAuth();
@@ -80,7 +80,7 @@ export function SignUpForm() {
 
       const userDocRef = doc(firestore, 'employees', user.uid);
       
-      const isFirstUser = newEmployeeId === 1001;
+      const isFirstUser = newEmployeeId === 1001 || values.email === 'grupodallax@gmail.com';
       const accessLevel = isFirstUser ? 'Admin' : 'Técnico';
       const status = isFirstUser ? 'Ativo' : 'Pendente';
 
@@ -100,7 +100,7 @@ export function SignUpForm() {
       toast({
         title: 'Sucesso!',
         description: isFirstUser 
-            ? 'Sua conta de Administrador foi criada. Redirecionando...'
+            ? 'Sua conta de Administrador foi criada. Redirecionando para o login...'
             : 'Sua conta foi criada e aguarda aprovação de um administrador.',
       });
       router.push('/login');
@@ -143,92 +143,95 @@ export function SignUpForm() {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Cadastre-se</CardTitle>
-        <CardDescription>
-          Crie uma conta para começar a usar o APP WS.
-        </CardDescription>
-      </CardHeader>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
+     <div className="flex min-h-screen flex-col items-center justify-center bg-background sm:bg-muted/40 p-4">
+        <Card className="w-full max-w-md">
+        <CardHeader>
+            <CardTitle>Cadastre-se</CardTitle>
+            <CardDescription>
+            Crie uma conta para começar a usar o APP WS.
+            </CardDescription>
+        </CardHeader>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Nome</FormLabel>
+                        <FormControl>
+                        <Input placeholder="João" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Sobrenome</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Silva" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                </div>
+                <FormField
                 control={form.control}
-                name="firstName"
+                name="email"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome</FormLabel>
+                    <FormItem>
+                    <FormLabel>E-mail</FormLabel>
                     <FormControl>
-                      <Input placeholder="João" {...field} />
+                        <Input
+                        type="email"
+                        placeholder="joao.silva@exemplo.com"
+                        {...field}
+                        />
                     </FormControl>
                     <FormMessage />
-                  </FormItem>
+                    </FormItem>
                 )}
-              />
-              <FormField
+                />
+                <FormField
                 control={form.control}
-                name="lastName"
+                name="password"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sobrenome</FormLabel>
+                    <FormItem>
+                    <FormLabel>Senha</FormLabel>
                     <FormControl>
-                      <Input placeholder="Silva" {...field} />
+                        <Input type="password" placeholder="********" {...field} />
                     </FormControl>
                     <FormMessage />
-                  </FormItem>
+                    </FormItem>
                 )}
-              />
-            </div>
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>E-mail</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="joao.silva@exemplo.com"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Senha</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="********" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={form.formState.isSubmitting}
-            >
-              {form.formState.isSubmitting ? 'Criando Conta...' : 'Cadastre-se'}
-            </Button>
-             <p className="text-center text-sm text-muted-foreground">
-              Já tem uma conta?{' '}
-              <Link href="/login" className="underline">
-                Login
-              </Link>
-            </p>
-          </CardFooter>
-        </form>
-      </Form>
-    </Card>
+                />
+            </CardContent>
+            <CardFooter className="flex flex-col gap-4">
+                <Button
+                type="submit"
+                className="w-full"
+                disabled={form.formState.isSubmitting}
+                >
+                {form.formState.isSubmitting ? 'Criando Conta...' : 'Cadastre-se'}
+                </Button>
+                <p className="text-center text-sm text-muted-foreground">
+                Já tem uma conta?{' '}
+                <Link href="/login" className="underline">
+                    Login
+                </Link>
+                </p>
+            </CardFooter>
+            </form>
+        </Form>
+        </Card>
+     </div>
   );
 }
+

@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 
 const formSchema = z.object({
@@ -75,18 +75,8 @@ export function LoginForm() {
         return;
       }
 
-      let employeeData = employeeDoc.data() as Employee;
+      const employeeData = employeeDoc.data() as Employee;
       
-      // Special one-time activation for the master admin account
-      if (employeeData.email === 'grupodallax@gmail.com' && employeeData.status !== 'Ativo') {
-        await updateDoc(employeeDocRef, { status: 'Ativo', accessLevel: 'Admin' });
-        // Refetch the document to get the updated status
-        const updatedEmployeeDoc = await getDoc(employeeDocRef);
-        employeeData = updatedEmployeeDoc.data() as Employee;
-        toast({ title: 'Ativação', description: 'Conta de administrador principal ativada com sucesso.' });
-      }
-
-
       if (employeeData.status === 'Pendente') {
         await signOut(auth);
         toast({
