@@ -41,13 +41,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         // Use the UID from the logged-in user object to get the correct document
         const adminDocRef = doc(firestore, 'employees', user.uid);
-        const adminDoc = await getDoc(adminDocRef);
+        try {
+            const adminDoc = await getDoc(adminDocRef);
 
-        if (adminDoc.exists()) {
-            const adminData = adminDoc.data() as Employee;
-            if (adminData.status !== 'Ativo' || adminData.accessLevel !== 'Admin') {
-                console.log("Master admin account is not active or has wrong access level. Forcing activation...");
-                try {
+            if (adminDoc.exists()) {
+                const adminData = adminDoc.data() as Employee;
+                // Check if status is NOT 'Ativo' or accessLevel is NOT 'Admin'
+                if (adminData.status !== 'Ativo' || adminData.accessLevel !== 'Admin') {
+                    console.log("Master admin account is not active or has wrong access level. Forcing activation...");
                     await updateDoc(adminDocRef, {
                         status: 'Ativo',
                         accessLevel: 'Admin'
@@ -55,11 +56,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     toast({ title: 'Conta Master Ativada', description: 'Sua conta de administrador foi reativada automaticamente.' });
                     // Force a refetch of the user document data to reflect the changes immediately
                     queryClient.invalidateQueries({ queryKey: [adminDocRef.path] });
-                } catch (e) {
-                    console.error("Failed to activate master admin:", e);
-                    toast({ variant: 'destructive', title: 'Falha na Ativação', description: 'Não foi possível ativar a conta master.' });
                 }
+            } else {
+                 console.log("Master admin document does not exist. This shouldn't happen after signup.");
             }
+        } catch (e) {
+            console.error("Failed to check or activate master admin:", e);
+            toast({ variant: 'destructive', title: 'Falha na Verificação', description: 'Não foi possível verificar a conta master.' });
         }
     };
     
