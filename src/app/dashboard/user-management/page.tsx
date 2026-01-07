@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, doc, query, orderBy, updateDoc } from 'firebase/firestore';
 import {
@@ -21,7 +21,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, ShieldCheck, Settings, CheckCircle } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Settings, CheckCircle, Loader2 } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +36,7 @@ function getInitials(firstName?: string, lastName?: string) {
   return `${first}${last}`.toUpperCase();
 }
 
-function UserRow({ employee, onEditPermissions, onApprove, isProcessing }: { employee: WithDocId<Employee>, onEditPermissions: (employee: WithDocId<Employee>) => void, onApprove: (employeeId: string) => void, isProcessing: boolean }) {
+function UserRow({ employee, onEditPermissions, onApprove, isProcessingId }: { employee: WithDocId<Employee>, onEditPermissions: (employee: WithDocId<Employee>) => void, onApprove: (employeeId: string) => void, isProcessingId: string | null }) {
   
   const getAccessLevelBadge = () => {
     if (employee.accessLevel === 'Admin') {
@@ -85,12 +85,12 @@ function UserRow({ employee, onEditPermissions, onApprove, isProcessing }: { emp
       <TableCell className="hidden md:table-cell">{employee.id}</TableCell>
        <TableCell className="text-right space-x-2">
          {employee.status === 'Pendente' && (
-            <Button variant="outline" size="sm" onClick={() => onApprove(employee.docId)} disabled={isProcessing}>
-                <CheckCircle className="mr-2 h-4 w-4"/>
+            <Button variant="outline" size="sm" onClick={() => onApprove(employee.docId)} disabled={isProcessingId === employee.docId}>
+                {isProcessingId === employee.docId ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CheckCircle className="mr-2 h-4 w-4"/>}
                 Aprovar
             </Button>
          )}
-        <Button variant="ghost" size="icon" onClick={() => onEditPermissions(employee)} title="Gerenciar permissões" disabled={isProcessing}>
+        <Button variant="ghost" size="icon" onClick={() => onEditPermissions(employee)} title="Gerenciar permissões" disabled={!!isProcessingId}>
           <Settings className="h-4 w-4" />
         </Button>
       </TableCell>
@@ -157,41 +157,24 @@ function AccessDeniedCard() {
     );
 }
 
-export default function UserManagementPage() {
+function AdminUserManagement() {
   const firestore = useFirestore();
-  const { user } = useUser();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [selectedEmployee, setSelectedEmployee] = useState<WithDocId<Employee> | null>(null);
   const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const currentUserDocRef = useMemoFirebase(
-    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
-    [firestore, user]
-  );
-  const { data: currentUserData, isLoading: isCurrentUserLoading } = useDoc<Employee>(currentUserDocRef);
-  
-  const isAdmin = useMemo(() => currentUserData?.accessLevel === 'Admin', [currentUserData]);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   const employeesQueryKey = ['employees'];
   const employeesCollectionRef = useMemoFirebase(
-    () => {
-      // Only create the query if we know the user is an admin.
-      if (!isCurrentUserLoading && isAdmin && firestore) {
-        return query(collection(firestore, 'employees'), orderBy('id'));
-      }
-      // Return null otherwise to prevent the query from running.
-      return null;
-    },
-    [firestore, isCurrentUserLoading, isAdmin]
+    () => (firestore ? query(collection(firestore, 'employees'), orderBy('id')) : null),
+    [firestore]
   );
 
-  const { data: employees, isLoading: areEmployeesLoading, error } = useCollection<Employee>(employeesCollectionRef, {
-      queryKey: employeesQueryKey,
-      // The query will only be enabled if the ref is not null.
+  const { data: employees, isLoading, error } = useCollection<Employee>(employeesCollectionRef, {
+    queryKey: employeesQueryKey,
   });
-  
+
   const handleEditPermissions = (employee: WithDocId<Employee>) => {
     setSelectedEmployee(employee);
     setIsPermissionsDialogOpen(true);
@@ -199,7 +182,7 @@ export default function UserManagementPage() {
   
   const handleApproveUser = async (employeeId: string) => {
     if (!firestore) return;
-    setIsProcessing(true);
+    setIsProcessing(employeeId);
     try {
         const employeeRef = doc(firestore, 'employees', employeeId);
         await updateDoc(employeeRef, { status: 'Ativo' });
@@ -209,11 +192,92 @@ export default function UserManagementPage() {
         toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível aprovar o usuário.' });
         console.error(err);
     } finally {
-        setIsProcessing(false);
+        setIsProcessing(null);
     }
   }
 
-  if (isCurrentUserLoading) {
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Gerenciamento de Usuários</CardTitle>
+          <CardDescription>
+            Visualize, aprove e gerencie as permissões dos usuários do sistema.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Usuário</TableHead>
+                <TableHead>Nível de Acesso</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">ID do usuário</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading && !error && <UserListSkeleton />}
+              {error && (
+                <TableRow key="error-row">
+                  <TableCell colSpan={5} className="text-center text-destructive">
+                    <p>Ocorreu um erro ao carregar os usuários.</p>
+                    <p className="text-xs">{error.message}</p>
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && !error && employees?.length === 0 && (
+                <TableRow key="no-results-row">
+                  <TableCell colSpan={5} className="text-center h-24">
+                    Nenhum usuário encontrado.
+                  </TableCell>
+                </TableRow>
+              )}
+              {employees?.map((employee) => (
+                <UserRow
+                  key={employee.docId}
+                  employee={employee}
+                  onEditPermissions={handleEditPermissions}
+                  onApprove={handleApproveUser}
+                  isProcessingId={isProcessing}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <UserPermissionsDialog
+        isOpen={isPermissionsDialogOpen}
+        onClose={() => setIsPermissionsDialogOpen(false)}
+        employee={selectedEmployee}
+        onPermissionsChange={() => queryClient.invalidateQueries({ queryKey: employeesQueryKey })}
+      />
+    </>
+  );
+}
+
+
+export default function UserManagementPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  const currentUserDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  
+  const { data: currentUserData, isLoading: isCurrentUserLoading } = useDoc<Employee>(currentUserDocRef);
+  
+  useEffect(() => {
+    if (currentUserData) {
+      setIsAdmin(currentUserData.accessLevel === 'Admin');
+    }
+  }, [currentUserData]);
+
+
+  if (isCurrentUserLoading || isAdmin === null) {
     return (
         <Card>
             <CardHeader>
@@ -233,81 +297,5 @@ export default function UserManagementPage() {
       return <AccessDeniedCard />;
   }
 
-  return (
-    <>
-    <Card>
-      <CardHeader>
-        <CardTitle>Gerenciamento de Usuários</CardTitle>
-        <CardDescription>
-          Visualize, aprove e gerencie as permissões dos usuários do sistema.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-         <Table>
-            <TableHeader>
-                <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Nível de Acesso</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">ID do usuário</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {(areEmployeesLoading || !employees) && !error && (
-                   [...Array(3)].map((_, i) => (
-                     <TableRow key={`skeleton-row-${i}`}>
-                        <TableCell>
-                            <div className="flex items-center gap-4">
-                                <Skeleton className="h-10 w-10 rounded-full" />
-                                <div className="space-y-2">
-                                <Skeleton className="h-4 w-[150px]" />
-                                <Skeleton className="h-3 w-[200px]" />
-                                </div>
-                            </div>
-                        </TableCell>
-                        <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
-                        <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[60px]" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
-                    </TableRow>
-                  ))
-                )}
-                {error && (
-                <TableRow key="error-row">
-                    <TableCell colSpan={5} className="text-center text-destructive">
-                    <p>Ocorreu um erro ao carregar os usuários.</p>
-                    <p className="text-xs">{error.message}</p>
-                    </TableCell>
-                </TableRow>
-                )}
-                {!areEmployeesLoading && !error && employees?.length === 0 && (
-                <TableRow key="no-results-row">
-                    <TableCell colSpan={5} className="text-center">
-                    Nenhum usuário encontrado.
-                    </TableCell>
-                </TableRow>
-                )}
-                {employees?.map((employee) => (
-                    <UserRow 
-                        key={employee.docId} 
-                        employee={employee} 
-                        onEditPermissions={handleEditPermissions} 
-                        onApprove={handleApproveUser}
-                        isProcessing={isProcessing}
-                    />
-                ))}
-            </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-    
-    <UserPermissionsDialog 
-        isOpen={isPermissionsDialogOpen}
-        onClose={() => setIsPermissionsDialogOpen(false)}
-        employee={selectedEmployee}
-        onPermissionsChange={() => queryClient.invalidateQueries({queryKey: employeesQueryKey})}
-    />
-    </>
-  );
+  return <AdminUserManagement />;
 }
