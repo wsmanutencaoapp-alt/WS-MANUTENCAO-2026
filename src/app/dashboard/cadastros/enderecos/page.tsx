@@ -8,13 +8,9 @@ import {
   addDoc,
   deleteDoc,
   doc,
-  orderBy,
   where,
   getDocs,
-  limit,
   writeBatch,
-  DocumentData,
-  DocumentReference,
 } from 'firebase/firestore';
 import {
   Card,
@@ -91,7 +87,7 @@ const CadastroEnderecosPage = () => {
 
 
   const addressesQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'addresses'), orderBy('createdAt', 'desc')) : null),
+    () => (firestore ? query(collection(firestore, 'addresses')) : null),
     [firestore]
   );
 
@@ -339,7 +335,7 @@ const CadastroEnderecosPage = () => {
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
         printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
-        printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; box-sizing: border-box; padding: 0 2mm; gap: 4mm; break-inside: avoid; } .logo { height: 40px; object-fit: contain; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; } .qr-code { width: 21mm; height: 21mm; justify-self: end; }  }</style>');
+        printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; box-sizing: border-box; padding: 0 2mm; gap: 8mm; break-inside: avoid; } .logo { height: 40px; object-fit: contain; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; } .qr-code { width: 21mm; height: 21mm; justify-self: end; }  }</style>');
         printWindow.document.write('</head><body>');
         printWindow.document.write(printableArea.innerHTML);
         printWindow.document.write('</body></html>');
@@ -529,7 +525,7 @@ const CadastroEnderecosPage = () => {
                 </DialogHeader>
                 <div id="printable-label-area" className="flex flex-col items-center gap-2 max-h-60 overflow-y-auto p-4 bg-muted/50 rounded-md">
                    {addressesToPrint.map(address => (
-                        <div key={address.docId} className="label-container grid grid-cols-[auto_1fr_auto] items-center p-1 border rounded-lg bg-white" style={{ width: '452px', height: '87px', boxSizing: 'content-box', gap: '4mm', padding: '0 2mm' }}>
+                        <div key={address.docId} className="label-container grid grid-cols-[auto_1fr_auto] items-center p-1 border rounded-lg bg-white" style={{ width: '452px', height: '87px', boxSizing: 'content-box', gap: '8mm', padding: '0 2mm' }}>
                            <Image
                                 src="/logo.png"
                                 alt="Logo"
