@@ -69,8 +69,9 @@ service cloud.firestore {
     }
     
     match /employees/{employeeId} {
-      // Allow any admin to read any profile. Allow users to read their own profile.
-      allow read: if isAdmin() || request.auth.uid == employeeId;
+      // Allow any authenticated user to read profiles. This is necessary for the login flow
+      // to check a user's status and for other parts of the app to function correctly.
+      allow read: if isAuthenticated();
       
       // Allow anyone to create their own employee document (during signup).
       // The `status` will be 'Pendente', so they can't do anything until approved.
