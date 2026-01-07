@@ -9,16 +9,20 @@ service cloud.firestore {
     }
     
     function getUserData() {
+      // Use get() which doesn't count as a read operation in most cases within rules
       return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
+      // Check if the user's UID exists in the employees collection and has the 'Admin' accessLevel.
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
              getUserData().accessLevel == 'Admin' && getUserData().status == 'Ativo';
     }
     
     function hasPermission(module) {
       let userData = getUserData();
+      // An active admin has all permissions.
+      // A regular user must be active and have the specific permission flag.
       return (isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true)) && userData.status == 'Ativo';
     }
 
@@ -29,9 +33,12 @@ service cloud.firestore {
     
     match /tools/{toolId} {
       allow read: if hasPermission('ferramentaria');
+      // Create is limited to ferramentaria users
       allow create: if hasPermission('ferramentaria');
+      // Update/delete is also limited to ferramentaria users
       allow update, delete: if hasPermission('ferramentaria');
       
+      // Subcollection for calibration history
       match /calibration_history/{calibrationId} {
         allow read: if hasPermission('ferramentaria');
         allow create: if hasPermission('ferramentaria');
@@ -65,7 +72,8 @@ service cloud.firestore {
       // Allow any admin to read any profile. Allow users to read their own profile.
       allow read: if isAdmin() || request.auth.uid == employeeId;
       
-      // Allow admins to create new users (signup form).
+      // Allow anyone to create their own employee document (during signup).
+      // The `status` will be 'Pendente', so they can't do anything until approved.
       allow create: if request.auth.uid == employeeId;
       
       // Admins can write to any field.
