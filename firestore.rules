@@ -8,48 +8,55 @@ service cloud.firestore {
       return request.auth != null;
     }
     
+    function getUserData() {
+      return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
-      // Check if the user's UID exists in the employees collection and has the 'Admin' accessLevel.
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
+             getUserData().accessLevel == 'Admin';
+    }
+    
+    function hasPermission(module) {
+      return isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && getUserData().permissions[module] == true);
     }
 
     match /supplies/{supplyId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read: if hasPermission('suprimentos');
+      allow write: if hasPermission('suprimentos');
     }
     
     match /tools/{toolId} {
-      allow read: if isAuthenticated();
-      // Allow create for any authenticated user, but restrict update/delete to admins.
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow read: if hasPermission('ferramentaria');
+      allow create: if hasPermission('ferramentaria');
+      allow update, delete: if hasPermission('ferramentaria');
       
-      // Allow any authenticated user to create calibration history records (needed for new tool creation).
       match /calibration_history/{calibrationId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
-        allow write: if isAdmin();
+        allow read: if hasPermission('ferramentaria');
+        allow create: if hasPermission('ferramentaria');
+        allow write: if hasPermission('ferramentaria');
       }
     }
     
     match /kits/{kitId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read: if hasPermission('ferramentaria');
+      allow write: if hasPermission('ferramentaria');
     }
     
     match /suppliers/{supplierId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read: if hasPermission('compras');
+      allow write: if hasPermission('compras');
     }
     
     match /operation_records/{operationRecordId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      // Operation records could be sensitive, restricting to admins for now.
+      allow read, write: if isAdmin();
     }
     
     match /images/{imageId} {
       allow read: if isAuthenticated();
+      // Writing images is usually part of another process (like creating a tool),
+      // so specific write rules are complex. Restricting to Admin is safest for now.
       allow write: if isAdmin();
     }
     
@@ -60,22 +67,20 @@ service cloud.firestore {
     }
     
     match /expenses/{expenseId} {
-      // Allow any authenticated user to create an expense record.
+      // Allow user to create for themselves, but only finance/admin can read all
       allow create: if isAuthenticated();
-      // Only admins can read, update, or delete expense records.
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if hasPermission('financeiro');
     }
 
     match /tool_requests/{requestId} {
-      // Allow a user to read/write their own requests, or allow an admin to manage all requests.
-      allow read, write: if request.resource.data.requesterId == request.auth.uid || isAdmin();
+      // Allow a user to create/read/write their own requests.
+      // Ferramentaria staff need to be able to read/update all requests.
+      allow read, write: if (request.auth.uid == resource.data.requesterId) || hasPermission('ferramentaria');
     }
     
     match /budgets/{budgetId} {
-      // Allow any authenticated user to read budgets (so sectors can see their budget).
-      allow read: if isAuthenticated();
-      // Only admins can create, update, or delete budget records.
-      allow write: if isAdmin();
+      // Only users with finance permission can manage budgets.
+      allow read, write: if hasPermission('financeiro');
     }
     
     match /addresses/{addressId} {
