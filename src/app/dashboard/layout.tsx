@@ -77,7 +77,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     if (!isLoading && user && employeeData) {
-      if (employeeData.status !== 'Ativo') {
+      // **BYPASS FOR MASTER ADMIN**: Ignore the status check for the master admin user to guarantee login.
+      if (user.email !== 'grupodallax@gmail.com' && employeeData.status !== 'Ativo') {
         toast({
           variant: 'destructive',
           title: 'Acesso Negado',
@@ -110,7 +111,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
   
-   if (employeeData.status !== 'Ativo') {
+   if (user.email !== 'grupodallax@gmail.com' && employeeData.status !== 'Ativo') {
     return (
         <div className="flex h-screen w-full flex-col items-center justify-center bg-muted/40">
             <Loader2 className="h-10 w-10 animate-spin text-destructive" />
