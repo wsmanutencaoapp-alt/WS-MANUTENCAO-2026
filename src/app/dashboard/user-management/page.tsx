@@ -177,9 +177,11 @@ export default function UserManagementPage() {
   const employeesQueryKey = ['employees'];
   const employeesCollectionRef = useMemoFirebase(
     () => {
+      // Only create the query if we know the user is an admin.
       if (!isCurrentUserLoading && isAdmin && firestore) {
         return query(collection(firestore, 'employees'), orderBy('id'));
       }
+      // Return null otherwise to prevent the query from running.
       return null;
     },
     [firestore, isCurrentUserLoading, isAdmin]
@@ -187,6 +189,7 @@ export default function UserManagementPage() {
 
   const { data: employees, isLoading: areEmployeesLoading, error } = useCollection<Employee>(employeesCollectionRef, {
       queryKey: employeesQueryKey,
+      // The query will only be enabled if the ref is not null.
   });
   
   const handleEditPermissions = (employee: WithDocId<Employee>) => {
