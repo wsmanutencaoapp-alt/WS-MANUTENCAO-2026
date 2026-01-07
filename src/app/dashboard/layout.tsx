@@ -10,6 +10,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { doc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { getModulePermissionForPath } from '@/lib/permissions';
+import { Loader2 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -26,7 +27,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const isLoading = isUserLoading || isEmployeeLoading;
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!isUserLoading && !user) {
       router.push('/login');
       return;
     }
@@ -57,23 +58,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       }
     }
 
-  }, [user, employeeData, isLoading, router, pathname]);
+  }, [user, employeeData, isLoading, isUserLoading, router, pathname]);
 
   if (isLoading || !user) {
     return (
-       <div className="flex min-h-screen w-full flex-col">
-        <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-             <Skeleton className="h-8 w-8 sm:hidden" />
-            <div className="relative ml-auto flex-1 md:grow-0">
-               <Skeleton className="h-8 w-full rounded-lg md:w-[200px] lg:w-[336px]" />
-            </div>
-            <Skeleton className="h-8 w-8 rounded-full" />
-          </header>
-          <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-            <Skeleton className="h-[50vh] w-full" />
-          </main>
-        </div>
+       <div className="flex h-screen w-full flex-col items-center justify-center bg-muted/40">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">Verificando credenciais...</p>
       </div>
     );
   }
