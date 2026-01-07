@@ -98,7 +98,7 @@ const CadastroFerramentasPage = () => {
   ), [firestore]);
   
   const { data: allTools, isLoading: isLoadingTools, error: toolsError } = useCollection<Tool>(allToolsQuery, {
-    queryKey: [allToolsQueryKey]
+    queryKey: [allToolsQueryKey],
   });
 
   const [modelos, ferramentasUnicas] = useMemo(() => {
@@ -640,5 +640,3 @@ const CadastroFerramentasPage = () => {
 };
 
 export default CadastroFerramentasPage;
-
-    

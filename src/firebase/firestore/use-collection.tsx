@@ -18,6 +18,7 @@ export type WithDocId<T> = T & { docId: string };
 
 export interface UseCollectionOptions {
   queryKey?: any[];
+  enabled?: boolean; // Add enabled option
 }
 
 export interface UseCollectionResult<T> {
@@ -63,7 +64,8 @@ export function useCollection<T = any>(
     options: UseCollectionOptions = {}
 ): UseCollectionResult<T> {
   const queryClient = useQueryClient();
-  const queryKey = options.queryKey || (memoizedTargetRefOrQuery ? [(memoizedTargetRefOrQuery as any)._query?.path.toString()] : []);
+  const { enabled = true, ...restOptions } = options;
+  const queryKey = restOptions.queryKey || (memoizedTargetRefOrQuery ? [(memoizedTargetRefOrQuery as any)._query?.path.toString()] : []);
 
   const { data, isLoading, error } = useQuery<WithDocId<T>[], Error>({
     queryKey,
@@ -73,13 +75,13 @@ export function useCollection<T = any>(
       }
       return fetchCollection<T>(memoizedTargetRefOrQuery);
     },
-    enabled: !!memoizedTargetRefOrQuery,
+    enabled: !!memoizedTargetRefOrQuery && enabled, // Control query execution
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
-    if (!memoizedTargetRefOrQuery) {
+    if (!memoizedTargetRefOrQuery || !enabled) {
       return;
     }
 
@@ -102,7 +104,7 @@ export function useCollection<T = any>(
     );
 
     return () => unsubscribe();
-  }, [memoizedTargetRefOrQuery, queryClient, queryKey]);
+  }, [memoizedTargetRefOrQuery, queryClient, queryKey, enabled]);
 
   if (memoizedTargetRefOrQuery && !(memoizedTargetRefOrQuery as any).__memo) {
       console.warn('useCollection was called without a memoized query. This can lead to infinite loops. Use useMemoFirebase to memoize your query.', memoizedTargetRefOrQuery);
