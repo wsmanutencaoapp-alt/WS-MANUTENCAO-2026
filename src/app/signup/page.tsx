@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, runTransaction, getDocs, collection, query, orderBy, limit } from 'firebase/firestore';
+import { doc, setDoc, getDocs, collection, query, orderBy, limit } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -81,10 +81,11 @@ export default function SignUpPage() {
       const userDocRef = doc(firestore, 'employees', user.uid);
       
       const isMasterAdmin = values.email === 'grupodallax@gmail.com';
-      const isFirstUser = newEmployeeId === 1001;
-
-      const accessLevel = isMasterAdmin || isFirstUser ? 'Admin' : 'Técnico';
-      const status = isMasterAdmin || isFirstUser ? 'Ativo' : 'Pendente';
+      
+      // Master admin is always created as 'Admin' and 'Ativo'.
+      // Other users start as 'Técnico' and 'Pendente'.
+      const accessLevel = isMasterAdmin ? 'Admin' : 'Técnico';
+      const status = isMasterAdmin ? 'Ativo' : 'Pendente';
 
       const userData = {
         id: newEmployeeId,
@@ -101,7 +102,7 @@ export default function SignUpPage() {
 
       toast({
         title: 'Sucesso!',
-        description: isMasterAdmin || isFirstUser
+        description: isMasterAdmin
             ? 'Sua conta de Administrador foi criada. Redirecionando para o login...'
             : 'Sua conta foi criada e aguarda aprovação de um administrador.',
       });

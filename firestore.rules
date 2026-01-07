@@ -13,15 +13,10 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data;
     }
 
-    function isMasterAdmin() {
-        return request.auth.token.email == 'grupodallax@gmail.com';
-    }
-
     function isAdmin() {
-      // An admin is either the master admin by email, or a user with Admin level and Active status.
-      return isMasterAdmin() || 
-             (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
-             getUserData().accessLevel == 'Admin' && getUserData().status == 'Ativo');
+      // An admin is a user with Admin level and Active status.
+      return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
+             getUserData().accessLevel == 'Admin' && getUserData().status == 'Ativo';
     }
     
     function hasPermission(module) {
@@ -77,9 +72,9 @@ service cloud.firestore {
       // A user can create their own employee document upon signup.
       allow create: if request.auth.uid == employeeId;
       
-      // The Master Admin can write to any employee document.
+      // An Admin can write to any employee document.
       // Any other user can only update their own profile, but cannot change critical fields.
-      allow update: if isMasterAdmin() || 
+      allow update: if isAdmin() || 
                      (request.auth.uid == employeeId && 
                       !('accessLevel' in request.resource.data) &&
                       !('permissions' in request.resource.data) &&

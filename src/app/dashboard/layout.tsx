@@ -5,7 +5,6 @@ import { Header } from '@/components/header';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth } from '@/firebase';
 import { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -27,48 +26,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
     [firestore, user]
   );
-  const { data: employeeData, isLoading: isEmployeeLoading, queryClient } = useDoc<Employee>(userDocRef);
+  const { data: employeeData, isLoading: isEmployeeLoading } = useDoc<Employee>(userDocRef);
 
   const isLoading = isUserLoading || isEmployeeLoading;
-
-   useEffect(() => {
-    // This is a one-time, forceful activation for the master admin account.
-    // It addresses the "can't log in" issue by ensuring the master admin is always active.
-    const ensureMasterAdminIsActive = async () => {
-        if (!firestore || !user || user.email !== 'grupodallax@gmail.com') {
-            return;
-        }
-
-        const adminDocRef = doc(firestore, 'employees', user.uid);
-        try {
-            const adminDoc = await getDoc(adminDocRef);
-
-            if (adminDoc.exists()) {
-                const adminData = adminDoc.data() as Employee;
-                // Force update if status is not 'Ativo' or accessLevel is not 'Admin'
-                if (adminData.status !== 'Ativo' || adminData.accessLevel !== 'Admin') {
-                    await updateDoc(adminDocRef, {
-                        status: 'Ativo',
-                        accessLevel: 'Admin'
-                    });
-                    toast({ title: 'Conta Master Ativada', description: 'Sua conta de administrador foi reativada automaticamente.' });
-                    // Invalidate the query to refetch the updated data
-                    queryClient.invalidateQueries({ queryKey: [adminDocRef.path] });
-                }
-            } else {
-                 // This case should ideally not happen if signup is successful
-                 console.log("Master admin document does not exist. This shouldn't happen after signup.");
-            }
-        } catch (e) {
-            console.error("Failed to check or activate master admin:", e);
-        }
-    };
-    
-    if (user && firestore) {
-        ensureMasterAdminIsActive();
-    }
-  }, [user, firestore, toast, queryClient]);
-
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -77,8 +37,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     if (!isLoading && user && employeeData) {
-      // **BYPASS FOR MASTER ADMIN**: Ignore the status check for the master admin user to guarantee login.
-      if (user.email !== 'grupodallax@gmail.com' && employeeData.status !== 'Ativo') {
+      if (employeeData.status !== 'Ativo') {
         toast({
           variant: 'destructive',
           title: 'Acesso Negado',
@@ -111,7 +70,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
   
-   if (user.email !== 'grupodallax@gmail.com' && employeeData.status !== 'Ativo') {
+   if (employeeData.status !== 'Ativo') {
     return (
         <div className="flex h-screen w-full flex-col items-center justify-center bg-muted/40">
             <Loader2 className="h-10 w-10 animate-spin text-destructive" />
