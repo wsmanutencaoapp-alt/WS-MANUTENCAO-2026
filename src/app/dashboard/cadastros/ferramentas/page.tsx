@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -17,7 +18,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject, uploadString } from 'firebase/storage';
-import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
+import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage, useDoc } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -44,7 +45,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2, Edit } from 'lucide-react';
-import type { Tool } from '@/lib/types';
+import type { Tool, Employee } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import Image from 'next/image';
@@ -63,7 +64,7 @@ const familiaSuggestions: { [key in Tool['familia']]?: Tool['classificacao'] } =
 };
 
 const CadastroFerramentasPage = () => {
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
   const { toast } = useToast();
@@ -92,13 +93,27 @@ const CadastroFerramentasPage = () => {
   const [toolImage, setToolImage] = useState<string | null>(null);
   const [docEngenhariaFile, setDocEngenhariaFile] = useState<File | null>(null);
 
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData, isLoading: isEmployeeLoading } = useDoc<Employee>(userDocRef);
 
-  const allToolsQuery = useMemoFirebase(() => (
-    firestore ? query(collection(firestore, 'tools'), orderBy('codigo')) : null
-  ), [firestore]);
+  const canFetchTools = useMemo(() => {
+    if (isEmployeeLoading || !employeeData) return false;
+    return employeeData.accessLevel === 'Admin' || (employeeData.permissions?.ferramentaria ?? false);
+  }, [employeeData, isEmployeeLoading]);
+
+  const allToolsQuery = useMemoFirebase(() => {
+    if (firestore && canFetchTools) {
+      return query(collection(firestore, 'tools'), orderBy('codigo'));
+    }
+    return null;
+  }, [firestore, canFetchTools]);
   
   const { data: allTools, isLoading: isLoadingTools, error: toolsError } = useCollection<Tool>(allToolsQuery, {
     queryKey: [allToolsQueryKey],
+    enabled: canFetchTools,
   });
 
   const [modelos, ferramentasUnicas] = useMemo(() => {
