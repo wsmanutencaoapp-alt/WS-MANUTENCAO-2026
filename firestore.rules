@@ -15,8 +15,10 @@ service cloud.firestore {
 
     function isAdmin() {
       // Check if the user's UID exists in the employees collection and has the 'Admin' accessLevel.
-      return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
-             getUserData().accessLevel == 'Admin' && getUserData().status == 'Ativo';
+      // CRITICAL: Also check for the master admin email directly to bypass the initial login paradox.
+      return (request.auth.token.email == 'grupodallax@gmail.com') ||
+             (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
+             getUserData().accessLevel == 'Admin' && getUserData().status == 'Ativo');
     }
     
     function hasPermission(module) {
