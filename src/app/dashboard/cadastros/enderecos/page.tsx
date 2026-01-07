@@ -121,25 +121,23 @@ const CadastroEnderecosPage = () => {
       
       const q = query(
         collection(firestore, 'addresses'), 
-        where('setor', '==', formState.setor),
-        orderBy('detalhe', 'desc'),
-        limit(1)
+        where('setor', '==', formState.setor)
       );
 
       const querySnapshot = await getDocs(q);
       let lastNumber = 0;
       
       if (!querySnapshot.empty) {
-          const lastDoc = querySnapshot.docs[0];
-          const data = lastDoc.data();
-          if (data.detalhe) {
-              const detalhe = data.detalhe as string;
-              // Extrai o número do detalhe (ex: "-D004" -> 4)
-              const currentNumber = parseInt(detalhe.replace('-D', ''), 10);
-              if (!isNaN(currentNumber)) {
-                  lastNumber = currentNumber;
+          querySnapshot.forEach(doc => {
+              const data = doc.data();
+              if (data.detalhe) {
+                  const detalhe = data.detalhe as string;
+                  const currentNumber = parseInt(detalhe.replace('-D', ''), 10);
+                  if (!isNaN(currentNumber) && currentNumber > lastNumber) {
+                      lastNumber = currentNumber;
+                  }
               }
-          }
+          });
       }
       
       const nextNumber = lastNumber + 1;
@@ -233,15 +231,19 @@ const CadastroEnderecosPage = () => {
 
         let currentStartDetalheNum = startDetalheNum;
         if (currentStartDetalheNum === null) {
-          const q = query(collection(firestore, 'addresses'), where('setor', '==', formState.setor), orderBy('detalhe', 'desc'), limit(1));
+          const q = query(collection(firestore, 'addresses'), where('setor', '==', formState.setor));
           const querySnapshot = await getDocs(q);
           let lastNumber = 0;
           if(!querySnapshot.empty) {
-              const data = querySnapshot.docs[0].data();
-              if (data.detalhe) {
-                const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
-                if (!isNaN(currentNumber)) lastNumber = currentNumber;
-              }
+              querySnapshot.forEach(doc => {
+                  const data = doc.data();
+                  if (data.detalhe) {
+                    const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
+                    if (!isNaN(currentNumber) && currentNumber > lastNumber) {
+                        lastNumber = currentNumber;
+                    }
+                  }
+              });
           }
           currentStartDetalheNum = lastNumber + 1;
         }
@@ -263,7 +265,7 @@ const CadastroEnderecosPage = () => {
           };
           const newDocRef = doc(addressesCollection);
           batch.set(newDocRef, newAddressData);
-          newAddressesForPrinting.push({ docId: newDocRef.id, ...newAddressData });
+          newAddressesForPrinting.push({ docId: newDocRef.id, ...newAddressData, codigoCompleto: newAddressData.codigoCompleto || '' });
         }
         await batch.commit();
         toast({ title: 'Sucesso!', description: `${numQuantity} novo(s) endereço(s) cadastrado(s).` });
@@ -337,7 +339,7 @@ const CadastroEnderecosPage = () => {
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
         printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
-        printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; justify-content: space-between; box-sizing: border-box; padding: 0 2mm; gap: 2mm; page-break-inside: avoid !important; break-inside: avoid !important; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; } .qr-code { width: 21mm; height: 21mm; } .logo { height: 10mm; } }</style>');
+        printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: auto 1fr; align-items: center; box-sizing: border-box; padding: 0 2mm; gap: 4mm; page-break-inside: avoid !important; break-inside: avoid !important; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; } .qr-code { width: 21mm; height: 21mm; justify-self: end; }  }</style>');
         printWindow.document.write('</head><body>');
         printWindow.document.write(printableArea.innerHTML);
         printWindow.document.write('</body></html>');
@@ -527,8 +529,7 @@ const CadastroEnderecosPage = () => {
                 </DialogHeader>
                 <div id="printable-label-area" className="flex flex-col items-center gap-2 max-h-60 overflow-y-auto p-4 bg-muted/50 rounded-md">
                    {addressesToPrint.map(address => (
-                        <div key={address.docId} className="label-container grid grid-cols-[auto_1fr_auto] items-center justify-between p-1 border rounded-lg bg-white" style={{ width: '452px', height: '87px', boxSizing: 'content-box' }}>
-                           <Image src="/logo.png" alt="Logo" width={80} height={40} className="self-center" />
+                        <div key={address.docId} className="label-container grid grid-cols-[1fr_auto] items-center justify-between p-1 border rounded-lg bg-white" style={{ width: '452px', height: '87px', boxSizing: 'content-box' }}>
                            <p className="address-text text-center font-mono font-bold text-black text-3xl leading-tight">
                                {address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
                            </p>
