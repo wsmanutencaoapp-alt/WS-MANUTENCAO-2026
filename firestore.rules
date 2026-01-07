@@ -62,8 +62,12 @@ service cloud.firestore {
     
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
-      // Allow a user to edit their own data, or allow an admin to edit any user's data.
-      allow write: if request.auth.uid == employeeId || isAdmin();
+      // 1. Admins can write to any field.
+      // 2. A user can update their own profile, BUT cannot change their accessLevel or permissions.
+      allow write: if isAdmin() || 
+                     (request.auth.uid == employeeId && 
+                      !('accessLevel' in request.resource.data) &&
+                      !('permissions' in request.resource.data));
     }
     
     match /expenses/{expenseId} {
