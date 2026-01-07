@@ -78,12 +78,12 @@ export function LoginForm() {
       let employeeData = employeeDoc.data() as Employee;
       
       // Special one-time activation for the master admin account
-      if (employeeData.email === 'grupodallax@gmail.com' && employeeData.status === 'Pendente') {
-        await updateDoc(employeeDocRef, { status: 'Ativo' });
+      if (employeeData.email === 'grupodallax@gmail.com' && employeeData.status !== 'Ativo') {
+        await updateDoc(employeeDocRef, { status: 'Ativo', accessLevel: 'Admin' });
         // Refetch the document to get the updated status
         const updatedEmployeeDoc = await getDoc(employeeDocRef);
         employeeData = updatedEmployeeDoc.data() as Employee;
-        toast({ title: 'Ativação', description: 'Conta de administrador ativada com sucesso.' });
+        toast({ title: 'Ativação', description: 'Conta de administrador principal ativada com sucesso.' });
       }
 
 
