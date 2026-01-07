@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 
 const formSchema = z.object({
@@ -77,21 +77,13 @@ export function LoginForm() {
 
       const employeeData = employeeDoc.data() as Employee;
       
-      if (employeeData.status === 'Pendente') {
-        await signOut(auth);
-        toast({
+      // The master admin activation is now handled in the dashboard layout.
+      // This logic just checks the status for regular users.
+      if (employeeData.status !== 'Ativo' && values.email !== 'grupodallax@gmail.com') {
+         await signOut(auth);
+         toast({
           variant: 'destructive',
-          title: 'Acesso Pendente',
-          description: 'Sua conta ainda não foi aprovada por um administrador.',
-        });
-        return;
-      }
-      
-       if (employeeData.status !== 'Ativo') {
-        await signOut(auth);
-        toast({
-          variant: 'destructive',
-          title: 'Acesso Bloqueado',
+          title: `Acesso ${employeeData.status}`,
           description: `Sua conta está com o status "${employeeData.status}". Contate um administrador.`,
         });
         return;

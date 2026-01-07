@@ -7,16 +7,19 @@ import { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { doc } from 'firebase/firestore';
+import { doc, getDocs, writeBatch, query, collection, where, limit, updateDoc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { getModulePermissionForPath } from '@/lib/permissions';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -26,6 +29,43 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const isLoading = isUserLoading || isEmployeeLoading;
 
+   useEffect(() => {
+    // This is a one-time, forceful activation for the master admin account.
+    // It addresses the "can't log in" issue by ensuring the master admin is always active.
+    const ensureMasterAdminIsActive = async () => {
+        if (!firestore || !user || user.email !== 'grupodallax@gmail.com') {
+            return;
+        }
+
+        // Use the UID from the logged-in user object to get the correct document
+        const adminDocRef = doc(firestore, 'employees', user.uid);
+        const adminDoc = await getDoc(adminDocRef);
+
+        if (adminDoc.exists()) {
+            const adminData = adminDoc.data() as Employee;
+            if (adminData.status !== 'Ativo' || adminData.accessLevel !== 'Admin') {
+                console.log("Master admin account is not active. Forcing activation...");
+                try {
+                    await updateDoc(adminDocRef, {
+                        status: 'Ativo',
+                        accessLevel: 'Admin'
+                    });
+                    toast({ title: 'Conta Master Ativada', description: 'Sua conta de administrador foi ativada.' });
+                    router.refresh(); // Refresh to re-evaluate permissions with the correct status
+                } catch (e) {
+                    console.error("Failed to activate master admin:", e);
+                    toast({ variant: 'destructive', title: 'Falha na Ativação', description: 'Não foi possível ativar a conta master.' });
+                }
+            }
+        }
+    };
+    
+    if (user) {
+        ensureMasterAdminIsActive();
+    }
+  }, [user, firestore, toast, router]);
+
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
@@ -33,39 +73,46 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     if (!isLoading && user && employeeData) {
+      // The master admin check is now separate. This handles normal permission checks.
+      if (employeeData.status !== 'Ativo') {
+        toast({
+          variant: 'destructive',
+          title: 'Acesso Negado',
+          description: `Sua conta está com o status "${employeeData.status}". Contate um administrador.`
+        });
+        signOut(auth).then(() => router.push('/login'));
+        return;
+      }
+      
       const requiredModulePermission = getModulePermissionForPath(pathname);
       const isAdmin = employeeData.accessLevel === 'Admin';
       
-      // Admins can access everything.
-      if (isAdmin) {
-        return;
-      }
-      
-      // Allow access to the main dashboard page for all logged-in users.
-      if (pathname === '/dashboard' || pathname === '/dashboard/') {
-        return;
-      }
-      
-      // If no specific module permission is required, it's a public sub-page or the root dashboard.
-      if (!requiredModulePermission) {
-        return;
-      }
+      if (isAdmin) return;
+      if (pathname === '/dashboard' || pathname === '/dashboard/') return;
+      if (!requiredModulePermission) return;
 
-      // Check if the user has permission for the required module.
       if (!employeeData.permissions || !employeeData.permissions[requiredModulePermission]) {
-        // Redirect to the main dashboard as a fallback if they lack module access.
         router.push('/dashboard');
       }
     }
 
-  }, [user, employeeData, isLoading, isUserLoading, router, pathname]);
+  }, [user, employeeData, isLoading, isUserLoading, router, pathname, toast]);
 
-  if (isLoading || !user) {
+  if (isLoading || !user || !employeeData) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center bg-muted/40">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="mt-4 text-muted-foreground">Verificando credenciais...</p>
       </div>
+    );
+  }
+  
+   if (employeeData.status !== 'Ativo') {
+    return (
+        <div className="flex h-screen w-full flex-col items-center justify-center bg-muted/40">
+            <Loader2 className="h-10 w-10 animate-spin text-destructive" />
+            <p className="mt-4 text-destructive">Sua conta não está ativa. Redirecionando...</p>
+        </div>
     );
   }
 
