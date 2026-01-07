@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 
 const formSchema = z.object({
@@ -75,7 +75,18 @@ export function LoginForm() {
         return;
       }
 
-      const employeeData = employeeDoc.data() as Employee;
+      let employeeData = employeeDoc.data() as Employee;
+      
+      // Special one-time activation for the master admin account
+      if (employeeData.email === 'grupodallax@gmail.com' && employeeData.status === 'Pendente') {
+        await updateDoc(employeeDocRef, { status: 'Ativo' });
+        // Refetch the document to get the updated status
+        const updatedEmployeeDoc = await getDoc(employeeDocRef);
+        employeeData = updatedEmployeeDoc.data() as Employee;
+        toast({ title: 'Ativação', description: 'Conta de administrador ativada com sucesso.' });
+      }
+
+
       if (employeeData.status === 'Pendente') {
         await signOut(auth);
         toast({
@@ -91,7 +102,7 @@ export function LoginForm() {
         toast({
           variant: 'destructive',
           title: 'Acesso Bloqueado',
-          description: 'Sua conta não está ativa. Contate um administrador.',
+          description: `Sua conta está com o status "${employeeData.status}". Contate um administrador.`,
         });
         return;
       }
@@ -116,7 +127,7 @@ export function LoginForm() {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Login</CardTitle>
         <CardDescription>
-          Acesse seu painel APP WS.
+          Acesse seu painel.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
