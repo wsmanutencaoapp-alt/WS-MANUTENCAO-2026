@@ -45,15 +45,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
             if (adminDoc.exists()) {
                 const adminData = adminDoc.data() as Employee;
+                // Force update if status is not 'Ativo' or accessLevel is not 'Admin'
                 if (adminData.status !== 'Ativo' || adminData.accessLevel !== 'Admin') {
                     await updateDoc(adminDocRef, {
                         status: 'Ativo',
                         accessLevel: 'Admin'
                     });
                     toast({ title: 'Conta Master Ativada', description: 'Sua conta de administrador foi reativada automaticamente.' });
+                    // Invalidate the query to refetch the updated data
                     queryClient.invalidateQueries({ queryKey: [adminDocRef.path] });
                 }
             } else {
+                 // This case should ideally not happen if signup is successful
                  console.log("Master admin document does not exist. This shouldn't happen after signup.");
             }
         } catch (e) {
@@ -75,8 +78,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
     if (!isLoading && user && employeeData) {
       if (employeeData.status !== 'Ativo') {
-        // This check will now correctly handle non-admin users with non-active status
-        // as the master admin will have been activated by the effect above.
         toast({
           variant: 'destructive',
           title: 'Acesso Negado',
