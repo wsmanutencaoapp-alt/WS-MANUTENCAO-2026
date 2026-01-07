@@ -55,13 +55,14 @@ function UserRow({ employee, onEditPermissions, onApprove, isProcessingId }: { e
   }
 
   const getStatusBadge = () => {
-      switch (employee.status) {
+      const status = employee.status || 'Pendente'; // Treat undefined as Pendente
+      switch (status) {
           case 'Ativo':
               return <Badge variant="success">Ativo</Badge>;
           case 'Pendente':
               return <Badge variant="warning">Pendente</Badge>;
           default:
-              return <Badge variant="destructive">{employee.status}</Badge>;
+              return <Badge variant="destructive">{status}</Badge>;
       }
   }
 
@@ -84,7 +85,7 @@ function UserRow({ employee, onEditPermissions, onApprove, isProcessingId }: { e
       <TableCell>{getStatusBadge()}</TableCell>
       <TableCell className="hidden md:table-cell">{employee.id}</TableCell>
        <TableCell className="text-right space-x-2">
-         {employee.status === 'Pendente' && (
+         {employee.status !== 'Ativo' && (
             <Button variant="outline" size="sm" onClick={() => onApprove(employee.docId)} disabled={isProcessingId === employee.docId}>
                 {isProcessingId === employee.docId ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CheckCircle className="mr-2 h-4 w-4"/>}
                 Aprovar
