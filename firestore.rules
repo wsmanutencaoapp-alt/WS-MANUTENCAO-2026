@@ -32,27 +32,24 @@ service cloud.firestore {
     }
 
     match /supplies/{supplyId} {
-      allow read: if hasPermission('suprimentos');
+      // Any authenticated user can read supplies, but only those with permission can write.
+      allow read: if isAuthenticated();
       allow write: if hasPermission('suprimentos');
     }
     
     match /tools/{toolId} {
-      allow read: if hasPermission('ferramentaria');
-      // Create is limited to ferramentaria users
-      allow create: if hasPermission('ferramentaria');
-      // Update/delete is also limited to ferramentaria users
-      allow update, delete: if hasPermission('ferramentaria');
+      // Any authenticated user can read tools, but only those with permission can write.
+      allow read: if isAuthenticated();
+      allow create, update, delete: if hasPermission('ferramentaria');
       
-      // Subcollection for calibration history
       match /calibration_history/{calibrationId} {
         allow read: if hasPermission('ferramentaria');
-        allow create: if hasPermission('ferramentaria');
-        allow write: if hasPermission('ferramentaria');
+        allow create, write: if hasPermission('ferramentaria');
       }
     }
     
     match /kits/{kitId} {
-      allow read: if hasPermission('ferramentaria');
+      allow read: if isAuthenticated();
       allow write: if hasPermission('ferramentaria');
     }
     
@@ -74,8 +71,10 @@ service cloud.firestore {
     }
     
     match /employees/{employeeId} {
+      // Any authenticated user can read employee profiles to get names, etc.
       allow read: if isAuthenticated();
       
+      // A user can create their own employee document upon signup.
       allow create: if request.auth.uid == employeeId;
       
       // The Master Admin can write to any employee document.
@@ -96,7 +95,7 @@ service cloud.firestore {
     match /tool_requests/{requestId} {
       // Allow a user to create/read/write their own requests if they are active.
       // Ferramentaria staff need to be able to read/update all requests.
-      allow read, write: if (request.auth.uid == resource.data.requesterId && getUserData().status == 'Ativo') || hasPermission('ferramentaria');
+      allow read, write: if (isAuthenticated() && (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.handledBy)) || hasPermission('ferramentaria');
     }
     
     match /budgets/{budgetId} {
@@ -105,7 +104,7 @@ service cloud.firestore {
     }
     
     match /addresses/{addressId} {
-        // Any authenticated user can manage addresses as long as they are active.
+        // Any authenticated and active user can manage addresses.
         allow read, write: if isAuthenticated() && getUserData().status == 'Ativo';
     }
 
