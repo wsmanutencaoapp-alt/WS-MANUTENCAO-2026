@@ -7,9 +7,11 @@ import {
   DocumentData,
   FirestoreError,
   DocumentSnapshot,
+  getDoc,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 /** Utility type to add an 'id' field to a given type T. */
 type WithId<T> = T & { id: string };
@@ -22,7 +24,29 @@ export interface UseDocResult<T> {
   data: T | null; // Document data, or null.
   isLoading: boolean;       // True if loading.
   error: FirestoreError | Error | null; // Error object, or null.
+  queryClient: ReturnType<typeof useQueryClient>;
 }
+
+async function fetchDoc<T>(docRef: DocumentReference<DocumentData>): Promise<T | null> {
+    try {
+        const snapshot = await getDoc(docRef);
+        if (snapshot.exists()) {
+            return snapshot.data() as T;
+        }
+        return null;
+    } catch (error) {
+        if (error instanceof FirestoreError) {
+            const contextualError = new FirestorePermissionError({
+                operation: 'get',
+                path: docRef.path,
+            });
+            errorEmitter.emit('permission-error', contextualError);
+            throw contextualError;
+        }
+        throw error;
+    }
+}
+
 
 /**
  * React hook to subscribe to a single Firestore document in real-time.
@@ -41,52 +65,47 @@ export interface UseDocResult<T> {
 export function useDoc<T = any>(
   memoizedDocRef: DocumentReference<DocumentData> | null | undefined,
 ): UseDocResult<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<FirestoreError | Error | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = useMemo(() => (memoizedDocRef ? [memoizedDocRef.path] : []), [memoizedDocRef]);
+
+  const { data, isLoading, error } = useQuery<T | null, Error>({
+      queryKey: queryKey,
+      queryFn: () => {
+          if (!memoizedDocRef) return Promise.resolve(null);
+          return fetchDoc<T>(memoizedDocRef);
+      },
+      enabled: !!memoizedDocRef,
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: true,
+  });
 
   useEffect(() => {
     if (!memoizedDocRef) {
-      setData(null);
-      setIsLoading(false);
-      setError(null);
       return;
     }
-
-    setIsLoading(true);
-    setError(null);
 
     const unsubscribe = onSnapshot(
       memoizedDocRef,
       (snapshot: DocumentSnapshot<DocumentData>) => {
         if (snapshot.exists()) {
-          // Return the document data as is, without overwriting any fields.
-          // The document's own ID can be accessed via docRef.id if needed.
-          setData(snapshot.data() as T);
+          queryClient.setQueryData(queryKey, snapshot.data() as T);
         } else {
-          // Document does not exist
-          setData(null);
+          queryClient.setQueryData(queryKey, null);
         }
-        setError(null); // Clear any previous error on successful snapshot (even if doc doesn't exist)
-        setIsLoading(false);
       },
-      (error: FirestoreError) => {
+      (err: FirestoreError) => {
         const contextualError = new FirestorePermissionError({
           operation: 'get',
           path: memoizedDocRef.path,
-        })
-
-        setError(contextualError)
-        setData(null)
-        setIsLoading(false)
-
-        // trigger global error propagation
+        });
         errorEmitter.emit('permission-error', contextualError);
+        queryClient.setQueryData(queryKey, (oldData: any) => ({ ...oldData, error: contextualError }));
       }
     );
 
     return () => unsubscribe();
-  }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
+  }, [memoizedDocRef, queryClient, queryKey]);
 
-  return { data, isLoading, error };
+
+  return { data: data ?? null, isLoading, error: error as FirestoreError | Error | null, queryClient };
 }

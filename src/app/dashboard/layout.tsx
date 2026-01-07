@@ -27,7 +27,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
     [firestore, user]
   );
-  const { data: employeeData, isLoading: isEmployeeLoading } = useDoc<Employee>(userDocRef);
+  const { data: employeeData, isLoading: isEmployeeLoading, queryClient } = useDoc<Employee>(userDocRef);
 
   const isLoading = isUserLoading || isEmployeeLoading;
 
@@ -46,14 +46,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         if (adminDoc.exists()) {
             const adminData = adminDoc.data() as Employee;
             if (adminData.status !== 'Ativo' || adminData.accessLevel !== 'Admin') {
-                console.log("Master admin account is not active. Forcing activation...");
+                console.log("Master admin account is not active or has wrong access level. Forcing activation...");
                 try {
                     await updateDoc(adminDocRef, {
                         status: 'Ativo',
                         accessLevel: 'Admin'
                     });
-                    toast({ title: 'Conta Master Ativada', description: 'Sua conta de administrador foi ativada.' });
-                    // No need to refresh, the useDoc hook will pick up the change
+                    toast({ title: 'Conta Master Ativada', description: 'Sua conta de administrador foi reativada automaticamente.' });
+                    // Force a refetch of the user document data to reflect the changes immediately
+                    queryClient.invalidateQueries({ queryKey: [adminDocRef.path] });
                 } catch (e) {
                     console.error("Failed to activate master admin:", e);
                     toast({ variant: 'destructive', title: 'Falha na Ativação', description: 'Não foi possível ativar a conta master.' });
@@ -65,7 +66,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (user && firestore) {
         ensureMasterAdminIsActive();
     }
-  }, [user, firestore, toast]);
+  }, [user, firestore, toast, queryClient]);
 
 
   useEffect(() => {
