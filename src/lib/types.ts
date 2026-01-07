@@ -137,6 +137,7 @@ export type Employee = {
   accessLevel: 'Admin' | 'Técnico' | string;
   photoURL?: string | null;
   permissions?: Permissions;
+  status: 'Ativo' | 'Pendente' | 'Inativo';
 };
 
 export type Despesa = {

@@ -14,11 +14,12 @@ service cloud.firestore {
 
     function isAdmin() {
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
-             getUserData().accessLevel == 'Admin';
+             getUserData().accessLevel == 'Admin' && getUserData().status == 'Ativo';
     }
     
     function hasPermission(module) {
-      return isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && getUserData().permissions[module] == true);
+      let userData = getUserData();
+      return (isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true)) && userData.status == 'Ativo';
     }
 
     match /supplies/{supplyId} {
@@ -61,25 +62,31 @@ service cloud.firestore {
     }
     
     match /employees/{employeeId} {
-      allow read: if isAuthenticated();
-      // 1. Admins can write to any field.
-      // 2. A user can update their own profile, BUT cannot change their accessLevel or permissions.
-      allow write: if isAdmin() || 
+      // Allow any admin to read any profile. Allow users to read their own profile.
+      allow read: if isAdmin() || request.auth.uid == employeeId;
+      
+      // Allow admins to create new users (signup form).
+      allow create: if request.auth.uid == employeeId;
+      
+      // Admins can write to any field.
+      // A user can update their own profile, BUT cannot change their accessLevel, permissions, or status.
+      allow update: if isAdmin() || 
                      (request.auth.uid == employeeId && 
                       !('accessLevel' in request.resource.data) &&
-                      !('permissions' in request.resource.data));
+                      !('permissions' in request.resource.data) &&
+                      !('status' in request.resource.data));
     }
     
     match /expenses/{expenseId} {
       // Allow user to create for themselves, but only finance/admin can read all
-      allow create: if isAuthenticated();
+      allow create: if hasPermission('financeiro');
       allow read, update, delete: if hasPermission('financeiro');
     }
 
     match /tool_requests/{requestId} {
-      // Allow a user to create/read/write their own requests.
+      // Allow a user to create/read/write their own requests if they are active.
       // Ferramentaria staff need to be able to read/update all requests.
-      allow read, write: if (request.auth.uid == resource.data.requesterId) || hasPermission('ferramentaria');
+      allow read, write: if (request.auth.uid == resource.data.requesterId && getUserData().status == 'Ativo') || hasPermission('ferramentaria');
     }
     
     match /budgets/{budgetId} {
@@ -88,14 +95,14 @@ service cloud.firestore {
     }
     
     match /addresses/{addressId} {
-        // Any authenticated user can manage addresses
-        allow read, write: if isAuthenticated();
+        // Any authenticated user can manage addresses as long as they are active.
+        allow read, write: if isAuthenticated() && getUserData().status == 'Ativo';
     }
 
     // This collection is used for generating sequential IDs.
     // Any authenticated user can read and write to it within a transaction.
     match /counters/{counterId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if isAuthenticated() && getUserData().status == 'Ativo';
     }
   }
 }

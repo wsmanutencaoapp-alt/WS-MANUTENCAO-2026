@@ -21,12 +21,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, ShieldCheck, Settings } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Settings, CheckCircle } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import UserPermissionsDialog from '@/components/UserPermissionsDialog';
+import { useQueryClient } from '@tanstack/react-query';
 
 
 function getInitials(firstName?: string, lastName?: string) {
@@ -35,10 +36,10 @@ function getInitials(firstName?: string, lastName?: string) {
   return `${first}${last}`.toUpperCase();
 }
 
-function UserRow({ employee, onEditPermissions }: { employee: WithDocId<Employee>, onEditPermissions: (employee: WithDocId<Employee>) => void }) {
+function UserRow({ employee, onEditPermissions, onApprove, isProcessing }: { employee: WithDocId<Employee>, onEditPermissions: (employee: WithDocId<Employee>) => void, onApprove: (employeeId: string) => void, isProcessing: boolean }) {
   
   const getAccessLevelBadge = () => {
-    if (employee.id === 1001) {
+    if (employee.accessLevel === 'Admin') {
        return (
         <Badge variant={'default'}>
           <ShieldCheck className="mr-1 h-3.5 w-3.5" />
@@ -52,6 +53,18 @@ function UserRow({ employee, onEditPermissions }: { employee: WithDocId<Employee
         </Badge>
        )
   }
+
+  const getStatusBadge = () => {
+      switch (employee.status) {
+          case 'Ativo':
+              return <Badge variant="success">Ativo</Badge>;
+          case 'Pendente':
+              return <Badge variant="warning">Pendente</Badge>;
+          default:
+              return <Badge variant="destructive">{employee.status}</Badge>;
+      }
+  }
+
 
   return (
     <TableRow>
@@ -68,10 +81,16 @@ function UserRow({ employee, onEditPermissions }: { employee: WithDocId<Employee
         </div>
       </TableCell>
       <TableCell>{getAccessLevelBadge()}</TableCell>
-      <TableCell className="hidden md:table-cell">{employee.docId}</TableCell>
+      <TableCell>{getStatusBadge()}</TableCell>
       <TableCell className="hidden md:table-cell">{employee.id}</TableCell>
-       <TableCell className="text-right">
-        <Button variant="ghost" size="icon" onClick={() => onEditPermissions(employee)} title="Gerenciar permissões">
+       <TableCell className="text-right space-x-2">
+         {employee.status === 'Pendente' && (
+            <Button variant="outline" size="sm" onClick={() => onApprove(employee.docId)} disabled={isProcessing}>
+                <CheckCircle className="mr-2 h-4 w-4"/>
+                Aprovar
+            </Button>
+         )}
+        <Button variant="ghost" size="icon" onClick={() => onEditPermissions(employee)} title="Gerenciar permissões" disabled={isProcessing}>
           <Settings className="h-4 w-4" />
         </Button>
       </TableCell>
@@ -86,7 +105,7 @@ function UserListSkeleton() {
         <TableRow>
           <TableHead>Usuário</TableHead>
           <TableHead>Nível de Acesso</TableHead>
-          <TableHead className="hidden md:table-cell">EMPLOYEE</TableHead>
+          <TableHead>Status</TableHead>
           <TableHead className="hidden md:table-cell">ID do usuário</TableHead>
            <TableHead>
             <span className="sr-only">Ações</span>
@@ -106,7 +125,7 @@ function UserListSkeleton() {
               </div>
             </TableCell>
             <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
-            <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[120px]" /></TableCell>
+            <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
             <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[60px]" /></TableCell>
             <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
           </TableRow>
@@ -141,8 +160,11 @@ function AccessDeniedCard() {
 export default function UserManagementPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedEmployee, setSelectedEmployee] = useState<WithDocId<Employee> | null>(null);
   const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const currentUserDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -152,6 +174,7 @@ export default function UserManagementPage() {
   
   const isAdmin = useMemo(() => currentUserData?.accessLevel === 'Admin', [currentUserData]);
 
+  const employeesQueryKey = ['employees'];
   const employeesCollectionRef = useMemoFirebase(
     () => {
       if (!isCurrentUserLoading && isAdmin && firestore) {
@@ -162,18 +185,30 @@ export default function UserManagementPage() {
     [firestore, isCurrentUserLoading, isAdmin]
   );
 
-  const { data: employees, isLoading: areEmployeesLoading, error, setData: setEmployees } = useCollection<Employee>(employeesCollectionRef);
+  const { data: employees, isLoading: areEmployeesLoading, error } = useCollection<Employee>(employeesCollectionRef, {
+      queryKey: employeesQueryKey,
+  });
   
   const handleEditPermissions = (employee: WithDocId<Employee>) => {
     setSelectedEmployee(employee);
     setIsPermissionsDialogOpen(true);
   };
   
-  // This function is no longer needed as updates are disabled.
-  const handlePermissionsChange = (employeeId: string, updatedPermissions: any) => {
-    // No-op
-  };
-
+  const handleApproveUser = async (employeeId: string) => {
+    if (!firestore) return;
+    setIsProcessing(true);
+    try {
+        const employeeRef = doc(firestore, 'employees', employeeId);
+        await updateDoc(employeeRef, { status: 'Ativo' });
+        toast({ title: 'Sucesso!', description: 'Usuário aprovado e ativado.' });
+        queryClient.invalidateQueries({ queryKey: employeesQueryKey });
+    } catch (err) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível aprovar o usuário.' });
+        console.error(err);
+    } finally {
+        setIsProcessing(false);
+    }
+  }
 
   if (isCurrentUserLoading) {
     return (
@@ -201,7 +236,7 @@ export default function UserManagementPage() {
       <CardHeader>
         <CardTitle>Gerenciamento de Usuários</CardTitle>
         <CardDescription>
-          Visualize e gerencie os usuários do sistema.
+          Visualize, aprove e gerencie as permissões dos usuários do sistema.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -210,11 +245,9 @@ export default function UserManagementPage() {
                 <TableRow>
                   <TableHead>Usuário</TableHead>
                   <TableHead>Nível de Acesso</TableHead>
-                  <TableHead className="hidden md:table-cell">EMPLOYEE</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="hidden md:table-cell">ID do usuário</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -231,7 +264,7 @@ export default function UserManagementPage() {
                             </div>
                         </TableCell>
                         <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
-                        <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[120px]" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
                         <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[60px]" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
                     </TableRow>
@@ -253,7 +286,13 @@ export default function UserManagementPage() {
                 </TableRow>
                 )}
                 {employees?.map((employee) => (
-                    <UserRow key={employee.docId} employee={employee} onEditPermissions={handleEditPermissions} />
+                    <UserRow 
+                        key={employee.docId} 
+                        employee={employee} 
+                        onEditPermissions={handleEditPermissions} 
+                        onApprove={handleApproveUser}
+                        isProcessing={isProcessing}
+                    />
                 ))}
             </TableBody>
         </Table>
@@ -264,7 +303,7 @@ export default function UserManagementPage() {
         isOpen={isPermissionsDialogOpen}
         onClose={() => setIsPermissionsDialogOpen(false)}
         employee={selectedEmployee}
-        onPermissionsChange={handlePermissionsChange}
+        onPermissionsChange={() => queryClient.invalidateQueries({queryKey: employeesQueryKey})}
     />
     </>
   );

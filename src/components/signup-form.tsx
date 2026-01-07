@@ -80,20 +80,21 @@ export function SignUpForm() {
 
       const userDocRef = doc(firestore, 'employees', user.uid);
       
-      // Determine access level: first user is Admin
-      const accessLevel = newEmployeeId === 1001 ? 'Admin' : 'Técnico';
+      const isFirstUser = newEmployeeId === 1001;
+      const accessLevel = isFirstUser ? 'Admin' : 'Técnico';
+      const status = isFirstUser ? 'Ativo' : 'Pendente';
 
       const userData = {
-        id: newEmployeeId, // Use the new sequential ID
-        uid: user.uid, // Keep Firebase Auth UID for reference
+        id: newEmployeeId,
+        uid: user.uid,
         firstName: values.firstName,
         lastName: values.lastName,
         email: values.email,
-        phone: '', // Phone is optional in this form
-        accessLevel: accessLevel, // Set access level based on logic
+        phone: '',
+        accessLevel: accessLevel,
+        status: status,
       };
       
-      // We are not awaiting this promise to avoid blocking the UI
       setDoc(userDocRef, userData).catch((error) => {
         errorEmitter.emit(
           'permission-error',
@@ -107,12 +108,13 @@ export function SignUpForm() {
 
       toast({
         title: 'Sucesso!',
-        description: 'Sua conta foi criada. Redirecionando para o painel...',
+        description: isFirstUser 
+            ? 'Sua conta de Administrador foi criada. Redirecionando...'
+            : 'Sua conta foi criada e aguarda aprovação de um administrador.',
       });
-      router.push('/dashboard');
+      router.push('/login');
 
     } catch (error: any) {
-      // Não exibe um toast para erros de permissão, pois são tratados globalmente
       if (error instanceof FirestorePermissionError) {
         return;
       }

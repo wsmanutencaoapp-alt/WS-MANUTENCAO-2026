@@ -24,8 +24,10 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useAuth, useFirestore } from '@/firebase';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import type { Employee } from '@/lib/types';
 
 const formSchema = z.object({
   email: z.string().email('Endereço de e-mail inválido'),
@@ -36,6 +38,7 @@ export function LoginForm() {
   const { toast } = useToast();
   const router = useRouter();
   const auth = useAuth();
+  const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -46,7 +49,7 @@ export function LoginForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!auth) {
+    if (!auth || !firestore) {
       toast({
         variant: 'destructive',
         title: 'Ops! Algo deu errado.',
@@ -55,40 +58,63 @@ export function LoginForm() {
       return;
     }
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      // Check employee status in Firestore
+      const employeeDocRef = doc(firestore, 'employees', user.uid);
+      const employeeDoc = await getDoc(employeeDocRef);
+
+      if (!employeeDoc.exists()) {
+        await signOut(auth);
+        toast({
+          variant: 'destructive',
+          title: 'Acesso Negado',
+          description: 'Perfil de funcionário não encontrado. Contate um administrador.',
+        });
+        return;
+      }
+
+      const employeeData = employeeDoc.data() as Employee;
+      if (employeeData.status === 'Pendente') {
+        await signOut(auth);
+        toast({
+          variant: 'destructive',
+          title: 'Acesso Pendente',
+          description: 'Sua conta ainda não foi aprovada por um administrador.',
+        });
+        return;
+      }
+      
+       if (employeeData.status !== 'Ativo') {
+        await signOut(auth);
+        toast({
+          variant: 'destructive',
+          title: 'Acesso Bloqueado',
+          description: 'Sua conta não está ativa. Contate um administrador.',
+        });
+        return;
+      }
+
       toast({
         title: 'Sucesso!',
         description: 'Login realizado com sucesso. Redirecionando para o painel...',
       });
       router.push('/dashboard');
     } catch (error: any) {
-      let errorMessage = 'Ocorreu um erro inesperado.';
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/user-not-found':
-          case 'auth/wrong-password':
-          case 'auth/invalid-credential':
-            errorMessage = 'E-mail ou senha inválidos.';
-            break;
-          case 'auth/invalid-email':
-            errorMessage = 'O endereço de e-mail não é válido.';
-            break;
-          default:
-            errorMessage = 'Falha ao fazer login. Por favor, tente novamente.';
-        }
-      }
+      // Use a generic error message for all login failures
       toast({
         variant: 'destructive',
         title: 'Falha no Login',
-        description: errorMessage,
+        description: 'Credenciais inválidas. Verifique seu e-mail e senha.',
       });
     }
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Login</CardTitle>
+    <Card className="w-full max-w-md border-0 shadow-none sm:border sm:shadow-sm">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">Login</CardTitle>
         <CardDescription>
           Acesse seu painel APP WS.
         </CardDescription>

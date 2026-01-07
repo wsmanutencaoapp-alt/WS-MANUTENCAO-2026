@@ -52,7 +52,7 @@ interface UserPermissionsDialogProps {
     isOpen: boolean;
     onClose: () => void;
     employee: WithDocId<Employee> | null;
-    onPermissionsChange: (employeeId: string, permissions: { [key: string]: boolean }) => void;
+    onPermissionsChange: () => void;
 }
 
 export default function UserPermissionsDialog({ isOpen, onClose, employee, onPermissionsChange }: UserPermissionsDialogProps) {
@@ -60,7 +60,6 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
     const [isSaving, setIsSaving] = useState(false);
     const firestore = useFirestore();
     const { toast } = useToast();
-    const queryClient = useQueryClient();
 
     useEffect(() => {
         if (employee) {
@@ -80,9 +79,7 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
                 title: 'Sucesso!',
                 description: `Permissões de ${employee.firstName} atualizadas.`,
             });
-            // This is the call that updates the parent component's state
-            onPermissionsChange(employee.docId, newPermissions);
-            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            onPermissionsChange();
             onClose();
         } catch (error) {
              errorEmitter.emit(
@@ -111,17 +108,12 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
         const newPermissions = { ...currentPermissions, [childId]: checked };
         
         if (checked) {
-            // Se um filho é marcado, garante que o pai também esteja marcado.
             newPermissions[parentId] = true;
         } else {
-            // Se um filho é desmarcado, verifica se algum outro filho ainda está marcado.
-            // Se nenhum outro filho estiver marcado, desmarca o pai.
             const subModules = availableScreens.filter(s => s.parentId === parentId);
             const anyOtherChildChecked = subModules.some(sub => newPermissions[sub.id] && sub.id !== childId);
             
-            // Se nenhum outro filho estiver selecionado, e o que estamos desmarcando é o ultimo, desmarcamos o pai também
-            const allChildrenWillBeUnchecked = subModules.every(sub => !newPermissions[sub.id]);
-            if (allChildrenWillBeUnchecked) {
+            if (!anyOtherChildChecked) {
                 newPermissions[parentId] = false;
             }
         }
@@ -135,7 +127,7 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
 
     if (!employee) return null;
 
-    const isUserAdmin = employee.accessLevel === 'Admin' || employee.id === 1001;
+    const isUserAdmin = employee.accessLevel === 'Admin';
     const moduleGroups = availableScreens.filter(s => s.isParent);
 
     return (
