@@ -2,12 +2,13 @@
 import type { ReactNode } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Header } from '@/components/header';
-import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth } from '@/firebase';
 import { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { doc, getDocs, writeBatch, query, collection, where, limit, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, query, collection, where, limit, updateDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 import type { Employee } from '@/lib/types';
 import { getModulePermissionForPath } from '@/lib/permissions';
 import { Loader2 } from 'lucide-react';
@@ -19,6 +20,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const firestore = useFirestore();
+  const auth = useAuth();
   const { toast } = useToast();
 
   const userDocRef = useMemoFirebase(
@@ -96,7 +98,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       }
     }
 
-  }, [user, employeeData, isLoading, isUserLoading, router, pathname, toast]);
+  }, [user, employeeData, isLoading, isUserLoading, router, pathname, toast, auth]);
 
   if (isLoading || !user || !employeeData) {
     return (
