@@ -80,9 +80,11 @@ export default function SignUpPage() {
 
       const userDocRef = doc(firestore, 'employees', user.uid);
       
-      const isFirstUser = newEmployeeId === 1001 || values.email === 'grupodallax@gmail.com';
-      const accessLevel = isFirstUser ? 'Admin' : 'Técnico';
-      const status = isFirstUser ? 'Ativo' : 'Pendente';
+      const isMasterAdmin = values.email === 'grupodallax@gmail.com';
+      const isFirstUser = newEmployeeId === 1001;
+
+      const accessLevel = isMasterAdmin || isFirstUser ? 'Admin' : 'Técnico';
+      const status = isMasterAdmin || isFirstUser ? 'Ativo' : 'Pendente';
 
       const userData = {
         id: newEmployeeId,
@@ -99,7 +101,7 @@ export default function SignUpPage() {
 
       toast({
         title: 'Sucesso!',
-        description: isFirstUser 
+        description: isMasterAdmin || isFirstUser
             ? 'Sua conta de Administrador foi criada. Redirecionando para o login...'
             : 'Sua conta foi criada e aguarda aprovação de um administrador.',
       });
@@ -234,4 +236,3 @@ export default function SignUpPage() {
      </div>
   );
 }
-
