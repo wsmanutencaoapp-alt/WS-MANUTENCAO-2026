@@ -100,38 +100,48 @@ function UserRow({ employee, onEditPermissions, onApprove, isProcessingId }: { e
 
 function UserListSkeleton() {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Usuário</TableHead>
-          <TableHead>Nível de Acesso</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="hidden md:table-cell">ID do usuário</TableHead>
-           <TableHead>
-            <span className="sr-only">Ações</span>
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {[...Array(3)].map((_, i) => (
-          <TableRow key={`skeleton-row-${i}`}>
-            <TableCell>
-              <div className="flex items-center gap-4">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-[150px]" />
-                  <Skeleton className="h-3 w-[200px]" />
-                </div>
-              </div>
-            </TableCell>
-            <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
-            <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
-            <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[60px]" /></TableCell>
-            <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+     <Card>
+        <CardHeader>
+            <CardTitle>Gerenciamento de Usuários</CardTitle>
+            <CardDescription>
+            Visualize, aprove e gerencie as permissões dos usuários do sistema.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Table>
+            <TableHeader>
+                <TableRow>
+                <TableHead>Usuário</TableHead>
+                <TableHead>Nível de Acesso</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">ID do usuário</TableHead>
+                <TableHead>
+                    <span className="sr-only">Ações</span>
+                </TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {[...Array(3)].map((_, i) => (
+                <TableRow key={`skeleton-row-${i}`}>
+                    <TableCell>
+                    <div className="flex items-center gap-4">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <div className="space-y-2">
+                        <Skeleton className="h-4 w-[150px]" />
+                        <Skeleton className="h-3 w-[200px]" />
+                        </div>
+                    </div>
+                    </TableCell>
+                    <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
+                    <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[60px]" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
+                </TableRow>
+                ))}
+            </TableBody>
+            </Table>
+        </CardContent>
+     </Card>
   );
 }
 
@@ -157,7 +167,7 @@ function AccessDeniedCard() {
     );
 }
 
-function AdminUserManagement() {
+function AdminUserManagement({ canFetch }: { canFetch: boolean }) {
   const firestore = useFirestore();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -167,12 +177,13 @@ function AdminUserManagement() {
 
   const employeesQueryKey = ['employees'];
   const employeesCollectionRef = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'employees'), orderBy('id')) : null),
-    [firestore]
+    () => (firestore && canFetch ? query(collection(firestore, 'employees'), orderBy('id')) : null),
+    [firestore, canFetch]
   );
 
   const { data: employees, isLoading, error } = useCollection<Employee>(employeesCollectionRef, {
     queryKey: employeesQueryKey,
+    enabled: canFetch, // react-query's enabled option
   });
 
   const handleEditPermissions = (employee: WithDocId<Employee>) => {
@@ -194,6 +205,12 @@ function AdminUserManagement() {
     } finally {
         setIsProcessing(null);
     }
+  }
+  
+  // If canFetch is false but we are not loading the current user anymore, it means it's not an admin.
+  // We can show a skeleton or nothing while the parent decides what to render.
+  if (!canFetch) {
+      return <UserListSkeleton />;
   }
 
   return (
@@ -217,7 +234,25 @@ function AdminUserManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && !error && <UserListSkeleton />}
+              {isLoading && !error && (
+                 [...Array(3)].map((_, i) => (
+                    <TableRow key={`skeleton-row-${i}`}>
+                        <TableCell>
+                        <div className="flex items-center gap-4">
+                            <Skeleton className="h-10 w-10 rounded-full" />
+                            <div className="space-y-2">
+                            <Skeleton className="h-4 w-[150px]" />
+                            <Skeleton className="h-3 w-[200px]" />
+                            </div>
+                        </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
+                        <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[60px]" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
+                    </TableRow>
+                ))
+              )}
               {error && (
                 <TableRow key="error-row">
                   <TableCell colSpan={5} className="text-center text-destructive">
@@ -261,8 +296,7 @@ function AdminUserManagement() {
 export default function UserManagementPage() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-
+  
   const currentUserDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
     [firestore, user]
@@ -270,32 +304,22 @@ export default function UserManagementPage() {
   
   const { data: currentUserData, isLoading: isCurrentUserLoading } = useDoc<Employee>(currentUserDocRef);
   
-  useEffect(() => {
-    if (currentUserData) {
-      setIsAdmin(currentUserData.accessLevel === 'Admin');
-    }
-  }, [currentUserData]);
+  const canFetchUsers = useMemo(() => {
+      if (isCurrentUserLoading || !currentUserData) {
+          return false;
+      }
+      return currentUserData.accessLevel === 'Admin';
+  }, [currentUserData, isCurrentUserLoading]);
 
+  const showAccessDenied = !isCurrentUserLoading && currentUserData?.accessLevel !== 'Admin';
 
-  if (isCurrentUserLoading || isAdmin === null) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Gerenciamento de Usuários</CardTitle>
-                <CardDescription>
-                Visualize e gerencie os usuários do sistema.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <UserListSkeleton />
-            </CardContent>
-        </Card>
-    );
+  if (isCurrentUserLoading) {
+    return <UserListSkeleton />;
   }
   
-  if (!isAdmin) {
+  if (showAccessDenied) {
       return <AccessDeniedCard />;
   }
 
-  return <AdminUserManagement />;
+  return <AdminUserManagement canFetch={canFetchUsers} />;
 }
