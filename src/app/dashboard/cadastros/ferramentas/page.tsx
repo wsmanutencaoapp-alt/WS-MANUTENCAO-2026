@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -229,86 +230,107 @@ const CadastroFerramentasPage = () => {
   
     setIsSaving(true);
   
-    try {
-        const tempId = doc(collection(firestore, 'temp')).id;
-        const toolDocId = editingTool?.docId || tempId;
-        
-        let imageUrl = editingTool?.imageUrl;
-        if (toolImage && toolImage.startsWith('data:')) {
-            imageUrl = await uploadImageAsDataUrl(toolImage, `tool_images/${toolDocId}.jpg`);
-        }
+    const tempId = doc(collection(firestore, 'temp')).id;
+    const toolDocId = editingTool?.docId || tempId;
+    
+    let imageUrl = editingTool?.imageUrl;
+    if (toolImage && toolImage.startsWith('data:')) {
+        imageUrl = await uploadImageAsDataUrl(toolImage, `tool_images/${toolDocId}.jpg`).catch((err) => {
+            console.error("Image upload failed:", err);
+            throw err;
+        });
+    }
 
-        let docEngenhariaUrl = editingTool?.doc_engenharia_url;
-        if (docEngenhariaFile) {
-            docEngenhariaUrl = await uploadFile(docEngenhariaFile, `doc_engenharia/${toolDocId}_${docEngenhariaFile.name}`);
+    let docEngenhariaUrl = editingTool?.doc_engenharia_url;
+    if (docEngenhariaFile) {
+        docEngenhariaUrl = await uploadFile(docEngenhariaFile, `doc_engenharia/${toolDocId}_${docEngenhariaFile.name}`).catch((err) => {
+            console.error("Doc upload failed:", err);
+            throw err;
+        });
+    }
+    
+    const baseToolData: Partial<Tool> = {
+        ...newFerramenta,
+        valor_estimado: Number(newFerramenta.valor_estimado) || 0,
+        imageUrl: imageUrl,
+        doc_engenharia_url: docEngenhariaUrl
+    };
+    Object.keys(baseToolData).forEach(key => baseToolData[key as keyof Partial<Tool>] === undefined && delete baseToolData[key as keyof Partial<Tool>]);
+    
+    if (!editingTool) { // Creating new tool
+        const { tipo, familia, classificacao } = newFerramenta;
+        if (!tipo || !familia || !classificacao) {
+            toast({ variant: "destructive", description: "Tipo, Família e Classificação são obrigatórios." });
+            setIsSaving(false);
+            return;
         }
         
-        const baseToolData: Partial<Tool> = {
-            ...newFerramenta,
-            valor_estimado: Number(newFerramenta.valor_estimado) || 0,
-            imageUrl: imageUrl,
-            doc_engenharia_url: docEngenhariaUrl
+        let sequencial = 0;
+        if(!isTemplate) {
+          const counterRef = doc(firestore, 'counters', `${tipo}-${familia}-${classificacao}`);
+          try {
+            sequencial = await runTransaction(firestore, async (transaction) => {
+                const counterDoc = await transaction.get(counterRef);
+                if (!counterDoc.exists()) {
+                    transaction.set(counterRef, { lastId: 0 });
+                    return 0;
+                }
+                const newId = (counterDoc.data()?.lastId ?? 0) + 1;
+                transaction.update(counterRef, { lastId: newId });
+                return newId;
+            });
+          } catch(e) {
+              errorEmitter.emit('permission-error', new FirestorePermissionError({
+                  path: counterRef.path, operation: 'write', requestResourceData: { lastId: 'increment' }
+              }));
+              setIsSaving(false);
+              return;
+          }
+        }
+       
+        const codigoCompleto = `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;
+        const status: Tool['status'] = tipo === 'EQV' ? 'Pendente' : 'Disponível';
+
+        const toolData: Omit<Tool, 'id'> = {
+            ...(baseToolData as Omit<Tool, 'id' | 'codigo' | 'sequencial' | 'status' | 'enderecamento'>),
+            codigo: codigoCompleto,
+            sequencial: sequencial,
+            status: status,
+            enderecamento: isTemplate ? 'LOGICA' : (baseToolData.enderecamento || ''),
         };
-        // Remove undefined properties to avoid overwriting existing data with nothing
-        Object.keys(baseToolData).forEach(key => baseToolData[key as keyof Partial<Tool>] === undefined && delete baseToolData[key as keyof Partial<Tool>]);
         
-        if (!editingTool) { // Creating new tool
-            const { tipo, familia, classificacao } = newFerramenta;
-            if (!tipo || !familia || !classificacao) {
-                toast({ variant: "destructive", description: "Tipo, Família e Classificação são obrigatórios." });
-                setIsSaving(false);
-                return;
-            }
-            
-            let sequencial = 0;
-            if(!isTemplate) {
-              const counterRef = doc(firestore, 'counters', `${tipo}-${familia}-${classificacao}`);
-              sequencial = await runTransaction(firestore, async (transaction) => {
-                  const counterDoc = await transaction.get(counterRef);
-                  if (!counterDoc.exists()) {
-                      transaction.set(counterRef, { lastId: 0 });
-                      return 0;
-                  }
-                  const newId = (counterDoc.data()?.lastId ?? 0) + 1;
-                  transaction.update(counterRef, { lastId: newId });
-                  return newId;
-              });
-            }
-           
-            const codigoCompleto = `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;
-            const status: Tool['status'] = tipo === 'EQV' ? 'Pendente' : 'Disponível';
-
-            const toolData: Omit<Tool, 'id'> = {
-                ...(baseToolData as Omit<Tool, 'id' | 'codigo' | 'sequencial' | 'status' | 'enderecamento'>),
-                codigo: codigoCompleto,
-                sequencial: sequencial,
-                status: status,
-                enderecamento: isTemplate ? 'LOGICA' : (baseToolData.enderecamento || ''),
-            };
-            
-            const docRef = await addDoc(collection(firestore, 'tools'), toolData);
-            
+        const toolsCollection = collection(firestore, 'tools');
+        addDoc(toolsCollection, toolData).then((docRef) => {
             if (!isTemplate) {
               setToolsToPrint([{...toolData, docId: docRef.id}]);
               setIsLabelPrintOpen(true);
             }
             toast({ title: "Sucesso!", description: `Ferramenta/Modelo ${codigoCompleto} criada.` });
+            resetForm();
+            setIsFormDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
+            setIsSaving(false);
+        }).catch(() => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: toolsCollection.path, operation: 'create', requestResourceData: toolData
+            }));
+            setIsSaving(false);
+        });
 
-        } else { // Updating existing tool
-            const toolRef = doc(firestore, 'tools', editingTool.docId);
-            await updateDoc(toolRef, baseToolData);
+    } else { // Updating existing tool
+        const toolRef = doc(firestore, 'tools', editingTool.docId);
+        updateDoc(toolRef, baseToolData).then(() => {
             toast({ title: "Sucesso!", description: `Ferramenta/Modelo atualizada.` });
-        }
-        
-        resetForm();
-        setIsFormDialogOpen(false);
-        queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
-
-    } catch (error) {
-      console.error("Erro ao salvar:", error);
-      toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível salvar. Verifique as permissões.` });
-    } finally {
-      setIsSaving(false);
+            resetForm();
+            setIsFormDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
+            setIsSaving(false);
+        }).catch(() => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: toolRef.path, operation: 'update', requestResourceData: baseToolData
+            }));
+            setIsSaving(false);
+        });
     }
   };
 
@@ -318,10 +340,9 @@ const CadastroFerramentasPage = () => {
         return;
     }
     setIsDeleting(true);
-    try {
-        const docRef = doc(firestore, 'tools', tool.docId);
-        await deleteDoc(docRef);
-
+    const docRef = doc(firestore, 'tools', tool.docId);
+    
+    deleteDoc(docRef).then(async () => {
         if (tool.imageUrl) {
             try {
               const imageRef = storageRef(storage, tool.imageUrl);
@@ -330,7 +351,6 @@ const CadastroFerramentasPage = () => {
                if (err.code !== 'storage/object-not-found') console.warn("Could not delete image:", err)
             }
         }
-
         if (tool.doc_engenharia_url) {
             try {
               const docUrlRef = storageRef(storage, tool.doc_engenharia_url);
@@ -339,15 +359,13 @@ const CadastroFerramentasPage = () => {
                if (err.code !== 'storage/object-not-found') console.warn("Could not delete engineering doc:", err)
             }
         }
-
         toast({ title: 'Sucesso', description: 'Modelo/Ferramenta excluído.' });
         queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
-    } catch (error) {
-        console.error("Erro ao excluir:", error);
-        toast({ variant: 'destructive', title: 'Erro ao Excluir', description: 'Não foi possível excluir o item.' });
-    } finally {
         setIsDeleting(false);
-    }
+    }).catch(() => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+        setIsDeleting(false);
+    });
   };
 
   const handleOpenEditDialog = (tool: WithDocId<Tool>) => {
