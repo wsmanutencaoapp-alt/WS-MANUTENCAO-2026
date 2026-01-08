@@ -1,8 +1,8 @@
 'use client';
 import { forwardRef, useImperativeHandle, useState, useMemo, useEffect } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, where, orderBy, documentId } from 'firebase/firestore';
-import type { ToolRequest, Tool } from '@/lib/types';
+import type { ToolRequest, Tool, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -21,14 +21,14 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, Inbox, Send, Undo2, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, AlertCircle, Inbox, Send, Undo2, Search, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import FulfillRequestDialog from './FulfillRequestDialog';
 import ManualCheckInDialog from './ManualCheckInDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import Image from 'next/image';
+import ManageRequestDialog from './ManageRequestDialog';
 
 export interface ToolRequestTableRef {
   refetchRequests: () => void;
@@ -54,7 +54,7 @@ const getStatusVariant = (status: ToolRequest['status']) => {
     }
 }
 
-const RequestRow = ({ request, onFulfill, onReturn, allTools, openCollapsibleId, setOpenCollapsibleId }: { request: WithDocId<ToolRequest>, onFulfill: (req: WithDocId<ToolRequest>) => void, onReturn: (req: WithDocId<ToolRequest>) => void, allTools: WithDocId<Tool>[] | undefined, openCollapsibleId: string | null, setOpenCollapsibleId: (id: string | null) => void }) => {
+const RequestRow = ({ request, onFulfill, onReturn, onManage, allTools, openCollapsibleId, setOpenCollapsibleId, isAdmin }: { request: WithDocId<ToolRequest>, onFulfill: (req: WithDocId<ToolRequest>) => void, onReturn: (req: WithDocId<ToolRequest>) => void, onManage: (req: WithDocId<ToolRequest>) => void, allTools: WithDocId<Tool>[] | undefined, openCollapsibleId: string | null, setOpenCollapsibleId: (id: string | null) => void, isAdmin: boolean }) => {
     const isOpen = openCollapsibleId === request.docId;
     const toolsInRequest = useMemo(() => {
         if (!allTools || !request.toolIds) return [];
@@ -88,6 +88,11 @@ const RequestRow = ({ request, onFulfill, onReturn, allTools, openCollapsibleId,
                         <Button variant="default" size="sm" onClick={(e) => { e.stopPropagation(); onReturn(request); }}>
                             <Undo2 className="mr-2 h-4 w-4" />
                             Devolver
+                        </Button>
+                    )}
+                     {isAdmin && (
+                        <Button variant="ghost" size="icon" className="ml-2" onClick={(e) => { e.stopPropagation(); onManage(request); }}>
+                            <Settings className="h-4 w-4" />
                         </Button>
                     )}
                 </TableCell>
@@ -127,11 +132,21 @@ const RequestRow = ({ request, onFulfill, onReturn, allTools, openCollapsibleId,
 
 
 const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(({ onActionSuccess, loanedTools, requests, isLoading, error, allTools }, ref) => {
+  const { user } = useUser();
+  const firestore = useFirestore();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [openCollapsibleId, setOpenCollapsibleId] = useState<string | null>(null);
   const [selectedRequestForFulfillment, setSelectedRequestForFulfillment] = useState<WithDocId<ToolRequest> | null>(null);
   const [selectedRequestForReturn, setSelectedRequestForReturn] = useState<WithDocId<ToolRequest> | null>(null);
+  const [selectedRequestForManagement, setSelectedRequestForManagement] = useState<WithDocId<ToolRequest> | null>(null);
+
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData, isLoading: isEmployeeLoading } = useDoc<Employee>(userDocRef);
+  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
 
   const filteredRequests = useMemo(() => {
     if (!requests) return [];
@@ -164,6 +179,7 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
     onActionSuccess();
     setSelectedRequestForFulfillment(null);
     setSelectedRequestForReturn(null);
+    setSelectedRequestForManagement(null);
   }
 
   const loanedToolsForRequest = useMemo(() => {
@@ -204,39 +220,40 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading && (
+                  {isLoading || isEmployeeLoading ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center">
                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                       </TableCell>
                     </TableRow>
-                  )}
-                  {error && (
+                  ) : error ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-destructive">
                          <AlertCircle className="inline-block mr-2" /> Erro ao carregar requisições.
                       </TableCell>
                     </TableRow>
-                  )}
-                  {!isLoading && filteredRequests.length === 0 && (
+                  ) : filteredRequests.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center h-24">
                         <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                         <p className="text-muted-foreground">Nenhuma requisição ativa encontrada.</p>
                       </TableCell>
                     </TableRow>
+                  ) : (
+                    filteredRequests.map(request => (
+                        <RequestRow
+                            key={request.docId}
+                            request={request}
+                            onFulfill={setSelectedRequestForFulfillment}
+                            onReturn={setSelectedRequestForReturn}
+                            onManage={setSelectedRequestForManagement}
+                            allTools={allTools}
+                            openCollapsibleId={openCollapsibleId}
+                            setOpenCollapsibleId={setOpenCollapsibleId}
+                            isAdmin={isAdmin}
+                        />
+                    ))
                   )}
-                  {!isLoading && filteredRequests.map(request => (
-                    <RequestRow
-                        key={request.docId}
-                        request={request}
-                        onFulfill={setSelectedRequestForFulfillment}
-                        onReturn={setSelectedRequestForReturn}
-                        allTools={allTools}
-                        openCollapsibleId={openCollapsibleId}
-                        setOpenCollapsibleId={setOpenCollapsibleId}
-                    />
-                  ))}
                 </TableBody>
             </Table>
         </CardContent>
@@ -259,6 +276,15 @@ const ToolRequestTable = forwardRef<ToolRequestTableRef, ToolRequestTableProps>(
             onActionSuccess={handleActionSuccess}
             preselectedToolIds={selectedRequestForReturn.toolIds}
             isRequestReturn={true}
+        />
+    )}
+
+    {selectedRequestForManagement && (
+        <ManageRequestDialog
+            isOpen={!!selectedRequestForManagement}
+            onClose={() => setSelectedRequestForManagement(null)}
+            request={selectedRequestForManagement}
+            onSuccess={handleActionSuccess}
         />
     )}
     </>

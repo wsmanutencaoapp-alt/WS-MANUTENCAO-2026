@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -7,44 +8,50 @@ service cloud.firestore {
       return request.auth != null;
     }
     
+    function getUserData() {
+      return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
-      // Check if the user's UID exists in the employees collection and has the 'Admin' accessLevel.
+      // An admin is a user with Admin level.
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
+             getUserData().accessLevel == 'Admin';
+    }
+    
+    function hasPermission(module) {
+      let userData = getUserData();
+      // An admin has all permissions.
+      // A regular user must be active and have the specific permission flag.
+      return isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true && userData.status == 'Ativo');
     }
 
     match /supplies/{supplyId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if hasPermission('suprimentos');
     }
     
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      // Allow create for any authenticated user, but restrict update/delete to admins.
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow create, update, delete: if hasPermission('ferramentaria');
       
-      // Allow any authenticated user to create calibration history records (needed for new tool creation).
       match /calibration_history/{calibrationId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
-        allow write: if isAdmin();
+        allow read: if hasPermission('ferramentaria');
+        allow create, write: if hasPermission('ferramentaria');
       }
     }
     
     match /kits/{kitId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if hasPermission('ferramentaria');
     }
     
     match /suppliers/{supplierId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read: if hasPermission('compras');
+      allow write: if hasPermission('compras');
     }
     
     match /operation_records/{operationRecordId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
     
     match /images/{imageId} {
@@ -54,24 +61,45 @@ service cloud.firestore {
     
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
-      // Allow a user to edit their own data, or allow an admin to edit any user's data.
-      allow write: if request.auth.uid == employeeId || isAdmin();
+      
+      allow create: if request.auth.uid == employeeId;
+      
+      allow update: if isAdmin() || 
+                     (request.auth.uid == employeeId && 
+                      !('accessLevel' in request.resource.data) &&
+                      !('permissions' in request.resource.data) &&
+                      !('status' in request.resource.data));
     }
     
     match /expenses/{expenseId} {
-      // Allow any authenticated user to create an expense record.
       allow create: if isAuthenticated();
-      // Only admins can read, update, or delete expense records.
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if hasPermission('financeiro');
     }
 
     match /tool_requests/{requestId} {
-      // Allow a user to read/write their own requests, or allow an admin to manage all requests.
-      allow read, write: if request.resource.data.requesterId == request.auth.uid || isAdmin();
+      // Allow a user to create their own request.
+      allow create: if isAuthenticated() && request.resource.data.requesterId == request.auth.uid;
+      
+      // Allow a user to read their own requests. Ferramentaria/Admins can read all.
+      allow read: if (isAuthenticated() && (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.handledBy)) || hasPermission('ferramentaria');
+      
+      // Allow Ferramentaria/Admins to update any request. A user can only cancel their own PENDING request.
+      allow update: if hasPermission('ferramentaria') ||
+                     (isAuthenticated() && request.auth.uid == resource.data.requesterId && resource.data.status == 'Pendente' && request.resource.data.status == 'Cancelada');
+
+      // Only Admins can delete requests.
+      allow delete: if isAdmin();
+    }
+    
+    match /budgets/{budgetId} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('financeiro');
+    }
+    
+    match /addresses/{addressId} {
+        allow read, write: if hasPermission('cadastros_enderecos');
     }
 
-    // This collection is used for generating sequential IDs.
-    // Any authenticated user can read and write to it within a transaction.
     match /counters/{counterId} {
         allow read, write: if isAuthenticated();
     }
