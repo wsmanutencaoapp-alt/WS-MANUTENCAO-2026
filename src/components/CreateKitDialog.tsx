@@ -76,23 +76,15 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
       if (!firestore || !isOpen) return;
       setIsPrerequisitesLoading(true);
       try {
-        const toolsSnapshot = await getDocs(collection(firestore, 'tools'));
-        const kitsSnapshot = await getDocs(collection(firestore, 'kits'));
-        const occupiedAddresses = new Set([
-            ...toolsSnapshot.docs.map(doc => doc.data().enderecamento),
-            ...kitsSnapshot.docs.map(doc => doc.data().enderecamento)
-        ]);
-        
         const addressesRef = collection(firestore, 'addresses');
         const qAddresses = query(addressesRef, where('setor', '==', '01'));
         const addressesSnapshot = await getDocs(qAddresses);
         
-        const unoccupied = addressesSnapshot.docs
+        const allFerramentariaAddresses = addressesSnapshot.docs
             .map(doc => doc.data() as Address)
-            .filter(addr => addr.codigoCompleto && !occupiedAddresses.has(addr.codigoCompleto))
             .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
             
-        setAvailableAddresses(unoccupied);
+        setAvailableAddresses(allFerramentariaAddresses);
       } catch (error) {
         console.error("Erro ao buscar endereços disponíveis:", error);
         toast({ variant: "destructive", title: "Erro de Busca", description: "Não foi possível carregar os endereços." });

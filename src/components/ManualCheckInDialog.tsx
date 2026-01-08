@@ -62,7 +62,7 @@ export default function ManualCheckInDialog({
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [availableAddresses, setAvailableAddresses] = useState<{ value: string, label: string }[]>([]);
-  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+  const [activePopover, setActivePopover] = useState<string | null>(null);
   
   const preselectedIdsString = useMemo(() => preselectedToolIds.sort().join(','), [preselectedToolIds]);
 
@@ -70,23 +70,15 @@ export default function ManualCheckInDialog({
     const fetchAddresses = async () => {
         if (!firestore || !isOpen) return;
         try {
-            const toolsSnapshot = await getDocs(collection(firestore, 'tools'));
-            const kitsSnapshot = await getDocs(collection(firestore, 'kits'));
-            const occupiedAddresses = new Set([
-                ...toolsSnapshot.docs.map(doc => doc.data().enderecamento),
-                ...kitsSnapshot.docs.map(doc => doc.data().enderecamento)
-            ]);
-            
             const addressesRef = collection(firestore, 'addresses');
             const qAddresses = query(addressesRef, where('setor', '==', '01'));
             const addressesSnapshot = await getDocs(qAddresses);
             
-            const unoccupied = addressesSnapshot.docs
+            const allFerramentariaAddresses = addressesSnapshot.docs
                 .map(doc => doc.data() as Address)
-                .filter(addr => addr.codigoCompleto && !occupiedAddresses.has(addr.codigoCompleto))
                 .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
                 
-            setAvailableAddresses(unoccupied);
+            setAvailableAddresses(allFerramentariaAddresses);
         } catch (error) {
             console.error("Erro ao buscar endereços disponíveis:", error);
         }
@@ -381,12 +373,12 @@ export default function ManualCheckInDialog({
                       </div>
                       <div className="space-y-1 my-2">
                           <Label htmlFor={`${toolId}-address`} className="text-xs">Novo Endereço <span className="text-destructive">*</span></Label>
-                          <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                          <Popover open={activePopover === toolId} onOpenChange={(isOpen) => setActivePopover(isOpen ? toolId : null)}>
                               <PopoverTrigger asChild>
                                   <Button
                                       variant="outline"
                                       role="combobox"
-                                      aria-expanded={isAddressPopoverOpen}
+                                      aria-expanded={activePopover === toolId}
                                       className="w-full justify-between font-normal"
                                   >
                                       {inspection.novoEnderecamento || "Selecione um endereço..."}
@@ -405,7 +397,7 @@ export default function ManualCheckInDialog({
                                                       value={addr.value}
                                                       onSelect={(currentValue) => {
                                                           handleAddressChange(toolId, currentValue === inspection.novoEnderecamento ? "" : currentValue);
-                                                          setIsAddressPopoverOpen(false);
+                                                          setActivePopover(null);
                                                       }}
                                                   >
                                                       <Check className={cn("mr-2 h-4 w-4", inspection.novoEnderecamento === addr.value ? "opacity-100" : "opacity-0")} />

@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -146,21 +144,12 @@ const CadastroFerramentasPage = () => {
         const addressesRef = collection(firestore, 'addresses');
         const qAddresses = query(addressesRef, where('setor', '==', '01')); // Ferramentaria
         const addressesSnapshot = await getDocs(qAddresses);
-        const allFerramentariaAddresses = addressesSnapshot.docs.map(doc => doc.data() as Address);
-
-        const toolsRef = collection(firestore, 'tools');
-        const toolsSnapshot = await getDocs(toolsRef);
-        const occupiedAddresses = new Set(
-          toolsSnapshot.docs
-            .map(doc => doc.data().enderecamento)
-            .filter(addr => !!addr && addr !== editingTool?.enderecamento) // Exclude the current tool's address
-        );
         
-        const unoccupied = allFerramentariaAddresses
-            .filter(addr => !occupiedAddresses.has(addr.codigoCompleto))
-            .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
+        const allFerramentariaAddresses = addressesSnapshot.docs
+          .map(doc => doc.data() as Address)
+          .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
             
-        setAvailableAddresses(unoccupied);
+        setAvailableAddresses(allFerramentariaAddresses);
       } catch (error) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar endereços.' });
       } finally {
@@ -169,7 +158,7 @@ const CadastroFerramentasPage = () => {
     };
 
     fetchAddresses();
-  }, [isFormDialogOpen, firestore, toast, editingTool]);
+  }, [isFormDialogOpen, firestore, toast]);
   
 
   useEffect(() => {

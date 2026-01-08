@@ -108,21 +108,16 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
             setAllModels(models);
             setFilteredModels(models);
 
-            // Fetch addresses and tools to determine available addresses
+            // Fetch addresses
             const addressesRef = collection(firestore, 'addresses');
             const qAddresses = query(addressesRef, where('setor', '==', '01'));
             const addressesSnapshot = await getDocs(qAddresses);
-            const allFerramentariaAddresses = addressesSnapshot.docs.map(doc => doc.data() as Address);
-
-            const toolsRef = collection(firestore, 'tools');
-            const toolsSnapshot = await getDocs(toolsRef);
-            const occupiedAddresses = new Set(toolsSnapshot.docs.map(doc => doc.data().enderecamento));
             
-            const unoccupied = allFerramentariaAddresses
-                .filter(addr => !occupiedAddresses.has(addr.codigoCompleto))
+            const allFerramentariaAddresses = addressesSnapshot.docs
+                .map(doc => doc.data() as Address)
                 .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
             
-            setAvailableAddresses(unoccupied);
+            setAvailableAddresses(allFerramentariaAddresses);
 
         } catch (error) {
             console.error('Erro ao buscar dados:', error);

@@ -77,32 +77,15 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
       if (!firestore || !isEditing) return;
       setIsLoadingAddresses(true);
       try {
-        const toolsSnapshot = await getDocs(collection(firestore, 'tools'));
-        const kitsSnapshot = await getDocs(collection(firestore, 'kits'));
-        
-        // Create a set of all occupied addresses, but exclude the current tool's address
-        const occupiedAddresses = new Set(
-          [
-            ...toolsSnapshot.docs.map(d => d.data().enderecamento),
-            ...kitsSnapshot.docs.map(d => d.data().enderecamento)
-          ].filter(addr => !!addr && addr !== tool?.enderecamento)
-        );
-        
         const addressesRef = collection(firestore, 'addresses');
         const qAddresses = query(addressesRef, where('setor', '==', '01'));
         const addressesSnapshot = await getDocs(qAddresses);
         
-        const unoccupied = addressesSnapshot.docs
+        const allFerramentariaAddresses = addressesSnapshot.docs
             .map(doc => doc.data() as Address)
-            .filter(addr => addr.codigoCompleto && !occupiedAddresses.has(addr.codigoCompleto))
             .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
             
-        // If the tool has a current address, add it to the list so it can be re-selected
-        if (tool?.enderecamento && !unoccupied.some(a => a.value === tool.enderecamento)) {
-            unoccupied.unshift({ value: tool.enderecamento, label: tool.enderecamento });
-        }
-            
-        setAvailableAddresses(unoccupied);
+        setAvailableAddresses(allFerramentariaAddresses);
       } catch (error) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar endereços.' });
       } finally {
@@ -111,7 +94,7 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     };
 
     fetchAddresses();
-  }, [isEditing, firestore, toast, tool]);
+  }, [isEditing, firestore, toast]);
 
 
   if (!tool) {
