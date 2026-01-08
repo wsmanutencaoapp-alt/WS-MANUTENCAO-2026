@@ -16,6 +16,7 @@ import { Separator } from './ui/separator';
 import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { availableModules } from '@/lib/permissions';
+import { cn } from "@/lib/utils";
 
 interface UserPermissionsDialogProps {
     isOpen: boolean;
