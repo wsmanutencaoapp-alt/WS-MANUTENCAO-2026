@@ -45,8 +45,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2, Edit } from 'lucide-react';
-import type { Tool, Employee } from '@/lib/types';
+import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2, Edit, Check, ChevronsUpDown } from 'lucide-react';
+import type { Tool, Employee, Address } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import Image from 'next/image';
@@ -58,6 +58,9 @@ import LabelPrintDialog from '@/components/LabelPrintDialog';
 import { useRouter } from 'next/navigation';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 
 
 const familiaSuggestions: { [key in Tool['familia']]?: Tool['classificacao'] } = {
@@ -93,6 +96,10 @@ const CadastroFerramentasPage = () => {
   const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
   const [toolImage, setToolImage] = useState<string | null>(null);
   const [docEngenhariaFile, setDocEngenhariaFile] = useState<File | null>(null);
+  
+  const [availableAddresses, setAvailableAddresses] = useState<{value: string, label: string}[]>([]);
+  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -130,6 +137,39 @@ const CadastroFerramentasPage = () => {
     });
     return [modelos, unicas];
   }, [allTools]);
+  
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      if (!isFormDialogOpen || !firestore) return;
+      setIsLoadingAddresses(true);
+      try {
+        const addressesRef = collection(firestore, 'addresses');
+        const qAddresses = query(addressesRef, where('setor', '==', '01')); // Ferramentaria
+        const addressesSnapshot = await getDocs(qAddresses);
+        const allFerramentariaAddresses = addressesSnapshot.docs.map(doc => doc.data() as Address);
+
+        const toolsRef = collection(firestore, 'tools');
+        const toolsSnapshot = await getDocs(toolsRef);
+        const occupiedAddresses = new Set(
+          toolsSnapshot.docs
+            .map(doc => doc.data().enderecamento)
+            .filter(addr => !!addr && addr !== editingTool?.enderecamento) // Exclude the current tool's address
+        );
+        
+        const unoccupied = allFerramentariaAddresses
+            .filter(addr => !occupiedAddresses.has(addr.codigoCompleto))
+            .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
+            
+        setAvailableAddresses(unoccupied);
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar endereços.' });
+      } finally {
+        setIsLoadingAddresses(false);
+      }
+    };
+
+    fetchAddresses();
+  }, [isFormDialogOpen, firestore, toast, editingTool]);
   
 
   useEffect(() => {
@@ -511,7 +551,48 @@ const CadastroFerramentasPage = () => {
                          <>
                             <div className="col-span-1">
                                 <Label htmlFor="enderecamento">Endereçamento <span className='text-destructive'>*</span></Label>
-                                <Input id="enderecamento" value={newFerramenta.enderecamento || ''} onChange={handleInputChange} required placeholder="Ex: GAV-01-A" />
+                                <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      aria-expanded={isAddressPopoverOpen}
+                                      className="w-full justify-between font-normal"
+                                      disabled={isLoadingAddresses}
+                                    >
+                                      {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : newFerramenta.enderecamento || "Selecione um endereço..."}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                                      <Command>
+                                      <CommandInput placeholder="Pesquisar endereço..." />
+                                      <CommandList>
+                                          <CommandEmpty>Nenhum endereço disponível.</CommandEmpty>
+                                          <CommandGroup>
+                                          {availableAddresses.map((addr) => (
+                                              <CommandItem
+                                              key={addr.value}
+                                              value={addr.value}
+                                              onSelect={(currentValue) => {
+                                                  handleSelectChange('enderecamento', currentValue === newFerramenta.enderecamento ? "" : currentValue)
+                                                  setIsAddressPopoverOpen(false)
+                                              }}
+                                              >
+                                              <Check
+                                                  className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  newFerramenta.enderecamento === addr.value ? "opacity-100" : "opacity-0"
+                                                  )}
+                                              />
+                                              {addr.label}
+                                              </CommandItem>
+                                          ))}
+                                          </CommandGroup>
+                                      </CommandList>
+                                      </Command>
+                                  </PopoverContent>
+                                </Popover>
                             </div>
                              <div className="col-span-1">
                                 <Label htmlFor="status">Status Inicial</Label>
