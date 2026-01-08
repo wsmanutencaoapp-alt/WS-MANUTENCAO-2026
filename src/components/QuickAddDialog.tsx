@@ -22,6 +22,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
+  DialogPortal,
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -437,34 +438,36 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                            <Command>
-                              <CommandInput placeholder="Pesquisar endereço..." />
-                              <CommandList>
-                                <CommandEmpty>Nenhum endereço disponível encontrado.</CommandEmpty>
-                                <CommandGroup>
-                                  {availableAddresses.map((addr) => (
-                                    <CommandItem
-                                      key={addr.value}
-                                      value={addr.value}
-                                      onSelect={(currentValue) => {
-                                        setEnderecamento(currentValue === enderecamento ? "" : currentValue)
-                                        setIsAddressPopoverOpen(false)
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          enderecamento === addr.value ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {addr.label}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
+                          <DialogPortal>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                                <Command>
+                                <CommandInput placeholder="Pesquisar endereço..." />
+                                <CommandList>
+                                    <CommandEmpty>Nenhum endereço disponível encontrado.</CommandEmpty>
+                                    <CommandGroup>
+                                    {availableAddresses.map((addr) => (
+                                        <CommandItem
+                                        key={addr.value}
+                                        value={addr.value}
+                                        onSelect={(currentValue) => {
+                                            setEnderecamento(currentValue === enderecamento ? "" : currentValue)
+                                            setIsAddressPopoverOpen(false)
+                                        }}
+                                        >
+                                        <Check
+                                            className={cn(
+                                            "mr-2 h-4 w-4",
+                                            enderecamento === addr.value ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        {addr.label}
+                                        </CommandItem>
+                                    ))}
+                                    </CommandGroup>
+                                </CommandList>
+                                </Command>
+                            </PopoverContent>
+                          </DialogPortal>
                         </Popover>
                     </div>
                     <div className="space-y-1.5">

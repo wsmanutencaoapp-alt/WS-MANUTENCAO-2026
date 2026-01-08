@@ -39,7 +39,7 @@ const DialogContent = React.forwardRef<
       ref={ref}
       onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[cmdk-input]')) {
+        if (target.closest('[cmdk-input]') || target.closest('[role=combobox]')) {
           e.preventDefault();
         }
       }}
