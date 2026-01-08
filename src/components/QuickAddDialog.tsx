@@ -22,7 +22,6 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-  DialogPortal,
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -342,7 +341,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Adicionar Unidade ao Estoque</DialogTitle>
