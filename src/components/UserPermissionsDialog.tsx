@@ -16,35 +16,21 @@ import { Separator } from './ui/separator';
 import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
-const availableScreens = [
-    { id: 'suprimentos', label: 'Suprimentos (Módulo)', isParent: true },
-    { id: 'suprimentos_movimentacao', label: 'Movimentação', isParent: false, parentId: 'suprimentos' },
-    { id: 'ferramentaria', label: 'Ferramentaria (Módulo)', isParent: true },
-    { id: 'ferramentaria_movimentacao', label: 'Entrada e Saída', isParent: false, parentId: 'ferramentaria' },
-    { id: 'calibracao', label: 'Calibração', isParent: false, parentId: 'ferramentaria' },
-    { id: 'compras', label: 'Compras (Módulo)', isParent: true },
-    { id: 'compras_aprovacoes', label: 'Aprovações', isParent: false, parentId: 'compras' },
-    { id: 'compras_controle', label: 'Controle', isParent: false, parentId: 'compras' },
-    { id: 'engenharia', label: 'Engenharia (Módulo)', isParent: true },
-    { id: 'engenharia_aprovacoes', label: 'Aprovações', isParent: false, parentId: 'engenharia' },
-    { id: 'engenharia_projetos', label: 'Projetos', isParent: false, parentId: 'engenharia' },
-    { id: 'comercial', label: 'Comercial (Módulo)', isParent: true },
-    { id: 'financeiro', label: 'Financeiro (Módulo)', isParent: true },
-    { id: 'financeiro_visao-geral', label: 'Visão Geral', isParent: false, parentId: 'financeiro' },
-    { id: 'financeiro_orcamento', label: 'Orçamento', isParent: false, parentId: 'financeiro' },
-    { id: 'financeiro_despesas', label: 'Despesas', isParent: false, parentId: 'financeiro' },
-    { id: 'userManagement', label: 'Gerenciar Usuários', isParent: true },
-    { id: 'configurador', label: 'Configurador (Módulo)', isParent: true },
-    { id: 'configurador_alcada-aprovacao', label: 'Alçada de Aprovação', isParent: false, parentId: 'configurador' },
-    { id: 'cadastros', label: 'Cadastros (Módulo)', isParent: true },
-    { id: 'cadastros_ferramentas', label: 'Ferramentas', isParent: false, parentId: 'cadastros' },
-    { id: 'contabilidade', label: 'Fiscal/Contábil (Módulo)', isParent: true },
-    { id: 'contabilidade_balancete', label: 'Balancete', isParent: false, parentId: 'contabilidade' },
-    { id: 'contabilidade_relatorios', label: 'Relatórios', isParent: false, parentId: 'contabilidade' },
-    { id: 'qualidade', label: 'Qualidade (Módulo)', isParent: true },
-    { id: 'gso', label: 'GSO (Módulo)', isParent: true },
-    { id: 'planejamento', label: 'Planejamento (Módulo)', isParent: true },
-    { id: 'manutencao', label: 'Manutenção (Módulo)', isParent: true },
+const availableModules = [
+    { id: 'suprimentos', label: 'Suprimentos' },
+    { id: 'ferramentaria', label: 'Ferramentaria' },
+    { id: 'compras', label: 'Compras' },
+    { id: 'engenharia', label: 'Engenharia' },
+    { id: 'comercial', label: 'Comercial' },
+    { id: 'financeiro', label: 'Financeiro' },
+    { id: 'userManagement', label: 'Gerenciar Usuários' },
+    { id: 'configurador', label: 'Configurador' },
+    { id: 'cadastros', label: 'Cadastros' },
+    { id: 'contabilidade', label: 'Fiscal/Contábil' },
+    { id: 'qualidade', label: 'Qualidade' },
+    { id: 'gso', label: 'GSO' },
+    { id: 'planejamento', label: 'Planejamento' },
+    { id: 'manutencao', label: 'Manutenção' },
 ];
 
 
@@ -94,31 +80,12 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
             setIsSaving(false);
         }
     };
-
-    const handleParentPermissionChange = (moduleId: string, checked: boolean) => {
-        const newPermissions = { ...currentPermissions, [moduleId]: checked };
-        const subModules = availableScreens.filter(s => s.parentId === moduleId);
-        subModules.forEach(sub => {
-            newPermissions[sub.id] = checked;
-        });
-        setCurrentPermissions(newPermissions);
-    };
-
-    const handleChildPermissionChange = (childId: string, parentId: string, checked: boolean) => {
-        const newPermissions = { ...currentPermissions, [childId]: checked };
-        
-        if (checked) {
-            newPermissions[parentId] = true;
-        } else {
-            const subModules = availableScreens.filter(s => s.parentId === parentId);
-            const anyOtherChildChecked = subModules.some(sub => newPermissions[sub.id] && sub.id !== childId);
-            
-            if (!anyOtherChildChecked) {
-                newPermissions[parentId] = false;
-            }
-        }
     
-        setCurrentPermissions(newPermissions);
+    const handlePermissionChange = (moduleId: string, checked: boolean) => {
+        setCurrentPermissions(prev => ({
+            ...prev,
+            [moduleId]: checked
+        }));
     };
     
     const handleSave = () => {
@@ -128,7 +95,6 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
     if (!employee) return null;
 
     const isUserAdmin = employee.accessLevel === 'Admin';
-    const moduleGroups = availableScreens.filter(s => s.isParent);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -136,60 +102,33 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
                 <DialogHeader>
                     <DialogTitle>Gerenciar Permissões de Acesso</DialogTitle>
                     <DialogDescription>
-                        Defina quais telas o usuário <span className="font-bold">{`${employee.firstName} ${employee.lastName}`}</span> pode acessar.
+                        Defina quais módulos o usuário <span className="font-bold">{`${employee.firstName} ${employee.lastName}`}</span> pode acessar.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="py-4 max-h-[60vh] overflow-y-auto pr-4">
                     {isUserAdmin ? (
                         <p className="text-sm text-center text-muted-foreground p-4 bg-muted/50 rounded-md">
-                            Administradores têm acesso irrestrito a todas as telas por padrão. As permissões não podem ser alteradas.
+                            Administradores têm acesso irrestrito a todos os módulos por padrão.
                         </p>
                     ) : (
-                        <div className="space-y-4">
-                            {moduleGroups.map((module, index) => {
-                                const subModules = availableScreens.filter(s => s.parentId === module.id);
-                                const isModuleChecked = currentPermissions?.[module.id] || false;
-
-                                return (
-                                <React.Fragment key={module.id}>
-                                    {index > 0 && <Separator className="my-3" />}
-                                    <div className="space-y-3">
-                                        <div className={`flex items-center space-x-3 rounded-md p-2`}>
-                                            <Checkbox
-                                                id={`${employee.docId}-${module.id}`}
-                                                checked={isModuleChecked}
-                                                onCheckedChange={(checked) => handleParentPermissionChange(module.id, !!checked)}
-                                                aria-label={`Permissão para ${module.label}`}
-                                            />
-                                            <Label
-                                                htmlFor={`${employee.docId}-${module.id}`}
-                                                className="text-sm font-semibold leading-none"
-                                            >
-                                                {module.label}
-                                            </Label>
-                                        </div>
-                                        {subModules.length > 0 && (
-                                        <div className="pl-8 space-y-3 animate-in fade-in-0 duration-300">
-                                                {subModules.map(sub => (
-                                                    <div key={sub.id} className="flex items-center space-x-3">
-                                                        <Checkbox
-                                                            id={`${employee.docId}-${sub.id}`}
-                                                            checked={currentPermissions?.[sub.id] || false}
-                                                            onCheckedChange={(checked) => handleChildPermissionChange(sub.id, module.id, !!checked)}
-                                                            aria-label={`Permissão para ${sub.label}`}
-                                                        />
-                                                        <Label htmlFor={`${employee.docId}-${sub.id}`} className="text-sm leading-none">
-                                                            {sub.label}
-                                                        </Label>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                        )}
-                                    </div>
-                                </React.Fragment>
-                                )
-                            })}
+                        <div className="space-y-3">
+                            {availableModules.map((module) => (
+                                <div key={module.id} className="flex items-center space-x-3">
+                                    <Checkbox
+                                        id={`${employee.docId}-${module.id}`}
+                                        checked={currentPermissions?.[module.id] || false}
+                                        onCheckedChange={(checked) => handlePermissionChange(module.id, !!checked)}
+                                        aria-label={`Permissão para ${module.label}`}
+                                    />
+                                    <Label
+                                        htmlFor={`${employee.docId}-${module.id}`}
+                                        className="text-sm font-medium leading-none"
+                                    >
+                                        {module.label}
+                                    </Label>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
