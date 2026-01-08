@@ -1,7 +1,7 @@
 'use client';
 import { forwardRef, useImperativeHandle, useState, useMemo, useEffect } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, where, orderBy, documentId } from 'firebase/firestore';
+import { collection, query, where, orderBy, documentId, doc } from 'firebase/firestore';
 import type { ToolRequest, Tool, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
