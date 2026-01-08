@@ -1,56 +1,72 @@
-export const allUserPermissions: { id: string; path: string, isModule?: boolean }[] = [
-    { id: 'dashboard', path: '/dashboard', isModule: true },
-    { id: 'suprimentos', path: '/dashboard/suprimentos', isModule: true },
-    { id: 'ferramentaria', path: '/dashboard/ferramentaria', isModule: true },
-    { id: 'calibracao', path: '/dashboard/calibracao', isModule: false }, // Part of ferramentaria
-    { id: 'cadastros', path: '/dashboard/cadastros', isModule: true },
-    { id: 'compras', path: '/dashboard/compras', isModule: true },
-    { id: 'engenharia', path: '/dashboard/engenharia', isModule: true },
-    { id: 'comercial', path: '/dashboard/comercial', isModule: true },
-    { id: 'financeiro', path: '/dashboard/financeiro', isModule: true },
-    { id: 'financeiro_budget', path: '/dashboard/financeiro/budget', isModule: false },
-    { id: 'contabilidade', path: '/dashboard/contabilidade', isModule: true },
-    { id: 'qualidade', path: '/dashboard/qualidade', isModule: true },
-    { id: 'gso', path: '/dashboard/gso', isModule: true },
-    { id: 'planejamento', path: '/dashboard/planejamento', isModule: true },
-    { id: 'manutencao', path: '/dashboard/manutencao', isModule: true },
-    { id: 'userManagement', path: '/dashboard/user-management', isModule: true },
-    { id: 'configurador', path: '/dashboard/configurador', isModule: true },
+export const availableModules: { id: string; label: string, isModule?: boolean }[] = [
+    { id: 'dashboard', label: 'Dashboard', isModule: true },
+    { id: 'suprimentos', label: 'Suprimentos (Módulo)', isModule: true },
+    { id: 'suprimentos_movimentacao', label: '-> Movimentação', isModule: false },
+    { id: 'ferramentaria', label: 'Ferramentaria (Módulo)', isModule: true },
+    { id: 'ferramentaria_lista', label: '-> Lista de Ferramentas', isModule: false },
+    { id: 'ferramentaria_movimentacao', label: '-> Entrada e Saída', isModule: false },
+    { id: 'ferramentaria_kits', label: '-> Gerenciar Kits', isModule: false },
+    { id: 'ferramentaria_historico', label: '-> Histórico Não Conformes', isModule: false },
+    { id: 'calibracao', label: 'Controle/Calibração', isModule: true }, // Standalone but related
+    { id: 'cadastros', label: 'Cadastros (Módulo)', isModule: true },
+    { id: 'cadastros_ferramentas', label: '-> Ferramentas', isModule: false },
+    { id: 'cadastros_suprimentos', label: '-> Suprimentos', isModule: false },
+    { id: 'cadastros_enderecos', label: '-> Endereços', isModule: false },
+    { id: 'compras', label: 'Compras (Módulo)', isModule: true },
+    { id: 'compras_aprovacoes', label: '-> Aprovações', isModule: false },
+    { id: 'compras_controle', label: '-> Controle', isModule: false },
+    { id: 'engenharia', label: 'Engenharia (Módulo)', isModule: true },
+    { id: 'engenharia_aprovacoes', label: '-> Aprovações', isModule: false },
+    { id: 'engenharia_projetos', label: '-> Projetos', isModule: false },
+    { id: 'comercial', label: 'Comercial', isModule: true },
+    { id: 'financeiro', label: 'Financeiro (Módulo)', isModule: true },
+    { id: 'financeiro_visao_geral', label: '-> Visão Geral', isModule: false },
+    { id: 'financeiro_budget', label: '-> Budget', isModule: false },
+    { id: 'financeiro_despesas', label: '-> Despesas', isModule: false },
+    { id: 'contabilidade', label: 'Fiscal/Contábil (Módulo)', isModule: true },
+    { id: 'contabilidade_balancete', label: '-> Balancete', isModule: false },
+    { id: 'contabilidade_relatorios', label: '-> Relatórios', isModule: false },
+    { id: 'contabilidade_classificacao', label: '-> Classificação Contábil', isModule: false },
+    { id: 'qualidade', label: 'Qualidade', isModule: true },
+    { id: 'gso', label: 'GSO', isModule: true },
+    { id: 'planejamento', label: 'Planejamento', isModule: true },
+    { id: 'manutencao', label: 'Manutenção', isModule: true },
+    { id: 'userManagement', label: 'Gerenciar Usuários', isModule: true },
+    { id: 'configurador', label: 'Configurador (Módulo)', isModule: true },
+    { id: 'configurador_alcada', label: '-> Alçada de Aprovação', isModule: false },
 ];
 
 export const getRequiredPermissionForPath = (path: string): string | null => {
-    // A rota /dashboard/ferramentaria é um alias, então tratamos como /lista-ferramentas
-    if (path === '/dashboard/ferramentaria') {
-        path = '/dashboard/ferramentaria/lista-ferramentas';
+    // Find the most specific match first by sorting paths by length descending
+    const sortedPermissions = [...availableModules].sort((a, b) => {
+        const pathA = a.id.replace(/_/g, '/');
+        const pathB = b.id.replace(/_/g, '/');
+        return pathB.length - pathA.length;
+    });
+
+    const pathSegments = path.split('/').filter(Boolean);
+    
+    // Example path: /dashboard/ferramentaria/lista-ferramentas
+    // We want to match `ferramentaria_lista`
+    
+    // Find the permission that is the best match for the current path
+    for (const p of sortedPermissions) {
+        const permissionPath = `/dashboard/${p.id.replace(/_/g, '/')}`;
+        if (path.startsWith(permissionPath)) {
+            return p.id;
+        }
     }
-    // A rota /dashboard é a página principal e deve ser acessível se o usuário estiver logado.
-    if (path === '/dashboard') {
-        return 'dashboard';
-    }
-    const matchingPermission = allUserPermissions.find(p => path.startsWith(p.path));
-    return matchingPermission ? matchingPermission.id : null;
-};
-
-
-/**
- * Finds the required top-level module permission for a given URL path.
- * @param path The URL path to check (e.g., /dashboard/ferramentaria/movimentacao).
- * @returns The permission ID of the parent module (e.g., 'ferramentaria') or null.
- */
-export const getModulePermissionForPath = (path: string): string | null => {
-    // Split the path into segments
-    const segments = path.split('/').filter(Boolean); // "dashboard", "ferramentaria", "movimentacao"
-
-    if (segments.length < 2) {
-        // Not a sub-page of the dashboard, or the dashboard itself
-        return null;
+    
+    // Fallback for top-level modules if no specific sub-module matches
+    if (pathSegments.length >= 2 && pathSegments[0] === 'dashboard') {
+        const moduleName = pathSegments[1];
+        const modulePermission = availableModules.find(p => p.id === moduleName && p.isModule);
+        if (modulePermission) {
+            return modulePermission.id;
+        }
     }
 
-    // The module name is typically the second segment
-    const moduleName = segments[1];
+    if (path === '/dashboard') return 'dashboard';
 
-    // Find the corresponding permission ID from the list
-    const modulePermission = allUserPermissions.find(p => p.isModule && p.path === `/dashboard/${moduleName}`);
-
-    return modulePermission ? modulePermission.id : null;
+    return null;
 };

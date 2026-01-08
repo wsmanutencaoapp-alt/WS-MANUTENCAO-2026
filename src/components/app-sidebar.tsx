@@ -50,7 +50,7 @@ const allNavItems: NavItem[] = [
     label: 'Suprimentos',
     permission: 'suprimentos',
     subItems: [
-        { href: '/dashboard/suprimentos/movimentacao', label: 'Movimentação' },
+        { href: '/dashboard/suprimentos/movimentacao', label: 'Movimentação', permission: 'suprimentos_movimentacao' },
     ]
   },
   { 
@@ -59,11 +59,11 @@ const allNavItems: NavItem[] = [
     label: 'Ferramentaria',
     permission: 'ferramentaria',
     subItems: [
-        { href: '/dashboard/ferramentaria/lista-ferramentas', icon: List, label: 'Lista de Ferramentas' },
-        { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída' },
-        { href: '/dashboard/ferramentaria/kits', icon: Package, label: 'Gerenciar Kits' },
-        { href: '/dashboard/calibracao', label: 'Controle/Calibração' },
-        { href: '/dashboard/ferramentaria/historico-nao-conformes', icon: History, label: 'Histórico Não Conformes' },
+        { href: '/dashboard/ferramentaria/lista-ferramentas', icon: List, label: 'Lista de Ferramentas', permission: 'ferramentaria_lista' },
+        { href: '/dashboard/ferramentaria/movimentacao', label: 'Entrada e Saída', permission: 'ferramentaria_movimentacao' },
+        { href: '/dashboard/ferramentaria/kits', icon: Package, label: 'Gerenciar Kits', permission: 'ferramentaria_kits' },
+        { href: '/dashboard/calibracao', label: 'Controle/Calibração', permission: 'calibracao' },
+        { href: '/dashboard/ferramentaria/historico-nao-conformes', icon: History, label: 'Histórico Não Conformes', permission: 'ferramentaria_historico' },
     ]
   },
   {
@@ -72,9 +72,9 @@ const allNavItems: NavItem[] = [
     label: 'Cadastros',
     permission: 'cadastros',
     subItems: [
-        { href: '/dashboard/cadastros/ferramentas', label: 'Ferramentas' },
-        { href: '/dashboard/cadastros/suprimentos', label: 'Suprimentos' },
-        { href: '/dashboard/cadastros/enderecos', label: 'Endereços' },
+        { href: '/dashboard/cadastros/ferramentas', label: 'Ferramentas', permission: 'cadastros_ferramentas' },
+        { href: '/dashboard/cadastros/suprimentos', label: 'Suprimentos', permission: 'cadastros_suprimentos' },
+        { href: '/dashboard/cadastros/enderecos', label: 'Endereços', permission: 'cadastros_enderecos' },
     ]
   },
   { 
@@ -83,8 +83,8 @@ const allNavItems: NavItem[] = [
     label: 'Compras',
     permission: 'compras',
     subItems: [
-        { href: '/dashboard/compras/aprovacoes', label: 'Aprovações' },
-        { href: '/dashboard/compras/controle', label: 'Controle' },
+        { href: '/dashboard/compras/aprovacoes', label: 'Aprovações', permission: 'compras_aprovacoes' },
+        { href: '/dashboard/compras/controle', label: 'Controle', permission: 'compras_controle' },
     ]
   },
   {
@@ -93,8 +93,8 @@ const allNavItems: NavItem[] = [
     label: 'Engenharia',
     permission: 'engenharia',
     subItems: [
-      { href: '/dashboard/engenharia/aprovacoes', label: 'Aprovações' },
-      { href: '/dashboard/engenharia/projetos', label: 'Projetos' },
+      { href: '/dashboard/engenharia/aprovacoes', label: 'Aprovações', permission: 'engenharia_aprovacoes' },
+      { href: '/dashboard/engenharia/projetos', label: 'Projetos', permission: 'engenharia_projetos' },
     ]
   },
   {
@@ -109,9 +109,9 @@ const allNavItems: NavItem[] = [
     label: 'Financeiro',
     permission: 'financeiro',
     subItems: [
-        { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral' },
-        { href: '/dashboard/financeiro/budget', label: 'Budget' },
-        { href: '/dashboard/financeiro/despesas', label: 'Despesas' },
+        { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral', permission: 'financeiro_visao_geral' },
+        { href: '/dashboard/financeiro/budget', label: 'Budget', permission: 'financeiro_budget' },
+        { href: '/dashboard/financeiro/despesas', label: 'Despesas', permission: 'financeiro_despesas' },
     ]
   },
   { 
@@ -120,9 +120,9 @@ const allNavItems: NavItem[] = [
     label: 'Fiscal/Contábil',
     permission: 'contabilidade',
     subItems: [
-        { href: '/dashboard/contabilidade/balancete', label: 'Balancete' },
-        { href: '/dashboard/contabilidade/relatorios', label: 'Relatórios' },
-        { href: '/dashboard/contabilidade/classificacao', label: 'Classificação Contábil' },
+        { href: '/dashboard/contabilidade/balancete', label: 'Balancete', permission: 'contabilidade_balancete' },
+        { href: '/dashboard/contabilidade/relatorios', label: 'Relatórios', permission: 'contabilidade_relatorios' },
+        { href: '/dashboard/contabilidade/classificacao', label: 'Classificação Contábil', permission: 'contabilidade_classificacao' },
     ]
   },
   {
@@ -159,17 +159,38 @@ const allBottomNavItems: NavItem[] = [
         label: 'Configurador',
         permission: 'configurador',
         subItems: [
-            { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação' }
+            { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação', permission: 'configurador_alcada' }
         ]
     },
 ]
 
-const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permissions'], isAdmin: boolean): NavItem[] => {
-    if (isAdmin) return items;
-    if (!permissions) return [];
+const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permissions'] | undefined, isAdmin: boolean): NavItem[] => {
+  if (!permissions && !isAdmin) return [];
 
-    return items.filter(item => item.permission && permissions[item.permission]);
+  return items.reduce((acc, item) => {
+    // Admins see everything. For others, check the main item permission.
+    const hasParentPermission = isAdmin || (item.permission && permissions?.[item.permission]);
+
+    if (hasParentPermission) {
+      // If the item has sub-items, filter them based on their specific permissions
+      if (item.subItems) {
+        const permittedSubItems = item.subItems.filter(subItem => 
+          isAdmin || (subItem.permission && permissions?.[subItem.permission])
+        );
+        
+        // Only include the parent item if it has at least one permitted sub-item
+        if (permittedSubItems.length > 0) {
+          acc.push({ ...item, subItems: permittedSubItems });
+        }
+      } else {
+        // If no sub-items, just include the parent item
+        acc.push(item);
+      }
+    }
+    return acc;
+  }, [] as NavItem[]);
 };
+
 
 const filterNavItemsBySearch = (items: NavItem[], searchTerm: string): NavItem[] => {
     if (!searchTerm) {
@@ -218,15 +239,14 @@ export function AppSidebar() {
 
   const navItems = useMemo(() => {
     if (!employeeData) return [];
-    // The dashboard link is always visible for logged-in users.
     const baseItems = allNavItems.filter(item => item.permission === 'dashboard');
-    const permittedItems = filterItemsByPermissions(allNavItems.filter(item => item.permission !== 'dashboard'), employeeData.permissions || {}, isAdmin);
+    const permittedItems = filterItemsByPermissions(allNavItems.filter(item => item.permission !== 'dashboard'), employeeData.permissions, isAdmin);
     return filterNavItemsBySearch([...baseItems, ...permittedItems], searchTerm);
   }, [employeeData, isAdmin, searchTerm]);
 
   const bottomNavItems = useMemo(() => {
     if (!employeeData) return [];
-    const permittedItems = filterItemsByPermissions(allBottomNavItems, employeeData.permissions || {}, isAdmin);
+    const permittedItems = filterItemsByPermissions(allBottomNavItems, employeeData.permissions, isAdmin);
     return filterNavItemsBySearch(permittedItems, searchTerm);
   }, [employeeData, isAdmin, searchTerm]);
 

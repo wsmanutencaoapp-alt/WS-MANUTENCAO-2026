@@ -9,7 +9,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import type { Employee } from '@/lib/types';
-import { getModulePermissionForPath } from '@/lib/permissions';
+import { getRequiredPermissionForPath } from '@/lib/permissions';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -47,14 +47,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         return;
       }
       
-      const requiredModulePermission = getModulePermissionForPath(pathname);
+      const requiredPermission = getRequiredPermissionForPath(pathname);
       const isAdmin = employeeData.accessLevel === 'Admin';
       
       if (isAdmin) return;
       if (pathname === '/dashboard' || pathname === '/dashboard/') return;
-      if (!requiredModulePermission) return;
+      if (!requiredPermission) return;
 
-      if (!employeeData.permissions || !employeeData.permissions[requiredModulePermission]) {
+      if (!employeeData.permissions || !employeeData.permissions[requiredPermission]) {
         router.push('/dashboard');
       }
     }

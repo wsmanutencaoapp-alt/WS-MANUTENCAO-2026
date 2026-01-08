@@ -15,24 +15,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Separator } from './ui/separator';
 import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-
-const availableModules = [
-    { id: 'suprimentos', label: 'Suprimentos' },
-    { id: 'ferramentaria', label: 'Ferramentaria' },
-    { id: 'compras', label: 'Compras' },
-    { id: 'engenharia', label: 'Engenharia' },
-    { id: 'comercial', label: 'Comercial' },
-    { id: 'financeiro', label: 'Financeiro' },
-    { id: 'userManagement', label: 'Gerenciar Usuários' },
-    { id: 'configurador', label: 'Configurador' },
-    { id: 'cadastros', label: 'Cadastros' },
-    { id: 'contabilidade', label: 'Fiscal/Contábil' },
-    { id: 'qualidade', label: 'Qualidade' },
-    { id: 'gso', label: 'GSO' },
-    { id: 'planejamento', label: 'Planejamento' },
-    { id: 'manutencao', label: 'Manutenção' },
-];
-
+import { availableModules } from '@/lib/permissions';
 
 interface UserPermissionsDialogProps {
     isOpen: boolean;
@@ -114,7 +97,7 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
                     ) : (
                         <div className="space-y-3">
                             {availableModules.map((module) => (
-                                <div key={module.id} className="flex items-center space-x-3">
+                                <div key={module.id} className={cn("flex items-center space-x-3", !module.isModule && "pl-6")}>
                                     <Checkbox
                                         id={`${employee.docId}-${module.id}`}
                                         checked={currentPermissions?.[module.id] || false}
@@ -123,7 +106,7 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
                                     />
                                     <Label
                                         htmlFor={`${employee.docId}-${module.id}`}
-                                        className="text-sm font-medium leading-none"
+                                        className={cn("text-sm leading-none", module.isModule ? "font-semibold" : "font-normal")}
                                     >
                                         {module.label}
                                     </Label>
