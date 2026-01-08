@@ -84,7 +84,8 @@ const ListaFerramentasPage = () => {
   });
   
   const inventarioVisivel = useMemo(() => {
-    const ferramentas = todasAsFerramentas?.filter(ferramenta => ferramenta.enderecamento !== 'LOGICA') || [];
+    // Explicitly filter for items that are unique tools (sequencial > 0)
+    const ferramentas = todasAsFerramentas?.filter(ferramenta => ferramenta.sequencial > 0) || [];
     const kits = todosOsKits?.map(kit => ({ ...kit, isKit: true, tipo: 'KIT' as const })) || [];
     return [...ferramentas, ...kits].sort((a, b) => a.codigo.localeCompare(b.codigo));
   }, [todasAsFerramentas, todosOsKits]);
