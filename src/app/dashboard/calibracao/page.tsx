@@ -46,8 +46,7 @@ const CalibracaoPage = () => {
     if (!firestore) return null;
     return query(
       collection(firestore, 'tools'),
-      where('classificacao', 'in', ['C', 'L', 'V']),
-      where('sequencial', '>', 0) // Garante que apenas ferramentas individuais sejam listadas
+      where('classificacao', 'in', ['C', 'L', 'V'])
     );
   }, [firestore]);
 
@@ -58,7 +57,8 @@ const CalibracaoPage = () => {
   const filteredTools = useMemo(() => {
     if (!tools) return [];
     
-    let tempTools = tools;
+    // Filter out template tools (sequencial === 0) client-side
+    let tempTools = tools.filter(tool => tool.sequencial > 0);
 
     if (classificacaoFilter !== 'todos') {
         tempTools = tempTools.filter(tool => tool.classificacao === classificacaoFilter);
