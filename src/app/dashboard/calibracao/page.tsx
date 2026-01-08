@@ -46,7 +46,8 @@ const CalibracaoPage = () => {
     if (!firestore) return null;
     return query(
       collection(firestore, 'tools'),
-      where('classificacao', 'in', ['C', 'L', 'V'])
+      where('classificacao', 'in', ['C', 'L', 'V']),
+      where('sequencial', '>', 0) // Garante que apenas ferramentas individuais sejam listadas
     );
   }, [firestore]);
 
