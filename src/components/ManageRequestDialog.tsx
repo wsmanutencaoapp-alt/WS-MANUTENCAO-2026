@@ -6,7 +6,11 @@ import {
   doc,
   writeBatch,
   updateDoc,
-  deleteDoc
+  collection,
+  query,
+  where,
+  documentId,
+  getDocs,
 } from 'firebase/firestore';
 import {
   Dialog,
@@ -88,15 +92,19 @@ export default function ManageRequestDialog({ request, isOpen, onClose, onSucces
         const batch = writeBatch(firestore);
         const requestRef = doc(firestore, 'tool_requests', request.docId);
 
-        // If tools were in use, set them back to available
+        // If tools were in use, check if they exist before trying to update them.
         if (request.status === 'Em Uso' && request.toolIds.length > 0) {
-            request.toolIds.forEach(toolId => {
-                const toolRef = doc(firestore, 'tools', toolId);
-                batch.update(toolRef, { status: 'Disponível' });
+            const toolsRef = collection(firestore, 'tools');
+            const q = query(toolsRef, where(documentId(), 'in', request.toolIds));
+            const existingToolsSnapshot = await getDocs(q);
+            
+            existingToolsSnapshot.forEach(toolDoc => {
+                // Only update tools that still exist
+                batch.update(toolDoc.ref, { status: 'Disponível' });
             });
         }
         
-        // Mark request as canceled
+        // Mark request as canceled regardless of whether the tools existed.
         batch.update(requestRef, { status: 'Cancelada' });
 
         await batch.commit();
