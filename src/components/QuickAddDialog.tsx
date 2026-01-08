@@ -27,8 +27,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Upload, ImageIcon, CalendarIcon, FileText } from 'lucide-react';
-import type { Tool, CalibrationRecord } from '@/lib/types';
+import { Loader2, Search, Upload, ImageIcon, CalendarIcon, FileText, Check, ChevronsUpDown } from 'lucide-react';
+import type { Tool, CalibrationRecord, Address } from '@/lib/types';
 import Image from 'next/image';
 import { ScrollArea } from './ui/scroll-area';
 import { useQueryClient } from '@tanstack/react-query';
@@ -36,6 +36,9 @@ import { Calendar } from './ui/calendar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { cn } from '@/lib/utils';
 
 interface QuickAddDialogProps {
   isOpen: boolean;
@@ -72,6 +75,10 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
 
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [availableAddresses, setAvailableAddresses] = useState<{value: string, label: string}[]>([]);
+  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const certificateInputRef = useRef<HTMLInputElement>(null);
@@ -86,29 +93,47 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
   }, [selectedModel]);
 
   useEffect(() => {
-    const fetchModels = async () => {
+    const fetchPrerequisites = async () => {
         if (!firestore || !isOpen) return;
         setIsSearching(true);
         try {
-            const toolsRef = collection(firestore, 'tools');
-            const q = query(toolsRef, where('enderecamento', '==', 'LOGICA'), where('tipo', 'in', ['STD', 'GSE']));
-            const querySnapshot = await getDocs(q);
-            const models = querySnapshot.docs.map(doc => ({
+            // Fetch models
+            const modelsRef = collection(firestore, 'tools');
+            const qModels = query(modelsRef, where('enderecamento', '==', 'LOGICA'), where('tipo', 'in', ['STD', 'GSE']));
+            const modelsSnapshot = await getDocs(qModels);
+            const models = modelsSnapshot.docs.map(doc => ({
                 ...(doc.data() as Tool),
                 docId: doc.id,
             }));
             setAllModels(models);
             setFilteredModels(models);
+
+            // Fetch addresses and tools to determine available addresses
+            const addressesRef = collection(firestore, 'addresses');
+            const qAddresses = query(addressesRef, where('setor', '==', '01'));
+            const addressesSnapshot = await getDocs(qAddresses);
+            const allFerramentariaAddresses = addressesSnapshot.docs.map(doc => doc.data() as Address);
+
+            const toolsRef = collection(firestore, 'tools');
+            const toolsSnapshot = await getDocs(toolsRef);
+            const occupiedAddresses = new Set(toolsSnapshot.docs.map(doc => doc.data().enderecamento));
+            
+            const unoccupied = allFerramentariaAddresses
+                .filter(addr => !occupiedAddresses.has(addr.codigoCompleto))
+                .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
+            
+            setAvailableAddresses(unoccupied);
+
         } catch (error) {
-            console.error('Erro ao buscar modelos:', error);
-            toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível carregar os modelos de ferramentas.' });
+            console.error('Erro ao buscar dados:', error);
+            toast({ variant: 'destructive', title: 'Erro na Busca', description: 'Não foi possível carregar os dados necessários.' });
         } finally {
             setIsSearching(false);
         }
     };
     
     if (isOpen) {
-      fetchModels();
+      fetchPrerequisites();
     }
   }, [isOpen, firestore, toast]);
 
@@ -158,6 +183,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
       setCertificateFile(null);
       setIsSearching(false);
       setIsSaving(false);
+      setAvailableAddresses([]);
       if(fileInputRef.current) fileInputRef.current.value = '';
       if(certificateInputRef.current) certificateInputRef.current.value = '';
   }
@@ -397,7 +423,49 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                  <div className="grid grid-cols-2 gap-4">
                      <div className="space-y-1.5">
                         <Label htmlFor="enderecamento">Endereçamento <span className="text-destructive">*</span></Label>
-                        <Input id="enderecamento" value={enderecamento} onChange={(e) => setEnderecamento(e.target.value)} placeholder="Ex: GAV-01-A" />
+                         <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={isAddressPopoverOpen}
+                              className="w-full justify-between font-normal"
+                            >
+                              {enderecamento
+                                ? availableAddresses.find((addr) => addr.value === enderecamento)?.label
+                                : "Selecione um endereço..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <Command>
+                              <CommandInput placeholder="Pesquisar endereço..." />
+                              <CommandList>
+                                <CommandEmpty>Nenhum endereço disponível encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                  {availableAddresses.map((addr) => (
+                                    <CommandItem
+                                      key={addr.value}
+                                      value={addr.value}
+                                      onSelect={(currentValue) => {
+                                        setEnderecamento(currentValue === enderecamento ? "" : currentValue)
+                                        setIsAddressPopoverOpen(false)
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          enderecamento === addr.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {addr.label}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                     </div>
                     <div className="space-y-1.5">
                         <Label htmlFor="marca">Marca</Label>
