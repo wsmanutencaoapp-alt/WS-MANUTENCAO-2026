@@ -14,16 +14,16 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // An admin is a user with Admin level and Active status.
+      // An admin is a user with Admin level. The status check is handled by hasPermission for non-admins.
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
-             getUserData().accessLevel == 'Admin' && getUserData().status == 'Ativo';
+             getUserData().accessLevel == 'Admin';
     }
     
     function hasPermission(module) {
       let userData = getUserData();
-      // An active admin has all permissions.
+      // An admin has all permissions.
       // A regular user must be active and have the specific permission flag.
-      return (isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true)) && userData.status == 'Ativo';
+      return isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true && userData.status == 'Ativo');
     }
 
     match /supplies/{supplyId} {
@@ -95,18 +95,19 @@ service cloud.firestore {
     
     match /budgets/{budgetId} {
       // Only users with finance permission can manage budgets.
-      allow read, write: if hasPermission('financeiro');
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('financeiro');
     }
     
     match /addresses/{addressId} {
         // Any authenticated and active user can manage addresses.
-        allow read, write: if isAuthenticated() && getUserData().status == 'Ativo';
+        allow read, write: if hasPermission('cadastros');
     }
 
     // This collection is used for generating sequential IDs.
     // Any authenticated user can read and write to it within a transaction.
     match /counters/{counterId} {
-        allow read, write: if isAuthenticated() && getUserData().status == 'Ativo';
+        allow read, write: if isAuthenticated();
     }
   }
 }
