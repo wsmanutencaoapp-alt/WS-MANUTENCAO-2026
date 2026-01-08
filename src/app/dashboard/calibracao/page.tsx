@@ -1,8 +1,8 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import type { Tool } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { collection, query, where, doc } from 'firebase/firestore';
+import type { Tool, Employee } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -15,10 +15,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
-import { Thermometer, History, PlusCircle, Loader2, Search } from 'lucide-react';
+import { Thermometer, History, PlusCircle, Loader2, Search, Edit } from 'lucide-react';
 import { addDays, format, isBefore, differenceInDays } from 'date-fns';
 import CalibrationDialog from '@/components/CalibrationDialog';
 import HistoryDialog from '@/components/CalibrationHistoryDialog';
+import EditCalibrationDialog from '@/components/EditCalibrationDialog'; // Import new component
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -26,11 +27,20 @@ import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 
 const CalibracaoPage = () => {
   const firestore = useFirestore();
+  const { user } = useUser();
   const [selectedTool, setSelectedTool] = useState<WithDocId<Tool> | null>(null);
   const [isCalibrationOpen, setIsCalibrationOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false); // State for the new dialog
   const [searchTerm, setSearchTerm] = useState('');
   const [classificacaoFilter, setClassificacaoFilter] = useState('todos');
+
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData } = useDoc<Employee>(userDocRef);
+  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
 
   const controllableToolsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -108,6 +118,11 @@ const CalibracaoPage = () => {
   const handleOpenHistory = (tool: WithDocId<Tool>) => {
     setSelectedTool(tool);
     setIsHistoryOpen(true);
+  };
+
+  const handleOpenEdit = (tool: WithDocId<Tool>) => {
+    setSelectedTool(tool);
+    setIsEditOpen(true);
   };
 
   return (
@@ -211,6 +226,11 @@ const CalibracaoPage = () => {
                             <Button variant="ghost" size="sm" onClick={() => handleOpenHistory(tool)}>
                                 <History className="mr-1 h-4 w-4" /> Histórico
                             </Button>
+                            {isAdmin && (
+                                <Button variant="ghost" size="sm" className="ml-2" onClick={() => handleOpenEdit(tool)}>
+                                    <Edit className="mr-1 h-4 w-4" /> Editar
+                                </Button>
+                            )}
                         </TableCell>
                     </TableRow>
                   )
@@ -232,6 +252,14 @@ const CalibracaoPage = () => {
         <HistoryDialog 
             isOpen={isHistoryOpen}
             onClose={() => setIsHistoryOpen(false)}
+            tool={selectedTool}
+        />
+      )}
+
+      {isEditOpen && selectedTool && (
+        <EditCalibrationDialog
+            isOpen={isEditOpen}
+            onClose={() => setIsEditOpen(false)}
             tool={selectedTool}
         />
       )}
