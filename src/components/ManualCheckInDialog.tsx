@@ -14,22 +14,26 @@ import { Checkbox } from '@/components/ui/checkbox';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { writeBatch, doc, query, collection, where, getDocs, limit, updateDoc } from 'firebase/firestore';
-import type { Tool, ToolRequest, InspectionResult } from '@/lib/types';
+import { writeBatch, doc, query, collection, where, getDocs } from 'firebase/firestore';
+import type { Tool, ToolRequest, InspectionResult, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { Loader2, Search, Undo2 } from 'lucide-react';
+import { Loader2, Search, Undo2, Check, ChevronsUpDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Textarea } from './ui/textarea';
 import { Separator } from './ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { cn } from '@/lib/utils';
 
 type InspectionStatus = 'ok' | 'nok';
 interface InspectionState {
   visual: InspectionStatus | null;
   funcional: InspectionStatus | null;
   observacao: string;
+  novoEnderecamento: string;
 }
 
 interface ManualCheckInDialogProps {
@@ -57,21 +61,49 @@ export default function ManualCheckInDialog({
   const [inspectionData, setInspectionData] = useState<Record<string, InspectionState>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [availableAddresses, setAvailableAddresses] = useState<{ value: string, label: string }[]>([]);
+  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
   
   const preselectedIdsString = useMemo(() => preselectedToolIds.sort().join(','), [preselectedToolIds]);
 
   useEffect(() => {
+    const fetchAddresses = async () => {
+        if (!firestore || !isOpen) return;
+        try {
+            const toolsSnapshot = await getDocs(collection(firestore, 'tools'));
+            const kitsSnapshot = await getDocs(collection(firestore, 'kits'));
+            const occupiedAddresses = new Set([
+                ...toolsSnapshot.docs.map(doc => doc.data().enderecamento),
+                ...kitsSnapshot.docs.map(doc => doc.data().enderecamento)
+            ]);
+            
+            const addressesRef = collection(firestore, 'addresses');
+            const qAddresses = query(addressesRef, where('setor', '==', '01'));
+            const addressesSnapshot = await getDocs(qAddresses);
+            
+            const unoccupied = addressesSnapshot.docs
+                .map(doc => doc.data() as Address)
+                .filter(addr => addr.codigoCompleto && !occupiedAddresses.has(addr.codigoCompleto))
+                .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
+                
+            setAvailableAddresses(unoccupied);
+        } catch (error) {
+            console.error("Erro ao buscar endereços disponíveis:", error);
+        }
+    };
+
     if (isOpen) {
+        fetchAddresses();
         const initialIds = new Set(preselectedToolIds);
         setSelectedToolIds(initialIds);
 
         const newInspectionData: Record<string, InspectionState> = {};
         initialIds.forEach(id => {
-            newInspectionData[id] = { visual: null, funcional: null, observacao: '' };
+            newInspectionData[id] = { visual: null, funcional: null, observacao: '', novoEnderecamento: '' };
         });
         setInspectionData(newInspectionData);
     }
-  }, [isOpen, preselectedIdsString]);
+  }, [isOpen, preselectedIdsString, firestore]);
 
 
   const filteredTools = useMemo(() => {
@@ -86,21 +118,18 @@ export default function ManualCheckInDialog({
   }, [allLoanedTools, searchTerm]);
 
   const handleToolSelect = (toolId: string) => {
-    // Cannot deselect tools when returning from a specific request
     if (isRequestReturn) return;
 
     setSelectedToolIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(toolId)) {
         newSet.delete(toolId);
-        // Also remove inspection data when unchecking
         const newInspectionData = { ...inspectionData };
         delete newInspectionData[toolId];
         setInspectionData(newInspectionData);
       } else {
         newSet.add(toolId);
-         // Initialize inspection data for the new tool
-        setInspectionData(prevInsp => ({...prevInsp, [toolId]: { visual: null, funcional: null, observacao: '' }}));
+        setInspectionData(prevInsp => ({...prevInsp, [toolId]: { visual: null, funcional: null, observacao: '', novoEnderecamento: '' }}));
       }
       return newSet;
     });
@@ -112,10 +141,18 @@ export default function ManualCheckInDialog({
       [toolId]: { ...prev[toolId], [type]: value },
     }));
   };
-   const handleObservacaoChange = (toolId: string, value: string) => {
+
+  const handleObservacaoChange = (toolId: string, value: string) => {
     setInspectionData(prev => ({
       ...prev,
       [toolId]: { ...prev[toolId], observacao: value },
+    }));
+  };
+  
+  const handleAddressChange = (toolId: string, value: string) => {
+    setInspectionData(prev => ({
+      ...prev,
+      [toolId]: { ...prev[toolId], novoEnderecamento: value },
     }));
   };
 
@@ -129,13 +166,11 @@ export default function ManualCheckInDialog({
 
   const isReturnDisabled = useMemo(() => {
     if (isSaving || selectedToolIds.size === 0) return true;
-    // Check if all checklists are filled for the selected tools
     for (const toolId of selectedToolIds) {
       const inspection = inspectionData[toolId];
-      if (!inspection || !inspection.visual || !inspection.funcional) {
-        return true; // Disable if any checklist is not filled
+      if (!inspection || !inspection.visual || !inspection.funcional || !inspection.novoEnderecamento) {
+        return true;
       }
-      // If NOK, observation is mandatory
       if ((inspection.visual === 'nok' || inspection.funcional === 'nok') && !inspection.observacao) {
         return true;
       }
@@ -149,7 +184,7 @@ export default function ManualCheckInDialog({
       return;
     }
     if (isReturnDisabled) {
-      toast({ variant: 'destructive', title: 'Ação Bloqueada', description: 'Preencha todos os checklists e observações (se houver NOK) antes de continuar.' });
+      toast({ variant: 'destructive', title: 'Ação Bloqueada', description: 'Preencha todos os checklists, endereços e observações (se houver NOK) antes de continuar.' });
       return;
     }
 
@@ -158,7 +193,6 @@ export default function ManualCheckInDialog({
       const batch = writeBatch(firestore);
       const toolIdsArray = Array.from(selectedToolIds);
 
-      // Find active requests for these tools
       const requestsRef = collection(firestore, 'tool_requests');
       const q = query(
         requestsRef,
@@ -167,7 +201,6 @@ export default function ManualCheckInDialog({
       );
       const requestSnapshot = await getDocs(q);
 
-      // We might have multiple requests if tools from different loans are returned together.
       const requestUpdates: Map<string, { returnedTools: string[], allTools: string[], existingConditions: Record<string, InspectionResult> }> = new Map();
 
       toolIdsArray.forEach(toolId => {
@@ -184,15 +217,10 @@ export default function ManualCheckInDialog({
         }
       });
       
-      // Update requests and tools
       for(const [reqId, update] of requestUpdates.entries()) {
-          
           const remainingToolsInRequest = update.allTools.filter(id => !update.returnedTools.includes(id));
           const allToolsForThisRequestReturned = remainingToolsInRequest.length === 0;
-
           const requestRef = doc(firestore, 'tool_requests', reqId);
-
-          // Prepare the return conditions object
           const newReturnConditions = { ...update.existingConditions };
           for (const toolId of update.returnedTools) {
               const inspection = inspectionData[toolId];
@@ -204,7 +232,6 @@ export default function ManualCheckInDialog({
                   };
               }
           }
-
           if (allToolsForThisRequestReturned) {
               batch.update(requestRef, { 
                   status: 'Devolvida', 
@@ -212,7 +239,6 @@ export default function ManualCheckInDialog({
                   returnConditions: newReturnConditions
               });
           } else {
-              // Partial return: remove returned tools from the request's list
               batch.update(requestRef, { 
                   toolIds: remainingToolsInRequest,
                   returnConditions: newReturnConditions 
@@ -220,7 +246,6 @@ export default function ManualCheckInDialog({
           }
       }
 
-      // Update tools status based on inspection
       for (const toolId of toolIdsArray) {
         const toolRef = doc(firestore, 'tools', toolId);
         const inspection = inspectionData[toolId];
@@ -228,22 +253,22 @@ export default function ManualCheckInDialog({
         
         if (isNonConforming) {
           batch.update(toolRef, { 
-            status: 'Com Avaria', // Set to evaluation status, not maintenance
-            observacao: inspection.observacao
+            status: 'Com Avaria',
+            observacao: inspection.observacao,
+            enderecamento: inspection.novoEnderecamento,
           });
         } else {
           batch.update(toolRef, { 
             status: 'Disponível',
-            observacao: '' // Clear observation if OK
+            observacao: '',
+            enderecamento: inspection.novoEnderecamento,
           });
         }
       }
 
       await batch.commit();
-
       toast({ title: 'Sucesso', description: `${toolIdsArray.length} ferramenta(s) processada(s) na devolução.` });
       
-      // Invalidate queries to refetch data across the app
       queryClient.invalidateQueries({ queryKey: ['tool_requests_active'] });
       queryClient.invalidateQueries({ queryKey: ['tool_requests_history_completed'] });
       queryClient.invalidateQueries({ queryKey: ['loanedToolsForMovement'] });
@@ -262,7 +287,7 @@ export default function ManualCheckInDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={resetAndClose}>
+    <Dialog open={isOpen} onOpenChange={resetAndClose} modal={false}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Registrar Entrada (Devolução e Inspeção)</DialogTitle>
@@ -272,7 +297,6 @@ export default function ManualCheckInDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[70vh]">
-          {/* Coluna da Esquerda: Lista de Ferramentas */}
           <div className="flex flex-col gap-4">
              <div className="space-y-1.5">
                 <Label htmlFor="toolSearch-checkin">Buscar Ferramenta Emprestada</Label>
@@ -323,7 +347,6 @@ export default function ManualCheckInDialog({
             </ScrollArea>
           </div>
           
-          {/* Coluna da Direita: Checklist */}
           <div className="flex flex-col gap-4">
             <Label>Checklist de Conformidade ({selectedToolIds.size} selecionadas)</Label>
             <ScrollArea className="h-96 border rounded-md">
@@ -355,6 +378,45 @@ export default function ManualCheckInDialog({
                             <div className="flex items-center space-x-2"><RadioGroupItem value="nok" id={`${toolId}-f-nok`} /><Label htmlFor={`${toolId}-f-nok`} className="text-xs">NOK</Label></div>
                           </RadioGroup>
                         </div>
+                      </div>
+                      <div className="space-y-1 my-2">
+                          <Label htmlFor={`${toolId}-address`} className="text-xs">Novo Endereço <span className="text-destructive">*</span></Label>
+                          <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                              <PopoverTrigger asChild>
+                                  <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      aria-expanded={isAddressPopoverOpen}
+                                      className="w-full justify-between font-normal"
+                                  >
+                                      {inspection.novoEnderecamento || "Selecione um endereço..."}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                                  <Command>
+                                      <CommandInput placeholder="Pesquisar endereço..." />
+                                      <CommandList>
+                                          <CommandEmpty>Nenhum endereço disponível.</CommandEmpty>
+                                          <CommandGroup>
+                                              {availableAddresses.map((addr) => (
+                                                  <CommandItem
+                                                      key={addr.value}
+                                                      value={addr.value}
+                                                      onSelect={(currentValue) => {
+                                                          handleAddressChange(toolId, currentValue === inspection.novoEnderecamento ? "" : currentValue);
+                                                          setIsAddressPopoverOpen(false);
+                                                      }}
+                                                  >
+                                                      <Check className={cn("mr-2 h-4 w-4", inspection.novoEnderecamento === addr.value ? "opacity-100" : "opacity-0")} />
+                                                      {addr.label}
+                                                  </CommandItem>
+                                              ))}
+                                          </CommandGroup>
+                                      </CommandList>
+                                  </Command>
+                              </PopoverContent>
+                          </Popover>
                       </div>
                       {showObservation && (
                         <div className="space-y-1 animate-in fade-in-50">
