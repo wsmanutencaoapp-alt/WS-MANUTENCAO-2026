@@ -159,7 +159,7 @@ const CalibracaoPage = () => {
                       <SelectItem value="todos">Todos os Tipos</SelectItem>
                       <SelectItem value="C">Calibrável (C)</SelectItem>
                       <SelectItem value="L">Teste de Carga (L)</SelectItem>
-                      <SelectItem value="V" anç>Vencimento (V)</SelectItem>
+                      <SelectItem value="V">Vencimento (V)</SelectItem>
                   </SelectContent>
               </Select>
             </div>
@@ -227,8 +227,8 @@ const CalibracaoPage = () => {
                                 <History className="mr-1 h-4 w-4" /> Histórico
                             </Button>
                             {isAdmin && (
-                                <Button variant="ghost" size="sm" className="ml-2" onClick={() => handleOpenEdit(tool)}>
-                                    <Edit className="mr-1 h-4 w-4" /> Editar
+                                <Button variant="ghost" size="icon" className="ml-2" onClick={() => handleOpenEdit(tool)}>
+                                    <Edit className="h-4 w-4" />
                                 </Button>
                             )}
                         </TableCell>
@@ -253,6 +253,7 @@ const CalibracaoPage = () => {
             isOpen={isHistoryOpen}
             onClose={() => setIsHistoryOpen(false)}
             tool={selectedTool}
+            isAdmin={isAdmin || false}
         />
       )}
 
