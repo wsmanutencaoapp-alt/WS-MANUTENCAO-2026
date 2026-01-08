@@ -22,19 +22,20 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import type { Tool } from '@/lib/types';
-import { Edit, ZoomIn, Save, Trash2, X, Loader2, Upload, AlertTriangle, FileText } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import type { Tool, Address, Kit } from '@/lib/types';
+import { Edit, ZoomIn, Save, Trash2, X, Loader2, Upload, AlertTriangle, FileText, ChevronsUpDown, Check } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useFirestore, useStorage } from '@/firebase';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Checkbox } from './ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertTitle, AlertDescription } from './ui/alert';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { cn } from '@/lib/utils';
 
 type DialogTool = Tool & Partial<WithDocId<Tool>>;
 
@@ -54,6 +55,10 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [availableAddresses, setAvailableAddresses] = useState<{value: string, label: string}[]>([]);
+  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+
   const firestore = useFirestore();
   const storage = useStorage();
   const { toast } = useToast();
@@ -66,6 +71,48 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     // Reset edit mode when dialog is closed or tool changes
     setIsEditing(false);
   }, [tool, isOpen]);
+  
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      if (!firestore || !isEditing) return;
+      setIsLoadingAddresses(true);
+      try {
+        const toolsSnapshot = await getDocs(collection(firestore, 'tools'));
+        const kitsSnapshot = await getDocs(collection(firestore, 'kits'));
+        
+        // Create a set of all occupied addresses, but exclude the current tool's address
+        const occupiedAddresses = new Set(
+          [
+            ...toolsSnapshot.docs.map(d => d.data().enderecamento),
+            ...kitsSnapshot.docs.map(d => d.data().enderecamento)
+          ].filter(addr => !!addr && addr !== tool?.enderecamento)
+        );
+        
+        const addressesRef = collection(firestore, 'addresses');
+        const qAddresses = query(addressesRef, where('setor', '==', '01'));
+        const addressesSnapshot = await getDocs(qAddresses);
+        
+        const unoccupied = addressesSnapshot.docs
+            .map(doc => doc.data() as Address)
+            .filter(addr => addr.codigoCompleto && !occupiedAddresses.has(addr.codigoCompleto))
+            .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
+            
+        // If the tool has a current address, add it to the list so it can be re-selected
+        if (tool?.enderecamento && !unoccupied.some(a => a.value === tool.enderecamento)) {
+            unoccupied.unshift({ value: tool.enderecamento, label: tool.enderecamento });
+        }
+            
+        setAvailableAddresses(unoccupied);
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar endereços.' });
+      } finally {
+        setIsLoadingAddresses(false);
+      }
+    };
+
+    fetchAddresses();
+  }, [isEditing, firestore, toast, tool]);
+
 
   if (!tool) {
     return null;
@@ -94,8 +141,8 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     }));
 };
 
-  const handleSelectChange = (id: string, value: string) => {
-    setEditableTool((prev) => ({ ...prev, [id]: value }));
+  const handleAddressChange = (value: string) => {
+    setEditableTool((prev) => ({ ...prev, enderecamento: value }));
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,7 +276,43 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                 </div>
                 <div className="space-y-1">
                     <Label htmlFor="enderecamento">Endereçamento</Label>
-                    <Input id="enderecamento" value={editableTool.enderecamento || ''} onChange={handleInputChange} />
+                    <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                        <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={isAddressPopoverOpen}
+                            className="w-full justify-between font-normal"
+                            disabled={isLoadingAddresses}
+                        >
+                            {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : editableTool.enderecamento || "Selecione..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                            <Command>
+                            <CommandInput placeholder="Pesquisar endereço..." />
+                            <CommandList>
+                                <CommandEmpty>Nenhum endereço disponível.</CommandEmpty>
+                                <CommandGroup>
+                                {availableAddresses.map((addr) => (
+                                    <CommandItem
+                                    key={addr.value}
+                                    value={addr.value}
+                                    onSelect={(currentValue) => {
+                                        handleAddressChange(currentValue === editableTool.enderecamento ? "" : currentValue)
+                                        setIsAddressPopoverOpen(false)
+                                    }}
+                                    >
+                                    <Check className={cn("mr-2 h-4 w-4", editableTool.enderecamento === addr.value ? "opacity-100" : "opacity-0")} />
+                                    {addr.label}
+                                    </CommandItem>
+                                ))}
+                                </CommandGroup>
+                            </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                 </div>
                 <div className="space-y-1">
                     <Label htmlFor="marca">Marca</Label>
