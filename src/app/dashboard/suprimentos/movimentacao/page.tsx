@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import type { SupplyMovement, Supply, SupplyStock } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
