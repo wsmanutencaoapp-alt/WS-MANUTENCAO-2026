@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -33,7 +32,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, isValid } from 'date-fns';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface SupplyMovementDialogProps {
   isOpen: boolean;
@@ -61,6 +59,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
 
   const [isValidadeOpen, setIsValidadeOpen] = useState(false);
   const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+  const [isSupplyPopoverOpen, setIsSupplyPopoverOpen] = useState(false);
   
   const allSuppliesQuery = useMemoFirebase(() => (
       firestore && !preselectedSupply ? query(collection(firestore, 'supplies')) : null
@@ -174,26 +173,50 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             {!preselectedSupply ? (
                  <div className="space-y-1.5">
                     <Label>Item de Suprimento <span className="text-destructive">*</span></Label>
-                    <Select
-                        onValueChange={(docId) => {
-                            const foundSupply = allSupplies?.find(s => s.docId === docId);
-                            setSelectedSupply(foundSupply || null);
-                        }}
-                        value={selectedSupply?.docId}
-                    >
-                        <SelectTrigger disabled={isLoadingSupplies}>
-                            <SelectValue placeholder={isLoadingSupplies ? "Carregando..." : "Selecione um item..."}>
-                                {selectedSupply ? `${selectedSupply.codigo} - ${selectedSupply.descricao}` : (isLoadingSupplies ? "Carregando..." : "Selecione um item...")}
-                            </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {allSupplies?.map((item) => (
-                                <SelectItem key={item.docId} value={item.docId}>
-                                    {item.codigo} - {item.descricao}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                     <Popover open={isSupplyPopoverOpen} onOpenChange={setIsSupplyPopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={isSupplyPopoverOpen}
+                            className="w-full justify-between font-normal"
+                            disabled={isLoadingSupplies}
+                            >
+                            {isLoadingSupplies ? <Loader2 className="h-4 w-4 animate-spin"/> : selectedSupply
+                                ? `${selectedSupply.codigo} - ${selectedSupply.descricao}`
+                                : "Selecione um item..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                            <Command>
+                                <CommandInput placeholder="Buscar por código ou descrição..." />
+                                <CommandList>
+                                <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                    {allSupplies?.map((item) => (
+                                    <CommandItem
+                                        key={item.docId}
+                                        value={`${item.codigo} ${item.descricao}`}
+                                        onSelect={() => {
+                                            setSelectedSupply(item);
+                                            setIsSupplyPopoverOpen(false);
+                                        }}
+                                    >
+                                        <Check
+                                        className={cn(
+                                            "mr-2 h-4 w-4",
+                                            selectedSupply?.docId === item.docId ? "opacity-100" : "opacity-0"
+                                        )}
+                                        />
+                                        {item.codigo} - {item.descricao}
+                                    </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                  </div>
             ) : (
                 <div className="p-3 rounded-md bg-muted/50 border">
@@ -288,4 +311,3 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     </Dialog>
   );
 }
-
