@@ -26,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, CalendarIcon, ChevronsUpDown } from 'lucide-react';
 import type { Supply, SupplyStock, SupplyMovement, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Popover, PopoverContent, PopoverTrigger, PopoverPortal } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -294,15 +294,17 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                                    <div className="space-y-1.5">
                                       <Label>Data de Validade <span className="text-destructive">*</span></Label>
                                       <Popover open={isValidadeOpen} onOpenChange={setIsValidadeOpen}>
-                                          <PopoverTrigger asChild>
+                                        <PopoverTrigger asChild>
                                           <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                              <CalendarIcon className="mr-2 h-4 w-4" />
-                                              {validade ? format(validade, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {validade ? format(validade, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
                                           </Button>
-                                          </PopoverTrigger>
+                                        </PopoverTrigger>
+                                        <PopoverPortal>
                                           <PopoverContent className="w-auto p-0">
                                               <Calendar mode="single" selected={validade} onSelect={setValidade} initialFocus onDayClick={() => setIsValidadeOpen(false)} />
                                           </PopoverContent>
+                                        </PopoverPortal>
                                       </Popover>
                                   </div>
                               )}
