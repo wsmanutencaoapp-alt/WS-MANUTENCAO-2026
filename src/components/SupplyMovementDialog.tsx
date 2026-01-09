@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter } from '@/firebase';
 import {
   collection,
@@ -10,7 +10,11 @@ import {
   where,
   getDocs,
   runTransaction,
+  uploadBytes,
+  getDownloadURL,
+  ref as storageRef,
 } from 'firebase/firestore';
+import { useStorage } from '@/firebase/provider';
 import {
   Dialog,
   DialogContent,
@@ -23,11 +27,9 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CalendarIcon, ChevronsUpDown } from 'lucide-react';
+import { Loader2, CalendarIcon, ChevronsUpDown, Upload, FileText } from 'lucide-react';
 import type { Supply, SupplyStock, SupplyMovement, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { Popover, PopoverContent, PopoverTrigger, PopoverPortal } from './ui/popover';
-import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, parse, isValid } from 'date-fns';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -48,9 +50,11 @@ interface SupplyMovementDialogProps {
 
 export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type, supply: preselectedSupply }: SupplyMovementDialogProps) {
   const firestore = useFirestore();
+  const storage = useStorage();
   const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [selectedSupply, setSelectedSupply] = useState<WithDocId<Supply> | null>(preselectedSupply);
@@ -64,6 +68,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
   const [unitCost, setUnitCost] = useState('');
   const [localizacao, setLocalizacao] = useState('');
   const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
+  const [documentoFile, setDocumentoFile] = useState<File | null>(null);
   
   // UI state
   const [selectorOpen, setSelectorOpen] = useState<'supply' | 'address' | 'stock' | null>(null);
@@ -116,6 +121,8 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     setUnitCost('');
     setLocalizacao('');
     setSelectedStockId(null);
+    setDocumentoFile(null);
+    if(docInputRef.current) docInputRef.current.value = '';
   };
   
   const handleClose = () => {
@@ -130,9 +137,16 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
         setLocalizacao(preselectedSupply?.localizacaoPadrao || '');
     }
   }, [isOpen, preselectedSupply]);
+  
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setDocumentoFile(file);
+    }
+  };
 
   const handleSave = async () => {
-    if (!firestore || !user || !selectedSupply) {
+    if (!firestore || !user || !selectedSupply || !storage) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Item de suprimento não selecionado.' });
         return;
     }
@@ -186,7 +200,14 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             const loteInterno = `${year}${month}${String(newSequencial).padStart(4, '0')}`;
             const newStockRef = doc(collection(firestore, 'supplies', selectedSupply.docId, 'stock'));
             
-            const stockData: Omit<SupplyStock, 'id'> = { loteInterno, quantidade: numQuantity, localizacao, dataEntrada: today.toISOString(), custoUnitario: parseFloat(unitCost) || 0, status: 'Disponível' };
+            let documentoUrl = '';
+            if (documentoFile) {
+                const docFileRef = storageRef(storage, `supply_documents/${selectedSupply.docId}/${newStockRef.id}/${documentoFile.name}`);
+                await uploadBytes(docFileRef, documentoFile);
+                documentoUrl = await getDownloadURL(docFileRef);
+            }
+
+            const stockData: Omit<SupplyStock, 'id'> = { loteInterno, quantidade: numQuantity, localizacao, dataEntrada: today.toISOString(), custoUnitario: parseFloat(unitCost) || 0, status: 'Disponível', documentoUrl: documentoUrl };
             if (loteFornecedor) stockData.loteFornecedor = loteFornecedor;
             if (validadeDate) stockData.dataValidade = validadeDate.toISOString();
 
@@ -320,6 +341,16 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                                       />
                                   </div>
                               )}
+                              <div className="space-y-1.5">
+                                <Label>Documento do Lote (Opcional)</Label>
+                                <Button asChild variant="outline" className="w-full">
+                                    <label className="cursor-pointer flex items-center">
+                                        {documentoFile ? <FileText className="mr-2 h-4 w-4 text-green-600" /> : <Upload className="mr-2 h-4 w-4" />}
+                                        <span className="truncate max-w-xs">{documentoFile ? documentoFile.name : 'Anexar documento'}</span>
+                                        <Input type="file" className="sr-only" ref={docInputRef} onChange={handleDocumentChange} />
+                                    </label>
+                                </Button>
+                              </div>
                           </>
                       ) : (
                            <>
@@ -411,5 +442,3 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     </>
   );
 }
-
-    

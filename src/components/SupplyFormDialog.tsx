@@ -67,7 +67,6 @@ const formSchema = z.object({
   partNumber: z.string(),
   unidadeMedida: z.enum(['UN', 'KG', 'MT', 'LT', 'CX']),
   imageUrl: z.string().optional(),
-  documentoUrl: z.string().optional(),
   
   // Aba 2: Rastreabilidade
   exigeLote: z.boolean().default(false),
@@ -107,10 +106,8 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const [isSaving, setIsSaving] = useState(false);
   
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [documentoFile, setDocumentoFile] = useState<File | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const docInputRef = useRef<HTMLInputElement>(null);
   
   const addressesQuery = useMemoFirebase(() => (
       firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
@@ -135,7 +132,6 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       estoqueMaximo: 0,
       localizacaoPadrao: '',
       imageUrl: '',
-      documentoUrl: '',
     },
   });
 
@@ -144,9 +140,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const resetFormAndClose = () => {
     form.reset();
     setPreviewImage(null);
-    setDocumentoFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
-    if (docInputRef.current) docInputRef.current.value = '';
     onClose();
   }
 
@@ -154,16 +148,14 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
     if (supply) {
       form.reset(supply);
       setPreviewImage(supply.imageUrl || null);
-      setDocumentoFile(null);
     } else {
       form.reset({
         descricao: '', partNumber: '', unidadeMedida: 'UN', familia: 'CT',
         exigeLote: false, exigeSerialNumber: false, exigeValidade: false,
         estoqueMinimo: 0, estoqueMaximo: 0, localizacaoPadrao: '',
-        imageUrl: '', documentoUrl: '',
+        imageUrl: '',
       });
       setPreviewImage(null);
-      setDocumentoFile(null);
     }
   }, [supply, form, isOpen]);
 
@@ -205,12 +197,6 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
     }
   };
 
-  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setDocumentoFile(file);
-    }
-  };
 
   const handleSave = async (values: z.infer<typeof formSchema>) => {
     if (!firestore || !storage) return;
@@ -224,22 +210,8 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
           const snapshot = await uploadString(imageRef, previewImage, 'data_url');
           finalImageUrl = await getDownloadURL(snapshot.ref);
       }
-
-      let finalDocumentoUrl = supply?.documentoUrl || '';
-      if (documentoFile) {
-        if (supply?.documentoUrl) {
-            try {
-                const fileUrl = new URL(supply.documentoUrl);
-                const filePath = decodeURIComponent(fileUrl.pathname.split('/o/')[1].split('?')[0]);
-                await deleteObject(storageRef(storage, filePath));
-            } catch(e) { console.warn("Could not delete old document", e)}
-        }
-        const docRef = storageRef(storage, `supply_documents/${tempId}/${documentoFile.name}`);
-        const snapshot = await uploadBytes(docRef, documentoFile);
-        finalDocumentoUrl = await getDownloadURL(snapshot.ref);
-      }
       
-      const dataToSave = { ...values, imageUrl: finalImageUrl, documentoUrl: finalDocumentoUrl };
+      const dataToSave = { ...values, imageUrl: finalImageUrl };
 
       if (supply) {
         // Edit mode
@@ -377,21 +349,6 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                             </div>
                             <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Carregar Foto</Button>
                             <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
-                       </div>
-                        <div className="space-y-2">
-                           <Label>Documento (FISPQ, Certificado, etc.)</Label>
-                           <div className="flex items-center gap-2">
-                            {supply?.documentoUrl && !documentoFile && (
-                                <Button asChild variant="secondary" size="icon" title="Visualizar documento atual">
-                                    <a href={supply.documentoUrl} target="_blank" rel="noopener noreferrer"><ExternalLink/></a>
-                                </Button>
-                            )}
-                            <Button type="button" variant="outline" className="w-full" onClick={() => docInputRef.current?.click()}>
-                                <Upload className="mr-2"/>
-                                <span className="truncate">{documentoFile ? documentoFile.name : (supply?.documentoUrl ? "Trocar Documento" : "Anexar Documento")}</span>
-                            </Button>
-                            <Input type="file" ref={docInputRef} onChange={handleDocumentChange} className="hidden"/>
-                           </div>
                        </div>
                    </div>
                  </div>

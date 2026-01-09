@@ -27,7 +27,7 @@ export type Supply = {
   
   // Anexos
   imageUrl?: string;
-  documentoUrl?: string;
+  // documentoUrl foi movido para SupplyStock
 };
 
 export type SupplyStock = {
@@ -40,6 +40,7 @@ export type SupplyStock = {
     dataValidade?: string; // ISO date string
     custoUnitario?: number;
     status: 'Disponível' | 'Reservado' | 'Bloqueado';
+    documentoUrl?: string; // URL do documento específico do lote (FISPQ, Certificado)
 };
 
 export type SupplyMovement = {

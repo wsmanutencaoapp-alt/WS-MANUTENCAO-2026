@@ -20,7 +20,7 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight, Printer } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight, Printer, ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
@@ -257,6 +257,13 @@ const SuprimentosPage = () => {
                         <Button variant="ghost" size="icon" title="Editar Item Mestre" onClick={() => handleOpenFormDialog(supplyInfo)}>
                             <Edit className="h-4 w-4"/>
                         </Button>
+                        {item.documentoUrl && (
+                             <Button asChild variant="ghost" size="icon" title="Ver Documento do Lote">
+                                <a href={item.documentoUrl} target="_blank" rel="noopener noreferrer">
+                                   <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </Button>
+                        )}
                         <Button variant="ghost" size="icon" title="Imprimir Etiqueta do Lote" onClick={() => setStockToPrint(item)}>
                             <Printer className="h-4 w-4" />
                         </Button>
