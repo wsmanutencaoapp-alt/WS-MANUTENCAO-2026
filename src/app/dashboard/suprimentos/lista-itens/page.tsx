@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
+import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
 import type { Supply, SupplyStock } from '@/lib/types';
 import {
   Table,
@@ -30,8 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import SupplyMovementDialog from '@/components/SupplyMovementDialog';
-import { getDocs } from 'firebase/firestore';
-
+import StockDetailsDialog from '@/components/StockDetailsDialog'; // Import new component
 
 const SuprimentosPage = () => {
   const firestore = useFirestore();
@@ -45,6 +44,8 @@ const SuprimentosPage = () => {
     type: 'entrada' | 'saida';
     supply: WithDocId<Supply> | null;
   }>({ isOpen: false, type: 'entrada', supply: null });
+  const [selectedSupplyForDetails, setSelectedSupplyForDetails] = useState<WithDocId<Supply> | null>(null);
+
 
   const suppliesQueryKey = ['suppliesMasterDataForListing'];
   const suppliesQuery = useMemoFirebase(
@@ -107,6 +108,10 @@ const SuprimentosPage = () => {
       queryClient.invalidateQueries({ queryKey: suppliesQueryKey });
       queryClient.invalidateQueries({ queryKey: ['allSupplyStock'] });
       setDialogState({ isOpen: false, type: 'entrada', supply: null });
+  };
+
+  const openStockDetails = (supply: WithDocId<Supply>) => {
+    setSelectedSupplyForDetails(supply);
   };
 
 
@@ -185,7 +190,16 @@ const SuprimentosPage = () => {
                   <TableCell className="font-mono">{item.codigo}</TableCell>
                   <TableCell className="font-medium">{item.descricao}</TableCell>
                   <TableCell>{item.partNumber || 'N/A'}</TableCell>
-                  <TableCell className="font-bold">{(item.saldoAtual || 0).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="link" 
+                      className="font-bold p-0 h-auto"
+                      onClick={() => openStockDetails(item)}
+                      disabled={(item.saldoAtual || 0) === 0}
+                    >
+                      {(item.saldoAtual || 0).toLocaleString()}
+                    </Button>
+                  </TableCell>
                   <TableCell>{item.unidadeMedida}</TableCell>
                    <TableCell className="text-right space-x-1">
                       <Button variant="outline" size="icon" title="Registrar Entrada" onClick={() => handleOpenDialog('entrada', item)}>
@@ -228,6 +242,14 @@ const SuprimentosPage = () => {
             onClose={() => setDialogState(prev => ({...prev, isOpen: false}))}
             onSuccess={handleDialogSuccess}
           />
+      )}
+
+      {selectedSupplyForDetails && (
+        <StockDetailsDialog
+          isOpen={!!selectedSupplyForDetails}
+          onClose={() => setSelectedSupplyForDetails(null)}
+          supply={selectedSupplyForDetails}
+        />
       )}
     </div>
   );
