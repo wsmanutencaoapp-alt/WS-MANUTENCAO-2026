@@ -2,6 +2,7 @@
 
 
 
+
 export type Supply = {
   id?: string;
   // Identificação
@@ -117,6 +118,7 @@ export type Permissions = {
   financeiro?: boolean;
   configurador?: boolean;
   userManagement?: boolean;
+  suprimentos_lista?: boolean;
   suprimentos_movimentacao?: boolean;
   ferramentaria_lista?: boolean;
   ferramentaria_movimentacao?: boolean;

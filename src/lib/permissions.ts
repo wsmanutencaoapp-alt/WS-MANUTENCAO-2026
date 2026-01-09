@@ -1,6 +1,7 @@
 export const availableModules: { id: string; label: string, isModule?: boolean }[] = [
     { id: 'dashboard', label: 'Dashboard', isModule: true },
     { id: 'suprimentos', label: 'Suprimentos (Módulo)', isModule: true },
+    { id: 'suprimentos_lista', label: '-> Lista de Itens', isModule: false },
     { id: 'suprimentos_movimentacao', label: '-> Movimentação', isModule: false },
     { id: 'ferramentaria', label: 'Ferramentaria (Módulo)', isModule: true },
     { id: 'ferramentaria_lista', label: '-> Lista de Ferramentas', isModule: false },

@@ -66,6 +66,7 @@ const allNavItems: NavItem[] = [
     label: 'Suprimentos',
     permission: 'suprimentos',
     subItems: [
+        { href: '/dashboard/suprimentos/lista-itens', icon: List, label: 'Lista de Itens', permission: 'suprimentos_lista' },
         { href: '/dashboard/suprimentos/movimentacao', label: 'Movimentação', permission: 'suprimentos_movimentacao' },
     ]
   },
