@@ -116,18 +116,23 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             const newStockRef = doc(collection(firestore, 'supply_stock'));
             const loteInterno = `LOTE-${Date.now()}`;
             
-            const stockData: SupplyStock = {
+            const stockData: Partial<SupplyStock> = {
                 supplyId: selectedSupply.docId,
                 supplyCodigo: selectedSupply.codigo,
                 loteInterno: loteInterno,
-                loteFornecedor: loteFornecedor || undefined,
                 quantidade: numQuantity,
                 localizacao: localizacao,
                 dataEntrada: new Date().toISOString(),
-                dataValidade: validade ? validade.toISOString() : undefined,
                 custoUnitario: parseFloat(unitCost) || 0,
                 status: 'Disponível'
             };
+
+            if (loteFornecedor) {
+                stockData.loteFornecedor = loteFornecedor;
+            }
+            if (validade) {
+                stockData.dataValidade = validade.toISOString();
+            }
 
             const movementData: Omit<SupplyMovement, 'id'> = {
                 supplyId: selectedSupply.docId,
