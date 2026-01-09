@@ -38,12 +38,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, PlusCircle, Trash2, Edit, Search } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, Edit, Search, LogIn, LogOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import Image from 'next/image';
 import SupplyFormDialog from '@/components/SupplyFormDialog';
+import SupplyMovementDialog from '@/components/SupplyMovementDialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 
@@ -52,8 +53,14 @@ const CadastroSuprimentosPage = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [editingSupply, setEditingSupply] = useState<WithDocId<Supply> | null>(null);
+  const [movementDialogState, setMovementDialogState] = useState<{
+    isOpen: boolean;
+    type: 'entrada' | 'saida';
+    supply: WithDocId<Supply> | null;
+  }>({ isOpen: false, type: 'entrada', supply: null });
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
@@ -80,15 +87,20 @@ const CadastroSuprimentosPage = () => {
     );
   }, [supplies, searchTerm]);
 
-  const handleOpenDialog = (supply: WithDocId<Supply> | null = null) => {
+  const handleOpenFormDialog = (supply: WithDocId<Supply> | null = null) => {
     setEditingSupply(supply);
-    setIsDialogOpen(true);
+    setIsFormDialogOpen(true);
+  };
+
+  const handleOpenMovementDialog = (type: 'entrada' | 'saida', supply: WithDocId<Supply>) => {
+    setMovementDialogState({ isOpen: true, type, supply });
   };
   
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: suppliesQueryKey });
-    setIsDialogOpen(false);
+    setIsFormDialogOpen(false);
     setEditingSupply(null);
+    setMovementDialogState({ isOpen: false, type: 'entrada', supply: null });
   };
   
   const handleDelete = async (supplyId: string) => {
@@ -110,7 +122,7 @@ const CadastroSuprimentosPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Cadastro de Suprimentos (Master Data)</h1>
-        <Button onClick={() => handleOpenDialog(null)}>
+        <Button onClick={() => handleOpenFormDialog(null)}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Adicionar Item
         </Button>
@@ -174,12 +186,18 @@ const CadastroSuprimentosPage = () => {
                   <TableCell><Badge variant="outline">{item.familia}</Badge></TableCell>
                   <TableCell>{item.unidadeMedida}</TableCell>
                   <TableCell className="text-right space-x-2">
-                    <Button variant="outline" size="icon" onClick={() => handleOpenDialog(item)}>
+                    <Button variant="ghost" size="icon" title="Registrar Entrada" onClick={() => handleOpenMovementDialog('entrada', item)}>
+                        <LogIn className="h-4 w-4 text-green-600"/>
+                    </Button>
+                     <Button variant="ghost" size="icon" title="Registrar Saída" onClick={() => handleOpenMovementDialog('saida', item)}>
+                        <LogOut className="h-4 w-4 text-orange-600"/>
+                    </Button>
+                    <Button variant="outline" size="icon" title="Editar Item" onClick={() => handleOpenFormDialog(item)}>
                       <Edit className="h-4 w-4" />
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="icon" disabled={isDeleting === item.docId}>
+                        <Button variant="destructive" size="icon" title="Excluir Item" disabled={isDeleting === item.docId}>
                             {isDeleting === item.docId ? <Loader2 className="animate-spin h-4 w-4"/> : <Trash2 className="h-4 w-4" />}
                         </Button>
                       </AlertDialogTrigger>
@@ -187,7 +205,7 @@ const CadastroSuprimentosPage = () => {
                           <AlertDialogHeader>
                           <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
                           <AlertDialogDescription>
-                              Tem certeza que deseja excluir o item <span className="font-bold">{item.descricao}</span>?
+                              Tem certeza que deseja excluir o item <span className="font-bold">{item.descricao}</span>? Esta ação não pode ser desfeita.
                           </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -207,11 +225,21 @@ const CadastroSuprimentosPage = () => {
       </Card>
 
       <SupplyFormDialog
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
+        isOpen={isFormDialogOpen}
+        onClose={() => setIsFormDialogOpen(false)}
         onSuccess={handleSuccess}
         supply={editingSupply}
       />
+
+       {movementDialogState.isOpen && (
+          <SupplyMovementDialog
+            isOpen={movementDialogState.isOpen}
+            type={movementDialogState.type}
+            supply={movementDialogState.supply}
+            onClose={() => setMovementDialogState(prev => ({...prev, isOpen: false}))}
+            onSuccess={handleSuccess}
+          />
+      )}
       
       {imageToView && (
         <Dialog open={!!imageToView} onOpenChange={() => setImageToView(null)}>
