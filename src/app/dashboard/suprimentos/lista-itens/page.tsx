@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
@@ -34,9 +33,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 
 
-type SupplyWithStock = WithDocId<Supply> & {
-    stock: WithDocId<SupplyStock>[];
-    totalStock: number;
+type EnrichedStockItem = WithDocId<SupplyStock> & {
+    supplyInfo: WithDocId<Supply>;
 };
 
 
@@ -58,9 +56,7 @@ const SuprimentosPage = () => {
   }>({ isOpen: false, supply: null });
   
   const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-
-
+  
   // 1. Fetch all master supply data 
   const suppliesQueryKey = ['suppliesMasterDataForStockList'];
   const suppliesQuery = useMemoFirebase(
@@ -71,24 +67,34 @@ const SuprimentosPage = () => {
     queryKey: suppliesQueryKey
   });
 
-  const [suppliesWithStock, setSuppliesWithStock] = useState<SupplyWithStock[]>([]);
+  const [enrichedStock, setEnrichedStock] = useState<EnrichedStockItem[]>([]);
   const [isStockLoading, setIsStockLoading] = useState(true);
 
-  // 2. Fetch stock for each supply item
+  // 2. Fetch all stock items from all supplies and enrich them
   useEffect(() => {
     if (!supplies || !firestore) return;
 
     const fetchAllStock = async () => {
         setIsStockLoading(true);
-        const enrichedSupplies: SupplyWithStock[] = [];
+        const allStockItems: EnrichedStockItem[] = [];
+        const supplyMap = new Map(supplies.map(s => [s.docId, s]));
+
         for (const supply of supplies) {
             const stockCollectionRef = collection(firestore, 'supplies', supply.docId, 'stock');
             const stockSnapshot = await getDocs(stockCollectionRef);
-            const stockItems = stockSnapshot.docs.map(doc => ({ ...doc.data() as SupplyStock, docId: doc.id }));
-            const totalStock = stockItems.reduce((acc, item) => acc + item.quantidade, 0);
-            enrichedSupplies.push({ ...supply, stock: stockItems, totalStock });
+            
+            stockSnapshot.forEach(doc => {
+                 const stockData = { ...doc.data() as SupplyStock, docId: doc.id };
+                 const supplyInfo = supplyMap.get(supply.docId);
+                 if (supplyInfo) {
+                     allStockItems.push({
+                         ...stockData,
+                         supplyInfo: supplyInfo
+                     });
+                 }
+            });
         }
-        setSuppliesWithStock(enrichedSupplies);
+        setEnrichedStock(allStockItems);
         setIsStockLoading(false);
     };
 
@@ -96,22 +102,24 @@ const SuprimentosPage = () => {
   }, [supplies, firestore]);
   
 
-  const filteredSupplies = useMemo(() => {
-    if (!suppliesWithStock) return [];
-    if (!searchTerm) return suppliesWithStock;
+  const filteredStock = useMemo(() => {
+    if (!enrichedStock) return [];
+    if (!searchTerm) return enrichedStock;
 
     const lowercasedTerm = searchTerm.toLowerCase();
-    return suppliesWithStock.filter(item => 
-      (item.descricao && item.descricao.toLowerCase().includes(lowercasedTerm)) ||
-      (item.codigo && item.codigo.toLowerCase().includes(lowercasedTerm))
+    return enrichedStock.filter(item => 
+      (item.supplyInfo.descricao && item.supplyInfo.descricao.toLowerCase().includes(lowercasedTerm)) ||
+      (item.supplyInfo.codigo && item.supplyInfo.codigo.toLowerCase().includes(lowercasedTerm)) ||
+      (item.loteInterno && item.loteInterno.toLowerCase().includes(lowercasedTerm)) ||
+      (item.localizacao && item.localizacao.toLowerCase().includes(lowercasedTerm))
     );
-  }, [suppliesWithStock, searchTerm]);
+  }, [enrichedStock, searchTerm]);
   
   const handleGoToCadastro = () => {
     router.push('/dashboard/cadastros/suprimentos');
   }
 
-  const handleOpenMovementDialog = (type: 'entrada' | 'saida', supply: WithDocId<Supply>) => {
+  const handleOpenMovementDialog = (type: 'entrada' | 'saida', supply: WithDocId<Supply> | null) => {
     setMovementDialogState({ isOpen: true, type, supply });
   };
 
@@ -120,23 +128,10 @@ const SuprimentosPage = () => {
   };
   
   const handleDialogSuccess = () => {
+      // Re-trigger the stock fetching
       queryClient.invalidateQueries({ queryKey: suppliesQueryKey });
-      // We need to re-trigger the useEffect that fetches stock
-      // Invalidating the master data query will do that.
       setMovementDialogState({ isOpen: false, type: 'entrada', supply: null });
       setFormDialogState({ isOpen: false, supply: null });
-  };
-  
-  const toggleRowExpansion = (docId: string) => {
-    setExpandedRows(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(docId)) {
-            newSet.delete(docId);
-        } else {
-            newSet.add(docId);
-        }
-        return newSet;
-    });
   };
 
   const isLoading = isLoadingSupplies || isStockLoading;
@@ -144,13 +139,13 @@ const SuprimentosPage = () => {
   return (
     <div className="space-y-6">
        <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Inventário Geral de Suprimentos</h1>
+        <h1 className="text-2xl font-bold">Inventário de Suprimentos por Lote</h1>
         <div className="flex gap-2">
-            <Button onClick={() => setMovementDialogState({ isOpen: true, type: 'entrada', supply: null })}>
+            <Button onClick={() => handleOpenMovementDialog('entrada', null)}>
                 <LogIn className="mr-2 h-4 w-4"/>
                 Registrar Entrada
             </Button>
-            <Button onClick={() => setMovementDialogState({ isOpen: true, type: 'saida', supply: null })}>
+            <Button onClick={() => handleOpenMovementDialog('saida', null)}>
                 <LogOut className="mr-2 h-4 w-4"/>
                 Registrar Saída
             </Button>
@@ -163,14 +158,14 @@ const SuprimentosPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Visão de Estoque</CardTitle>
+          <CardTitle>Visão de Estoque por Lote</CardTitle>
           <CardDescription>
-            Visualize o saldo total de cada item. Clique em um item para ver os detalhes dos lotes.
+            Visualize cada lote de item individualmente no estoque.
           </CardDescription>
           <div className="relative pt-4">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-                placeholder="Pesquisar por item ou código..."
+                placeholder="Pesquisar por item, código, lote ou localização..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -181,113 +176,59 @@ const SuprimentosPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12"></TableHead>
                 <TableHead className="w-16">Foto</TableHead>
                 <TableHead>Item (Código)</TableHead>
-                <TableHead>Part Number</TableHead>
-                <TableHead>Saldo Total</TableHead>
-                <TableHead>Estoque Mín.</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Lote Interno</TableHead>
+                <TableHead>Localização</TableHead>
+                <TableHead>Quantidade</TableHead>
+                <TableHead>Validade</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
-                <TableRow><TableCell colSpan={8} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
               )}
-              {!isLoading && filteredSupplies.length === 0 && (
+              {!isLoading && filteredStock.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                         <PackageSearch className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                         <p className="text-muted-foreground">Nenhum item em estoque.</p>
                     </TableCell>
                 </TableRow>
               )}
-              {!isLoading && filteredSupplies.map(item => {
-                  const status = item.totalStock <= 0 
-                               ? 'Sem Estoque' 
-                               : item.totalStock <= item.estoqueMinimo 
-                               ? 'Estoque Baixo' 
-                               : 'Em Estoque';
-                  const statusVariant = status === 'Sem Estoque' ? 'destructive' : status === 'Estoque Baixo' ? 'default' : 'success';
-                  const isExpanded = expandedRows.has(item.docId);
-
+              {!isLoading && filteredStock.map(item => {
+                  const { supplyInfo } = item;
                   return (
-                    <Fragment key={item.docId}>
-                        <TableRow>
-                            <TableCell>
-                                {item.stock.length > 0 && (
-                                    <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(item.docId)}>
-                                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                    </Button>
-                                )}
-                            </TableCell>
-                            <TableCell>
-                            <button onClick={() => setImageToView({ src: item.imageUrl || 'https://picsum.photos/seed/supply/48/48', alt: item.descricao || 'Item sem imagem' })}>
-                                <Image
-                                alt={item.descricao || ''}
-                                className="aspect-square rounded-md object-cover cursor-pointer"
-                                height="48"
-                                src={item.imageUrl || 'https://picsum.photos/seed/supply/48/48'}
-                                width="48"
-                                />
-                            </button>
-                            </TableCell>
+                    <TableRow key={item.docId}>
                         <TableCell>
-                            <div className="font-medium">{item.descricao}</div>
-                            <div className="text-sm text-muted-foreground">{item.codigo}</div>
+                        <button onClick={() => setImageToView({ src: supplyInfo.imageUrl || 'https://picsum.photos/seed/supply/48/48', alt: supplyInfo.descricao || 'Item sem imagem' })}>
+                            <Image
+                            alt={supplyInfo.descricao || ''}
+                            className="aspect-square rounded-md object-cover cursor-pointer"
+                            height="48"
+                            src={supplyInfo.imageUrl || 'https://picsum.photos/seed/supply/48/48'}
+                            width="48"
+                            />
+                        </button>
                         </TableCell>
-                        <TableCell className="font-mono">{item.partNumber}</TableCell>
-                        <TableCell className="font-bold">{item.totalStock.toLocaleString()}</TableCell>
-                        <TableCell>{item.estoqueMinimo.toLocaleString()}</TableCell>
-                        <TableCell>
-                            <Badge variant={statusVariant}>{status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right space-x-1">
-                            <Button variant="ghost" size="icon" title="Registrar Entrada" onClick={() => handleOpenMovementDialog('entrada', item)}>
-                                <LogIn className="h-4 w-4 text-green-600"/>
-                            </Button>
-                            <Button variant="ghost" size="icon" title="Registrar Saída" onClick={() => handleOpenMovementDialog('saida', item)}>
-                                <LogOut className="h-4 w-4 text-orange-600"/>
-                            </Button>
-                            <Button variant="ghost" size="icon" title="Editar Item Mestre" onClick={() => handleOpenFormDialog(item)}>
-                                <Edit className="h-4 w-4"/>
-                            </Button>
-                        </TableCell>
-                        </TableRow>
-                        {isExpanded && (
-                            <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <TableCell colSpan={8} className="p-0">
-                                    <div className="p-4">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Lote Interno</TableHead>
-                                                    <TableHead>Lote Fornecedor</TableHead>
-                                                    <TableHead>Quantidade</TableHead>
-                                                    <TableHead>Localização</TableHead>
-                                                    <TableHead>Data Entrada</TableHead>
-                                                    <TableHead>Validade</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {item.stock.map(stockItem => (
-                                                    <TableRow key={stockItem.docId}>
-                                                        <TableCell className="font-mono">{stockItem.loteInterno}</TableCell>
-                                                        <TableCell>{stockItem.loteFornecedor || 'N/A'}</TableCell>
-                                                        <TableCell>{stockItem.quantidade}</TableCell>
-                                                        <TableCell>{stockItem.localizacao}</TableCell>
-                                                        <TableCell>{format(parseISO(stockItem.dataEntrada), 'dd/MM/yyyy')}</TableCell>
-                                                        <TableCell>{stockItem.dataValidade ? format(parseISO(stockItem.dataValidade), 'dd/MM/yyyy') : 'N/A'}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </Fragment>
+                    <TableCell>
+                        <div className="font-medium">{supplyInfo.descricao}</div>
+                        <div className="text-sm text-muted-foreground">{supplyInfo.codigo}</div>
+                    </TableCell>
+                    <TableCell className="font-mono">{item.loteInterno}</TableCell>
+                    <TableCell>{item.localizacao}</TableCell>
+                    <TableCell className="font-bold">{item.quantidade.toLocaleString()}</TableCell>
+                    <TableCell>{item.dataValidade ? format(parseISO(item.dataValidade), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                    <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" title="Registrar Saída deste Lote" onClick={() => handleOpenMovementDialog('saida', supplyInfo)}>
+                            <LogOut className="h-4 w-4 text-orange-600"/>
+                        </Button>
+                        <Button variant="ghost" size="icon" title="Editar Item Mestre" onClick={() => handleOpenFormDialog(supplyInfo)}>
+                            <Edit className="h-4 w-4"/>
+                        </Button>
+                    </TableCell>
+                    </TableRow>
                   );
               })}
             </TableBody>
