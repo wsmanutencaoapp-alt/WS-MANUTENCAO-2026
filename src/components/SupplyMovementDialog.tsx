@@ -290,7 +290,14 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-lg" onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          // Allow interaction with cmdk elements
+          if (target.closest('[cmdk-input-wrapper]')) {
+              return;
+          }
+          e.preventDefault();
+      }}>
         <DialogHeader>
           <DialogTitle>Registrar {type === 'entrada' ? 'Entrada' : 'Saída'} de Suprimento</DialogTitle>
           <DialogDescription>
@@ -317,33 +324,31 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                         </PopoverTrigger>
-                        <PopoverPortal>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
-                                <Command>
-                                    <CommandInput placeholder="Buscar por código ou descrição..." />
-                                    <CommandList>
-                                    <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
-                                    <CommandGroup>
-                                        {allSupplies?.map((item) => (
-                                        <CommandItem
-                                            key={item.docId}
-                                            value={`${item.codigo} ${item.descricao}`}
-                                            onSelect={() => {
-                                                setSelectedSupply(item);
-                                                setLocalizacao(item.localizacaoPadrao || '');
-                                                setSelectedStockId(null);
-                                                setIsSupplyPopoverOpen(false);
-                                            }}
-                                        >
-                                            <Check className={cn("mr-2 h-4 w-4", selectedSupply?.docId === item.docId ? "opacity-100" : "opacity-0")} />
-                                            {item.codigo} - {item.descricao}
-                                        </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </PopoverPortal>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                            <Command>
+                                <CommandInput placeholder="Buscar por código ou descrição..." />
+                                <CommandList>
+                                <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                    {allSupplies?.map((item) => (
+                                    <CommandItem
+                                        key={item.docId}
+                                        value={`${item.codigo} ${item.descricao}`}
+                                        onSelect={() => {
+                                            setSelectedSupply(item);
+                                            setLocalizacao(item.localizacaoPadrao || '');
+                                            setSelectedStockId(null);
+                                            setIsSupplyPopoverOpen(false);
+                                        }}
+                                    >
+                                        <Check className={cn("mr-2 h-4 w-4", selectedSupply?.docId === item.docId ? "opacity-100" : "opacity-0")} />
+                                        {item.codigo} - {item.descricao}
+                                    </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
                     </Popover>
                  </div>
             ) : (
@@ -375,24 +380,22 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                 <PopoverPortal>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
-                                        <Command>
-                                            <CommandInput placeholder="Buscar endereço..." />
-                                            <CommandList>
-                                                <CommandEmpty>Nenhum endereço encontrado.</CommandEmpty>
-                                                <CommandGroup>
-                                                    {addresses?.map(addr => (
-                                                    <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => { setLocalizacao(val); setIsAddressPopoverOpen(false); }}>
-                                                        <Check className={cn("mr-2 h-4 w-4", localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />
-                                                        {addr.codigoCompleto}
-                                                    </CommandItem>
-                                                    ))}
-                                                </CommandGroup>
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </PopoverPortal>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                                    <Command>
+                                        <CommandInput placeholder="Buscar endereço..." />
+                                        <CommandList>
+                                            <CommandEmpty>Nenhum endereço encontrado.</CommandEmpty>
+                                            <CommandGroup>
+                                                {addresses?.map(addr => (
+                                                <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => { setLocalizacao(val); setIsAddressPopoverOpen(false); }}>
+                                                    <Check className={cn("mr-2 h-4 w-4", localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />
+                                                    {addr.codigoCompleto}
+                                                </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
                                 </Popover>
                             </div>
                              <div className="space-y-1.5">
@@ -413,11 +416,9 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                                             {validade ? format(validade, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
                                         </Button>
                                         </PopoverTrigger>
-                                        <PopoverPortal>
-                                            <PopoverContent className="w-auto p-0">
-                                                <Calendar mode="single" selected={validade} onSelect={setValidade} initialFocus onDayClick={() => setIsValidadeOpen(false)} />
-                                            </PopoverContent>
-                                        </PopoverPortal>
+                                        <PopoverContent className="w-auto p-0">
+                                            <Calendar mode="single" selected={validade} onSelect={setValidade} initialFocus onDayClick={() => setIsValidadeOpen(false)} />
+                                        </PopoverContent>
                                     </Popover>
                                 </div>
                             )}
@@ -433,7 +434,6 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverPortal>
                                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
                                     <Command>
                                         <CommandInput placeholder="Buscar lote..." />
@@ -450,7 +450,6 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                                         </CommandList>
                                     </Command>
                                 </PopoverContent>
-                                </PopoverPortal>
                                 </Popover>
                             </div>
                             <div className="space-y-1.5">
