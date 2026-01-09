@@ -290,7 +290,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Registrar {type === 'entrada' ? 'Entrada' : 'Saída'} de Suprimento</DialogTitle>
           <DialogDescription>
