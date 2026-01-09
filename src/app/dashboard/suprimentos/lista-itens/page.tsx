@@ -43,6 +43,7 @@ import SupplyFormDialog from '@/components/SupplyFormDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import EditStockItemDialog from '@/components/EditStockItemDialog';
+import { useToast } from '@/hooks/use-toast';
 
 
 type EnrichedStockItem = WithDocId<SupplyStock> & {
@@ -440,5 +441,3 @@ const SuprimentosPage = () => {
 };
 
 export default SuprimentosPage;
-
-    
