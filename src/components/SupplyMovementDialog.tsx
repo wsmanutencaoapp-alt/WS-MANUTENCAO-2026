@@ -10,10 +10,12 @@ import {
   where,
   getDocs,
   runTransaction,
-  uploadBytes,
-  getDownloadURL,
-  ref as storageRef,
 } from 'firebase/firestore';
+import {
+    uploadBytes,
+    getDownloadURL,
+    ref as storageRef,
+} from 'firebase/storage';
 import { useStorage } from '@/firebase/provider';
 import {
   Dialog,
