@@ -46,6 +46,7 @@ export type SupplyMovement = {
     supplyId: string;
     supplyStockId: string; // Referência ao lote específico movimentado
     supplyCodigo: string;
+    loteFornecedor?: string;
     type: 'entrada' | 'saida' | 'ajuste';
     quantity: number;
     responsibleId: string;
