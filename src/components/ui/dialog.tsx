@@ -38,9 +38,6 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       onInteractOutside={(e) => {
-        // This is the definitive fix. It prevents the dialog from closing when
-        // an interaction (like a click) happens outside of it. This allows
-        // the Popover (which renders in a Portal, thus "outside") to receive the click.
         e.preventDefault()
       }}
       className={cn(
