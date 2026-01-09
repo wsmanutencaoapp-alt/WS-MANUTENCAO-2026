@@ -164,27 +164,26 @@ export default function MovimentacaoMateriaisPage() {
                                 <TableHead>Valor Total</TableHead>
                                 <TableHead>Usuário</TableHead>
                                 <TableHead>Origem/Destino</TableHead>
-                                <TableHead className="text-right">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="h-24 text-center">
+                                    <TableCell colSpan={8} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
                             )}
                             {error && (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="h-24 text-center text-destructive">
+                                    <TableCell colSpan={8} className="h-24 text-center text-destructive">
                                         Erro ao carregar histórico: {error.message}
                                     </TableCell>
                                 </TableRow>
                             )}
                             {!isLoading && filteredHistory.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="h-24 text-center">
+                                    <TableCell colSpan={8} className="h-24 text-center">
                                          <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                                          <p className="text-muted-foreground">Nenhum movimento encontrado.</p>
                                     </TableCell>
@@ -210,14 +209,6 @@ export default function MovimentacaoMateriaisPage() {
                                         </TableCell>
                                         <TableCell>{item.responsibleName}</TableCell>
                                         <TableCell>{item.type === 'entrada' || item.type === 'devolucao' ? item.origin : item.destination}</TableCell>
-                                        <TableCell className="text-right">
-                                            {item.type === 'saida' && (
-                                                <Button variant="outline" size="sm" onClick={() => setReturnDialogState({ isOpen: true, movement: item })}>
-                                                    <Undo className="mr-2 h-3.5 w-3.5"/>
-                                                    Devolver
-                                                </Button>
-                                            )}
-                                        </TableCell>
                                     </TableRow>
                                 )}
                             )}

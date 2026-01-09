@@ -31,7 +31,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight, Printer, ExternalLink, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight, Printer, ExternalLink, Trash2, Undo } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from '@/components/ui/badge';
 import EditStockItemDialog from '@/components/EditStockItemDialog';
 import { useToast } from '@/hooks/use-toast';
+import ReturnMovementDialog from '@/components/ReturnMovementDialog';
 
 
 type EnrichedStockItem = WithDocId<SupplyStock> & {
@@ -71,6 +72,11 @@ const SuprimentosPage = () => {
   }>({ isOpen: false, supply: null });
   
   const [editStockDialogState, setEditStockDialogState] = useState<{
+    isOpen: boolean;
+    stockItem: EnrichedStockItem | null;
+  }>({ isOpen: false, stockItem: null });
+
+  const [returnDialogState, setReturnDialogState] = useState<{
     isOpen: boolean;
     stockItem: EnrichedStockItem | null;
   }>({ isOpen: false, stockItem: null });
@@ -160,6 +166,10 @@ const SuprimentosPage = () => {
   const handleOpenEditStockDialog = (item: EnrichedStockItem) => {
     setEditStockDialogState({ isOpen: true, stockItem: item });
   };
+  
+  const handleOpenReturnDialog = (item: EnrichedStockItem) => {
+    setReturnDialogState({ isOpen: true, stockItem: item });
+  };
 
   const handleDialogSuccess = (newItem?: EnrichedStockItem) => {
       // Re-trigger the stock fetching
@@ -167,6 +177,7 @@ const SuprimentosPage = () => {
       setMovementDialogState({ isOpen: false, type: 'entrada', supply: null });
       setFormDialogState({ isOpen: false, supply: null });
       setEditStockDialogState({ isOpen: false, stockItem: null });
+      setReturnDialogState({ isOpen: false, stockItem: null });
 
       if (newItem) {
         setStockToPrint(newItem);
@@ -304,6 +315,9 @@ const SuprimentosPage = () => {
                     <TableCell className="font-bold">{item.quantidade.toLocaleString()}</TableCell>
                     <TableCell>{item.dataValidade ? format(parseISO(item.dataValidade), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                     <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" title="Registrar Devolução para este lote" onClick={() => handleOpenReturnDialog(item)}>
+                            <Undo className="h-4 w-4 text-blue-600"/>
+                        </Button>
                         <Button variant="ghost" size="icon" title="Registrar Saída deste Lote" onClick={() => handleOpenMovementDialog('saida', supplyInfo)}>
                             <LogOut className="h-4 w-4 text-orange-600"/>
                         </Button>
@@ -377,6 +391,15 @@ const SuprimentosPage = () => {
           onClose={() => setEditStockDialogState({ isOpen: false, stockItem: null })}
           onSuccess={handleDialogSuccess}
           stockItem={editStockDialogState.stockItem}
+        />
+      )}
+      
+       {returnDialogState.isOpen && returnDialogState.stockItem && (
+        <ReturnMovementDialog
+          isOpen={returnDialogState.isOpen}
+          onClose={() => setReturnDialogState({ isOpen: false, stockItem: null })}
+          stockItem={returnDialogState.stockItem}
+          onSuccess={handleDialogSuccess}
         />
       )}
 
