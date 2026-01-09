@@ -147,7 +147,7 @@ const SuprimentosPage = () => {
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
         printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
-        printWindow.document.write('<style>@media print { @page { size: 55mm 25mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; box-sizing: border-box; padding: 2mm; gap: 2mm; break-inside: avoid; } .info { display: flex; flex-direction: column; justify-content: center; } .desc { font-size: 8px; font-weight: bold; } .code { font-size: 7px; font-family: monospace; } .lot { font-size: 10px; font-weight: bold; font-family: monospace; } .due-date { font-size: 8px; font-weight: bold; } .qr-code { width: 21mm; height: 21mm; justify-self: end; }  }</style>');
+        printWindow.document.write('<style>@media print { @page { size: 100mm 60mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; box-sizing: border-box; padding: 5mm; gap: 5mm; break-inside: avoid; } .info { display: flex; flex-direction: column; justify-content: center; } .desc { font-size: 16px; font-weight: bold; } .code { font-size: 12px; font-family: monospace; } .lot { font-size: 18px; font-weight: bold; font-family: monospace; } .due-date { font-size: 14px; font-weight: bold; } .qr-code { width: 45mm; height: 45mm; justify-self: end; }  }</style>');
         printWindow.document.write('</head><body>');
         printWindow.document.write(printableArea.innerHTML);
         printWindow.document.write('</body></html>');
@@ -308,27 +308,27 @@ const SuprimentosPage = () => {
 
        {stockToPrint && (
         <Dialog open={!!stockToPrint} onOpenChange={() => setStockToPrint(null)}>
-            <DialogContent className="max-w-xl">
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Etiqueta de Suprimento</DialogTitle>
                     <DialogDescription>
-                        Confirme a etiqueta e clique em imprimir. Dimensões: 55mm x 25mm.
+                        Confirme a etiqueta e clique em imprimir. Dimensões: 100mm x 60mm.
                     </DialogDescription>
                 </DialogHeader>
                 <div id="printable-label-area" className="flex justify-center p-4 bg-muted/50 rounded-md">
-                    <div className="label-container grid grid-cols-[1fr_auto] items-center p-1 border rounded-lg bg-white" style={{ width: '208px', height: '95px', boxSizing: 'content-box', gap: '2mm', padding: '2mm' }}>
+                    <div className="label-container grid grid-cols-[1fr_auto] items-center p-1 border rounded-lg bg-white" style={{ width: '377px', height: '226px', boxSizing: 'content-box', gap: '5mm', padding: '5mm' }}>
                        <div className="info flex flex-col justify-center h-full">
-                           <p className="desc font-bold text-black" style={{fontSize: '8px'}}>{stockToPrint.supplyInfo.descricao}</p>
-                           <p className="code font-mono text-black" style={{fontSize: '7px'}}>{stockToPrint.supplyInfo.codigo}</p>
-                           <p className="lot font-mono font-bold text-black" style={{fontSize: '10px'}}>{stockToPrint.loteInterno}</p>
-                           {stockToPrint.dataValidade && <p className="due-date font-bold text-black" style={{fontSize: '8px'}}>VAL: {format(parseISO(stockToPrint.dataValidade), 'dd/MM/yyyy')}</p>}
+                           <p className="desc font-bold text-black" style={{fontSize: '16px'}}>{stockToPrint.supplyInfo.descricao}</p>
+                           <p className="code font-mono text-black" style={{fontSize: '12px'}}>{stockToPrint.supplyInfo.codigo}</p>
+                           <p className="lot font-mono font-bold text-black mt-2" style={{fontSize: '18px'}}>{stockToPrint.loteInterno}</p>
+                           {stockToPrint.dataValidade && <p className="due-date font-bold text-black mt-1" style={{fontSize: '14px'}}>VAL: {format(parseISO(stockToPrint.dataValidade), 'dd/MM/yyyy')}</p>}
                        </div>
-                       <div className="qr-code self-center" style={{width: '80px', height: '80px'}}>
+                       <div className="qr-code self-center" style={{width: '170px', height: '170px'}}>
                             <Image
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(`${stockToPrint.supplyInfo.codigo}/${stockToPrint.loteInterno}`)}`}
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=${encodeURIComponent(`${stockToPrint.supplyInfo.codigo}/${stockToPrint.loteInterno}`)}`}
                                 alt={`QR Code for ${stockToPrint.loteInterno}`}
-                                width={80}
-                                height={80}
+                                width={170}
+                                height={170}
                             />
                        </div>
                     </div>
@@ -349,5 +349,3 @@ const SuprimentosPage = () => {
 };
 
 export default SuprimentosPage;
-
-    
