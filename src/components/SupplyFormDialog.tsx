@@ -60,7 +60,7 @@ const familyCodes: Record<Supply['familia'], string> = {
 const formSchema = z.object({
   // Aba 1: Identificação
   descricao: z.string().min(3, { message: "A descrição é obrigatória." }),
-  partNumber: z.string().min(1, { message: "O Part Number é obrigatório." }),
+  partNumber: z.string(),
   unidadeMedida: z.enum(['UN', 'KG', 'MT', 'LT', 'CX']),
   familia: z.enum(['MP', 'CT', 'CG', 'CP', 'PA']),
   
@@ -74,6 +74,14 @@ const formSchema = z.object({
   estoqueMinimo: z.coerce.number().min(0).default(0),
   estoqueMaximo: z.coerce.number().min(0).default(0),
   localizacaoPadrao: z.string().min(1, { message: "A localização é obrigatória." })
+}).refine(data => {
+    if (data.familia !== 'CG') {
+        return data.partNumber.length > 0;
+    }
+    return true;
+}, {
+    message: "O Part Number é obrigatório para esta família.",
+    path: ["partNumber"],
 }).refine(data => data.estoqueMaximo >= data.estoqueMinimo, {
     message: "Estoque máximo deve ser maior ou igual ao mínimo.",
     path: ["estoqueMaximo"],
@@ -215,6 +223,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const isLoteDisabled = useMemo(() => ['MP', 'PA', 'CP', 'CT'].includes(familia), [familia]);
   const isSerialDisabled = useMemo(() => ['MP', 'CG', 'CT'].includes(familia), [familia]);
   const isSerialMandatory = useMemo(() => ['PA', 'CP'].includes(familia), [familia]);
+  const isPartNumberRequired = useMemo(() => familia !== 'CG', [familia]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -271,7 +280,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                   name="partNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Part Number (P/N)</FormLabel>
+                      <FormLabel>Part Number (P/N){isPartNumberRequired && <span className="text-destructive">*</span>}</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
