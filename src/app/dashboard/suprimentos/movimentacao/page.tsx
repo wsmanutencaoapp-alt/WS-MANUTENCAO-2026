@@ -21,40 +21,40 @@ import {
     CardDescription,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Inbox, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { Loader2, Search, Inbox, ArrowDownCircle, ArrowUpCircle, Undo } from 'lucide-react';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Button } from '@/components/ui/button';
+import ReturnMovementDialog from '@/components/ReturnMovementDialog';
+import { useQueryClient } from '@tanstack/react-query';
+
 
 type EnrichedMovement = WithDocId<SupplyMovement> & {
-  supplyInfo?: Pick<Supply, 'descricao'>;
+  supplyInfo?: Pick<Supply, 'descricao' | 'imageUrl'>;
   stockInfo?: Partial<Pick<SupplyStock, 'custoUnitario' | 'loteInterno'>>;
 };
 
 export default function MovimentacaoMateriaisPage() {
     const firestore = useFirestore();
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
+    const [returnDialogState, setReturnDialogState] = useState<{ isOpen: boolean; movement: EnrichedMovement | null }>({ isOpen: false, movement: null });
 
+    const movementsQueryKey = ['supplyMovementsHistory'];
     const movementsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'supply_movements'), orderBy('date', 'desc'));
     }, [firestore]);
-    const { data: movements, isLoading: isLoadingMovements, error: movementsError } = useCollection<WithDocId<SupplyMovement>>(movementsQuery, { queryKey: ['supplyMovementsHistory'] });
+    const { data: movements, isLoading: isLoadingMovements, error: movementsError } = useCollection<WithDocId<SupplyMovement>>(movementsQuery, { queryKey: movementsQueryKey });
 
+    const suppliesQueryKey = ['allSuppliesForHistory'];
     const suppliesQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'supplies'));
     }, [firestore]);
-    const { data: supplies, isLoading: isLoadingSupplies, error: suppliesError } = useCollection<WithDocId<Supply>>(suppliesQuery, { queryKey: ['allSuppliesForHistory'] });
+    const { data: supplies, isLoading: isLoadingSupplies, error: suppliesError } = useCollection<WithDocId<Supply>>(suppliesQuery, { queryKey: suppliesQueryKey });
     
-    // We need to fetch all stock items to get cost and lot info. This can be inefficient at scale.
-    // For a real-world app, cost/lot info might be denormalized onto the movement document itself.
     const [allStock, setAllStock] = useState<Map<string, WithDocId<SupplyStock>>>(new Map());
     const [isStockLoading, setIsStockLoading] = useState(true);
 
@@ -68,7 +68,6 @@ export default function MovimentacaoMateriaisPage() {
                 const stockCollectionRef = collection(firestore, 'supplies', supply.docId, 'stock');
                 const stockSnapshot = await getDocs(stockCollectionRef);
                 stockSnapshot.forEach(doc => {
-                    // Key is `supplyId/stockId`
                     stockMap.set(`${supply.docId}/${doc.id}`, { ...doc.data() as SupplyStock, docId: doc.id });
                 });
             }
@@ -85,9 +84,13 @@ export default function MovimentacaoMateriaisPage() {
         
         return movements.map(movement => {
             const stockInfo = allStock.get(`${movement.supplyId}/${movement.supplyStockId}`);
+            const supplyInfo = suppliesMap.get(movement.supplyCodigo);
             return {
                 ...movement,
-                supplyInfo: suppliesMap.get(movement.supplyCodigo),
+                supplyInfo: {
+                    descricao: supplyInfo?.descricao || 'Item não encontrado',
+                    imageUrl: supplyInfo?.imageUrl
+                },
                 stockInfo: {
                     custoUnitario: stockInfo?.custoUnitario,
                     loteInterno: stockInfo?.loteInterno
@@ -110,11 +113,27 @@ export default function MovimentacaoMateriaisPage() {
             (item.stockInfo?.loteInterno?.toLowerCase() || '').includes(lowercasedTerm)
         );
     }, [enrichedHistory, searchTerm]);
+    
+    const handleReturnSuccess = () => {
+      queryClient.invalidateQueries({ queryKey: movementsQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] }); // Invalidate stock list on another page
+      setReturnDialogState({isOpen: false, movement: null });
+    }
 
     const isLoading = isLoadingMovements || isLoadingSupplies || isStockLoading;
     const error = movementsError || suppliesError;
 
+    const getBadge = (type: SupplyMovement['type']) => {
+        switch(type) {
+            case 'entrada': return <Badge variant="success"><ArrowDownCircle className="mr-1 h-3.5 w-3.5" />Entrada</Badge>;
+            case 'saida': return <Badge variant="destructive"><ArrowUpCircle className="mr-1 h-3.5 w-3.5" />Saída</Badge>;
+            case 'devolucao': return <Badge variant="warning"><Undo className="mr-1 h-3.5 w-3.5" />Devolução</Badge>;
+            default: return <Badge variant="secondary">{type}</Badge>;
+        }
+    }
+
     return (
+      <>
         <div className="space-y-6">
             <h1 className="text-2xl font-bold">Histórico de Movimentação de Suprimentos</h1>
             <Card>
@@ -137,7 +156,7 @@ export default function MovimentacaoMateriaisPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-28">Tipo</TableHead>
+                                <TableHead className="w-32">Tipo</TableHead>
                                 <TableHead>Data</TableHead>
                                 <TableHead>Item (Código)</TableHead>
                                 <TableHead>Lote</TableHead>
@@ -145,50 +164,40 @@ export default function MovimentacaoMateriaisPage() {
                                 <TableHead>Valor Total</TableHead>
                                 <TableHead>Usuário</TableHead>
                                 <TableHead>Origem/Destino</TableHead>
+                                <TableHead className="text-right">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={9} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
                             )}
                             {error && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center text-destructive">
+                                    <TableCell colSpan={9} className="h-24 text-center text-destructive">
                                         Erro ao carregar histórico: {error.message}
                                     </TableCell>
                                 </TableRow>
                             )}
                             {!isLoading && filteredHistory.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={9} className="h-24 text-center">
                                          <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                                          <p className="text-muted-foreground">Nenhum movimento encontrado.</p>
                                     </TableCell>
                                 </TableRow>
                             )}
                             {!isLoading && filteredHistory.map((item) => {
-                                const isEntrada = item.type === 'entrada';
                                 const totalValue = (item.stockInfo?.custoUnitario || 0) * item.quantity;
                                 return (
-                                    <TableRow key={item.docId} className={cn(
-                                        isEntrada ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
-                                    )}>
-                                        <TableCell>
-                                            <Badge variant={isEntrada ? 'success' : 'destructive'}>
-                                                {isEntrada ? 
-                                                    <ArrowDownCircle className="mr-1 h-3.5 w-3.5" /> : 
-                                                    <ArrowUpCircle className="mr-1 h-3.5 w-3.5" />
-                                                }
-                                                {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                                            </Badge>
-                                        </TableCell>
+                                    <TableRow key={item.docId}>
+                                        <TableCell>{getBadge(item.type)}</TableCell>
                                         <TableCell>{format(new Date(item.date), 'dd/MM/yyyy HH:mm')}</TableCell>
                                         <TableCell>
-                                            <div className="font-medium">{item.supplyInfo?.descricao || 'Item não encontrado'}</div>
+                                            <div className="font-medium">{item.supplyInfo?.descricao}</div>
                                             <div className="text-sm text-muted-foreground font-mono">{item.supplyCodigo}</div>
                                         </TableCell>
                                         <TableCell>
@@ -200,7 +209,15 @@ export default function MovimentacaoMateriaisPage() {
                                             {totalValue > 0 ? totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A'}
                                         </TableCell>
                                         <TableCell>{item.responsibleName}</TableCell>
-                                        <TableCell>{isEntrada ? item.origin : item.destination}</TableCell>
+                                        <TableCell>{item.type === 'entrada' || item.type === 'devolucao' ? item.origin : item.destination}</TableCell>
+                                        <TableCell className="text-right">
+                                            {item.type === 'saida' && (
+                                                <Button variant="outline" size="sm" onClick={() => setReturnDialogState({ isOpen: true, movement: item })}>
+                                                    <Undo className="mr-2 h-3.5 w-3.5"/>
+                                                    Devolver
+                                                </Button>
+                                            )}
+                                        </TableCell>
                                     </TableRow>
                                 )}
                             )}
@@ -209,5 +226,15 @@ export default function MovimentacaoMateriaisPage() {
                 </CardContent>
             </Card>
         </div>
+
+        {returnDialogState.isOpen && (
+            <ReturnMovementDialog 
+                isOpen={returnDialogState.isOpen}
+                onClose={() => setReturnDialogState({ isOpen: false, movement: null })}
+                movement={returnDialogState.movement}
+                onSuccess={handleReturnSuccess}
+            />
+        )}
+      </>
     );
 }
