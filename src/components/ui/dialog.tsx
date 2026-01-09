@@ -38,14 +38,9 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       onInteractOutside={(e) => {
-        // This is the definitive fix.
-        // It checks if the interaction is happening inside a command palette (the search/select box).
-        // If it is, we do nothing, allowing the click/interaction to go through.
-        // For any other click outside the dialog, we prevent the default behavior (closing the dialog).
-        const target = e.target as HTMLElement
-        if (target.closest('[cmdk-input-wrapper]')) {
-          return
-        }
+        // This is the definitive fix. It prevents the dialog from closing when
+        // an interaction (like a click) happens outside of it. This allows
+        // the Popover (which renders in a Portal, thus "outside") to receive the click.
         e.preventDefault()
       }}
       className={cn(
