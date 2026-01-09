@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, getDocs } from 'firebase/firestore';
-import type { Supply, SupplyStock } from '@/lib/types';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { collection, query, orderBy, doc, getDocs, deleteDoc } from 'firebase/firestore';
+import type { Supply, SupplyStock, Employee } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -19,8 +19,19 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight, Printer, ExternalLink } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight, Printer, ExternalLink, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
@@ -43,6 +54,8 @@ const SuprimentosPage = () => {
   const firestore = useFirestore();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { user } = useUser();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [movementDialogState, setMovementDialogState] = useState<{
@@ -63,6 +76,14 @@ const SuprimentosPage = () => {
 
   const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
   const [stockToPrint, setStockToPrint] = useState<EnrichedStockItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData } = useDoc<Employee>(userDocRef);
+  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
 
   
   // 1. Fetch all master supply data 
@@ -71,7 +92,7 @@ const SuprimentosPage = () => {
     () => (firestore ? query(collection(firestore, 'supplies'), orderBy('codigo')) : null),
     [firestore]
   );
-  const { data: supplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery, {
+  const { data: supplies, isLoading: isLoadingSupplies, error } = useCollection<WithDocId<Supply>>(suppliesQuery, {
     queryKey: suppliesQueryKey
   });
 
@@ -151,6 +172,23 @@ const SuprimentosPage = () => {
       }
   };
   
+  const handleDeleteStockItem = async (item: EnrichedStockItem) => {
+    if (!firestore) return;
+    setIsDeleting(item.docId);
+    try {
+        const stockDocRef = doc(firestore, 'supplies', item.supplyInfo.docId, 'stock', item.docId);
+        await deleteDoc(stockDocRef);
+        toast({ title: 'Sucesso!', description: 'Lote de suprimento excluído.' });
+        // Instead of refetching everything, we can just remove the item from the local state for a faster UI update.
+        setEnrichedStock(prev => prev.filter(stock => stock.docId !== item.docId));
+    } catch (err) {
+        console.error("Erro ao excluir lote:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível excluir o lote.' });
+    } finally {
+        setIsDeleting(null);
+    }
+  };
+
   const executePrint = () => {
     const printableArea = document.getElementById('printable-label-area');
     if (!printableArea) return;
@@ -227,6 +265,9 @@ const SuprimentosPage = () => {
               {isLoading && (
                 <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
               )}
+              {error && (
+                <TableRow><TableCell colSpan={7} className="text-center text-destructive h-24">{error.message}</TableCell></TableRow>
+              )}
               {!isLoading && filteredStock.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center">
@@ -278,6 +319,29 @@ const SuprimentosPage = () => {
                         <Button variant="ghost" size="icon" title="Imprimir Etiqueta do Lote" onClick={() => setStockToPrint(item)}>
                             <Printer className="h-4 w-4" />
                         </Button>
+                        {isAdmin && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" title="Excluir Lote" disabled={isDeleting === item.docId}>
+                                        {isDeleting === item.docId ? <Loader2 className="animate-spin h-4 w-4"/> : <Trash2 className="h-4 w-4 text-destructive"/>}
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Tem certeza que deseja excluir o lote <span className="font-bold">{item.loteInterno}</span>? Esta ação não pode ser desfeita e não irá gerar um registro de movimentação.
+                                    </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteStockItem(item)}>
+                                        Sim, Excluir
+                                    </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
                     </TableCell>
                     </TableRow>
                   );
@@ -376,3 +440,5 @@ const SuprimentosPage = () => {
 };
 
 export default SuprimentosPage;
+
+    
