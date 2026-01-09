@@ -29,7 +29,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Popover, PopoverContent, PopoverTrigger, PopoverPortal } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useQueryClient } from '@tanstack/react-query';
 import ItemSelectorDialog from './ItemSelectorDialog';
@@ -57,13 +57,12 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
   const [destination, setDestination] = useState(''); // For 'saida'
   const [origin, setOrigin] = useState(''); // For 'entrada'
   const [loteFornecedor, setLoteFornecedor] = useState('');
-  const [validade, setValidade] = useState<Date | undefined>();
+  const [validade, setValidade] = useState<string>(''); // Changed to string
   const [unitCost, setUnitCost] = useState('');
   const [localizacao, setLocalizacao] = useState('');
   const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
   
   // UI state
-  const [isValidadeOpen, setIsValidadeOpen] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState<'supply' | 'address' | 'stock' | null>(null);
   
   // Data Fetching
@@ -110,7 +109,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     setOrigin('');
     setDestination('');
     setLoteFornecedor('');
-    setValidade(undefined);
+    setValidade('');
     setUnitCost('');
     setLocalizacao('');
     setSelectedStockId(null);
@@ -148,6 +147,20 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             setIsSaving(false);
             return;
         }
+        let validadeDate: Date | null = null;
+        if (selectedSupply.exigeValidade) {
+            if (!validade) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'Data de validade é obrigatória.' });
+                setIsSaving(false);
+                return;
+            }
+            validadeDate = new Date(validade);
+            if (!isValid(validadeDate)) {
+                 toast({ variant: 'destructive', title: 'Erro', description: 'Formato de data de validade inválido. Use AAAA-MM-DD.' });
+                 setIsSaving(false);
+                 return;
+            }
+        }
         try {
             const today = new Date();
             const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -172,7 +185,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             
             const stockData: Omit<SupplyStock, 'id'> = { loteInterno, quantidade: numQuantity, localizacao, dataEntrada: today.toISOString(), custoUnitario: parseFloat(unitCost) || 0, status: 'Disponível' };
             if (loteFornecedor) stockData.loteFornecedor = loteFornecedor;
-            if (validade) stockData.dataValidade = validade.toISOString();
+            if (validadeDate) stockData.dataValidade = validadeDate.toISOString();
 
             const movementData: Omit<SupplyMovement, 'id'> = { supplyId: selectedSupply.docId, supplyStockId: newStockRef.id, supplyCodigo: selectedSupply.codigo, type: 'entrada', quantity: numQuantity, responsibleId: user.uid, responsibleName: user.displayName || user.email || 'Desconhecido', date: today.toISOString(), origin };
 
@@ -292,20 +305,14 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                               </div>
                               {selectedSupply.exigeValidade && (
                                    <div className="space-y-1.5">
-                                      <Label>Data de Validade <span className="text-destructive">*</span></Label>
-                                      <Popover open={isValidadeOpen} onOpenChange={setIsValidadeOpen}>
-                                        <PopoverTrigger asChild>
-                                          <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {validade ? format(validade, 'dd/MM/yyyy') : <span>Escolha uma data</span>}
-                                          </Button>
-                                        </PopoverTrigger>
-                                        <PopoverPortal>
-                                          <PopoverContent className="w-auto p-0">
-                                              <Calendar mode="single" selected={validade} onSelect={setValidade} initialFocus onDayClick={() => setIsValidadeOpen(false)} />
-                                          </PopoverContent>
-                                        </PopoverPortal>
-                                      </Popover>
+                                      <Label htmlFor="validade">Data de Validade (AAAA-MM-DD) <span className="text-destructive">*</span></Label>
+                                       <Input
+                                        id="validade"
+                                        type="text"
+                                        placeholder="Ex: 2025-12-31"
+                                        value={validade}
+                                        onChange={(e) => setValidade(e.target.value)}
+                                      />
                                   </div>
                               )}
                           </>
