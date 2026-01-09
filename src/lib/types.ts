@@ -25,8 +25,9 @@ export type Supply = {
   // Dados de controle (agora calculados a partir do supply_stock)
   saldoAtual?: number; // Este será um campo calculado/agregado
   
-  // Imagem
+  // Anexos
   imageUrl?: string;
+  documentoUrl?: string;
 };
 
 export type SupplyStock = {

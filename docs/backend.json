@@ -1,4 +1,5 @@
 
+
 {
   "entities": {
     "Address": {
@@ -141,6 +142,11 @@
           "type": "string",
           "format": "uri",
           "description": "URL of the supply item's photo."
+        },
+        "documentoUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of an attached document (e.g., datasheet, certificate)."
         }
       },
       "required": [
@@ -1086,4 +1092,3 @@
   }
 }
 
-    

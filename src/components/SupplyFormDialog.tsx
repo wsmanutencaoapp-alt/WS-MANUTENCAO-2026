@@ -15,7 +15,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import {
   Dialog,
   DialogContent,
@@ -28,7 +28,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, ImageIcon } from 'lucide-react';
+import { Loader2, Upload, ImageIcon, FileText, ExternalLink } from 'lucide-react';
 import type { Supply, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -67,6 +67,7 @@ const formSchema = z.object({
   partNumber: z.string(),
   unidadeMedida: z.enum(['UN', 'KG', 'MT', 'LT', 'CX']),
   imageUrl: z.string().optional(),
+  documentoUrl: z.string().optional(),
   
   // Aba 2: Rastreabilidade
   exigeLote: z.boolean().default(false),
@@ -104,8 +105,12 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const storage = useStorage();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [documentoFile, setDocumentoFile] = useState<File | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   
   const addressesQuery = useMemoFirebase(() => (
       firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
@@ -130,6 +135,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       estoqueMaximo: 0,
       localizacaoPadrao: '',
       imageUrl: '',
+      documentoUrl: '',
     },
   });
 
@@ -138,9 +144,9 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const resetFormAndClose = () => {
     form.reset();
     setPreviewImage(null);
-    if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
+    setDocumentoFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (docInputRef.current) docInputRef.current.value = '';
     onClose();
   }
 
@@ -148,21 +154,16 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
     if (supply) {
       form.reset(supply);
       setPreviewImage(supply.imageUrl || null);
+      setDocumentoFile(null);
     } else {
       form.reset({
-        descricao: '',
-        partNumber: '',
-        unidadeMedida: 'UN',
-        familia: 'CT',
-        exigeLote: false,
-        exigeSerialNumber: false,
-        exigeValidade: false,
-        estoqueMinimo: 0,
-        estoqueMaximo: 0,
-        localizacaoPadrao: '',
-        imageUrl: '',
+        descricao: '', partNumber: '', unidadeMedida: 'UN', familia: 'CT',
+        exigeLote: false, exigeSerialNumber: false, exigeValidade: false,
+        estoqueMinimo: 0, estoqueMaximo: 0, localizacaoPadrao: '',
+        imageUrl: '', documentoUrl: '',
       });
       setPreviewImage(null);
+      setDocumentoFile(null);
     }
   }, [supply, form, isOpen]);
 
@@ -204,19 +205,39 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
     }
   };
 
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setDocumentoFile(file);
+    }
+  };
+
   const handleSave = async (values: z.infer<typeof formSchema>) => {
     if (!firestore || !storage) return;
     setIsSaving(true);
+    const tempId = supply?.docId || doc(collection(firestore, 'temp')).id;
 
     try {
       let finalImageUrl = supply?.imageUrl || '';
       if (previewImage && previewImage !== (supply?.imageUrl || '')) {
-          const imageRef = storageRef(storage, `supply_images/${doc(collection(firestore, 'temp')).id}.jpg`);
+          const imageRef = storageRef(storage, `supply_images/${tempId}.jpg`);
           const snapshot = await uploadString(imageRef, previewImage, 'data_url');
           finalImageUrl = await getDownloadURL(snapshot.ref);
       }
+
+      let finalDocumentoUrl = supply?.documentoUrl || '';
+      if (documentoFile) {
+        if (supply?.documentoUrl) {
+            try {
+                await deleteObject(storageRef(storage, supply.documentoUrl));
+            } catch(e) { console.warn("Could not delete old document", e)}
+        }
+        const docRef = storageRef(storage, `supply_documents/${tempId}/${documentoFile.name}`);
+        const snapshot = await uploadBytes(docRef, documentoFile);
+        finalDocumentoUrl = await getDownloadURL(snapshot.ref);
+      }
       
-      const dataToSave = { ...values, imageUrl: finalImageUrl };
+      const dataToSave = { ...values, imageUrl: finalImageUrl, documentoUrl: finalDocumentoUrl };
 
       if (supply) {
         // Edit mode
@@ -346,13 +367,30 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                       )}
                     />
                    </div>
-                   <div className="space-y-2">
-                        <Label>Foto do Item</Label>
-                        <div className="flex justify-center items-center h-48 w-full bg-muted rounded-md relative">
-                            {previewImage ? <Image src={previewImage} alt="Preview" fill className="object-contain rounded-md" /> : <ImageIcon className="h-10 w-10 text-muted-foreground" />}
-                        </div>
-                        <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Carregar Foto</Button>
-                        <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
+                   <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Foto do Item</Label>
+                            <div className="flex justify-center items-center h-48 w-full bg-muted rounded-md relative">
+                                {previewImage ? <Image src={previewImage} alt="Preview" fill className="object-contain rounded-md" /> : <ImageIcon className="h-10 w-10 text-muted-foreground" />}
+                            </div>
+                            <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Carregar Foto</Button>
+                            <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
+                       </div>
+                        <div className="space-y-2">
+                           <Label>Documento (FISPQ, Certificado, etc.)</Label>
+                           <div className="flex items-center gap-2">
+                            {supply?.documentoUrl && !documentoFile && (
+                                <Button asChild variant="secondary" size="icon">
+                                    <a href={supply.documentoUrl} target="_blank" rel="noopener noreferrer"><ExternalLink/></a>
+                                </Button>
+                            )}
+                            <Button type="button" variant="outline" className="w-full" onClick={() => docInputRef.current?.click()}>
+                                <Upload className="mr-2"/>
+                                <span className="truncate">{documentoFile ? documentoFile.name : "Anexar Documento"}</span>
+                            </Button>
+                            <Input type="file" ref={docInputRef} onChange={handleDocumentChange} className="hidden"/>
+                           </div>
+                       </div>
                    </div>
                  </div>
               </TabsContent>
