@@ -140,6 +140,7 @@ export default function MovimentacaoMateriaisPage() {
                                 <TableHead className="w-28">Tipo</TableHead>
                                 <TableHead>Data</TableHead>
                                 <TableHead>Item (Código)</TableHead>
+                                <TableHead>Lote</TableHead>
                                 <TableHead>Quantidade</TableHead>
                                 <TableHead>Valor Total</TableHead>
                                 <TableHead>Usuário</TableHead>
@@ -149,21 +150,21 @@ export default function MovimentacaoMateriaisPage() {
                         <TableBody>
                             {isLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center">
+                                    <TableCell colSpan={8} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
                             )}
                             {error && (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center text-destructive">
+                                    <TableCell colSpan={8} className="h-24 text-center text-destructive">
                                         Erro ao carregar histórico: {error.message}
                                     </TableCell>
                                 </TableRow>
                             )}
                             {!isLoading && filteredHistory.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center">
+                                    <TableCell colSpan={8} className="h-24 text-center">
                                          <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                                          <p className="text-muted-foreground">Nenhum movimento encontrado.</p>
                                     </TableCell>
@@ -177,28 +178,22 @@ export default function MovimentacaoMateriaisPage() {
                                         isEntrada ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
                                     )}>
                                         <TableCell>
-                                            <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger>
-                                                    <Badge variant={isEntrada ? 'success' : 'destructive'} className="cursor-help">
-                                                        {isEntrada ? 
-                                                            <ArrowDownCircle className="mr-1 h-3.5 w-3.5" /> : 
-                                                            <ArrowUpCircle className="mr-1 h-3.5 w-3.5" />
-                                                        }
-                                                        {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                                                    </Badge>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                <p>Lote Interno: {item.stockInfo?.loteInterno || 'N/A'}</p>
-                                                {item.loteFornecedor && <p>Lote Fornecedor: {item.loteFornecedor}</p>}
-                                                </TooltipContent>
-                                            </Tooltip>
-                                            </TooltipProvider>
+                                            <Badge variant={isEntrada ? 'success' : 'destructive'}>
+                                                {isEntrada ? 
+                                                    <ArrowDownCircle className="mr-1 h-3.5 w-3.5" /> : 
+                                                    <ArrowUpCircle className="mr-1 h-3.5 w-3.5" />
+                                                }
+                                                {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell>{format(new Date(item.date), 'dd/MM/yyyy HH:mm')}</TableCell>
                                         <TableCell>
                                             <div className="font-medium">{item.supplyInfo?.descricao || 'Item não encontrado'}</div>
                                             <div className="text-sm text-muted-foreground font-mono">{item.supplyCodigo}</div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="font-mono text-sm">{item.stockInfo?.loteInterno || 'N/A'}</div>
+                                            {item.loteFornecedor && <div className="font-mono text-xs text-muted-foreground">F: {item.loteFornecedor}</div>}
                                         </TableCell>
                                         <TableCell className="font-bold">{item.quantity.toLocaleString()}</TableCell>
                                         <TableCell>
