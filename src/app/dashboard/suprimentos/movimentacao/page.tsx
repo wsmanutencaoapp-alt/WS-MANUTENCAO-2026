@@ -43,7 +43,10 @@ export default function MovimentacaoMateriaisPage() {
     const firestore = useFirestore();
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
-    const [returnDialogState, setReturnDialogState] = useState<{ isOpen: boolean; stockItem: EnrichedStockItem | null }>({ isOpen: false, stockItem: null });
+    const [returnDialogState, setReturnDialogState] = useState<{ 
+        isOpen: boolean; 
+        movement: EnrichedMovement | null 
+    }>({ isOpen: false, movement: null });
 
     const movementsQueryKey = ['supplyMovementsHistory'];
     const movementsQuery = useMemoFirebase(() => {
@@ -128,18 +131,13 @@ export default function MovimentacaoMateriaisPage() {
             alert("Não é possível devolver este item pois os dados do lote ou do item mestre estão faltando.");
             return;
         }
-
-        const stockItemForDialog: EnrichedStockItem = {
-            ...(movement.stockInfo as WithDocId<SupplyStock>),
-            supplyInfo: movement.supplyInfo as WithDocId<Supply>,
-        }
-        setReturnDialogState({ isOpen: true, stockItem: stockItemForDialog });
+        setReturnDialogState({ isOpen: true, movement: movement });
     }
 
     const handleReturnSuccess = () => {
       queryClient.invalidateQueries({ queryKey: movementsQueryKey });
       queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] }); // Invalidate stock list on another page
-      setReturnDialogState({isOpen: false, stockItem: null });
+      setReturnDialogState({isOpen: false, movement: null });
     }
 
     const isLoading = isLoadingMovements || isLoadingSupplies || isStockLoading;
@@ -180,7 +178,7 @@ export default function MovimentacaoMateriaisPage() {
                             <TableRow>
                                 <TableHead className="w-32">Tipo</TableHead>
                                 <TableHead>Data</TableHead>
-                                <TableHead>Item (Código)</TableHead>
+                                <TableHead>Item (Código / P/N)</TableHead>
                                 <TableHead>Lote</TableHead>
                                 <TableHead>Quantidade</TableHead>
                                 <TableHead>Valor Total</TableHead>
@@ -253,8 +251,8 @@ export default function MovimentacaoMateriaisPage() {
         {returnDialogState.isOpen && (
             <ReturnMovementDialog 
                 isOpen={returnDialogState.isOpen}
-                onClose={() => setReturnDialogState({ isOpen: false, stockItem: null })}
-                stockItem={returnDialogState.stockItem}
+                onClose={() => setReturnDialogState({ isOpen: false, movement: null })}
+                movement={returnDialogState.movement}
                 onSuccess={handleReturnSuccess}
             />
         )}
