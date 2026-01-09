@@ -290,7 +290,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose} modal>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar {type === 'entrada' ? 'Entrada' : 'Saída'} de Suprimento</DialogTitle>
@@ -467,5 +467,3 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     </Dialog>
   );
 }
-
-    
