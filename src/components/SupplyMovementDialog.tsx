@@ -5,14 +5,13 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import {
   collection,
-  runTransaction,
   doc,
   writeBatch,
   query,
   where,
   getDocs,
-  increment,
-  addDoc
+  addDoc,
+  setDoc,
 } from 'firebase/firestore';
 import {
   Dialog,
@@ -34,6 +33,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, isValid } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface SupplyMovementDialogProps {
   isOpen: boolean;
@@ -67,7 +67,6 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     ), [firestore, preselectedSupply, isOpen]);
     
   const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(allSuppliesQuery);
-  const [supplyPopoverOpen, setSupplyPopoverOpen] = useState(false);
 
   const addressesQuery = useMemoFirebase(() => (
       firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
@@ -125,7 +124,23 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                 status: 'Disponível'
             };
 
-            await setDoc(newStockRef, stockData);
+            const movementData: Omit<SupplyMovement, 'id'> = {
+                supplyId: selectedSupply.docId,
+                supplyStockId: newStockRef.id,
+                supplyCodigo: selectedSupply.codigo,
+                type: 'entrada',
+                quantity: numQuantity,
+                responsibleId: user.uid,
+                responsibleName: user.displayName || user.email || 'Desconhecido',
+                date: new Date().toISOString(),
+                origin: origin,
+            };
+
+            const batch = writeBatch(firestore);
+            batch.set(newStockRef, stockData);
+            batch.set(doc(collection(firestore, 'supply_movements')), movementData);
+            
+            await batch.commit();
 
             toast({ title: 'Sucesso!', description: `Entrada registrada no lote ${loteInterno}.` });
             onSuccess();
@@ -159,44 +174,26 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             {!preselectedSupply ? (
                  <div className="space-y-1.5">
                     <Label>Item de Suprimento <span className="text-destructive">*</span></Label>
-                    <Popover open={supplyPopoverOpen} onOpenChange={setSupplyPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between font-normal"
-                          disabled={isLoadingSupplies}
-                        >
-                          {isLoadingSupplies ? <Loader2 className="h-4 w-4 animate-spin"/> : selectedSupply
-                            ? `${selectedSupply.codigo} - ${selectedSupply.descricao}`
-                            : "Selecione um item..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
-                          <Command>
-                          <CommandInput placeholder="Buscar item..." />
-                          <CommandList>
-                              <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
-                              <CommandGroup>
-                              {allSupplies?.map((item) => (
-                                  <CommandItem
-                                  key={item.docId}
-                                  value={`${item.codigo} ${item.descricao}`}
-                                  onSelect={() => {
-                                      setSelectedSupply(item);
-                                      setSupplyPopoverOpen(false);
-                                  }}
-                                  >
-                                  <Check className={cn("mr-2 h-4 w-4", selectedSupply?.docId === item.docId ? "opacity-100" : "opacity-0")} />
-                                  {item.codigo} - {item.descricao}
-                                  </CommandItem>
-                              ))}
-                              </CommandGroup>
-                          </CommandList>
-                          </Command>
-                      </PopoverContent>
-                    </Popover>
+                    <Select
+                        onValueChange={(docId) => {
+                            const foundSupply = allSupplies?.find(s => s.docId === docId);
+                            setSelectedSupply(foundSupply || null);
+                        }}
+                        value={selectedSupply?.docId}
+                    >
+                        <SelectTrigger disabled={isLoadingSupplies}>
+                            <SelectValue placeholder={isLoadingSupplies ? "Carregando..." : "Selecione um item..."}>
+                                {selectedSupply ? `${selectedSupply.codigo} - ${selectedSupply.descricao}` : (isLoadingSupplies ? "Carregando..." : "Selecione um item...")}
+                            </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {allSupplies?.map((item) => (
+                                <SelectItem key={item.docId} value={item.docId}>
+                                    {item.codigo} - {item.descricao}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                  </div>
             ) : (
                 <div className="p-3 rounded-md bg-muted/50 border">
@@ -291,3 +288,4 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     </Dialog>
   );
 }
+
