@@ -9,8 +9,7 @@ import {
   query,
   where,
   getDocs,
-  addDoc,
-  setDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import {
   Dialog,
@@ -113,8 +112,27 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     
     if (type === 'entrada') {
         try {
+            const today = new Date();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const year = today.getFullYear();
+            const counterId = `loteInterno_${month}_${year}`;
+            
+            const counterRef = doc(firestore, 'counters', counterId);
+
+            const newSequencial = await runTransaction(firestore, async (transaction) => {
+                const counterDoc = await transaction.get(counterRef);
+                if (!counterDoc.exists()) {
+                    transaction.set(counterRef, { lastId: 1 });
+                    return 1;
+                }
+                const newId = (counterDoc.data().lastId || 0) + 1;
+                transaction.update(counterRef, { lastId: newId });
+                return newId;
+            });
+
+            const loteInterno = `${month}/${year}/${String(newSequencial).padStart(4, '0')}`;
+
             const newStockRef = doc(collection(firestore, 'supply_stock'));
-            const loteInterno = `LOTE-${Date.now()}`;
             
             const stockData: Partial<SupplyStock> = {
                 supplyId: selectedSupply.docId,
@@ -122,7 +140,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                 loteInterno: loteInterno,
                 quantidade: numQuantity,
                 localizacao: localizacao,
-                dataEntrada: new Date().toISOString(),
+                dataEntrada: today.toISOString(),
                 custoUnitario: parseFloat(unitCost) || 0,
                 status: 'Disponível'
             };
@@ -322,3 +340,5 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     </Dialog>
   );
 }
+
+    
