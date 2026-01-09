@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import type { SupplyMovement, Supply } from '@/lib/types';
+import type { SupplyMovement, Supply, SupplyStock } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -34,6 +34,7 @@ import {
 
 type EnrichedMovement = WithDocId<SupplyMovement> & {
   supplyInfo?: Pick<Supply, 'descricao'>;
+  stockInfo?: Partial<Pick<SupplyStock, 'custoUnitario' | 'loteInterno'>>;
 };
 
 export default function MovimentacaoMateriaisPage() {
@@ -51,16 +52,49 @@ export default function MovimentacaoMateriaisPage() {
         return query(collection(firestore, 'supplies'));
     }, [firestore]);
     const { data: supplies, isLoading: isLoadingSupplies, error: suppliesError } = useCollection<WithDocId<Supply>>(suppliesQuery, { queryKey: ['allSuppliesForHistory'] });
+    
+    // We need to fetch all stock items to get cost and lot info. This can be inefficient at scale.
+    // For a real-world app, cost/lot info might be denormalized onto the movement document itself.
+    const [allStock, setAllStock] = useState<Map<string, WithDocId<SupplyStock>>>(new Map());
+    const [isStockLoading, setIsStockLoading] = useState(true);
+
+    useMemo(() => {
+        if (!supplies || !firestore) return;
+
+        const fetchAllStock = async () => {
+            setIsStockLoading(true);
+            const stockMap = new Map<string, WithDocId<SupplyStock>>();
+            for (const supply of supplies) {
+                const stockCollectionRef = collection(firestore, 'supplies', supply.docId, 'stock');
+                const stockSnapshot = await getDocs(stockCollectionRef);
+                stockSnapshot.forEach(doc => {
+                    // Key is `supplyId/stockId`
+                    stockMap.set(`${supply.docId}/${doc.id}`, { ...doc.data() as SupplyStock, docId: doc.id });
+                });
+            }
+            setAllStock(stockMap);
+            setIsStockLoading(false);
+        };
+
+        fetchAllStock();
+    }, [supplies, firestore]);
 
     const enrichedHistory = useMemo((): EnrichedMovement[] => {
-        if (!movements || !supplies) return [];
+        if (!movements || !supplies || !allStock) return [];
         const suppliesMap = new Map(supplies.map(s => [s.codigo, s]));
         
-        return movements.map(movement => ({
-            ...movement,
-            supplyInfo: suppliesMap.get(movement.supplyCodigo),
-        }));
-    }, [movements, supplies]);
+        return movements.map(movement => {
+            const stockInfo = allStock.get(`${movement.supplyId}/${movement.supplyStockId}`);
+            return {
+                ...movement,
+                supplyInfo: suppliesMap.get(movement.supplyCodigo),
+                stockInfo: {
+                    custoUnitario: stockInfo?.custoUnitario,
+                    loteInterno: stockInfo?.loteInterno
+                }
+            }
+        });
+    }, [movements, supplies, allStock]);
 
     const filteredHistory = useMemo(() => {
         if (!enrichedHistory) return [];
@@ -72,12 +106,12 @@ export default function MovimentacaoMateriaisPage() {
             item.responsibleName.toLowerCase().includes(lowercasedTerm) ||
             (item.origin?.toLowerCase() || '').includes(lowercasedTerm) ||
             (item.destination?.toLowerCase() || '').includes(lowercasedTerm) ||
-            item.loteFornecedor?.toLowerCase().includes(lowercasedTerm) ||
-            item.supplyStockId.toLowerCase().includes(lowercasedTerm)
+            (item.loteFornecedor?.toLowerCase() || '').includes(lowercasedTerm) ||
+            (item.stockInfo?.loteInterno?.toLowerCase() || '').includes(lowercasedTerm)
         );
     }, [enrichedHistory, searchTerm]);
 
-    const isLoading = isLoadingMovements || isLoadingSupplies;
+    const isLoading = isLoadingMovements || isLoadingSupplies || isStockLoading;
     const error = movementsError || suppliesError;
 
     return (
@@ -92,7 +126,7 @@ export default function MovimentacaoMateriaisPage() {
                      <div className="relative pt-4">
                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                        <Input
-                           placeholder="Pesquisar por item, usuário, OS, NF-e..."
+                           placeholder="Pesquisar por item, usuário, OS, NF-e, lote..."
                            value={searchTerm}
                            onChange={(e) => setSearchTerm(e.target.value)}
                            className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -103,10 +137,11 @@ export default function MovimentacaoMateriaisPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-16">Tipo</TableHead>
+                                <TableHead className="w-28">Tipo</TableHead>
                                 <TableHead>Data</TableHead>
                                 <TableHead>Item (Código)</TableHead>
                                 <TableHead>Quantidade</TableHead>
+                                <TableHead>Valor Total</TableHead>
                                 <TableHead>Usuário</TableHead>
                                 <TableHead>Origem/Destino</TableHead>
                             </TableRow>
@@ -114,21 +149,21 @@ export default function MovimentacaoMateriaisPage() {
                         <TableBody>
                             {isLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
+                                    <TableCell colSpan={7} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
                             )}
                             {error && (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center text-destructive">
+                                    <TableCell colSpan={7} className="h-24 text-center text-destructive">
                                         Erro ao carregar histórico: {error.message}
                                     </TableCell>
                                 </TableRow>
                             )}
                             {!isLoading && filteredHistory.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
+                                    <TableCell colSpan={7} className="h-24 text-center">
                                          <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                                          <p className="text-muted-foreground">Nenhum movimento encontrado.</p>
                                     </TableCell>
@@ -136,6 +171,7 @@ export default function MovimentacaoMateriaisPage() {
                             )}
                             {!isLoading && filteredHistory.map((item) => {
                                 const isEntrada = item.type === 'entrada';
+                                const totalValue = (item.stockInfo?.custoUnitario || 0) * item.quantity;
                                 return (
                                     <TableRow key={item.docId} className={cn(
                                         isEntrada ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
@@ -144,7 +180,7 @@ export default function MovimentacaoMateriaisPage() {
                                             <TooltipProvider>
                                             <Tooltip>
                                                 <TooltipTrigger>
-                                                    <Badge variant={isEntrada ? 'success' : 'destructive'}>
+                                                    <Badge variant={isEntrada ? 'success' : 'destructive'} className="cursor-help">
                                                         {isEntrada ? 
                                                             <ArrowDownCircle className="mr-1 h-3.5 w-3.5" /> : 
                                                             <ArrowUpCircle className="mr-1 h-3.5 w-3.5" />
@@ -153,7 +189,7 @@ export default function MovimentacaoMateriaisPage() {
                                                     </Badge>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                <p>Lote Interno: {item.supplyStockId}</p>
+                                                <p>Lote Interno: {item.stockInfo?.loteInterno || 'N/A'}</p>
                                                 {item.loteFornecedor && <p>Lote Fornecedor: {item.loteFornecedor}</p>}
                                                 </TooltipContent>
                                             </Tooltip>
@@ -165,6 +201,9 @@ export default function MovimentacaoMateriaisPage() {
                                             <div className="text-sm text-muted-foreground font-mono">{item.supplyCodigo}</div>
                                         </TableCell>
                                         <TableCell className="font-bold">{item.quantity.toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            {totalValue > 0 ? totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A'}
+                                        </TableCell>
                                         <TableCell>{item.responsibleName}</TableCell>
                                         <TableCell>{isEntrada ? item.origin : item.destination}</TableCell>
                                     </TableRow>
