@@ -30,16 +30,20 @@ import ReturnMovementDialog from '@/components/ReturnMovementDialog';
 import { useQueryClient } from '@tanstack/react-query';
 
 
+type EnrichedStockItem = WithDocId<SupplyStock> & {
+    supplyInfo: WithDocId<Supply>;
+};
+
 type EnrichedMovement = WithDocId<SupplyMovement> & {
-  supplyInfo?: Pick<Supply, 'descricao' | 'imageUrl'>;
-  stockInfo?: Partial<Pick<SupplyStock, 'custoUnitario' | 'loteInterno'>>;
+  supplyInfo?: Pick<Supply, 'descricao' | 'imageUrl'> & WithDocId<Supply>;
+  stockInfo?: Partial<WithDocId<SupplyStock>>;
 };
 
 export default function MovimentacaoMateriaisPage() {
     const firestore = useFirestore();
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
-    const [returnDialogState, setReturnDialogState] = useState<{ isOpen: boolean; movement: EnrichedMovement | null }>({ isOpen: false, movement: null });
+    const [returnDialogState, setReturnDialogState] = useState<{ isOpen: boolean; stockItem: EnrichedStockItem | null }>({ isOpen: false, stockItem: null });
 
     const movementsQueryKey = ['supplyMovementsHistory'];
     const movementsQuery = useMemoFirebase(() => {
@@ -68,7 +72,8 @@ export default function MovimentacaoMateriaisPage() {
                 const stockCollectionRef = collection(firestore, 'supplies', supply.docId, 'stock');
                 const stockSnapshot = await getDocs(stockCollectionRef);
                 stockSnapshot.forEach(doc => {
-                    stockMap.set(`${supply.docId}/${doc.id}`, { ...doc.data() as SupplyStock, docId: doc.id });
+                    const stockData = { ...doc.data() as SupplyStock, docId: doc.id };
+                    stockMap.set(`${supply.docId}/${doc.id}`, stockData);
                 });
             }
             setAllStock(stockMap);
@@ -80,21 +85,23 @@ export default function MovimentacaoMateriaisPage() {
 
     const enrichedHistory = useMemo((): EnrichedMovement[] => {
         if (!movements || !supplies || !allStock) return [];
-        const suppliesMap = new Map(supplies.map(s => [s.codigo, s]));
+        const suppliesMap = new Map(supplies.map(s => [s.docId, s]));
         
         return movements.map(movement => {
-            const stockInfo = allStock.get(`${movement.supplyId}/${movement.supplyStockId}`);
-            const supplyInfo = suppliesMap.get(movement.supplyCodigo);
+            const stockData = allStock.get(`${movement.supplyId}/${movement.supplyStockId}`);
+            const supplyData = suppliesMap.get(movement.supplyId);
             return {
                 ...movement,
-                supplyInfo: {
-                    descricao: supplyInfo?.descricao || 'Item não encontrado',
-                    imageUrl: supplyInfo?.imageUrl
-                },
-                stockInfo: {
-                    custoUnitario: stockInfo?.custoUnitario,
-                    loteInterno: stockInfo?.loteInterno
-                }
+                supplyInfo: supplyData ? {
+                    ...supplyData,
+                    descricao: supplyData?.descricao || 'Item não encontrado',
+                    imageUrl: supplyData?.imageUrl
+                } : undefined,
+                stockInfo: stockData ? {
+                    ...stockData,
+                    custoUnitario: stockData?.custoUnitario,
+                    loteInterno: stockData?.loteInterno
+                } : undefined
             }
         });
     }, [movements, supplies, allStock]);
@@ -114,10 +121,23 @@ export default function MovimentacaoMateriaisPage() {
         );
     }, [enrichedHistory, searchTerm]);
     
+    const handleOpenReturnDialog = (movement: EnrichedMovement) => {
+        if (!movement.stockInfo || !movement.supplyInfo) {
+            alert("Não é possível devolver este item pois os dados do lote ou do item mestre estão faltando.");
+            return;
+        }
+
+        const stockItemForDialog: EnrichedStockItem = {
+            ...(movement.stockInfo as WithDocId<SupplyStock>),
+            supplyInfo: movement.supplyInfo as WithDocId<Supply>,
+        }
+        setReturnDialogState({ isOpen: true, stockItem: stockItemForDialog });
+    }
+
     const handleReturnSuccess = () => {
       queryClient.invalidateQueries({ queryKey: movementsQueryKey });
       queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] }); // Invalidate stock list on another page
-      setReturnDialogState({isOpen: false, movement: null });
+      setReturnDialogState({isOpen: false, stockItem: null });
     }
 
     const isLoading = isLoadingMovements || isLoadingSupplies || isStockLoading;
@@ -164,26 +184,27 @@ export default function MovimentacaoMateriaisPage() {
                                 <TableHead>Valor Total</TableHead>
                                 <TableHead>Usuário</TableHead>
                                 <TableHead>Origem/Destino</TableHead>
+                                <TableHead className="text-right">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={9} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
                             )}
                             {error && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center text-destructive">
+                                    <TableCell colSpan={9} className="h-24 text-center text-destructive">
                                         Erro ao carregar histórico: {error.message}
                                     </TableCell>
                                 </TableRow>
                             )}
                             {!isLoading && filteredHistory.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={9} className="h-24 text-center">
                                          <Inbox className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                                          <p className="text-muted-foreground">Nenhum movimento encontrado.</p>
                                     </TableCell>
@@ -209,6 +230,14 @@ export default function MovimentacaoMateriaisPage() {
                                         </TableCell>
                                         <TableCell>{item.responsibleName}</TableCell>
                                         <TableCell>{item.type === 'entrada' || item.type === 'devolucao' ? item.origin : item.destination}</TableCell>
+                                        <TableCell className="text-right">
+                                            {item.type === 'saida' && (
+                                                <Button variant="outline" size="sm" onClick={() => handleOpenReturnDialog(item)}>
+                                                    <Undo className="mr-2 h-3.5 w-3.5"/>
+                                                    Devolver
+                                                </Button>
+                                            )}
+                                        </TableCell>
                                     </TableRow>
                                 )}
                             )}
@@ -221,8 +250,8 @@ export default function MovimentacaoMateriaisPage() {
         {returnDialogState.isOpen && (
             <ReturnMovementDialog 
                 isOpen={returnDialogState.isOpen}
-                onClose={() => setReturnDialogState({ isOpen: false, movement: null })}
-                movement={returnDialogState.movement}
+                onClose={() => setReturnDialogState({ isOpen: false, stockItem: null })}
+                stockItem={returnDialogState.stockItem}
                 onSuccess={handleReturnSuccess}
             />
         )}
