@@ -29,16 +29,19 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Popover, PopoverContent, PopoverTrigger, PopoverPortal } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parse, isValid } from 'date-fns';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useQueryClient } from '@tanstack/react-query';
 import ItemSelectorDialog from './ItemSelectorDialog';
 
+type EnrichedStockItem = WithDocId<SupplyStock> & {
+    supplyInfo: WithDocId<Supply>;
+};
 
 interface SupplyMovementDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (newItem?: EnrichedStockItem) => void;
   type: 'entrada' | 'saida';
   supply: WithDocId<Supply> | null;
 }
@@ -154,7 +157,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                 setIsSaving(false);
                 return;
             }
-            validadeDate = new Date(validade);
+            validadeDate = parse(validade, 'yyyy-MM-dd', new Date());
             if (!isValid(validadeDate)) {
                  toast({ variant: 'destructive', title: 'Erro', description: 'Formato de data de validade inválido. Use AAAA-MM-DD.' });
                  setIsSaving(false);
@@ -196,9 +199,14 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             await batch.commit();
 
             toast({ title: 'Sucesso!', description: `Entrada registrada no lote ${loteInterno}.` });
-            queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] }); 
-            queryClient.invalidateQueries({ queryKey: ['supplyMovementsHistory'] });
-            onSuccess();
+            
+            const newStockItemForPrint: EnrichedStockItem = {
+              ...(stockData as SupplyStock), // cast because id is optional on Omit
+              docId: newStockRef.id,
+              supplyInfo: selectedSupply,
+            };
+
+            onSuccess(newStockItemForPrint);
             handleClose();
 
         } catch (err: any) {
@@ -232,9 +240,6 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             });
             
             toast({ title: 'Sucesso!', description: `Saída de ${numQuantity} unidade(s) do lote ${selectedStockItem.loteInterno} registrada.` });
-            queryClient.invalidateQueries({ queryKey: ['availableStockForSupply', selectedSupply.docId] });
-            queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] }); 
-            queryClient.invalidateQueries({ queryKey: ['supplyMovementsHistory'] });
             onSuccess();
             handleClose();
 
@@ -406,3 +411,5 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     </>
   );
 }
+
+    

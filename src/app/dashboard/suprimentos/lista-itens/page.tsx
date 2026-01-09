@@ -129,11 +129,15 @@ const SuprimentosPage = () => {
     setFormDialogState({ isOpen: true, supply: supply });
   };
   
-  const handleDialogSuccess = () => {
+  const handleDialogSuccess = (newItem?: EnrichedStockItem) => {
       // Re-trigger the stock fetching
       queryClient.invalidateQueries({ queryKey: suppliesQueryKey });
       setMovementDialogState({ isOpen: false, type: 'entrada', supply: null });
       setFormDialogState({ isOpen: false, supply: null });
+
+      if (newItem) {
+        setStockToPrint(newItem);
+      }
   };
   
   const executePrint = () => {
@@ -345,3 +349,5 @@ const SuprimentosPage = () => {
 };
 
 export default SuprimentosPage;
+
+    
