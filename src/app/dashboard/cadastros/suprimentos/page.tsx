@@ -1,17 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import {
   collection,
   query,
   orderBy,
   doc,
-  writeBatch,
-  addDoc,
-  updateDoc,
   deleteDoc,
-  runTransaction
 } from 'firebase/firestore';
 import type { Supply } from '@/lib/types';
 import {
@@ -49,14 +45,6 @@ import Image from 'next/image';
 import SupplyFormDialog from '@/components/SupplyFormDialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-
-const familyCodes: Record<string, string> = {
-  MP: '10',
-  PA: '20',
-  CG: '30',
-  CT: '40',
-  CP: '50',
-};
 
 const CadastroSuprimentosPage = () => {
   const firestore = useFirestore();
@@ -146,7 +134,8 @@ const CadastroSuprimentosPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-16">Código</TableHead>
+                <TableHead className="hidden w-[64px] sm:table-cell">Foto</TableHead>
+                <TableHead>Código</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Part Number</TableHead>
                 <TableHead>Família</TableHead>
@@ -156,16 +145,25 @@ const CadastroSuprimentosPage = () => {
             </TableHeader>
             <TableBody>
               {isLoading && (
-                <TableRow><TableCell colSpan={6} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
               )}
               {error && (
-                <TableRow><TableCell colSpan={6} className="text-center text-destructive h-24">Erro ao carregar dados.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-destructive h-24">Erro ao carregar dados.</TableCell></TableRow>
               )}
               {!isLoading && filteredSupplies.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center h-24">Nenhum item encontrado.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center h-24">Nenhum item encontrado.</TableCell></TableRow>
               )}
               {!isLoading && filteredSupplies.map(item => (
                 <TableRow key={item.docId}>
+                   <TableCell className="hidden sm:table-cell">
+                      <Image
+                        alt={item.descricao}
+                        className="aspect-square rounded-md object-cover"
+                        height="48"
+                        src={item.imageUrl || 'https://picsum.photos/seed/supply/48/48'}
+                        width="48"
+                      />
+                    </TableCell>
                   <TableCell className="font-mono">{item.codigo}</TableCell>
                   <TableCell className="font-medium">{item.descricao}</TableCell>
                   <TableCell>{item.partNumber}</TableCell>

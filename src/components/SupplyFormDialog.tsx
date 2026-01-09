@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useStorage } from '@/firebase';
 import {
   collection,
   runTransaction,
@@ -14,6 +14,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
+import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload, ImageIcon } from 'lucide-react';
 import type { Supply, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -48,6 +49,7 @@ import {
 } from "@/components/ui/form"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from './ui/separator';
+import Image from 'next/image';
 
 const familyCodes: Record<Supply['familia'], string> = {
   MP: '10',
@@ -59,10 +61,11 @@ const familyCodes: Record<Supply['familia'], string> = {
 
 const formSchema = z.object({
   // Aba 1: Identificação
+  familia: z.enum(['MP', 'CT', 'CG', 'CP', 'PA']),
   descricao: z.string().min(3, { message: "A descrição é obrigatória." }),
   partNumber: z.string(),
   unidadeMedida: z.enum(['UN', 'KG', 'MT', 'LT', 'CX']),
-  familia: z.enum(['MP', 'CT', 'CG', 'CP', 'PA']),
+  imageUrl: z.string().optional(),
   
   // Aba 2: Rastreabilidade
   exigeLote: z.boolean().default(false),
@@ -97,8 +100,11 @@ interface SupplyFormDialogProps {
 
 export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }: SupplyFormDialogProps) {
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const addressesQuery = useMemoFirebase(() => (
       firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
@@ -122,14 +128,25 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       estoqueMinimo: 0,
       estoqueMaximo: 0,
       localizacaoPadrao: '',
+      imageUrl: '',
     },
   });
 
   const familia = form.watch('familia');
 
+  const resetFormAndClose = () => {
+    form.reset();
+    setPreviewImage(null);
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+    onClose();
+  }
+
   useEffect(() => {
     if (supply) {
       form.reset(supply);
+      setPreviewImage(supply.imageUrl || null);
     } else {
       form.reset({
         descricao: '',
@@ -142,13 +159,14 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
         estoqueMinimo: 0,
         estoqueMaximo: 0,
         localizacaoPadrao: '',
+        imageUrl: '',
       });
+      setPreviewImage(null);
     }
   }, [supply, form, isOpen]);
 
-  // Lógica para desabilitar/setar campos de rastreabilidade
   useEffect(() => {
-    if (!isOpen) return; // Don't run effect if dialog is closed
+    if (!isOpen) return;
     switch (familia) {
       case 'MP':
         form.setValue('exigeLote', true);
@@ -161,14 +179,13 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
         break;
       case 'CT':
         form.setValue('exigeLote', true);
-        form.setValue('exigeSerialNumber', false); // Can be optional as per blueprint
+        form.setValue('exigeSerialNumber', false);
         break;
       case 'CG':
         form.setValue('exigeLote', false);
         form.setValue('exigeSerialNumber', false);
         break;
       default:
-        // Set to default for new items
         if (!supply) {
            form.setValue('exigeLote', false);
            form.setValue('exigeSerialNumber', false);
@@ -177,15 +194,33 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
     }
   }, [familia, form.setValue, isOpen, supply]);
   
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setPreviewImage(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSave = async (values: z.infer<typeof formSchema>) => {
-    if (!firestore) return;
+    if (!firestore || !storage) return;
     setIsSaving(true);
 
     try {
+      let finalImageUrl = supply?.imageUrl || '';
+      if (previewImage && previewImage !== (supply?.imageUrl || '')) {
+          const imageRef = storageRef(storage, `supply_images/${doc(collection(firestore, 'temp')).id}.jpg`);
+          const snapshot = await uploadString(imageRef, previewImage, 'data_url');
+          finalImageUrl = await getDownloadURL(snapshot.ref);
+      }
+      
+      const dataToSave = { ...values, imageUrl: finalImageUrl };
+
       if (supply) {
         // Edit mode
         const supplyRef = doc(firestore, 'supplies', supply.docId);
-        await updateDoc(supplyRef, values);
+        await updateDoc(supplyRef, dataToSave);
         toast({ title: "Sucesso!", description: "Item atualizado." });
       } else {
         // Create mode
@@ -206,12 +241,13 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
         const codigo = `${prefix}${newSequencial.toString().padStart(4, '0')}`;
         
         await addDoc(collection(firestore, 'supplies'), {
-          ...values,
+          ...dataToSave,
           codigo: codigo,
         });
         toast({ title: "Sucesso!", description: `Item ${codigo} criado.` });
       }
       onSuccess();
+      resetFormAndClose();
     } catch (err: any) {
       console.error("Erro ao salvar item:", err);
       toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar o item.' });
@@ -226,7 +262,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const isPartNumberRequired = useMemo(() => familia !== 'CG', [familia]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={resetFormAndClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{supply ? 'Editar Item de Suprimento' : 'Novo Item de Suprimento'}</DialogTitle>
@@ -250,7 +286,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Família</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="MP">MP - Matéria-Prima</SelectItem>
@@ -286,13 +322,18 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                     </FormItem>
                   )}
                 />
+                 <div className="flex items-center gap-4">
+                    {previewImage ? <Image src={previewImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Foto</Button>
+                    <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
+                </div>
                 <FormField
                   control={form.control}
                   name="unidadeMedida"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Unidade de Medida</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="UN">UN (Unidade)</SelectItem>
@@ -351,7 +392,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                     render={({ field }) => (
                       <FormItem className='animate-in fade-in-50'>
                         <FormLabel>Tipo de Material</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo..."/></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="Metal">Metal</SelectItem>
@@ -398,7 +439,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Localização Padrão</FormLabel>
-                           <Select onValueChange={field.onChange} defaultValue={field.value} >
+                           <Select onValueChange={field.onChange} value={field.value} >
                             <FormControl>
                               <SelectTrigger disabled={isLoadingAddresses}>
                                 <SelectValue placeholder={isLoadingAddresses ? "Carregando endereços..." : "Selecione a localização"} />
@@ -417,7 +458,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
               </TabsContent>
             </Tabs>
              <DialogFooter className='pt-4'>
-                <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
+                <Button variant="outline" onClick={resetFormAndClose} disabled={isSaving}>Cancelar</Button>
                 <Button type="submit" disabled={isSaving}>
                   {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar

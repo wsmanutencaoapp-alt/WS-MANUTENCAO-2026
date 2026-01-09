@@ -84,45 +84,76 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Supply",
       "type": "object",
-      "description": "Represents an aircraft maintenance supply item.",
+      "description": "Represents the master data for a supply item.",
       "properties": {
-        "id": {
+        "codigo": {
           "type": "string",
-          "description": "Unique identifier for the Supply entity."
+          "description": "Unique, system-generated code for the supply item."
         },
-        "name": {
-          "type": "string",
-          "description": "Name of the supply item."
-        },
-        "description": {
+        "descricao": {
           "type": "string",
           "description": "Detailed description of the supply item."
         },
-        "quantityOnHand": {
-          "type": "number",
-          "description": "The number of supply items currently in stock."
-        },
-        "reorderPoint": {
-          "type": "number",
-          "description": "The quantity at which a reorder should be triggered."
-        },
-        "unitCost": {
-          "type": "number",
-          "description": "The cost of a single unit of the supply item."
-        },
-        "supplierId": {
+        "partNumber": {
           "type": "string",
-          "description": "Reference to Supplier. (Relationship: Supplier 1:N Supply)"
+          "description": "Manufacturer's Part Number."
+        },
+        "unidadeMedida": {
+          "type": "string",
+          "enum": ["UN", "KG", "MT", "LT", "CX"],
+          "description": "Unit of measure for the supply."
+        },
+        "familia": {
+          "type": "string",
+          "enum": ["MP", "CT", "CG", "CP", "PA"],
+          "description": "The family/category of the supply item."
+        },
+        "exigeLote": {
+          "type": "boolean",
+          "description": "Indicates if lot tracking is required."
+        },
+        "exigeSerialNumber": {
+          "type": "boolean",
+          "description": "Indicates if serial number tracking is required."
+        },
+        "exigeValidade": {
+          "type": "boolean",
+          "description": "Indicates if expiration date tracking is required."
+        },
+        "tipoMaterial": {
+          "type": "string",
+          "enum": ["Metal", "Polímero", "Tecido", "Outro"],
+          "description": "Specific material type, used for 'Matéria-Prima' family."
+        },
+        "estoqueMinimo": {
+          "type": "number",
+          "description": "The minimum stock level before a reorder is triggered."
+        },
+        "estoqueMaximo": {
+          "type": "number",
+          "description": "The maximum stock level to avoid over-purchasing."
+        },
+        "localizacaoPadrao": {
+          "type": "string",
+          "description": "Default storage address for this supply item."
+        },
+        "imageUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the supply item's photo."
         }
       },
       "required": [
-        "id",
-        "name",
-        "description",
-        "quantityOnHand",
-        "reorderPoint",
-        "unitCost",
-        "supplierId"
+        "codigo",
+        "descricao",
+        "unidadeMedida",
+        "familia",
+        "exigeLote",
+        "exigeSerialNumber",
+        "exigeValidade",
+        "estoqueMinimo",
+        "estoqueMaximo",
+        "localizacaoPadrao"
       ]
     },
     "Tool": {
@@ -762,7 +793,7 @@
           "schema": {
             "$ref": "#/backend/entities/Supply"
           },
-          "description": "Stores aircraft maintenance supplies.  Includes supplierId for associating supplies with suppliers.",
+          "description": "Stores the master data for supply items.",
           "params": [
             {
               "name": "supplyId",
