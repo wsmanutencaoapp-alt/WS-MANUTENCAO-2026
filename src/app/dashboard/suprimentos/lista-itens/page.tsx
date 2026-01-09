@@ -20,7 +20,7 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight, Printer } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,7 @@ import SupplyMovementDialog from '@/components/SupplyMovementDialog';
 import { format, parseISO } from 'date-fns';
 import Image from 'next/image';
 import SupplyFormDialog from '@/components/SupplyFormDialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 
 
@@ -56,6 +56,8 @@ const SuprimentosPage = () => {
   }>({ isOpen: false, supply: null });
   
   const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
+  const [stockToPrint, setStockToPrint] = useState<EnrichedStockItem | null>(null);
+
   
   // 1. Fetch all master supply data 
   const suppliesQueryKey = ['suppliesMasterDataForStockList'];
@@ -133,6 +135,27 @@ const SuprimentosPage = () => {
       setMovementDialogState({ isOpen: false, type: 'entrada', supply: null });
       setFormDialogState({ isOpen: false, supply: null });
   };
+  
+  const executePrint = () => {
+    const printableArea = document.getElementById('printable-label-area');
+    if (!printableArea) return;
+
+    const printWindow = window.open('', '', 'height=600,width=800');
+    if (printWindow) {
+        printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
+        printWindow.document.write('<style>@media print { @page { size: 55mm 25mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; box-sizing: border-box; padding: 2mm; gap: 2mm; break-inside: avoid; } .info { display: flex; flex-direction: column; justify-content: center; } .desc { font-size: 8px; font-weight: bold; } .code { font-size: 7px; font-family: monospace; } .lot { font-size: 10px; font-weight: bold; font-family: monospace; } .due-date { font-size: 8px; font-weight: bold; } .qr-code { width: 21mm; height: 21mm; justify-self: end; }  }</style>');
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(printableArea.innerHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+        }, 250);
+    }
+  };
+
 
   const isLoading = isLoadingSupplies || isStockLoading;
 
@@ -230,6 +253,9 @@ const SuprimentosPage = () => {
                         <Button variant="ghost" size="icon" title="Editar Item Mestre" onClick={() => handleOpenFormDialog(supplyInfo)}>
                             <Edit className="h-4 w-4"/>
                         </Button>
+                        <Button variant="ghost" size="icon" title="Imprimir Etiqueta do Lote" onClick={() => setStockToPrint(item)}>
+                            <Printer className="h-4 w-4" />
+                        </Button>
                     </TableCell>
                     </TableRow>
                   );
@@ -275,6 +301,45 @@ const SuprimentosPage = () => {
           </DialogContent>
         </Dialog>
       )}
+
+       {stockToPrint && (
+        <Dialog open={!!stockToPrint} onOpenChange={() => setStockToPrint(null)}>
+            <DialogContent className="max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>Etiqueta de Suprimento</DialogTitle>
+                    <DialogDescription>
+                        Confirme a etiqueta e clique em imprimir. Dimensões: 55mm x 25mm.
+                    </DialogDescription>
+                </DialogHeader>
+                <div id="printable-label-area" className="flex justify-center p-4 bg-muted/50 rounded-md">
+                    <div className="label-container grid grid-cols-[1fr_auto] items-center p-1 border rounded-lg bg-white" style={{ width: '208px', height: '95px', boxSizing: 'content-box', gap: '2mm', padding: '2mm' }}>
+                       <div className="info flex flex-col justify-center h-full">
+                           <p className="desc font-bold text-black" style={{fontSize: '8px'}}>{stockToPrint.supplyInfo.descricao}</p>
+                           <p className="code font-mono text-black" style={{fontSize: '7px'}}>{stockToPrint.supplyInfo.codigo}</p>
+                           <p className="lot font-mono font-bold text-black" style={{fontSize: '10px'}}>{stockToPrint.loteInterno}</p>
+                           {stockToPrint.dataValidade && <p className="due-date font-bold text-black" style={{fontSize: '8px'}}>VAL: {format(parseISO(stockToPrint.dataValidade), 'dd/MM/yyyy')}</p>}
+                       </div>
+                       <div className="qr-code self-center" style={{width: '80px', height: '80px'}}>
+                            <Image
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(`${stockToPrint.supplyInfo.codigo}/${stockToPrint.loteInterno}`)}`}
+                                alt={`QR Code for ${stockToPrint.loteInterno}`}
+                                width={80}
+                                height={80}
+                            />
+                       </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setStockToPrint(null)}>Cancelar</Button>
+                    <Button onClick={executePrint}>
+                        <Printer className="mr-2 h-4 w-4"/>
+                        Imprimir
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
+
     </div>
   );
 };
