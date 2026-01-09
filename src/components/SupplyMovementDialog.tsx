@@ -130,7 +130,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                 return newId;
             });
 
-            const loteInterno = `${month}/${year}/${String(newSequencial).padStart(4, '0')}`;
+            const loteInterno = `${year}${month}${String(newSequencial).padStart(4, '0')}`;
 
             const newStockRef = doc(collection(firestore, 'supply_stock'));
             
@@ -340,5 +340,3 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     </Dialog>
   );
 }
-
-    
