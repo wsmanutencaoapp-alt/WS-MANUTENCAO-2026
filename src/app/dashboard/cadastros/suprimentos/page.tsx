@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, PlusCircle, Trash2, Edit, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -55,6 +56,7 @@ const CadastroSuprimentosPage = () => {
   const [editingSupply, setEditingSupply] = useState<WithDocId<Supply> | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
 
   const suppliesQueryKey = ['suppliesMasterData'];
   const suppliesQuery = useMemoFirebase(
@@ -73,7 +75,7 @@ const CadastroSuprimentosPage = () => {
     const lowercasedTerm = searchTerm.toLowerCase();
     return supplies.filter(supply => 
       supply.descricao.toLowerCase().includes(lowercasedTerm) ||
-      supply.partNumber.toLowerCase().includes(lowercasedTerm) ||
+      (supply.partNumber && supply.partNumber.toLowerCase().includes(lowercasedTerm)) ||
       supply.codigo.toLowerCase().includes(lowercasedTerm)
     );
   }, [supplies, searchTerm]);
@@ -156,13 +158,15 @@ const CadastroSuprimentosPage = () => {
               {!isLoading && filteredSupplies.map(item => (
                 <TableRow key={item.docId}>
                    <TableCell className="hidden sm:table-cell">
-                      <Image
-                        alt={item.descricao}
-                        className="aspect-square rounded-md object-cover"
-                        height="48"
-                        src={item.imageUrl || 'https://picsum.photos/seed/supply/48/48'}
-                        width="48"
-                      />
+                      <button onClick={() => setImageToView({ src: item.imageUrl || 'https://picsum.photos/seed/supply/48/48', alt: item.descricao })}>
+                        <Image
+                          alt={item.descricao}
+                          className="aspect-square rounded-md object-cover cursor-pointer"
+                          height="48"
+                          src={item.imageUrl || 'https://picsum.photos/seed/supply/48/48'}
+                          width="48"
+                        />
+                      </button>
                     </TableCell>
                   <TableCell className="font-mono">{item.codigo}</TableCell>
                   <TableCell className="font-medium">{item.descricao}</TableCell>
@@ -208,6 +212,24 @@ const CadastroSuprimentosPage = () => {
         onSuccess={handleSuccess}
         supply={editingSupply}
       />
+      
+      {imageToView && (
+        <Dialog open={!!imageToView} onOpenChange={() => setImageToView(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{imageToView.alt}</DialogTitle>
+            </DialogHeader>
+            <div className="relative w-full aspect-square">
+              <Image 
+                src={imageToView.src}
+                alt={imageToView.alt}
+                fill
+                className="object-contain rounded-md"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

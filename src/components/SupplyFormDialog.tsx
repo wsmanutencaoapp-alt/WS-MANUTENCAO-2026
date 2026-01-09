@@ -280,73 +280,80 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
               </TabsList>
               
               <TabsContent value="identificacao" className="space-y-4 py-4">
-                 <FormField
-                  control={form.control}
-                  name="familia"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Família</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="MP">MP - Matéria-Prima</SelectItem>
-                          <SelectItem value="CT">CT - Consumível Técnico</SelectItem>
-                          <SelectItem value="CG">CG - Consumível Geral</SelectItem>
-                          <SelectItem value="CP">CP - Componente</SelectItem>
-                          <SelectItem value="PA">PA - Produto Acabado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="descricao"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Descrição</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="partNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Part Number (P/N){isPartNumberRequired && <span className="text-destructive">*</span>}</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <div className="flex items-center gap-4">
-                    {previewImage ? <Image src={previewImage} alt="Preview" width={48} height={48} className="rounded-md object-cover" /> : <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>}
-                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Foto</Button>
-                    <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
-                </div>
-                <FormField
-                  control={form.control}
-                  name="unidadeMedida"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Unidade de Medida</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="UN">UN (Unidade)</SelectItem>
-                          <SelectItem value="KG">KG (Quilograma)</SelectItem>
-                          <SelectItem value="MT">MT (Metro)</SelectItem>
-                          <SelectItem value="LT">LT (Litro)</SelectItem>
-                          <SelectItem value="CX">CX (Caixa)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                   <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="familia"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Família</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="MP">MP - Matéria-Prima</SelectItem>
+                              <SelectItem value="CT">CT - Consumível Técnico</SelectItem>
+                              <SelectItem value="CG">CG - Consumível Geral</SelectItem>
+                              <SelectItem value="CP">CP - Componente</SelectItem>
+                              <SelectItem value="PA">PA - Produto Acabado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="descricao"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Descrição</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="partNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Part Number (P/N){isPartNumberRequired && <span className="text-destructive">*</span>}</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="unidadeMedida"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Unidade de Medida</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="UN">UN (Unidade)</SelectItem>
+                              <SelectItem value="KG">KG (Quilograma)</SelectItem>
+                              <SelectItem value="MT">MT (Metro)</SelectItem>
+                              <SelectItem value="LT">LT (Litro)</SelectItem>
+                              <SelectItem value="CX">CX (Caixa)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                   </div>
+                   <div className="space-y-2">
+                        <Label>Foto do Item</Label>
+                        <div className="flex justify-center items-center h-48 w-full bg-muted rounded-md relative">
+                            {previewImage ? <Image src={previewImage} alt="Preview" fill className="object-contain rounded-md" /> : <ImageIcon className="h-10 w-10 text-muted-foreground" />}
+                        </div>
+                        <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Carregar Foto</Button>
+                        <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
+                   </div>
+                 </div>
               </TabsContent>
 
               <TabsContent value="rastreabilidade" className="space-y-4 py-4">
