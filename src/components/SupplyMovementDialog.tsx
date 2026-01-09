@@ -305,13 +305,13 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                               </div>
                               {selectedSupply.exigeValidade && (
                                    <div className="space-y-1.5">
-                                      <Label htmlFor="validade">Data de Validade (AAAA-MM-DD) <span className="text-destructive">*</span></Label>
+                                      <Label htmlFor="validade">Data de Validade <span className="text-destructive">*</span></Label>
                                        <Input
                                         id="validade"
-                                        type="text"
-                                        placeholder="Ex: 2025-12-31"
+                                        type="date"
                                         value={validade}
                                         onChange={(e) => setValidade(e.target.value)}
+                                        className="w-full"
                                       />
                                   </div>
                               )}
