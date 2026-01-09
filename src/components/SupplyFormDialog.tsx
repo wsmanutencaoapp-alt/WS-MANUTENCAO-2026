@@ -9,7 +9,10 @@ import {
   runTransaction,
   doc,
   addDoc,
-  updateDoc
+  updateDoc,
+  query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
 import {
   Dialog,
@@ -89,8 +92,14 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   
-  const addressesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'addresses') : null), [firestore]);
-  const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, { queryKey: ['addresses'] });
+  const addressesQuery = useMemoFirebase(() => (
+      firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
+    ), [firestore]);
+    
+  const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, { 
+      queryKey: ['addresses_suprimentos'],
+      enabled: isOpen,
+    });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
