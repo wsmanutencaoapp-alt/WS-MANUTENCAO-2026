@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useUser, useCollection, useMemoFirebase, errorEmitter } from '@/firebase';
 import {
   collection,
   doc,
@@ -23,14 +24,17 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CalendarIcon, Check, ChevronsUpDown, Hash, Building } from 'lucide-react';
+import { Loader2, CalendarIcon, Check, ChevronsUpDown } from 'lucide-react';
 import type { Supply, SupplyStock, SupplyMovement, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
-import { format, isValid } from 'date-fns';
+import { format } from 'date-fns';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { useQueryClient } from '@tanstack/react-query';
+
 
 interface SupplyMovementDialogProps {
   isOpen: boolean;
@@ -44,6 +48,8 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [isSaving, setIsSaving] = useState(false);
   const [selectedSupply, setSelectedSupply] = useState<WithDocId<Supply> | null>(preselectedSupply);
   
@@ -96,7 +102,8 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     }
     return null;
   }, [firestore, type, selectedSupply]);
-  const { data: availableStock, isLoading: isLoadingStock } = useCollection<WithDocId<SupplyStock>>(availableStockQuery, {
+
+  const { data: availableStock, isLoading: isLoadingStock, error: stockError } = useCollection<WithDocId<SupplyStock>>(availableStockQuery, {
     queryKey: ['availableStockForSupply', selectedSupply?.docId],
     enabled: isOpen && type === 'saida' && !!selectedSupply,
   });
@@ -207,6 +214,8 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             await batch.commit();
 
             toast({ title: 'Sucesso!', description: `Entrada registrada no lote ${loteInterno}.` });
+            queryClient.invalidateQueries({ queryKey: ['allSupplyStockList'] });
+            queryClient.invalidateQueries({ queryKey: ['supplyMovementsHistory'] });
             onSuccess();
             handleClose();
 
@@ -243,11 +252,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                 }
 
                 const newQuantity = currentQuantity - numQuantity;
-                if (newQuantity > 0) {
-                    transaction.update(stockRef, { quantidade: newQuantity });
-                } else {
-                    transaction.delete(stockRef);
-                }
+                transaction.update(stockRef, { quantidade: newQuantity });
 
                 const movementData: Omit<SupplyMovement, 'id'> = {
                     supplyId: selectedSupply.docId,
@@ -264,12 +269,18 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             });
             
             toast({ title: 'Sucesso!', description: `Saída de ${numQuantity} unidade(s) do lote ${selectedStockItem.loteInterno} registrada.` });
+            queryClient.invalidateQueries({ queryKey: ['allSupplyStockList'] });
+            queryClient.invalidateQueries({ queryKey: ['supplyMovementsHistory'] });
             onSuccess();
             handleClose();
 
         } catch(err: any) {
             console.error("Erro na saída:", err);
-            toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível registrar a saída.' });
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: `supply_stock/${selectedStockId}`,
+                operation: 'write',
+                requestResourceData: { quantidade: `decrement by ${numQuantity}` }
+            }));
         } finally {
             setIsSaving(false);
         }
@@ -278,7 +289,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose} modal={false}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar {type === 'entrada' ? 'Entrada' : 'Saída'} de Suprimento</DialogTitle>
