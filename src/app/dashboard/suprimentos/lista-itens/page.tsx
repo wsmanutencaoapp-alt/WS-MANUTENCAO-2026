@@ -158,7 +158,7 @@ const SuprimentosPage = () => {
                 <TableHead className="hidden w-[64px] sm:table-cell">Foto</TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead>Descrição</TableHead>
-                <TableHead>Part Number</TableHead>
+                <TableHead>Localização Padrão</TableHead>
                 <TableHead>Saldo Atual</TableHead>
                 <TableHead>U.M.</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -189,7 +189,7 @@ const SuprimentosPage = () => {
                     </TableCell>
                   <TableCell className="font-mono">{item.codigo}</TableCell>
                   <TableCell className="font-medium">{item.descricao}</TableCell>
-                  <TableCell>{item.partNumber || 'N/A'}</TableCell>
+                  <TableCell>{item.localizacaoPadrao || 'N/A'}</TableCell>
                   <TableCell>
                     <Button 
                       variant="link" 
