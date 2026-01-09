@@ -31,9 +31,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if hasPermission('suprimentos');
       
-      // Allow users with permission to read and write to the stock subcollection
+      // Allow authenticated users to read stock, but only permitted users to write.
       match /stock/{stockId} {
-        allow read, write: if hasPermission('suprimentos');
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('suprimentos');
       }
     }
     
