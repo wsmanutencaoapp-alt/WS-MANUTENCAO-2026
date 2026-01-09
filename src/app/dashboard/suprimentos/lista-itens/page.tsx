@@ -135,7 +135,7 @@ const SuprimentosPage = () => {
     };
 
     fetchAllStock();
-  }, [supplies, firestore]);
+  }, [supplies, firestore, queryClient]);
   
 
   const filteredStock = useMemo(() => {
@@ -315,9 +315,6 @@ const SuprimentosPage = () => {
                     <TableCell className="font-bold">{item.quantidade.toLocaleString()}</TableCell>
                     <TableCell>{item.dataValidade ? format(parseISO(item.dataValidade), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                     <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" title="Registrar Devolução para este lote" onClick={() => handleOpenReturnDialog(item)}>
-                            <Undo className="h-4 w-4 text-blue-600"/>
-                        </Button>
                         <Button variant="ghost" size="icon" title="Registrar Saída deste Lote" onClick={() => handleOpenMovementDialog('saida', supplyInfo)}>
                             <LogOut className="h-4 w-4 text-orange-600"/>
                         </Button>
