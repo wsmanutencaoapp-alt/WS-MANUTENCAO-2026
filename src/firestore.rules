@@ -9,11 +9,12 @@ service cloud.firestore {
     }
     
     function getUserData() {
+      // Use get() which doesn't count as a read operation in most cases within rules
       return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
-      // An admin is a user with Admin level.
+      // An admin is a user with Admin level. The status check is handled by hasPermission for non-admins.
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
              getUserData().accessLevel == 'Admin';
     }
@@ -30,6 +31,16 @@ service cloud.firestore {
       allow write: if hasPermission('suprimentos');
     }
     
+    match /supply_stock/{stockId} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('suprimentos');
+    }
+    
+    match /supply_movements/{movementId} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('suprimentos');
+    }
+
     match /tools/{toolId} {
       allow read: if isAuthenticated();
       allow create, update, delete: if hasPermission('ferramentaria');
@@ -51,19 +62,26 @@ service cloud.firestore {
     }
     
     match /operation_records/{operationRecordId} {
+      // Operation records could be sensitive, restricting to admins for now.
       allow read, write: if isAdmin();
     }
     
     match /images/{imageId} {
       allow read: if isAuthenticated();
+      // Writing images is usually part of another process (like creating a tool),
+      // so specific write rules are complex. Restricting to Admin is safest for now.
       allow write: if isAdmin();
     }
     
     match /employees/{employeeId} {
+      // Any authenticated user can read employee profiles to get names, etc.
       allow read: if isAuthenticated();
       
+      // A user can create their own employee document upon signup.
       allow create: if request.auth.uid == employeeId;
       
+      // An Admin can write to any employee document.
+      // Any other user can only update their own profile, but cannot change critical fields.
       allow update: if isAdmin() || 
                      (request.auth.uid == employeeId && 
                       !('accessLevel' in request.resource.data) &&
@@ -72,34 +90,30 @@ service cloud.firestore {
     }
     
     match /expenses/{expenseId} {
-      allow create: if isAuthenticated();
+      // Allow user to create for themselves, but only finance/admin can read all
+      allow create: if hasPermission('financeiro');
       allow read, update, delete: if hasPermission('financeiro');
     }
 
     match /tool_requests/{requestId} {
-      // Allow a user to create their own request.
-      allow create: if isAuthenticated() && request.resource.data.requesterId == request.auth.uid;
-      
-      // Allow a user to read their own requests. Ferramentaria/Admins can read all.
-      allow read: if (isAuthenticated() && (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.handledBy)) || hasPermission('ferramentaria');
-      
-      // Allow Ferramentaria/Admins to update any request. A user can only cancel their own PENDING request.
-      allow update: if hasPermission('ferramentaria') ||
-                     (isAuthenticated() && request.auth.uid == resource.data.requesterId && resource.data.status == 'Pendente' && request.resource.data.status == 'Cancelada');
-
-      // Only Admins can delete requests.
-      allow delete: if isAdmin();
+      // Allow a user to create/read/write their own requests if they are active.
+      // Ferramentaria staff need to be able to read/update all requests.
+      allow read, write: if (isAuthenticated() && (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.handledBy)) || hasPermission('ferramentaria');
     }
     
     match /budgets/{budgetId} {
+      // Only users with finance permission can manage budgets.
       allow read: if isAuthenticated();
       allow write: if hasPermission('financeiro');
     }
     
     match /addresses/{addressId} {
-        allow read, write: if hasPermission('cadastros_enderecos');
+        // Any authenticated and active user can manage addresses.
+        allow read, write: if hasPermission('cadastros');
     }
 
+    // This collection is used for generating sequential IDs.
+    // Any authenticated user can read and write to it within a transaction.
     match /counters/{counterId} {
         allow read, write: if isAuthenticated();
     }

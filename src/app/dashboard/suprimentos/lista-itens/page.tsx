@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
-import type { Supply } from '@/lib/types';
+import { collection, query, orderBy, where } from 'firebase/firestore';
+import type { Supply, SupplyStock } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -23,13 +23,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, PlusCircle, Search, LogIn, LogOut } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import SupplyMovementDialog from '@/components/SupplyMovementDialog';
+import { getDocs } from 'firebase/firestore';
+
 
 const SuprimentosPage = () => {
   const firestore = useFirestore();
@@ -54,17 +56,44 @@ const SuprimentosPage = () => {
     queryKey: suppliesQueryKey
   });
 
+  const { data: stockData, isLoading: isLoadingStock } = useQuery({
+    queryKey: ['allSupplyStock'],
+    queryFn: async () => {
+        if (!firestore) return new Map<string, number>();
+        const stockQuery = query(collection(firestore, 'supply_stock'));
+        const snapshot = await getDocs(stockQuery);
+        const stockMap = new Map<string, number>();
+        snapshot.forEach(doc => {
+            const stock = doc.data() as SupplyStock;
+            const currentQty = stockMap.get(stock.supplyId) || 0;
+            stockMap.set(stock.supplyId, currentQty + stock.quantidade);
+        });
+        return stockMap;
+    },
+    enabled: !!firestore,
+    staleTime: 60000, // Refetch every minute
+  });
+
+  const suppliesWithStock = useMemo(() => {
+    if (!supplies || !stockData) return [];
+    return supplies.map(supply => ({
+      ...supply,
+      saldoAtual: stockData.get(supply.docId) || 0,
+    }));
+  }, [supplies, stockData]);
+
+
   const filteredSupplies = useMemo(() => {
-    if (!supplies) return [];
-    if (!searchTerm) return supplies;
+    if (!suppliesWithStock) return [];
+    if (!searchTerm) return suppliesWithStock;
 
     const lowercasedTerm = searchTerm.toLowerCase();
-    return supplies.filter(supply => 
+    return suppliesWithStock.filter(supply => 
       supply.descricao.toLowerCase().includes(lowercasedTerm) ||
       (supply.partNumber && supply.partNumber.toLowerCase().includes(lowercasedTerm)) ||
       supply.codigo.toLowerCase().includes(lowercasedTerm)
     );
-  }, [supplies, searchTerm]);
+  }, [suppliesWithStock, searchTerm]);
   
   const handleGoToCadastro = () => {
     router.push('/dashboard/cadastros/suprimentos');
@@ -76,6 +105,7 @@ const SuprimentosPage = () => {
   
   const handleDialogSuccess = () => {
       queryClient.invalidateQueries({ queryKey: suppliesQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['allSupplyStock'] });
       setDialogState({ isOpen: false, type: 'entrada', supply: null });
   };
 
@@ -124,23 +154,22 @@ const SuprimentosPage = () => {
                 <TableHead>Código</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Part Number</TableHead>
-                <TableHead>Localização</TableHead>
                 <TableHead>Saldo Atual</TableHead>
                 <TableHead>U.M.</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && (
-                <TableRow><TableCell colSpan={8} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
+              {(isLoading || isLoadingStock) && (
+                <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
               )}
               {error && (
-                <TableRow><TableCell colSpan={8} className="text-center text-destructive h-24">Erro ao carregar dados.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-destructive h-24">Erro ao carregar dados.</TableCell></TableRow>
               )}
-              {!isLoading && filteredSupplies.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center h-24">Nenhum item encontrado.</TableCell></TableRow>
+              {!isLoading && !isLoadingStock && filteredSupplies.length === 0 && (
+                <TableRow><TableCell colSpan={7} className="text-center h-24">Nenhum item encontrado.</TableCell></TableRow>
               )}
-              {!isLoading && filteredSupplies.map(item => (
+              {!isLoading && !isLoadingStock && filteredSupplies.map(item => (
                 <TableRow key={item.docId}>
                    <TableCell className="hidden sm:table-cell">
                       <button onClick={() => setImageToView({ src: item.imageUrl || 'https://picsum.photos/seed/supply/48/48', alt: item.descricao })}>
@@ -156,7 +185,6 @@ const SuprimentosPage = () => {
                   <TableCell className="font-mono">{item.codigo}</TableCell>
                   <TableCell className="font-medium">{item.descricao}</TableCell>
                   <TableCell>{item.partNumber || 'N/A'}</TableCell>
-                  <TableCell>{item.localizacaoPadrao}</TableCell>
                   <TableCell className="font-bold">{(item.saldoAtual || 0).toLocaleString()}</TableCell>
                   <TableCell>{item.unidadeMedida}</TableCell>
                    <TableCell className="text-right space-x-1">

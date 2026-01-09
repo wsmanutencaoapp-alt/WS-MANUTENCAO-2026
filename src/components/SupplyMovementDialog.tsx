@@ -27,7 +27,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CalendarIcon, Check, ChevronsUpDown, Hash, Building } from 'lucide-react';
-import type { Supply, SupplyMovement, Address } from '@/lib/types';
+import type { Supply, SupplyStock, SupplyMovement, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
@@ -54,11 +54,13 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
   const [quantity, setQuantity] = useState('');
   const [origin, setOrigin] = useState(''); // For 'entrada'
   const [destination, setDestination] = useState(''); // For 'saida'
-  const [lote, setLote] = useState('');
+  const [loteFornecedor, setLoteFornecedor] = useState('');
   const [validade, setValidade] = useState<Date | undefined>();
   const [unitCost, setUnitCost] = useState('');
+  const [localizacao, setLocalizacao] = useState('');
 
   const [isValidadeOpen, setIsValidadeOpen] = useState(false);
+  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
   
   const allSuppliesQuery = useMemoFirebase(() => (
       firestore && !preselectedSupply ? query(collection(firestore, 'supplies')) : null
@@ -66,6 +68,11 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     
   const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(allSuppliesQuery);
   const [supplyPopoverOpen, setSupplyPopoverOpen] = useState(false);
+
+  const addressesQuery = useMemoFirebase(() => (
+      firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
+  ), [firestore]);
+  const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery);
   
   useEffect(() => {
     if (isOpen) {
@@ -75,9 +82,10 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
         setQuantity('');
         setOrigin('');
         setDestination('');
-        setLote('');
+        setLoteFornecedor('');
         setValidade(undefined);
         setUnitCost('');
+        setLocalizacao(preselectedSupply?.localizacaoPadrao || '');
     }
   }, [isOpen, preselectedSupply]);
 
@@ -92,61 +100,46 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
         return;
     }
 
+    if (type === 'entrada' && !localizacao) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'A localização é obrigatória para a entrada.' });
+        return;
+    }
+
     setIsSaving(true);
-    try {
-        const supplyRef = doc(firestore, 'supplies', selectedSupply.docId);
-        const movementsRef = collection(firestore, 'supply_movements');
-        
-        await runTransaction(firestore, async (transaction) => {
-            const supplyDoc = await transaction.get(supplyRef);
-            if (!supplyDoc.exists()) {
-                throw new Error("Item de suprimento não encontrado.");
-            }
-
-            const currentSaldo = supplyDoc.data().saldoAtual || 0;
-            let newSaldo: number;
-
-            if (type === 'entrada') {
-                newSaldo = currentSaldo + numQuantity;
-            } else { // 'saida'
-                if (currentSaldo < numQuantity) {
-                    throw new Error("Saldo insuficiente para a saída.");
-                }
-                newSaldo = currentSaldo - numQuantity;
-            }
-
-            transaction.update(supplyRef, { saldoAtual: newSaldo });
+    
+    if (type === 'entrada') {
+        try {
+            const newStockRef = doc(collection(firestore, 'supply_stock'));
+            const loteInterno = `LOTE-${Date.now()}`;
             
-            const movementData: Omit<SupplyMovement, 'id'> = {
+            const stockData: SupplyStock = {
                 supplyId: selectedSupply.docId,
                 supplyCodigo: selectedSupply.codigo,
-                type: type,
-                quantity: numQuantity,
-                responsibleId: user.uid,
-                responsibleName: user.displayName || user.email || 'N/A',
-                date: new Date().toISOString(),
-                origin: type === 'entrada' ? origin : undefined,
-                destination: type === 'saida' ? destination : undefined,
-                lote: selectedSupply.exigeLote && type === 'entrada' ? lote : undefined,
-                validade: selectedSupply.exigeValidade && type === 'entrada' && validade ? validade.toISOString() : undefined,
-                unitCost: type === 'entrada' ? parseFloat(unitCost) || undefined : undefined
+                loteInterno: loteInterno,
+                loteFornecedor: loteFornecedor || undefined,
+                quantidade: numQuantity,
+                localizacao: localizacao,
+                dataEntrada: new Date().toISOString(),
+                dataValidade: validade ? validade.toISOString() : undefined,
+                custoUnitario: parseFloat(unitCost) || 0,
+                status: 'Disponível'
             };
-            
-            // In a real transaction, we can't get the doc ID before commit.
-            // So we add the doc outside the transaction if we need its ID.
-            // For a simple log, it's fine to just add it.
-            const newMovementRef = doc(movementsRef);
-            transaction.set(newMovementRef, movementData);
-        });
 
-        toast({ title: 'Sucesso!', description: `Movimentação de ${selectedSupply.codigo} registrada.` });
-        onSuccess();
-        onClose();
-        
-    } catch (err: any) {
-        console.error("Erro na transação:", err);
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível registrar a movimentação.' });
-    } finally {
+            await setDoc(newStockRef, stockData);
+
+            toast({ title: 'Sucesso!', description: `Entrada registrada no lote ${loteInterno}.` });
+            onSuccess();
+            onClose();
+
+        } catch (err: any) {
+            console.error("Erro na entrada:", err);
+            toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível registrar a entrada.' });
+        } finally {
+            setIsSaving(false);
+        }
+    } else {
+        // TODO: Implementar lógica de saída que consome dos lotes existentes
+        toast({ title: 'Em breve', description: 'A lógica de saída de estoque por lote será implementada na próxima etapa.' });
         setIsSaving(false);
     }
   };
@@ -158,7 +151,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
         <DialogHeader>
           <DialogTitle>Registrar {type === 'entrada' ? 'Entrada' : 'Saída'} de Suprimento</DialogTitle>
           <DialogDescription>
-            {type === 'entrada' ? 'Adicione itens ao estoque.' : 'Retire itens do estoque.'}
+            {type === 'entrada' ? 'Adicione itens ao estoque, criando um novo lote.' : 'Retire itens do estoque.'}
           </DialogDescription>
         </DialogHeader>
         
@@ -225,16 +218,41 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                                 <Label htmlFor="origin">Origem <span className="text-destructive">*</span></Label>
                                 <Input id="origin" value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="Ex: NF-e 12345, OC-678, Devolução..." />
                             </div>
+                            <div className="space-y-1.5">
+                                <Label>Localização <span className="text-destructive">*</span></Label>
+                                <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={isLoadingAddresses}>
+                                    {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : localizacao || "Selecione..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                                    <Command>
+                                        <CommandInput placeholder="Buscar endereço..." />
+                                        <CommandList>
+                                            <CommandEmpty>Nenhum endereço encontrado.</CommandEmpty>
+                                            <CommandGroup>
+                                                {addresses?.map(addr => (
+                                                <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => { setLocalizacao(val); setIsAddressPopoverOpen(false); }}>
+                                                    <Check className={cn("mr-2 h-4 w-4", localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />
+                                                    {addr.codigoCompleto}
+                                                </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                                </Popover>
+                            </div>
                              <div className="space-y-1.5">
                                 <Label htmlFor="unitCost">Custo Unitário (R$)</Label>
                                 <Input id="unitCost" type="number" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} placeholder="Ex: 25.50"/>
                             </div>
-                            {selectedSupply.exigeLote && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="lote">Lote <span className="text-destructive">*</span></Label>
-                                    <Input id="lote" value={lote} onChange={(e) => setLote(e.target.value)} />
-                                </div>
-                            )}
+                             <div className="space-y-1.5">
+                                <Label htmlFor="loteFornecedor">Lote do Fornecedor (Opcional)</Label>
+                                <Input id="loteFornecedor" value={loteFornecedor} onChange={(e) => setLoteFornecedor(e.target.value)} />
+                            </div>
                             {selectedSupply.exigeValidade && (
                                  <div className="space-y-1.5">
                                     <Label>Data de Validade <span className="text-destructive">*</span></Label>
@@ -273,4 +291,3 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     </Dialog>
   );
 }
-

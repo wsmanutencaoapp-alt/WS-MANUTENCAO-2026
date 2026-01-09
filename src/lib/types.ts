@@ -19,32 +19,40 @@ export type Supply = {
   // Parâmetros de Estoque
   estoqueMinimo: number;
   estoqueMaximo: number;
-  localizacaoPadrao: string;
+  localizacaoPadrao: string; // Mantido como sugestão
   
-  // Dados de controle (não parte do form de master data)
-  saldoAtual?: number;
-  precoMedio?: number;
-  pedidosEmAberto?: number;
-
+  // Dados de controle (agora calculados a partir do supply_stock)
+  saldoAtual?: number; // Este será um campo calculado/agregado
+  
   // Imagem
   imageUrl?: string;
+};
+
+export type SupplyStock = {
+    id?: string;
+    supplyId: string;
+    supplyCodigo: string;
+    loteInterno: string; // Lote gerado pelo sistema para cada entrada
+    loteFornecedor?: string; // Lote informado pelo fornecedor (opcional)
+    quantidade: number;
+    localizacao: string; // Endereço físico deste lote
+    dataEntrada: string; // ISO date string
+    dataValidade?: string; // ISO date string
+    custoUnitario?: number;
+    status: 'Disponível' | 'Reservado' | 'Bloqueado';
 };
 
 export type SupplyMovement = {
     id?: string;
     supplyId: string;
+    supplyStockId: string; // Referência ao lote específico movimentado
     supplyCodigo: string;
-    type: 'entrada' | 'saida';
+    type: 'entrada' | 'saida' | 'ajuste';
     quantity: number;
     responsibleId: string;
     responsibleName: string;
     date: string; // ISO date string
-    // Entrada
-    origin?: string; // Ex: "OC-123", "NF-456", "PROD-789"
-    lote?: string;
-    validade?: string; // ISO date string
-    unitCost?: number;
-    // Saída
+    origin?: string; // Ex: "OC-123", "NF-456"
     destination?: string; // Ex: "OS-123", "CC-MANUTENCAO"
 };
 

@@ -137,10 +137,6 @@
           "type": "string",
           "description": "Default storage address for this supply item."
         },
-        "saldoAtual": {
-            "type": "number",
-            "description": "Current on-hand balance of the supply."
-        },
         "imageUrl": {
           "type": "string",
           "format": "uri",
@@ -160,6 +156,58 @@
         "localizacaoPadrao"
       ]
     },
+    "SupplyStock": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SupplyStock",
+      "type": "object",
+      "description": "Represents a specific batch of a supply item at a specific location.",
+      "properties": {
+        "supplyId": {
+          "type": "string",
+          "description": "Foreign key to the master Supply document."
+        },
+        "supplyCodigo": {
+          "type": "string",
+          "description": "Denormalized supply code for easy querying."
+        },
+        "loteInterno": {
+          "type": "string",
+          "description": "System-generated lot number for this specific entry."
+        },
+        "loteFornecedor": {
+          "type": "string",
+          "description": "Optional lot number provided by the supplier."
+        },
+        "quantidade": {
+          "type": "number",
+          "description": "The quantity of items in this specific stock."
+        },
+        "localizacao": {
+          "type": "string",
+          "description": "The physical address code where this stock is stored."
+        },
+        "dataEntrada": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when this stock was entered."
+        },
+        "dataValidade": {
+          "type": "string",
+          "format": "date",
+          "description": "The expiration date for this stock, if applicable."
+        },
+        "custoUnitario": {
+          "type": "number",
+          "description": "The cost per unit for this specific entry."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Disponível", "Reservado", "Bloqueado"],
+          "description": "The current status of this specific stock."
+        }
+      },
+      "required": ["supplyId", "supplyCodigo", "loteInterno", "quantidade", "localizacao", "dataEntrada", "status"]
+    },
     "SupplyMovement": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "SupplyMovement",
@@ -170,13 +218,17 @@
           "type": "string",
           "description": "The ID of the master supply item."
         },
+        "supplyStockId": {
+            "type": "string",
+            "description": "The ID of the specific stock lot being moved."
+        },
         "supplyCodigo": {
           "type": "string",
           "description": "The code of the master supply item for easy querying."
         },
         "type": {
           "type": "string",
-          "enum": ["entrada", "saida"],
+          "enum": ["entrada", "saida", "ajuste"],
           "description": "The type of movement."
         },
         "quantity": {
@@ -203,22 +255,9 @@
         "destination": {
           "type": "string",
           "description": "For 'saida', the destination (e.g., Work Order, Cost Center)."
-        },
-        "lote": {
-          "type": "string",
-          "description": "The batch/lot number, if applicable."
-        },
-        "validade": {
-          "type": "string",
-          "format": "date",
-          "description": "The expiration date, if applicable."
-        },
-        "unitCost": {
-          "type": "number",
-          "description": "The cost per unit for this specific entry."
         }
       },
-      "required": ["supplyId", "supplyCodigo", "type", "quantity", "responsibleId", "responsibleName", "date"]
+      "required": ["supplyId", "supplyStockId", "supplyCodigo", "type", "quantity", "responsibleId", "responsibleName", "date"]
     },
     "Tool": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -862,6 +901,22 @@
             {
               "name": "supplyId",
               "description": "Unique identifier for the supply item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/supply_stock/{stockId}",
+        "definition": {
+          "entityName": "SupplyStock",
+          "schema": {
+            "$ref": "#/backend/entities/SupplyStock"
+          },
+          "description": "Stores individual, trackable batches of supplies with specific locations and quantities.",
+          "params": [
+            {
+              "name": "stockId",
+              "description": "Unique identifier for the supply stock record."
             }
           ]
         }
