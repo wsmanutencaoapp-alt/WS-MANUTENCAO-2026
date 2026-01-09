@@ -1,8 +1,4 @@
 
-
-
-
-
 export type Supply = {
   id?: string;
   // Identificação
@@ -33,6 +29,25 @@ export type Supply = {
   // Imagem
   imageUrl?: string;
 };
+
+export type SupplyMovement = {
+    id?: string;
+    supplyId: string;
+    supplyCodigo: string;
+    type: 'entrada' | 'saida';
+    quantity: number;
+    responsibleId: string;
+    responsibleName: string;
+    date: string; // ISO date string
+    // Entrada
+    origin?: string; // Ex: "OC-123", "NF-456", "PROD-789"
+    lote?: string;
+    validade?: string; // ISO date string
+    unitCost?: number;
+    // Saída
+    destination?: string; // Ex: "OS-123", "CC-MANUTENCAO"
+};
+
 
 export type Tool = {
   id: string;

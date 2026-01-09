@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -28,12 +29,20 @@ import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
+import SupplyMovementDialog from '@/components/SupplyMovementDialog';
 
 const SuprimentosPage = () => {
   const firestore = useFirestore();
   const router = useRouter();
+  const queryClient = useQueryClient();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
+  const [dialogState, setDialogState] = useState<{
+    isOpen: boolean;
+    type: 'entrada' | 'saida';
+    supply: WithDocId<Supply> | null;
+  }>({ isOpen: false, type: 'entrada', supply: null });
 
   const suppliesQueryKey = ['suppliesMasterDataForListing'];
   const suppliesQuery = useMemoFirebase(
@@ -61,20 +70,30 @@ const SuprimentosPage = () => {
     router.push('/dashboard/cadastros/suprimentos');
   }
 
+  const handleOpenDialog = (type: 'entrada' | 'saida', supply: WithDocId<Supply> | null = null) => {
+    setDialogState({ isOpen: true, type, supply });
+  };
+  
+  const handleDialogSuccess = () => {
+      queryClient.invalidateQueries({ queryKey: suppliesQueryKey });
+      setDialogState({ isOpen: false, type: 'entrada', supply: null });
+  };
+
+
   return (
     <div className="space-y-6">
        <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Visão Geral de Suprimentos</h1>
         <div className="flex gap-2">
-            <Button variant="outline" disabled>
+            <Button onClick={() => handleOpenDialog('entrada')}>
                 <LogIn className="mr-2 h-4 w-4"/>
                 Registrar Entrada
             </Button>
-            <Button variant="outline" disabled>
+            <Button onClick={() => handleOpenDialog('saida')}>
                 <LogOut className="mr-2 h-4 w-4"/>
                 Registrar Saída
             </Button>
-            <Button onClick={handleGoToCadastro}>
+            <Button variant="outline" onClick={handleGoToCadastro}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Adicionar Item ao Cadastro
             </Button>
@@ -108,17 +127,18 @@ const SuprimentosPage = () => {
                 <TableHead>Localização</TableHead>
                 <TableHead>Saldo Atual</TableHead>
                 <TableHead>U.M.</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
-                <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
               )}
               {error && (
-                <TableRow><TableCell colSpan={7} className="text-center text-destructive h-24">Erro ao carregar dados.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-destructive h-24">Erro ao carregar dados.</TableCell></TableRow>
               )}
               {!isLoading && filteredSupplies.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center h-24">Nenhum item encontrado.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center h-24">Nenhum item encontrado.</TableCell></TableRow>
               )}
               {!isLoading && filteredSupplies.map(item => (
                 <TableRow key={item.docId}>
@@ -139,6 +159,14 @@ const SuprimentosPage = () => {
                   <TableCell>{item.localizacaoPadrao}</TableCell>
                   <TableCell className="font-bold">{(item.saldoAtual || 0).toLocaleString()}</TableCell>
                   <TableCell>{item.unidadeMedida}</TableCell>
+                   <TableCell className="text-right space-x-1">
+                      <Button variant="outline" size="icon" title="Registrar Entrada" onClick={() => handleOpenDialog('entrada', item)}>
+                          <LogIn className="h-4 w-4"/>
+                      </Button>
+                      <Button variant="outline" size="icon" title="Registrar Saída" onClick={() => handleOpenDialog('saida', item)}>
+                          <LogOut className="h-4 w-4"/>
+                      </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -162,6 +190,16 @@ const SuprimentosPage = () => {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {dialogState.isOpen && (
+          <SupplyMovementDialog
+            isOpen={dialogState.isOpen}
+            type={dialogState.type}
+            supply={dialogState.supply}
+            onClose={() => setDialogState(prev => ({...prev, isOpen: false}))}
+            onSuccess={handleDialogSuccess}
+          />
       )}
     </div>
   );

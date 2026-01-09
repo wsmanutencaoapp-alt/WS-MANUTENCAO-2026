@@ -137,6 +137,10 @@
           "type": "string",
           "description": "Default storage address for this supply item."
         },
+        "saldoAtual": {
+            "type": "number",
+            "description": "Current on-hand balance of the supply."
+        },
         "imageUrl": {
           "type": "string",
           "format": "uri",
@@ -155,6 +159,66 @@
         "estoqueMaximo",
         "localizacaoPadrao"
       ]
+    },
+    "SupplyMovement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SupplyMovement",
+      "type": "object",
+      "description": "Records a single movement (in or out) of a supply item.",
+      "properties": {
+        "supplyId": {
+          "type": "string",
+          "description": "The ID of the master supply item."
+        },
+        "supplyCodigo": {
+          "type": "string",
+          "description": "The code of the master supply item for easy querying."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["entrada", "saida"],
+          "description": "The type of movement."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of items moved."
+        },
+        "responsibleId": {
+          "type": "string",
+          "description": "The UID of the user who performed the movement."
+        },
+        "responsibleName": {
+          "type": "string",
+          "description": "The name of the user for display."
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the movement."
+        },
+        "origin": {
+          "type": "string",
+          "description": "For 'entrada', the source (e.g., PO number, NF number)."
+        },
+        "destination": {
+          "type": "string",
+          "description": "For 'saida', the destination (e.g., Work Order, Cost Center)."
+        },
+        "lote": {
+          "type": "string",
+          "description": "The batch/lot number, if applicable."
+        },
+        "validade": {
+          "type": "string",
+          "format": "date",
+          "description": "The expiration date, if applicable."
+        },
+        "unitCost": {
+          "type": "number",
+          "description": "The cost per unit for this specific entry."
+        }
+      },
+      "required": ["supplyId", "supplyCodigo", "type", "quantity", "responsibleId", "responsibleName", "date"]
     },
     "Tool": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -798,6 +862,22 @@
             {
               "name": "supplyId",
               "description": "Unique identifier for the supply item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/supply_movements/{movementId}",
+        "definition": {
+          "entityName": "SupplyMovement",
+          "schema": {
+            "$ref": "#/backend/entities/SupplyMovement"
+          },
+          "description": "Stores the historical log of all supply movements.",
+          "params": [
+            {
+              "name": "movementId",
+              "description": "Unique identifier for the supply movement record."
             }
           ]
         }
