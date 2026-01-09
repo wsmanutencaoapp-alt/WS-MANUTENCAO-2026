@@ -178,7 +178,7 @@ const SuprimentosPage = () => {
               <TableRow>
                 <TableHead className="w-16">Foto</TableHead>
                 <TableHead>Item (Código)</TableHead>
-                <TableHead>Lote Interno</TableHead>
+                <TableHead>Lotes (Interno/Fornecedor)</TableHead>
                 <TableHead>Localização</TableHead>
                 <TableHead>Quantidade</TableHead>
                 <TableHead>Validade</TableHead>
@@ -216,7 +216,10 @@ const SuprimentosPage = () => {
                         <div className="font-medium">{supplyInfo.descricao}</div>
                         <div className="text-sm text-muted-foreground">{supplyInfo.codigo}</div>
                     </TableCell>
-                    <TableCell className="font-mono">{item.loteInterno}</TableCell>
+                    <TableCell>
+                        <div className="font-mono text-sm">{item.loteInterno}</div>
+                        {item.loteFornecedor && <div className="font-mono text-xs text-muted-foreground">F: {item.loteFornecedor}</div>}
+                    </TableCell>
                     <TableCell>{item.localizacao}</TableCell>
                     <TableCell className="font-bold">{item.quantidade.toLocaleString()}</TableCell>
                     <TableCell>{item.dataValidade ? format(parseISO(item.dataValidade), 'dd/MM/yyyy') : 'N/A'}</TableCell>
