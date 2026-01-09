@@ -32,6 +32,14 @@ service cloud.firestore {
       allow write: if hasPermission('suprimentos');
     }
     
+    match /supply_stock/{stockId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /supply_movements/{movementId} {
+      allow read, write: if isAuthenticated();
+    }
+
     match /tools/{toolId} {
       // Any authenticated user can read tools, but only those with permission can write.
       allow read: if isAuthenticated();
