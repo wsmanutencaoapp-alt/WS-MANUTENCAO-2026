@@ -87,80 +87,25 @@
       "type": "object",
       "description": "Represents the master data for a supply item.",
       "properties": {
-        "codigo": {
-          "type": "string",
-          "description": "Unique, system-generated code for the supply item."
-        },
-        "descricao": {
-          "type": "string",
-          "description": "Detailed description of the supply item."
-        },
-        "partNumber": {
-          "type": "string",
-          "description": "Manufacturer's Part Number."
-        },
-        "unidadeMedida": {
-          "type": "string",
-          "enum": ["UN", "KG", "MT", "LT", "CX"],
-          "description": "Unit of measure for the supply."
-        },
-        "familia": {
-          "type": "string",
-          "enum": ["MP", "CT", "CG", "CP", "PA"],
-          "description": "The family/category of the supply item."
-        },
-        "exigeLote": {
-          "type": "boolean",
-          "description": "Indicates if lot tracking is required."
-        },
-        "exigeSerialNumber": {
-          "type": "boolean",
-          "description": "Indicates if serial number tracking is required."
-        },
-        "exigeValidade": {
-          "type": "boolean",
-          "description": "Indicates if expiration date tracking is required."
-        },
-        "tipoMaterial": {
-          "type": "string",
-          "enum": ["Metal", "Polímero", "Tecido", "Outro"],
-          "description": "Specific material type, used for 'Matéria-Prima' family."
-        },
-        "estoqueMinimo": {
-          "type": "number",
-          "description": "The minimum stock level before a reorder is triggered."
-        },
-        "estoqueMaximo": {
-          "type": "number",
-          "description": "The maximum stock level to avoid over-purchasing."
-        },
-        "localizacaoPadrao": {
-          "type": "string",
-          "description": "Default storage address for this supply item."
-        },
-        "imageUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of the supply item's photo."
-        },
-        "documentoUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of the supply item's master document (e.g., technical sheet)."
-        }
+        "codigo": { "type": "string", "description": "Unique, system-generated code for the supply item." },
+        "descricao": { "type": "string", "description": "Detailed description of the supply item." },
+        "partNumber": { "type": "string", "description": "Manufacturer's Part Number." },
+        "unidadeMedida": { "type": "string", "enum": ["UN", "KG", "MT", "LT", "CX"], "description": "Unit of measure for the supply." },
+        "familia": { "type": "string", "enum": ["MP", "CT", "CG", "CP", "PA"], "description": "The family/category of the supply item." },
+        "exigeLote": { "type": "boolean", "description": "Indicates if lot tracking is required." },
+        "exigeSerialNumber": { "type": "boolean", "description": "Indicates if serial number tracking is required." },
+        "exigeValidade": { "type": "boolean", "description": "Indicates if expiration date tracking is required." },
+        "tipoMaterial": { "type": "string", "enum": ["Metal", "Polímero", "Tecido", "Outro"], "description": "Specific material type, used for 'Matéria-Prima' family." },
+        "estoqueMinimo": { "type": "number", "description": "The minimum stock level before a reorder is triggered." },
+        "estoqueMaximo": { "type": "number", "description": "The maximum stock level to avoid over-purchasing." },
+        "localizacaoPadrao": { "type": "string", "description": "Default storage address for this supply item." },
+        "unidadeSecundaria": { "type": "string", "enum": ["G", "ML", "CM", "MM"], "description": "Secondary unit for consumption (e.g., grams)." },
+        "fatorConversao": { "type": "number", "description": "Conversion factor from primary to secondary unit (e.g., 1 UN = 1000 G)." },
+        "pesoBruto": { "type": "number", "description": "Gross weight in the secondary unit, including packaging." },
+        "imageUrl": { "type": "string", "format": "uri", "description": "URL of the supply item's photo." },
+        "documentoUrl": { "type": "string", "format": "uri", "description": "URL of the supply item's master document (e.g., technical sheet)." }
       },
-      "required": [
-        "codigo",
-        "descricao",
-        "unidadeMedida",
-        "familia",
-        "exigeLote",
-        "exigeSerialNumber",
-        "exigeValidade",
-        "estoqueMinimo",
-        "estoqueMaximo",
-        "localizacaoPadrao"
-      ]
+      "required": [ "codigo", "descricao", "unidadeMedida", "familia", "exigeLote", "exigeSerialNumber", "exigeValidade", "estoqueMinimo", "estoqueMaximo", "localizacaoPadrao" ]
     },
     "SupplyStock": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -168,46 +113,16 @@
       "type": "object",
       "description": "Represents a specific batch of a supply item at a specific location.",
       "properties": {
-        "loteInterno": {
-          "type": "string",
-          "description": "System-generated lot number for this specific entry."
-        },
-        "loteFornecedor": {
-          "type": "string",
-          "description": "Optional lot number provided by the supplier."
-        },
-        "quantidade": {
-          "type": "number",
-          "description": "The quantity of items in this specific stock."
-        },
-        "localizacao": {
-          "type": "string",
-          "description": "The physical address code where this stock is stored."
-        },
-        "dataEntrada": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The timestamp when this stock was entered."
-        },
-        "dataValidade": {
-          "type": "string",
-          "format": "date",
-          "description": "The expiration date for this stock, if applicable."
-        },
-        "custoUnitario": {
-          "type": "number",
-          "description": "The cost per unit for this specific entry."
-        },
-        "status": {
-          "type": "string",
-          "enum": ["Disponível", "Reservado", "Bloqueado"],
-          "description": "The current status of this specific stock."
-        },
-        "documentoUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of a document attached to this specific lot."
-        }
+        "loteInterno": { "type": "string", "description": "System-generated lot number for this specific entry." },
+        "loteFornecedor": { "type": "string", "description": "Optional lot number provided by the supplier." },
+        "quantidade": { "type": "number", "description": "The quantity of items in the primary unit of measure." },
+        "pesoLiquido": { "type": "number", "description": "The current quantity in the secondary unit of measure (e.g., remaining grams)." },
+        "localizacao": { "type": "string", "description": "The physical address code where this stock is stored." },
+        "dataEntrada": { "type": "string", "format": "date-time", "description": "The timestamp when this stock was entered." },
+        "dataValidade": { "type": "string", "format": "date", "description": "The expiration date for this stock, if applicable." },
+        "custoUnitario": { "type": "number", "description": "The cost per unit for this specific entry." },
+        "status": { "type": "string", "enum": ["Disponível", "Reservado", "Bloqueado"], "description": "The current status of this specific stock." },
+        "documentoUrl": { "type": "string", "format": "uri", "description": "URL of a document attached to this specific lot." }
       },
       "required": ["loteInterno", "quantidade", "localizacao", "dataEntrada", "status"]
     },
@@ -1096,4 +1011,3 @@
     "reasoning": "This Firestore data structure is designed to support AeroTrack's aircraft maintenance management features, focusing on supply and tool control, operation recording, and image storage. The structure prioritizes authorization independence through denormalization where needed and adheres to structural segregation principles to ensure consistent security postures within collections.  Path-based ownership is used for user-related data (none explicitly defined, but included for future expansion). Collaborative data patterns, utilizing membership maps, are employed where applicable. \n\nSpecifically, authorization independence is achieved by denormalizing necessary authorization data (like supplier or employee IDs) directly into subcollections when access needs to be controlled at the subcollection level without relying on `get()` calls to parent documents.  For example, the OperationRecord collection includes the employeeId to track which employee performed the operation and use it for authorization.  This denormalization is critical for atomic operations and simplifies security rule implementation. QAPs (Rules are not Filters) are supported through structural segregation. Each top-level collection is treated as having homogeneous security requirements. Additionally, the use of employeeId as a foreign key in relevant collections like OperationRecord allows for efficient querying and filtering based on employee-specific operations. This design facilitates secure list operations because rules can be written based on the contents of the document itself, not on related documents."
   }
 }
-

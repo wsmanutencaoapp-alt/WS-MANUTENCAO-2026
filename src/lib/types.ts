@@ -20,11 +20,13 @@ export type Supply = {
   // Parâmetros de Estoque
   estoqueMinimo: number;
   estoqueMaximo: number;
-  localizacaoPadrao: string; // Mantido como sugestão
+  localizacaoPadrao: string; 
   
-  // Dados de controle (agora calculados a partir do supply_stock)
-  saldoAtual?: number; // Este será um campo calculado/agregado
-  
+  // Novos campos de conversão e peso
+  unidadeSecundaria?: 'G' | 'ML' | 'CM' | 'MM'; // Grama, Mililitro, Centímetro, Milímetro
+  fatorConversao?: number; // Ex: 1 UN = 1000 G
+  pesoBruto?: number; // Peso total com embalagem, na unidade secundária
+
   // Anexos
   imageUrl?: string;
   documentoUrl?: string;
@@ -34,7 +36,8 @@ export type SupplyStock = {
     id?: string;
     loteInterno: string; // Lote gerado pelo sistema para cada entrada
     loteFornecedor?: string; // Lote informado pelo fornecedor (opcional)
-    quantidade: number;
+    quantidade: number; // Quantidade na unidade de medida principal (ex: 1 UN)
+    pesoLiquido?: number; // Quantidade atual na unidade secundária (ex: 850 G)
     localizacao: string; // Endereço físico deste lote
     dataEntrada: string; // ISO date string
     dataValidade?: string; // ISO date string
@@ -220,5 +223,3 @@ export type Address = {
   codigoCompleto: string;
   createdAt: string; // ISO date string
 };
-
-    

@@ -78,7 +78,13 @@ const formSchema = z.object({
   // Aba 3: Estoque
   estoqueMinimo: z.coerce.number().min(0).default(0),
   estoqueMaximo: z.coerce.number().min(0).default(0),
-  localizacaoPadrao: z.string().min(1, { message: "A localização é obrigatória." })
+  localizacaoPadrao: z.string().min(1, { message: "A localização é obrigatória." }),
+  
+  // Aba 4: Conversão
+  unidadeSecundaria: z.enum(['G', 'ML', 'CM', 'MM']).optional(),
+  fatorConversao: z.coerce.number().optional(),
+  pesoBruto: z.coerce.number().optional(),
+
 }).refine(data => {
     if (data.familia !== 'CG') {
         return data.partNumber.length > 0;
@@ -136,6 +142,8 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       localizacaoPadrao: '',
       imageUrl: '',
       documentoUrl: '',
+      fatorConversao: 0,
+      pesoBruto: 0,
     },
   });
 
@@ -159,7 +167,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
         descricao: '', partNumber: '', unidadeMedida: 'UN', familia: 'CT',
         exigeLote: false, exigeSerialNumber: false, exigeValidade: false,
         estoqueMinimo: 0, estoqueMaximo: 0, localizacaoPadrao: '',
-        imageUrl: '', documentoUrl: '',
+        imageUrl: '', documentoUrl: '', fatorConversao: 0, pesoBruto: 0
       });
       setPreviewImage(null);
     }
@@ -298,13 +306,15 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSave)}>
             <Tabs defaultValue="identificacao" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="identificacao">Identificação</TabsTrigger>
                 <TabsTrigger value="rastreabilidade">Rastreabilidade</TabsTrigger>
                 <TabsTrigger value="estoque">Estoque</TabsTrigger>
+                <TabsTrigger value="conversao">Conversão</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="identificacao" className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+              <div className="max-h-[60vh] overflow-y-auto pr-4 mt-4">
+              <TabsContent value="identificacao" className="space-y-4 m-0">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                    <div className="space-y-4">
                     <FormField
@@ -399,7 +409,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                  </div>
               </TabsContent>
 
-              <TabsContent value="rastreabilidade" className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+              <TabsContent value="rastreabilidade" className="space-y-4 m-0">
                 <p className="text-sm text-muted-foreground">Regras definidas pela família <span className='font-bold'>{familia}</span>:</p>
                 <div className="space-y-4 rounded-md border p-4">
                   <FormField
@@ -458,7 +468,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                  )}
               </TabsContent>
 
-              <TabsContent value="estoque" className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+              <TabsContent value="estoque" className="space-y-4 m-0">
                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -506,7 +516,57 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                       )}
                     />
               </TabsContent>
-            </Tabs>
+
+              <TabsContent value="conversao" className="space-y-4 m-0">
+                <p className="text-sm text-muted-foreground">Opcional. Use para itens comprados em uma unidade, mas consumidos em outra (ex: comprado em UN, consumido em G).</p>
+                <div className="space-y-4 rounded-md border p-4">
+                    <FormField
+                      control={form.control}
+                      name="unidadeSecundaria"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Unidade de Consumo</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Selecione..."/></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="G">G (Grama)</SelectItem>
+                              <SelectItem value="ML">ML (Mililitro)</SelectItem>
+                              <SelectItem value="CM">CM (Centímetro)</SelectItem>
+                              <SelectItem value="MM">MM (Milímetro)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="fatorConversao"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Fator de Conversão</FormLabel>
+                          <FormControl><Input type="number" {...field} placeholder={`Qtd. de ${form.getValues('unidadeSecundaria') || 'unid.'} por ${form.getValues('unidadeMedida')}`}/></FormControl>
+                          <FormDescription>Ex: Se 1 UN tem 500g, o fator é 500.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pesoBruto"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Peso Bruto Total</FormLabel>
+                          <FormControl><Input type="number" {...field} placeholder={`Peso em ${form.getValues('unidadeSecundaria') || 'unid.'}, incluindo embalagem`}/></FormControl>
+                           <FormDescription>Peso total do item com embalagem, na unidade de consumo.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </div>
+              </TabsContent>
+              </div>
+
              <DialogFooter className='pt-4'>
                 <Button variant="outline" onClick={resetFormAndClose} disabled={isSaving}>Cancelar</Button>
                 <Button type="submit" disabled={isSaving}>
@@ -514,6 +574,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                   Salvar
                 </Button>
              </DialogFooter>
+            </Tabs>
           </form>
         </Form>
       </DialogContent>

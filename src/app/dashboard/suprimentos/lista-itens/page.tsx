@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
@@ -314,7 +315,10 @@ const SuprimentosPage = () => {
                         {item.loteFornecedor && <div className="font-mono text-xs text-muted-foreground">F: {item.loteFornecedor}</div>}
                     </TableCell>
                     <TableCell>{item.localizacao}</TableCell>
-                    <TableCell className="font-bold">{item.quantidade.toLocaleString()}</TableCell>
+                    <TableCell>
+                        <div className="font-bold">{item.quantidade.toLocaleString()} {supplyInfo.unidadeMedida}</div>
+                        {item.pesoLiquido !== undefined && <div className="text-xs text-muted-foreground">{item.pesoLiquido.toLocaleString()} {supplyInfo.unidadeSecundaria}</div>}
+                    </TableCell>
                     <TableCell>{item.dataValidade ? format(parseISO(item.dataValidade), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                     <TableCell className="text-right space-x-1">
                         <Button variant="ghost" size="icon" title="Registrar Saída deste Lote" onClick={() => handleOpenMovementDialog('saida', supplyInfo)}>

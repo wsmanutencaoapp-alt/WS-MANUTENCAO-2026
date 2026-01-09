@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -209,7 +210,17 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                 documentoUrl = await getDownloadURL(docFileRef);
             }
 
-            const stockData: Omit<SupplyStock, 'id'> = { loteInterno, quantidade: numQuantity, localizacao, dataEntrada: today.toISOString(), custoUnitario: parseFloat(unitCost) || 0, status: 'Disponível', documentoUrl: documentoUrl };
+            const stockData: Omit<SupplyStock, 'id'> = { 
+                loteInterno, 
+                quantidade: numQuantity, 
+                localizacao, 
+                dataEntrada: today.toISOString(), 
+                custoUnitario: parseFloat(unitCost) || 0, 
+                status: 'Disponível', 
+                documentoUrl: documentoUrl,
+                pesoLiquido: selectedSupply.fatorConversao ? selectedSupply.fatorConversao * numQuantity : undefined,
+            };
+
             if (loteFornecedor) stockData.loteFornecedor = loteFornecedor;
             if (validadeDate) stockData.dataValidade = validadeDate.toISOString();
 
