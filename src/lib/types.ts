@@ -1,15 +1,35 @@
 
 
+
 export type Supply = {
-  id: string;
-  name: string;
+  id?: string;
+  // Identificação
+  codigo: string; // Gerado automaticamente
+  descricao: string;
   partNumber: string;
-  quantity: number;
-  unit: 'units' | 'liters' | 'kg';
-  category: 'Avionics' | 'Mechanical' | 'Consumables' | 'Structural';
-  status: 'In Stock' | 'Low Stock' | 'Out of Stock';
-  imageUrl: string;
-  imageHint: string;
+  unidadeMedida: 'UN' | 'KG' | 'MT' | 'LT' | 'CX';
+  familia: 'MP' | 'CT' | 'CG' | 'CP' | 'PA';
+  
+  // Rastreabilidade
+  exigeLote: boolean;
+  exigeSerialNumber: boolean;
+  exigeValidade: boolean;
+  
+  // Dados específicos da família
+  tipoMaterial?: 'Metal' | 'Polímero' | 'Tecido' | 'Outro'; // Para MP
+  
+  // Parâmetros de Estoque
+  estoqueMinimo: number;
+  estoqueMaximo: number;
+  localizacaoPadrao: string;
+  
+  // Dados de controle (não parte do form de master data)
+  saldoAtual?: number;
+  precoMedio?: number;
+  pedidosEmAberto?: number;
+
+  // Imagem
+  imageUrl?: string;
 };
 
 export type Tool = {
