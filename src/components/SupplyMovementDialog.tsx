@@ -65,12 +65,18 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
       firestore && !preselectedSupply ? query(collection(firestore, 'supplies')) : null
     ), [firestore, preselectedSupply, isOpen]);
     
-  const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(allSuppliesQuery);
+  const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(allSuppliesQuery, {
+    queryKey: ['allSuppliesForMovementDialog'],
+    enabled: isOpen && !preselectedSupply,
+  });
 
   const addressesQuery = useMemoFirebase(() => (
       firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
   ), [firestore]);
-  const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery);
+  const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, {
+      queryKey: ['supplyAddressesForMovementDialog'],
+      enabled: isOpen,
+  });
   
   useEffect(() => {
     if (isOpen) {
@@ -160,7 +166,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar {type === 'entrada' ? 'Entrada' : 'Saída'} de Suprimento</DialogTitle>
