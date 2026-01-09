@@ -35,7 +35,7 @@ type EnrichedStockItem = WithDocId<SupplyStock> & {
 };
 
 type EnrichedMovement = WithDocId<SupplyMovement> & {
-  supplyInfo?: Pick<Supply, 'descricao' | 'imageUrl'> & WithDocId<Supply>;
+  supplyInfo?: Pick<Supply, 'descricao' | 'imageUrl' | 'partNumber'> & WithDocId<Supply>;
   stockInfo?: Partial<WithDocId<SupplyStock>>;
 };
 
@@ -95,7 +95,8 @@ export default function MovimentacaoMateriaisPage() {
                 supplyInfo: supplyData ? {
                     ...supplyData,
                     descricao: supplyData?.descricao || 'Item não encontrado',
-                    imageUrl: supplyData?.imageUrl
+                    imageUrl: supplyData?.imageUrl,
+                    partNumber: supplyData?.partNumber
                 } : undefined,
                 stockInfo: stockData ? {
                     ...stockData,
@@ -113,6 +114,7 @@ export default function MovimentacaoMateriaisPage() {
         return enrichedHistory.filter(item => 
             item.supplyCodigo.toLowerCase().includes(lowercasedTerm) ||
             (item.supplyInfo?.descricao?.toLowerCase() || '').includes(lowercasedTerm) ||
+            (item.supplyInfo?.partNumber?.toLowerCase() || '').includes(lowercasedTerm) ||
             item.responsibleName.toLowerCase().includes(lowercasedTerm) ||
             (item.origin?.toLowerCase() || '').includes(lowercasedTerm) ||
             (item.destination?.toLowerCase() || '').includes(lowercasedTerm) ||
@@ -165,7 +167,7 @@ export default function MovimentacaoMateriaisPage() {
                      <div className="relative pt-4">
                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                        <Input
-                           placeholder="Pesquisar por item, usuário, OS, NF-e, lote..."
+                           placeholder="Pesquisar por item, P/N, usuário, OS, NF-e, lote..."
                            value={searchTerm}
                            onChange={(e) => setSearchTerm(e.target.value)}
                            className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -219,6 +221,7 @@ export default function MovimentacaoMateriaisPage() {
                                         <TableCell>
                                             <div className="font-medium">{item.supplyInfo?.descricao}</div>
                                             <div className="text-sm text-muted-foreground font-mono">{item.supplyCodigo}</div>
+                                            <div className="text-xs text-muted-foreground">{item.supplyInfo?.partNumber}</div>
                                         </TableCell>
                                         <TableCell>
                                             <div className="font-mono text-sm">{item.stockInfo?.loteInterno || 'N/A'}</div>

@@ -146,6 +146,7 @@ const SuprimentosPage = () => {
     return enrichedStock.filter(item => 
       (item.supplyInfo.descricao && item.supplyInfo.descricao.toLowerCase().includes(lowercasedTerm)) ||
       (item.supplyInfo.codigo && item.supplyInfo.codigo.toLowerCase().includes(lowercasedTerm)) ||
+      (item.supplyInfo.partNumber && item.supplyInfo.partNumber.toLowerCase().includes(lowercasedTerm)) ||
       (item.loteInterno && item.loteInterno.toLowerCase().includes(lowercasedTerm)) ||
       (item.localizacao && item.localizacao.toLowerCase().includes(lowercasedTerm))
     );
@@ -253,7 +254,7 @@ const SuprimentosPage = () => {
           <div className="relative pt-4">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-                placeholder="Pesquisar por item, código, lote ou localização..."
+                placeholder="Pesquisar por item, P/N, código, lote ou localização..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -265,7 +266,7 @@ const SuprimentosPage = () => {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-16">Foto</TableHead>
-                <TableHead>Item (Código)</TableHead>
+                <TableHead>Item (Código / P/N)</TableHead>
                 <TableHead>Lotes (Interno/Fornecedor)</TableHead>
                 <TableHead>Localização</TableHead>
                 <TableHead>Quantidade</TableHead>
@@ -305,7 +306,8 @@ const SuprimentosPage = () => {
                         </TableCell>
                     <TableCell>
                         <div className="font-medium">{supplyInfo.descricao}</div>
-                        <div className="text-sm text-muted-foreground">{supplyInfo.codigo}</div>
+                        <div className="text-sm text-muted-foreground font-mono">{supplyInfo.codigo}</div>
+                        <div className="text-xs text-muted-foreground">{supplyInfo.partNumber}</div>
                     </TableCell>
                     <TableCell>
                         <div className="font-mono text-sm">{item.loteInterno}</div>
