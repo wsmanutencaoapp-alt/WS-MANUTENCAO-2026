@@ -15,7 +15,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref as storageRef, uploadString, getDownloadURL, deleteObject, uploadBytes } from 'firebase/storage';
 import {
   Dialog,
   DialogContent,
@@ -229,7 +229,10 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       if (documentoFile) {
         if (supply?.documentoUrl) {
             try {
-                await deleteObject(storageRef(storage, supply.documentoUrl));
+                // Correctly extract file path from URL
+                const fileUrl = new URL(supply.documentoUrl);
+                const filePath = decodeURIComponent(fileUrl.pathname.split('/o/')[1].split('?')[0]);
+                await deleteObject(storageRef(storage, filePath));
             } catch(e) { console.warn("Could not delete old document", e)}
         }
         const docRef = storageRef(storage, `supply_documents/${tempId}/${documentoFile.name}`);
