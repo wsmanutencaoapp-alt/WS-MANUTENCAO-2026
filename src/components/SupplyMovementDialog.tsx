@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -254,8 +253,12 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             toast({ variant: 'destructive', title: 'Erro', description: 'Lote de saída não selecionado.' });
             setIsSaving(false); return;
         }
-        if (numQuantity > selectedStockItem.quantidade) {
-            toast({ variant: 'destructive', title: 'Erro de Quantidade', description: `A quantidade a ser retirada (${numQuantity}) é maior que a disponível no lote (${selectedStockItem.quantidade}).` });
+
+        const isConsumable = !!selectedSupply.fatorConversao;
+        const currentStockAmount = isConsumable ? selectedStockItem.pesoLiquido || 0 : selectedStockItem.quantidade;
+
+        if (numQuantity > currentStockAmount) {
+            toast({ variant: 'destructive', title: 'Erro de Quantidade', description: `A quantidade a ser retirada (${numQuantity}) é maior que a disponível no lote (${currentStockAmount}).` });
             setIsSaving(false); return;
         }
 
@@ -266,20 +269,42 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                 const stockDoc = await transaction.get(stockRef);
                 if (!stockDoc.exists()) throw new Error("O lote selecionado não existe mais.");
 
-                const newQuantity = stockDoc.data().quantidade - numQuantity;
-                transaction.update(stockRef, { quantidade: newQuantity });
+                let updateData: Partial<SupplyStock> = {};
 
-                const movementData: Omit<SupplyMovement, 'id'> = { supplyId: selectedSupply.docId, supplyStockId: selectedStockId, supplyCodigo: selectedSupply.codigo, type: 'saida', quantity: numQuantity, responsibleId: user.uid, responsibleName: user.displayName || user.email || 'Desconhecido', date: new Date().toISOString(), destination };
+                if (isConsumable) {
+                    const currentPesoLiquido = stockDoc.data().pesoLiquido || 0;
+                    updateData.pesoLiquido = currentPesoLiquido - numQuantity;
+                    // Check if the item is fully consumed
+                    if (updateData.pesoLiquido <= 0) {
+                        updateData.quantidade = stockDoc.data().quantidade - 1;
+                    }
+                } else {
+                    updateData.quantidade = stockDoc.data().quantidade - numQuantity;
+                }
+                
+                transaction.update(stockRef, updateData);
+
+                const movementData: Omit<SupplyMovement, 'id'> = { 
+                    supplyId: selectedSupply.docId, 
+                    supplyStockId: selectedStockId, 
+                    supplyCodigo: selectedSupply.codigo, 
+                    type: 'saida', 
+                    quantity: numQuantity, 
+                    responsibleId: user.uid, 
+                    responsibleName: user.displayName || user.email || 'Desconhecido', 
+                    date: new Date().toISOString(), 
+                    destination 
+                };
                 transaction.set(doc(collection(firestore, 'supply_movements')), movementData);
             });
             
-            toast({ title: 'Sucesso!', description: `Saída de ${numQuantity} unidade(s) do lote ${selectedStockItem.loteInterno} registrada.` });
+            toast({ title: 'Sucesso!', description: `Saída de ${numQuantity} ${isConsumable ? selectedSupply.unidadeSecundaria : selectedSupply.unidadeMedida} registrada.` });
             onSuccess();
             handleClose();
 
         } catch(err: any) {
             console.error("Erro na saída:", err);
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `supplies/${selectedSupply.docId}/stock/${selectedStockId}`, operation: 'write', requestResourceData: { quantidade: `decrement by ${numQuantity}` } }));
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `supplies/${selectedSupply.docId}/stock/${selectedStockId}`, operation: 'write', requestResourceData: { quantity: `decrement by ${numQuantity}` } }));
         } finally {
             setIsSaving(false);
         }
@@ -316,10 +341,19 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
               
               {selectedSupply && (
                   <div className="space-y-4 animate-in fade-in-50">
-                       <div className="space-y-1.5">
-                          <Label htmlFor="quantity">Quantidade <span className="text-destructive">*</span></Label>
-                          <Input id="quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" />
-                      </div>
+                      {type === 'saida' && !!selectedSupply.fatorConversao ? (
+                           <div className="space-y-1.5">
+                              <Label htmlFor="quantity">Quantidade a Consumir ({selectedSupply.unidadeSecundaria}) <span className="text-destructive">*</span></Label>
+                              <Input id="quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" />
+                                {selectedStockItem && <p className="text-xs text-muted-foreground">Disponível: {selectedStockItem.pesoLiquido?.toLocaleString()} {selectedSupply.unidadeSecundaria}</p>}
+                           </div>
+                      ) : (
+                          <div className="space-y-1.5">
+                              <Label htmlFor="quantity">Quantidade ({selectedSupply.unidadeMedida}) <span className="text-destructive">*</span></Label>
+                              <Input id="quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" />
+                               {type === 'saida' && selectedStockItem && <p className="text-xs text-muted-foreground">Disponível: {selectedStockItem.quantidade.toLocaleString()}</p>}
+                          </div>
+                      )}
 
                       {type === 'entrada' ? (
                           <>
@@ -370,7 +404,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                               <div className="space-y-1.5">
                                   <Label>Lote de Saída <span className="text-destructive">*</span></Label>
                                   <Button variant="outline" className="w-full justify-between font-normal" onClick={() => setSelectorOpen('stock')} disabled={isLoadingStock}>
-                                    {isLoadingStock ? <Loader2 className="h-4 w-4 animate-spin"/> : selectedStockItem ? `${selectedStockItem.loteInterno} (Qtd: ${selectedStockItem.quantidade})` : "Selecione um lote..."}
+                                    {isLoadingStock ? <Loader2 className="h-4 w-4 animate-spin"/> : selectedStockItem ? `${selectedStockItem.loteInterno} (Qtd: ${selectedSupply.fatorConversao ? `${selectedStockItem.pesoLiquido} ${selectedSupply.unidadeSecundaria}` : selectedStockItem.quantidade})` : "Selecione um lote..."}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
                               </div>
@@ -444,7 +478,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
         }
         renderItem={(item) => (
             <div className="flex flex-col items-start">
-                <p>Lote: {item.loteInterno} (Qtd: {item.quantidade})</p>
+                <p>Lote: {item.loteInterno} (Qtd: {selectedSupply?.fatorConversao ? `${item.pesoLiquido} ${selectedSupply.unidadeSecundaria}`: item.quantidade})</p>
                 <p className="text-xs text-muted-foreground">Local: {item.localizacao} - Validade: {item.dataValidade ? format(new Date(item.dataValidade), 'dd/MM/yy') : 'N/A'}</p>
             </div>
         )}

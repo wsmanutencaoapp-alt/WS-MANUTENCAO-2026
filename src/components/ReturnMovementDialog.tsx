@@ -20,7 +20,7 @@ import type { Supply, SupplyStock, SupplyMovement } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 
 type EnrichedMovement = WithDocId<SupplyMovement> & {
-    supplyInfo?: Pick<Supply, 'descricao' | 'imageUrl' | 'partNumber'> & WithDocId<Supply>;
+    supplyInfo?: Pick<Supply, 'descricao' | 'imageUrl' | 'partNumber' | 'fatorConversao' | 'unidadeSecundaria'> & WithDocId<Supply>;
     stockInfo?: Partial<WithDocId<SupplyStock>>;
 };
 
@@ -39,14 +39,15 @@ export default function ReturnMovementDialog({ isOpen, onClose, movement, onSucc
   const [origin, setOrigin] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
+  const isConsumable = !!movement?.supplyInfo?.fatorConversao;
   const maxReturnableQuantity = movement?.quantity || 0;
 
   useEffect(() => {
     if (isOpen) {
       setQuantity('');
-      setOrigin('');
+      setOrigin(`Devolução ${movement?.destination || ''}`);
     }
-  }, [isOpen]);
+  }, [isOpen, movement]);
 
   const handleReturn = async () => {
     if (!firestore || !user || !movement || !movement.stockInfo || !movement.supplyInfo) return;
@@ -74,9 +75,17 @@ export default function ReturnMovementDialog({ isOpen, onClose, movement, onSucc
           if (!stockDoc.exists()) {
               throw new Error("O lote de estoque original não foi encontrado.");
           }
-          const currentQuantity = stockDoc.data().quantidade;
-          const newQuantity = currentQuantity + numQuantity;
-          transaction.update(stockRef, { quantidade: newQuantity });
+          
+          let updateData: Partial<SupplyStock> = {};
+          if (isConsumable) {
+              const currentPesoLiquido = stockDoc.data().pesoLiquido || 0;
+              updateData.pesoLiquido = currentPesoLiquido + numQuantity;
+          } else {
+              const currentQuantity = stockDoc.data().quantidade;
+              updateData.quantidade = currentQuantity + numQuantity;
+          }
+
+          transaction.update(stockRef, updateData);
           
           const newMovementData: Omit<SupplyMovement, 'id'> = {
             supplyId: movement.supplyInfo!.docId,
@@ -121,10 +130,10 @@ export default function ReturnMovementDialog({ isOpen, onClose, movement, onSucc
           <div className="p-3 rounded-md bg-muted/50 border">
               <p className="text-sm font-semibold">{movement.supplyInfo?.descricao}</p>
               <p className="text-xs text-muted-foreground font-mono">{movement.supplyInfo?.codigo}</p>
-              <p className="text-xs text-muted-foreground">Qtd. da Saída Original: {movement.quantity}</p>
+              <p className="text-xs text-muted-foreground">Qtd. da Saída Original: {movement.quantity} {isConsumable ? movement.supplyInfo?.unidadeSecundaria : ''}</p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="quantity">Quantidade a Devolver</Label>
+            <Label htmlFor="quantity">Quantidade a Devolver {isConsumable ? `(${movement.supplyInfo?.unidadeSecundaria})`: ''}</Label>
             <Input
               id="quantity"
               type="number"
