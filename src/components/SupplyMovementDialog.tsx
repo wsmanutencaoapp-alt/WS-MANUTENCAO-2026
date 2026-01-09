@@ -47,54 +47,94 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
   const [isSaving, setIsSaving] = useState(false);
   const [selectedSupply, setSelectedSupply] = useState<WithDocId<Supply> | null>(preselectedSupply);
   
-  // Form state
+  // Form state for both types
   const [quantity, setQuantity] = useState('');
-  const [origin, setOrigin] = useState(''); // For 'entrada'
   const [destination, setDestination] = useState(''); // For 'saida'
+  
+  // State for 'entrada'
+  const [origin, setOrigin] = useState('');
   const [loteFornecedor, setLoteFornecedor] = useState('');
   const [validade, setValidade] = useState<Date | undefined>();
   const [unitCost, setUnitCost] = useState('');
   const [localizacao, setLocalizacao] = useState('');
 
+  // State for 'saida'
+  const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
+  
+  // UI state
   const [isValidadeOpen, setIsValidadeOpen] = useState(false);
   const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
   const [isSupplyPopoverOpen, setIsSupplyPopoverOpen] = useState(false);
+  const [isStockPopoverOpen, setIsStockPopoverOpen] = useState(false);
   
+  // Fetch master data
   const allSuppliesQuery = useMemoFirebase(() => (
       firestore && !preselectedSupply ? query(collection(firestore, 'supplies')) : null
     ), [firestore, preselectedSupply, isOpen]);
-    
   const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(allSuppliesQuery, {
     queryKey: ['allSuppliesForMovementDialog'],
     enabled: isOpen && !preselectedSupply,
   });
 
+  // Fetch addresses (for 'entrada')
   const addressesQuery = useMemoFirebase(() => (
       firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
   ), [firestore]);
   const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, {
       queryKey: ['supplyAddressesForMovementDialog'],
-      enabled: isOpen,
+      enabled: isOpen && type === 'entrada',
+  });
+
+  // Fetch available stock lots for the selected supply (for 'saida')
+  const availableStockQuery = useMemoFirebase(() => {
+    if (firestore && type === 'saida' && selectedSupply) {
+      return query(
+        collection(firestore, 'supply_stock'),
+        where('supplyId', '==', selectedSupply.docId),
+        where('quantidade', '>', 0)
+      );
+    }
+    return null;
+  }, [firestore, type, selectedSupply]);
+  const { data: availableStock, isLoading: isLoadingStock } = useCollection<WithDocId<SupplyStock>>(availableStockQuery, {
+    queryKey: ['availableStockForSupply', selectedSupply?.docId],
+    enabled: isOpen && type === 'saida' && !!selectedSupply,
   });
   
+  const selectedStockItem = useMemo(() => {
+    if (!selectedStockId || !availableStock) return null;
+    return availableStock.find(stock => stock.docId === selectedStockId) || null;
+  }, [selectedStockId, availableStock]);
+
+  const resetState = () => {
+    setIsSaving(false);
+    setSelectedSupply(null);
+    setQuantity('');
+    setOrigin('');
+    setDestination('');
+    setLoteFornecedor('');
+    setValidade(undefined);
+    setUnitCost('');
+    setLocalizacao('');
+    setSelectedStockId(null);
+  };
+  
+  const handleClose = () => {
+    resetState();
+    onClose();
+  }
+
   useEffect(() => {
     if (isOpen) {
-        // Reset state when dialog opens
-        setIsSaving(false);
-        setSelectedSupply(preselectedSupply);
-        setQuantity('');
-        setOrigin('');
-        setDestination('');
-        setLoteFornecedor('');
-        setValidade(undefined);
-        setUnitCost('');
+        resetState(); // Clear everything
+        setSelectedSupply(preselectedSupply); // Then set the preselected one
         setLocalizacao(preselectedSupply?.localizacaoPadrao || '');
     }
   }, [isOpen, preselectedSupply]);
 
   const handleSave = async () => {
     if (!firestore || !user || !selectedSupply) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Dados incompletos.' });
+        toast({ variant: 'destructive', title: 'Erro', description: 'Item de suprimento não selecionado.' });
         return;
     }
     const numQuantity = parseFloat(quantity);
@@ -103,19 +143,19 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
         return;
     }
 
-    if (type === 'entrada' && !localizacao) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'A localização é obrigatória para a entrada.' });
-        return;
-    }
-
     setIsSaving(true);
     
     if (type === 'entrada') {
+        if (!localizacao) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'A localização é obrigatória para a entrada.' });
+            setIsSaving(false);
+            return;
+        }
         try {
             const today = new Date();
             const month = String(today.getMonth() + 1).padStart(2, '0');
             const year = today.getFullYear();
-            const counterId = `loteInterno_${month}_${year}`;
+            const counterId = `loteInterno_${year}_${month}`;
             
             const counterRef = doc(firestore, 'counters', counterId);
 
@@ -145,12 +185,8 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                 status: 'Disponível'
             };
 
-            if (loteFornecedor) {
-                stockData.loteFornecedor = loteFornecedor;
-            }
-            if (validade) {
-                stockData.dataValidade = validade.toISOString();
-            }
+            if (loteFornecedor) stockData.loteFornecedor = loteFornecedor;
+            if (validade) stockData.dataValidade = validade.toISOString();
 
             const movementData: Omit<SupplyMovement, 'id'> = {
                 supplyId: selectedSupply.docId,
@@ -172,7 +208,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
 
             toast({ title: 'Sucesso!', description: `Entrada registrada no lote ${loteInterno}.` });
             onSuccess();
-            onClose();
+            handleClose();
 
         } catch (err: any) {
             console.error("Erro na entrada:", err);
@@ -180,21 +216,74 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
         } finally {
             setIsSaving(false);
         }
-    } else {
-        // TODO: Implementar lógica de saída que consome dos lotes existentes
-        toast({ title: 'Em breve', description: 'A lógica de saída de estoque por lote será implementada na próxima etapa.' });
-        setIsSaving(false);
+    } else { // Handle 'saida'
+        if (!selectedStockId || !selectedStockItem) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Lote de saída não selecionado.' });
+            setIsSaving(false);
+            return;
+        }
+        if (numQuantity > selectedStockItem.quantidade) {
+            toast({ variant: 'destructive', title: 'Erro de Quantidade', description: `A quantidade a ser retirada (${numQuantity}) é maior que a disponível no lote (${selectedStockItem.quantidade}).` });
+            setIsSaving(false);
+            return;
+        }
+
+        try {
+            const stockRef = doc(firestore, 'supply_stock', selectedStockId);
+            
+            await runTransaction(firestore, async (transaction) => {
+                const stockDoc = await transaction.get(stockRef);
+                if (!stockDoc.exists()) {
+                    throw new Error("O lote selecionado não existe mais.");
+                }
+
+                const currentQuantity = stockDoc.data().quantidade;
+                if (numQuantity > currentQuantity) {
+                    throw new Error("Quantidade insuficiente no lote selecionado.");
+                }
+
+                const newQuantity = currentQuantity - numQuantity;
+                if (newQuantity > 0) {
+                    transaction.update(stockRef, { quantidade: newQuantity });
+                } else {
+                    transaction.delete(stockRef);
+                }
+
+                const movementData: Omit<SupplyMovement, 'id'> = {
+                    supplyId: selectedSupply.docId,
+                    supplyStockId: selectedStockId,
+                    supplyCodigo: selectedSupply.codigo,
+                    type: 'saida',
+                    quantity: numQuantity,
+                    responsibleId: user.uid,
+                    responsibleName: user.displayName || user.email || 'Desconhecido',
+                    date: new Date().toISOString(),
+                    destination: destination,
+                };
+                transaction.set(doc(collection(firestore, 'supply_movements')), movementData);
+            });
+            
+            toast({ title: 'Sucesso!', description: `Saída de ${numQuantity} unidade(s) do lote ${selectedStockItem.loteInterno} registrada.` });
+            onSuccess();
+            handleClose();
+
+        } catch(err: any) {
+            console.error("Erro na saída:", err);
+            toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível registrar a saída.' });
+        } finally {
+            setIsSaving(false);
+        }
     }
   };
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+    <Dialog open={isOpen} onOpenChange={handleClose} modal={false}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar {type === 'entrada' ? 'Entrada' : 'Saída'} de Suprimento</DialogTitle>
           <DialogDescription>
-            {type === 'entrada' ? 'Adicione itens ao estoque, criando um novo lote.' : 'Retire itens do estoque.'}
+            {type === 'entrada' ? 'Adicione itens ao estoque, criando um novo lote.' : 'Retire itens do estoque consumindo de um lote existente.'}
           </DialogDescription>
         </DialogHeader>
         
@@ -229,15 +318,12 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                                         value={`${item.codigo} ${item.descricao}`}
                                         onSelect={() => {
                                             setSelectedSupply(item);
+                                            setLocalizacao(item.localizacaoPadrao || '');
+                                            setSelectedStockId(null);
                                             setIsSupplyPopoverOpen(false);
                                         }}
                                     >
-                                        <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4",
-                                            selectedSupply?.docId === item.docId ? "opacity-100" : "opacity-0"
-                                        )}
-                                        />
+                                        <Check className={cn("mr-2 h-4 w-4", selectedSupply?.docId === item.docId ? "opacity-100" : "opacity-0")} />
                                         {item.codigo} - {item.descricao}
                                     </CommandItem>
                                     ))}
@@ -320,18 +406,47 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                             )}
                         </>
                     ) : (
-                         <div className="space-y-1.5">
-                            <Label htmlFor="destination">Destino <span className="text-destructive">*</span></Label>
-                            <Input id="destination" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Ex: OS-987, Centro de Custo, etc." />
-                        </div>
+                         <>
+                            <div className="space-y-1.5">
+                                <Label>Lote de Saída <span className="text-destructive">*</span></Label>
+                                <Popover open={isStockPopoverOpen} onOpenChange={setIsStockPopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={isLoadingStock}>
+                                    {isLoadingStock ? <Loader2 className="h-4 w-4 animate-spin"/> : selectedStockItem ? `${selectedStockItem.loteInterno} (Qtd: ${selectedStockItem.quantidade})` : "Selecione um lote..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                                    <Command>
+                                        <CommandInput placeholder="Buscar lote..." />
+                                        <CommandList>
+                                            <CommandEmpty>Nenhum lote encontrado.</CommandEmpty>
+                                            <CommandGroup>
+                                                {availableStock?.map(stock => (
+                                                <CommandItem key={stock.docId} value={stock.loteInterno} onSelect={() => { setSelectedStockId(stock.docId); setIsStockPopoverOpen(false); }}>
+                                                    <Check className={cn("mr-2 h-4 w-4", selectedStockId === stock.docId ? "opacity-100" : "opacity-0")} />
+                                                    Lote: {stock.loteInterno} (Qtd: {stock.quantidade}) - Loc: {stock.localizacao}
+                                                </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="destination">Destino <span className="text-destructive">*</span></Label>
+                                <Input id="destination" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Ex: OS-987, Centro de Custo, etc." />
+                            </div>
+                         </>
                     )}
                 </div>
             )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={isSaving || !selectedSupply || !quantity}>
+          <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={isSaving || !selectedSupply || !quantity || (type === 'saida' && !selectedStockId)}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirmar {type === 'entrada' ? 'Entrada' : 'Saída'}
           </Button>
