@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -212,7 +213,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             await batch.commit();
 
             toast({ title: 'Sucesso!', description: `Entrada registrada no lote ${loteInterno}.` });
-            queryClient.invalidateQueries({ queryKey: ['allSupplyStockList'] }); // This needs to be updated for subcollections
+            queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] }); 
             queryClient.invalidateQueries({ queryKey: ['supplyMovementsHistory'] });
             onSuccess();
             handleClose();
@@ -269,7 +270,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             
             toast({ title: 'Sucesso!', description: `Saída de ${numQuantity} unidade(s) do lote ${selectedStockItem.loteInterno} registrada.` });
             queryClient.invalidateQueries({ queryKey: ['availableStockForSupply', selectedSupply.docId] });
-            queryClient.invalidateQueries({ queryKey: ['allSupplyStockList'] }); // This might still be useful depending on where it's used
+            queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] }); 
             queryClient.invalidateQueries({ queryKey: ['supplyMovementsHistory'] });
             onSuccess();
             handleClose();
