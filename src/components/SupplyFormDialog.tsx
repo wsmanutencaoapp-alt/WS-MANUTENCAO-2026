@@ -228,6 +228,26 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
               <TabsContent value="identificacao" className="space-y-4 py-4">
                  <FormField
                   control={form.control}
+                  name="familia"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Família</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="MP">MP - Matéria-Prima</SelectItem>
+                          <SelectItem value="CT">CT - Consumível Técnico</SelectItem>
+                          <SelectItem value="CG">CG - Consumível Geral</SelectItem>
+                          <SelectItem value="CP">CP - Componente</SelectItem>
+                          <SelectItem value="PA">PA - Produto Acabado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="descricao"
                   render={({ field }) => (
                     <FormItem>
@@ -248,48 +268,26 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="unidadeMedida"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Unidade de Medida</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            <SelectItem value="UN">UN (Unidade)</SelectItem>
-                            <SelectItem value="KG">KG (Quilograma)</SelectItem>
-                            <SelectItem value="MT">MT (Metro)</SelectItem>
-                            <SelectItem value="LT">LT (Litro)</SelectItem>
-                            <SelectItem value="CX">CX (Caixa)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="familia"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Família</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            <SelectItem value="MP">MP - Matéria-Prima</SelectItem>
-                            <SelectItem value="CT">CT - Consumível Técnico</SelectItem>
-                            <SelectItem value="CG">CG - Consumível Geral</SelectItem>
-                            <SelectItem value="CP">CP - Componente</SelectItem>
-                            <SelectItem value="PA">PA - Produto Acabado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="unidadeMedida"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Unidade de Medida</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="UN">UN (Unidade)</SelectItem>
+                          <SelectItem value="KG">KG (Quilograma)</SelectItem>
+                          <SelectItem value="MT">MT (Metro)</SelectItem>
+                          <SelectItem value="LT">LT (Litro)</SelectItem>
+                          <SelectItem value="CX">CX (Caixa)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </TabsContent>
 
               <TabsContent value="rastreabilidade" className="space-y-4 py-4">
