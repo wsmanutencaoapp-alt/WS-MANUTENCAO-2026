@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, getDocs } from 'firebase/firestore';
 import type { Supply, SupplyStock } from '@/lib/types';
@@ -21,13 +21,13 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import SupplyMovementDialog from '@/components/SupplyMovementDialog';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Image from 'next/image';
 import SupplyFormDialog from '@/components/SupplyFormDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -58,6 +58,7 @@ const SuprimentosPage = () => {
   }>({ isOpen: false, supply: null });
   
   const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
 
   // 1. Fetch all master supply data 
@@ -126,6 +127,18 @@ const SuprimentosPage = () => {
       setFormDialogState({ isOpen: false, supply: null });
   };
   
+  const toggleRowExpansion = (docId: string) => {
+    setExpandedRows(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(docId)) {
+            newSet.delete(docId);
+        } else {
+            newSet.add(docId);
+        }
+        return newSet;
+    });
+  };
+
   const isLoading = isLoadingSupplies || isStockLoading;
 
   return (
@@ -152,7 +165,7 @@ const SuprimentosPage = () => {
         <CardHeader>
           <CardTitle>Visão de Estoque</CardTitle>
           <CardDescription>
-            Visualize o saldo total de cada item de suprimento.
+            Visualize o saldo total de cada item. Clique em um item para ver os detalhes dos lotes.
           </CardDescription>
           <div className="relative pt-4">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -168,6 +181,7 @@ const SuprimentosPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12"></TableHead>
                 <TableHead className="w-16">Foto</TableHead>
                 <TableHead>Item (Código)</TableHead>
                 <TableHead>Part Number</TableHead>
@@ -179,11 +193,11 @@ const SuprimentosPage = () => {
             </TableHeader>
             <TableBody>
               {isLoading && (
-                <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
               )}
               {!isLoading && filteredSupplies.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
+                    <TableCell colSpan={8} className="h-24 text-center">
                         <PackageSearch className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
                         <p className="text-muted-foreground">Nenhum item em estoque.</p>
                     </TableCell>
@@ -196,42 +210,84 @@ const SuprimentosPage = () => {
                                ? 'Estoque Baixo' 
                                : 'Em Estoque';
                   const statusVariant = status === 'Sem Estoque' ? 'destructive' : status === 'Estoque Baixo' ? 'default' : 'success';
+                  const isExpanded = expandedRows.has(item.docId);
 
                   return (
-                    <TableRow key={item.docId}>
+                    <Fragment key={item.docId}>
+                        <TableRow>
+                            <TableCell>
+                                {item.stock.length > 0 && (
+                                    <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(item.docId)}>
+                                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </Button>
+                                )}
+                            </TableCell>
+                            <TableCell>
+                            <button onClick={() => setImageToView({ src: item.imageUrl || 'https://picsum.photos/seed/supply/48/48', alt: item.descricao || 'Item sem imagem' })}>
+                                <Image
+                                alt={item.descricao || ''}
+                                className="aspect-square rounded-md object-cover cursor-pointer"
+                                height="48"
+                                src={item.imageUrl || 'https://picsum.photos/seed/supply/48/48'}
+                                width="48"
+                                />
+                            </button>
+                            </TableCell>
                         <TableCell>
-                          <button onClick={() => setImageToView({ src: item.imageUrl || 'https://picsum.photos/seed/supply/48/48', alt: item.descricao || 'Item sem imagem' })}>
-                            <Image
-                              alt={item.descricao || ''}
-                              className="aspect-square rounded-md object-cover cursor-pointer"
-                              height="48"
-                              src={item.imageUrl || 'https://picsum.photos/seed/supply/48/48'}
-                              width="48"
-                            />
-                          </button>
+                            <div className="font-medium">{item.descricao}</div>
+                            <div className="text-sm text-muted-foreground">{item.codigo}</div>
                         </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{item.descricao}</div>
-                        <div className="text-sm text-muted-foreground">{item.codigo}</div>
-                      </TableCell>
-                      <TableCell className="font-mono">{item.partNumber}</TableCell>
-                      <TableCell className="font-bold">{item.totalStock.toLocaleString()}</TableCell>
-                      <TableCell>{item.estoqueMinimo.toLocaleString()}</TableCell>
-                      <TableCell>
-                          <Badge variant={statusVariant}>{status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-1">
-                          <Button variant="ghost" size="icon" title="Registrar Entrada" onClick={() => handleOpenMovementDialog('entrada', item)}>
-                              <LogIn className="h-4 w-4 text-green-600"/>
-                          </Button>
-                          <Button variant="ghost" size="icon" title="Registrar Saída" onClick={() => handleOpenMovementDialog('saida', item)}>
-                              <LogOut className="h-4 w-4 text-orange-600"/>
-                          </Button>
-                          <Button variant="ghost" size="icon" title="Editar Item Mestre" onClick={() => handleOpenFormDialog(item)}>
-                              <Edit className="h-4 w-4"/>
-                          </Button>
-                      </TableCell>
-                    </TableRow>
+                        <TableCell className="font-mono">{item.partNumber}</TableCell>
+                        <TableCell className="font-bold">{item.totalStock.toLocaleString()}</TableCell>
+                        <TableCell>{item.estoqueMinimo.toLocaleString()}</TableCell>
+                        <TableCell>
+                            <Badge variant={statusVariant}>{status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-1">
+                            <Button variant="ghost" size="icon" title="Registrar Entrada" onClick={() => handleOpenMovementDialog('entrada', item)}>
+                                <LogIn className="h-4 w-4 text-green-600"/>
+                            </Button>
+                            <Button variant="ghost" size="icon" title="Registrar Saída" onClick={() => handleOpenMovementDialog('saida', item)}>
+                                <LogOut className="h-4 w-4 text-orange-600"/>
+                            </Button>
+                            <Button variant="ghost" size="icon" title="Editar Item Mestre" onClick={() => handleOpenFormDialog(item)}>
+                                <Edit className="h-4 w-4"/>
+                            </Button>
+                        </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                            <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                <TableCell colSpan={8} className="p-0">
+                                    <div className="p-4">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Lote Interno</TableHead>
+                                                    <TableHead>Lote Fornecedor</TableHead>
+                                                    <TableHead>Quantidade</TableHead>
+                                                    <TableHead>Localização</TableHead>
+                                                    <TableHead>Data Entrada</TableHead>
+                                                    <TableHead>Validade</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {item.stock.map(stockItem => (
+                                                    <TableRow key={stockItem.docId}>
+                                                        <TableCell className="font-mono">{stockItem.loteInterno}</TableCell>
+                                                        <TableCell>{stockItem.loteFornecedor || 'N/A'}</TableCell>
+                                                        <TableCell>{stockItem.quantidade}</TableCell>
+                                                        <TableCell>{stockItem.localizacao}</TableCell>
+                                                        <TableCell>{format(parseISO(stockItem.dataEntrada), 'dd/MM/yyyy')}</TableCell>
+                                                        <TableCell>{stockItem.dataValidade ? format(parseISO(stockItem.dataValidade), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </Fragment>
                   );
               })}
             </TableBody>
@@ -280,5 +336,3 @@ const SuprimentosPage = () => {
 };
 
 export default SuprimentosPage;
-
-    
