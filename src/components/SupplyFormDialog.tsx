@@ -229,7 +229,6 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       if (documentoFile) {
         if (supply?.documentoUrl) {
             try {
-                // Correctly extract file path from URL
                 const fileUrl = new URL(supply.documentoUrl);
                 const filePath = decodeURIComponent(fileUrl.pathname.split('/o/')[1].split('?')[0]);
                 await deleteObject(storageRef(storage, filePath));
@@ -383,13 +382,13 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                            <Label>Documento (FISPQ, Certificado, etc.)</Label>
                            <div className="flex items-center gap-2">
                             {supply?.documentoUrl && !documentoFile && (
-                                <Button asChild variant="secondary" size="icon">
+                                <Button asChild variant="secondary" size="icon" title="Visualizar documento atual">
                                     <a href={supply.documentoUrl} target="_blank" rel="noopener noreferrer"><ExternalLink/></a>
                                 </Button>
                             )}
                             <Button type="button" variant="outline" className="w-full" onClick={() => docInputRef.current?.click()}>
                                 <Upload className="mr-2"/>
-                                <span className="truncate">{documentoFile ? documentoFile.name : "Anexar Documento"}</span>
+                                <span className="truncate">{documentoFile ? documentoFile.name : (supply?.documentoUrl ? "Trocar Documento" : "Anexar Documento")}</span>
                             </Button>
                             <Input type="file" ref={docInputRef} onChange={handleDocumentChange} className="hidden"/>
                            </div>
@@ -519,5 +518,3 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
     </Dialog>
   );
 }
-
-    
