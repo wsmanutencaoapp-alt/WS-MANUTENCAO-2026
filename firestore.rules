@@ -27,17 +27,18 @@ service cloud.firestore {
     }
 
     match /supplies/{supplyId} {
-      // Any authenticated user can read supplies, but only those with permission can write.
+      // Any authenticated user can read supplies master data
       allow read: if isAuthenticated();
       allow write: if hasPermission('suprimentos');
-    }
-    
-    match /supply_stock/{stockId} {
-      allow read, write: if isAuthenticated();
+      
+      // Allow users with permission to read and write to the stock subcollection
+      match /stock/{stockId} {
+        allow read, write: if hasPermission('suprimentos');
+      }
     }
     
     match /supply_movements/{movementId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if hasPermission('suprimentos');
     }
 
     match /tools/{toolId} {
@@ -119,3 +120,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

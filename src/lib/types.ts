@@ -1,4 +1,5 @@
 
+
 export type Supply = {
   id?: string;
   // Identificação
@@ -30,8 +31,6 @@ export type Supply = {
 
 export type SupplyStock = {
     id?: string;
-    supplyId: string;
-    supplyCodigo: string;
     loteInterno: string; // Lote gerado pelo sistema para cada entrada
     loteFornecedor?: string; // Lote informado pelo fornecedor (opcional)
     quantidade: number;
@@ -218,3 +217,5 @@ export type Address = {
   codigoCompleto: string;
   createdAt: string; // ISO date string
 };
+
+    

@@ -94,9 +94,9 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
   // Fetch available stock lots for the selected supply (for 'saida')
   const availableStockQuery = useMemoFirebase(() => {
     if (firestore && type === 'saida' && selectedSupply) {
+      // Correctly query the subcollection
       return query(
-        collection(firestore, 'supply_stock'),
-        where('supplyId', '==', selectedSupply.docId),
+        collection(firestore, 'supplies', selectedSupply.docId, 'stock'),
         where('quantidade', '>', 0)
       );
     }
@@ -179,11 +179,10 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
 
             const loteInterno = `${year}${month}${String(newSequencial).padStart(4, '0')}`;
 
-            const newStockRef = doc(collection(firestore, 'supply_stock'));
+            // Create ref inside the subcollection
+            const newStockRef = doc(collection(firestore, 'supplies', selectedSupply.docId, 'stock'));
             
-            const stockData: Partial<SupplyStock> = {
-                supplyId: selectedSupply.docId,
-                supplyCodigo: selectedSupply.codigo,
+            const stockData: Omit<SupplyStock, 'id'> = {
                 loteInterno: loteInterno,
                 quantidade: numQuantity,
                 localizacao: localizacao,
@@ -214,7 +213,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             await batch.commit();
 
             toast({ title: 'Sucesso!', description: `Entrada registrada no lote ${loteInterno}.` });
-            queryClient.invalidateQueries({ queryKey: ['allSupplyStockList'] });
+            queryClient.invalidateQueries({ queryKey: ['allSupplyStockList'] }); // This needs to be updated for subcollections
             queryClient.invalidateQueries({ queryKey: ['supplyMovementsHistory'] });
             onSuccess();
             handleClose();
@@ -238,7 +237,8 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
         }
 
         try {
-            const stockRef = doc(firestore, 'supply_stock', selectedStockId);
+            // Correct ref to the subcollection document
+            const stockRef = doc(firestore, 'supplies', selectedSupply.docId, 'stock', selectedStockId);
             
             await runTransaction(firestore, async (transaction) => {
                 const stockDoc = await transaction.get(stockRef);
@@ -269,7 +269,8 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
             });
             
             toast({ title: 'Sucesso!', description: `Saída de ${numQuantity} unidade(s) do lote ${selectedStockItem.loteInterno} registrada.` });
-            queryClient.invalidateQueries({ queryKey: ['allSupplyStockList'] });
+            queryClient.invalidateQueries({ queryKey: ['availableStockForSupply', selectedSupply.docId] });
+            queryClient.invalidateQueries({ queryKey: ['allSupplyStockList'] }); // This might still be useful depending on where it's used
             queryClient.invalidateQueries({ queryKey: ['supplyMovementsHistory'] });
             onSuccess();
             handleClose();
@@ -277,7 +278,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
         } catch(err: any) {
             console.error("Erro na saída:", err);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: `supply_stock/${selectedStockId}`,
+                path: `supplies/${selectedSupply.docId}/stock/${selectedStockId}`,
                 operation: 'write',
                 requestResourceData: { quantidade: `decrement by ${numQuantity}` }
             }));
@@ -289,7 +290,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose} modal={false}>
+    <Dialog open={isOpen} onOpenChange={handleClose} modal>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar {type === 'entrada' ? 'Entrada' : 'Saída'} de Suprimento</DialogTitle>
@@ -466,3 +467,5 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
     </Dialog>
   );
 }
+
+    

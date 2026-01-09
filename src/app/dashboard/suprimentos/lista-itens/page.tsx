@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, getDocs } from 'firebase/firestore';
 import type { Supply, SupplyStock } from '@/lib/types';
 import {
   Table,
@@ -20,7 +21,7 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
@@ -30,11 +31,12 @@ import { format } from 'date-fns';
 import Image from 'next/image';
 import SupplyFormDialog from '@/components/SupplyFormDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 
 
-type StockItemWithDetails = WithDocId<SupplyStock> & {
-    itemDescricao?: string;
-    itemImageUrl?: string;
+type SupplyWithStock = WithDocId<Supply> & {
+    stock: WithDocId<SupplyStock>[];
+    totalStock: number;
 };
 
 
@@ -58,87 +60,78 @@ const SuprimentosPage = () => {
   const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
 
 
-  // 1. Fetch all master supply data to map details to stock items
+  // 1. Fetch all master supply data 
   const suppliesQueryKey = ['suppliesMasterDataForStockList'];
   const suppliesQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'supplies')) : null),
+    () => (firestore ? query(collection(firestore, 'supplies'), orderBy('codigo')) : null),
     [firestore]
   );
   const { data: supplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery, {
     queryKey: suppliesQueryKey
   });
 
-  // 2. Fetch all stock items
-  const stockQueryKey = ['allSupplyStockList'];
-  const stockQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'supply_stock'), orderBy('dataEntrada', 'desc')) : null),
-    [firestore]
-  );
-  const { data: stockItems, isLoading: isLoadingStock, error } = useCollection<WithDocId<SupplyStock>>(stockQuery, {
-      queryKey: stockQueryKey
-  });
+  const [suppliesWithStock, setSuppliesWithStock] = useState<SupplyWithStock[]>([]);
+  const [isStockLoading, setIsStockLoading] = useState(true);
 
-  // 3. Combine the data
-  const combinedStockList = useMemo((): StockItemWithDetails[] => {
-    if (!stockItems || !supplies) return [];
-    
-    const suppliesMap = new Map(supplies.map(s => [s.docId, s]));
+  // 2. Fetch stock for each supply item
+  useEffect(() => {
+    if (!supplies || !firestore) return;
 
-    return stockItems.map(stockItem => {
-        const masterItem = suppliesMap.get(stockItem.supplyId);
-        return {
-            ...stockItem,
-            itemDescricao: masterItem?.descricao || 'Descrição não encontrada',
-            itemImageUrl: masterItem?.imageUrl,
+    const fetchAllStock = async () => {
+        setIsStockLoading(true);
+        const enrichedSupplies: SupplyWithStock[] = [];
+        for (const supply of supplies) {
+            const stockCollectionRef = collection(firestore, 'supplies', supply.docId, 'stock');
+            const stockSnapshot = await getDocs(stockCollectionRef);
+            const stockItems = stockSnapshot.docs.map(doc => ({ ...doc.data() as SupplyStock, docId: doc.id }));
+            const totalStock = stockItems.reduce((acc, item) => acc + item.quantidade, 0);
+            enrichedSupplies.push({ ...supply, stock: stockItems, totalStock });
         }
-    });
+        setSuppliesWithStock(enrichedSupplies);
+        setIsStockLoading(false);
+    };
 
-  }, [stockItems, supplies]);
+    fetchAllStock();
+  }, [supplies, firestore]);
+  
 
-  const filteredStockList = useMemo(() => {
-    if (!combinedStockList) return [];
-    if (!searchTerm) return combinedStockList;
+  const filteredSupplies = useMemo(() => {
+    if (!suppliesWithStock) return [];
+    if (!searchTerm) return suppliesWithStock;
 
     const lowercasedTerm = searchTerm.toLowerCase();
-    return combinedStockList.filter(item => 
-      (item.itemDescricao && item.itemDescricao.toLowerCase().includes(lowercasedTerm)) ||
-      (item.supplyCodigo && item.supplyCodigo.toLowerCase().includes(lowercasedTerm)) ||
-      (item.loteInterno && item.loteInterno.toLowerCase().includes(lowercasedTerm)) ||
-      (item.loteFornecedor && item.loteFornecedor.toLowerCase().includes(lowercasedTerm))
+    return suppliesWithStock.filter(item => 
+      (item.descricao && item.descricao.toLowerCase().includes(lowercasedTerm)) ||
+      (item.codigo && item.codigo.toLowerCase().includes(lowercasedTerm))
     );
-  }, [combinedStockList, searchTerm]);
+  }, [suppliesWithStock, searchTerm]);
   
   const handleGoToCadastro = () => {
     router.push('/dashboard/cadastros/suprimentos');
   }
 
-  const handleOpenMovementDialog = (type: 'entrada' | 'saida', supplyId: string) => {
-    const supply = supplies?.find(s => s.docId === supplyId);
-    if(supply) {
-        setMovementDialogState({ isOpen: true, type, supply });
-    }
+  const handleOpenMovementDialog = (type: 'entrada' | 'saida', supply: WithDocId<Supply>) => {
+    setMovementDialogState({ isOpen: true, type, supply });
   };
 
-  const handleOpenFormDialog = (supplyId: string) => {
-    const supply = supplies?.find(s => s.docId === supplyId);
-    if (supply) {
-        setFormDialogState({ isOpen: true, supply: supply });
-    }
+  const handleOpenFormDialog = (supply: WithDocId<Supply>) => {
+    setFormDialogState({ isOpen: true, supply: supply });
   };
   
   const handleDialogSuccess = () => {
-      queryClient.invalidateQueries({ queryKey: stockQueryKey });
       queryClient.invalidateQueries({ queryKey: suppliesQueryKey });
+      // We need to re-trigger the useEffect that fetches stock
+      // Invalidating the master data query will do that.
       setMovementDialogState({ isOpen: false, type: 'entrada', supply: null });
       setFormDialogState({ isOpen: false, supply: null });
   };
   
-  const isLoading = isLoadingStock || isLoadingSupplies;
+  const isLoading = isLoadingSupplies || isStockLoading;
 
   return (
     <div className="space-y-6">
        <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Inventário de Lotes de Suprimentos</h1>
+        <h1 className="text-2xl font-bold">Inventário Geral de Suprimentos</h1>
         <div className="flex gap-2">
             <Button onClick={() => setMovementDialogState({ isOpen: true, type: 'entrada', supply: null })}>
                 <LogIn className="mr-2 h-4 w-4"/>
@@ -157,14 +150,14 @@ const SuprimentosPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Lotes em Estoque</CardTitle>
+          <CardTitle>Visão de Estoque</CardTitle>
           <CardDescription>
-            Gerencie e visualize todos os lotes individuais de suprimentos em estoque.
+            Visualize o saldo total de cada item de suprimento.
           </CardDescription>
           <div className="relative pt-4">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-                placeholder="Pesquisar por item, código, lote..."
+                placeholder="Pesquisar por item ou código..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -177,10 +170,10 @@ const SuprimentosPage = () => {
               <TableRow>
                 <TableHead className="w-16">Foto</TableHead>
                 <TableHead>Item (Código)</TableHead>
-                <TableHead>Lote Interno</TableHead>
-                <TableHead>Quantidade</TableHead>
-                <TableHead>Localização</TableHead>
-                <TableHead>Data de Entrada</TableHead>
+                <TableHead>Part Number</TableHead>
+                <TableHead>Saldo Total</TableHead>
+                <TableHead>Estoque Mín.</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -188,46 +181,59 @@ const SuprimentosPage = () => {
               {isLoading && (
                 <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>
               )}
-              {error && (
-                <TableRow><TableCell colSpan={7} className="text-center text-destructive h-24">Erro ao carregar dados.</TableCell></TableRow>
-              )}
-              {!isLoading && filteredStockList.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center h-24">Nenhum lote em estoque.</TableCell></TableRow>
-              )}
-              {!isLoading && filteredStockList.map(item => (
-                <TableRow key={item.docId}>
-                    <TableCell>
-                      <button onClick={() => setImageToView({ src: item.itemImageUrl || 'https://picsum.photos/seed/supply/48/48', alt: item.itemDescricao || 'Item sem imagem' })}>
-                        <Image
-                          alt={item.itemDescricao || ''}
-                          className="aspect-square rounded-md object-cover cursor-pointer"
-                          height="48"
-                          src={item.itemImageUrl || 'https://picsum.photos/seed/supply/48/48'}
-                          width="48"
-                        />
-                      </button>
+              {!isLoading && filteredSupplies.length === 0 && (
+                <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                        <PackageSearch className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
+                        <p className="text-muted-foreground">Nenhum item em estoque.</p>
                     </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{item.itemDescricao}</div>
-                    <div className="text-sm text-muted-foreground">{item.supplyCodigo}</div>
-                  </TableCell>
-                  <TableCell className="font-mono">{item.loteInterno}</TableCell>
-                  <TableCell className="font-bold">{item.quantidade.toLocaleString()}</TableCell>
-                  <TableCell>{item.localizacao}</TableCell>
-                  <TableCell>{format(new Date(item.dataEntrada), 'dd/MM/yyyy')}</TableCell>
-                  <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="icon" title="Registrar Entrada" onClick={() => handleOpenMovementDialog('entrada', item.supplyId)}>
-                          <LogIn className="h-4 w-4 text-green-600"/>
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Registrar Saída" onClick={() => handleOpenMovementDialog('saida', item.supplyId)}>
-                          <LogOut className="h-4 w-4 text-orange-600"/>
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Editar Item Mestre" onClick={() => handleOpenFormDialog(item.supplyId)}>
-                          <Edit className="h-4 w-4"/>
-                      </Button>
-                  </TableCell>
                 </TableRow>
-              ))}
+              )}
+              {!isLoading && filteredSupplies.map(item => {
+                  const status = item.totalStock <= 0 
+                               ? 'Sem Estoque' 
+                               : item.totalStock <= item.estoqueMinimo 
+                               ? 'Estoque Baixo' 
+                               : 'Em Estoque';
+                  const statusVariant = status === 'Sem Estoque' ? 'destructive' : status === 'Estoque Baixo' ? 'default' : 'success';
+
+                  return (
+                    <TableRow key={item.docId}>
+                        <TableCell>
+                          <button onClick={() => setImageToView({ src: item.imageUrl || 'https://picsum.photos/seed/supply/48/48', alt: item.descricao || 'Item sem imagem' })}>
+                            <Image
+                              alt={item.descricao || ''}
+                              className="aspect-square rounded-md object-cover cursor-pointer"
+                              height="48"
+                              src={item.imageUrl || 'https://picsum.photos/seed/supply/48/48'}
+                              width="48"
+                            />
+                          </button>
+                        </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{item.descricao}</div>
+                        <div className="text-sm text-muted-foreground">{item.codigo}</div>
+                      </TableCell>
+                      <TableCell className="font-mono">{item.partNumber}</TableCell>
+                      <TableCell className="font-bold">{item.totalStock.toLocaleString()}</TableCell>
+                      <TableCell>{item.estoqueMinimo.toLocaleString()}</TableCell>
+                      <TableCell>
+                          <Badge variant={statusVariant}>{status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                          <Button variant="ghost" size="icon" title="Registrar Entrada" onClick={() => handleOpenMovementDialog('entrada', item)}>
+                              <LogIn className="h-4 w-4 text-green-600"/>
+                          </Button>
+                          <Button variant="ghost" size="icon" title="Registrar Saída" onClick={() => handleOpenMovementDialog('saida', item)}>
+                              <LogOut className="h-4 w-4 text-orange-600"/>
+                          </Button>
+                          <Button variant="ghost" size="icon" title="Editar Item Mestre" onClick={() => handleOpenFormDialog(item)}>
+                              <Edit className="h-4 w-4"/>
+                          </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -274,3 +280,5 @@ const SuprimentosPage = () => {
 };
 
 export default SuprimentosPage;
+
+    

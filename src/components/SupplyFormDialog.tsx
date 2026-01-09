@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
@@ -477,3 +478,5 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
     </Dialog>
   );
 }
+
+    
