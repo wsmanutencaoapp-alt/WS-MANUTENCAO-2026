@@ -31,6 +31,7 @@ import Image from 'next/image';
 import SupplyFormDialog from '@/components/SupplyFormDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import EditStockItemDialog from '@/components/EditStockItemDialog';
 
 
 type EnrichedStockItem = WithDocId<SupplyStock> & {
@@ -55,6 +56,11 @@ const SuprimentosPage = () => {
       supply: WithDocId<Supply> | null;
   }>({ isOpen: false, supply: null });
   
+  const [editStockDialogState, setEditStockDialogState] = useState<{
+    isOpen: boolean;
+    stockItem: EnrichedStockItem | null;
+  }>({ isOpen: false, stockItem: null });
+
   const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
   const [stockToPrint, setStockToPrint] = useState<EnrichedStockItem | null>(null);
 
@@ -129,11 +135,16 @@ const SuprimentosPage = () => {
     setFormDialogState({ isOpen: true, supply: supply });
   };
   
+  const handleOpenEditStockDialog = (item: EnrichedStockItem) => {
+    setEditStockDialogState({ isOpen: true, stockItem: item });
+  };
+
   const handleDialogSuccess = (newItem?: EnrichedStockItem) => {
       // Re-trigger the stock fetching
       queryClient.invalidateQueries({ queryKey: suppliesQueryKey });
       setMovementDialogState({ isOpen: false, type: 'entrada', supply: null });
       setFormDialogState({ isOpen: false, supply: null });
+      setEditStockDialogState({ isOpen: false, stockItem: null });
 
       if (newItem) {
         setStockToPrint(newItem);
@@ -254,7 +265,7 @@ const SuprimentosPage = () => {
                         <Button variant="ghost" size="icon" title="Registrar Saída deste Lote" onClick={() => handleOpenMovementDialog('saida', supplyInfo)}>
                             <LogOut className="h-4 w-4 text-orange-600"/>
                         </Button>
-                        <Button variant="ghost" size="icon" title="Editar Item Mestre" onClick={() => handleOpenFormDialog(supplyInfo)}>
+                        <Button variant="ghost" size="icon" title="Editar Lote" onClick={() => handleOpenEditStockDialog(item)}>
                             <Edit className="h-4 w-4"/>
                         </Button>
                         {item.documentoUrl && (
@@ -293,6 +304,15 @@ const SuprimentosPage = () => {
             onSuccess={handleDialogSuccess}
             supply={formDialogState.supply}
           />
+      )}
+
+      {editStockDialogState.isOpen && (
+        <EditStockItemDialog
+          isOpen={editStockDialogState.isOpen}
+          onClose={() => setEditStockDialogState({ isOpen: false, stockItem: null })}
+          onSuccess={handleDialogSuccess}
+          stockItem={editStockDialogState.stockItem}
+        />
       )}
 
       {imageToView && (

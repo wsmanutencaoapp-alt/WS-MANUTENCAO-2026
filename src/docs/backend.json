@@ -1,4 +1,5 @@
 
+
 {
   "entities": {
     "Address": {
@@ -84,46 +85,182 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Supply",
       "type": "object",
-      "description": "Represents an aircraft maintenance supply item.",
+      "description": "Represents the master data for a supply item.",
       "properties": {
-        "id": {
+        "codigo": {
           "type": "string",
-          "description": "Unique identifier for the Supply entity."
+          "description": "Unique, system-generated code for the supply item."
         },
-        "name": {
-          "type": "string",
-          "description": "Name of the supply item."
-        },
-        "description": {
+        "descricao": {
           "type": "string",
           "description": "Detailed description of the supply item."
         },
-        "quantityOnHand": {
-          "type": "number",
-          "description": "The number of supply items currently in stock."
-        },
-        "reorderPoint": {
-          "type": "number",
-          "description": "The quantity at which a reorder should be triggered."
-        },
-        "unitCost": {
-          "type": "number",
-          "description": "The cost of a single unit of the supply item."
-        },
-        "supplierId": {
+        "partNumber": {
           "type": "string",
-          "description": "Reference to Supplier. (Relationship: Supplier 1:N Supply)"
+          "description": "Manufacturer's Part Number."
+        },
+        "unidadeMedida": {
+          "type": "string",
+          "enum": ["UN", "KG", "MT", "LT", "CX"],
+          "description": "Unit of measure for the supply."
+        },
+        "familia": {
+          "type": "string",
+          "enum": ["MP", "CT", "CG", "CP", "PA"],
+          "description": "The family/category of the supply item."
+        },
+        "exigeLote": {
+          "type": "boolean",
+          "description": "Indicates if lot tracking is required."
+        },
+        "exigeSerialNumber": {
+          "type": "boolean",
+          "description": "Indicates if serial number tracking is required."
+        },
+        "exigeValidade": {
+          "type": "boolean",
+          "description": "Indicates if expiration date tracking is required."
+        },
+        "tipoMaterial": {
+          "type": "string",
+          "enum": ["Metal", "Polímero", "Tecido", "Outro"],
+          "description": "Specific material type, used for 'Matéria-Prima' family."
+        },
+        "estoqueMinimo": {
+          "type": "number",
+          "description": "The minimum stock level before a reorder is triggered."
+        },
+        "estoqueMaximo": {
+          "type": "number",
+          "description": "The maximum stock level to avoid over-purchasing."
+        },
+        "localizacaoPadrao": {
+          "type": "string",
+          "description": "Default storage address for this supply item."
+        },
+        "imageUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the supply item's photo."
+        },
+        "documentoUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the supply item's master document (e.g., technical sheet)."
         }
       },
       "required": [
-        "id",
-        "name",
-        "description",
-        "quantityOnHand",
-        "reorderPoint",
-        "unitCost",
-        "supplierId"
+        "codigo",
+        "descricao",
+        "unidadeMedida",
+        "familia",
+        "exigeLote",
+        "exigeSerialNumber",
+        "exigeValidade",
+        "estoqueMinimo",
+        "estoqueMaximo",
+        "localizacaoPadrao"
       ]
+    },
+    "SupplyStock": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SupplyStock",
+      "type": "object",
+      "description": "Represents a specific batch of a supply item at a specific location.",
+      "properties": {
+        "loteInterno": {
+          "type": "string",
+          "description": "System-generated lot number for this specific entry."
+        },
+        "loteFornecedor": {
+          "type": "string",
+          "description": "Optional lot number provided by the supplier."
+        },
+        "quantidade": {
+          "type": "number",
+          "description": "The quantity of items in this specific stock."
+        },
+        "localizacao": {
+          "type": "string",
+          "description": "The physical address code where this stock is stored."
+        },
+        "dataEntrada": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when this stock was entered."
+        },
+        "dataValidade": {
+          "type": "string",
+          "format": "date",
+          "description": "The expiration date for this stock, if applicable."
+        },
+        "custoUnitario": {
+          "type": "number",
+          "description": "The cost per unit for this specific entry."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Disponível", "Reservado", "Bloqueado"],
+          "description": "The current status of this specific stock."
+        },
+        "documentoUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of a document attached to this specific lot."
+        }
+      },
+      "required": ["loteInterno", "quantidade", "localizacao", "dataEntrada", "status"]
+    },
+    "SupplyMovement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SupplyMovement",
+      "type": "object",
+      "description": "Records a single movement (in or out) of a supply item.",
+      "properties": {
+        "supplyId": {
+          "type": "string",
+          "description": "The ID of the master supply item."
+        },
+        "supplyStockId": {
+            "type": "string",
+            "description": "The ID of the specific stock lot being moved."
+        },
+        "supplyCodigo": {
+          "type": "string",
+          "description": "The code of the master supply item for easy querying."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["entrada", "saida", "ajuste"],
+          "description": "The type of movement."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of items moved."
+        },
+        "responsibleId": {
+          "type": "string",
+          "description": "The UID of the user who performed the movement."
+        },
+        "responsibleName": {
+          "type": "string",
+          "description": "The name of the user for display."
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the movement."
+        },
+        "origin": {
+          "type": "string",
+          "description": "For 'entrada', the source (e.g., PO number, NF number)."
+        },
+        "destination": {
+          "type": "string",
+          "description": "For 'saida', the destination (e.g., Work Order, Cost Center)."
+        }
+      },
+      "required": ["supplyId", "supplyStockId", "supplyCodigo", "type", "quantity", "responsibleId", "responsibleName", "date"]
     },
     "Tool": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -438,11 +575,6 @@
           "description": "URL of the employee's profile picture.",
           "format": "uri"
         },
-        "status": {
-            "type": "string",
-            "description": "The current status of the user account.",
-            "enum": ["Ativo", "Pendente", "Inativo"]
-        },
         "permissions": {
           "type": "object",
           "description": "A map of screen names to booleans indicating access rights.",
@@ -478,8 +610,7 @@
         "firstName",
         "lastName",
         "email",
-        "accessLevel",
-        "status"
+        "accessLevel"
       ]
     },
     "Despesa": {
@@ -768,11 +899,47 @@
           "schema": {
             "$ref": "#/backend/entities/Supply"
           },
-          "description": "Stores aircraft maintenance supplies.  Includes supplierId for associating supplies with suppliers.",
+          "description": "Stores the master data for supply items.",
           "params": [
             {
               "name": "supplyId",
               "description": "Unique identifier for the supply item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/supplies/{supplyId}/stock/{stockId}",
+        "definition": {
+          "entityName": "SupplyStock",
+          "schema": {
+            "$ref": "#/backend/entities/SupplyStock"
+          },
+          "description": "Stores individual, trackable batches of supplies as a subcollection of the master supply item.",
+          "params": [
+            {
+              "name": "supplyId",
+              "description": "The ID of the parent supply item."
+            },
+            {
+              "name": "stockId",
+              "description": "Unique identifier for the supply stock record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/supply_movements/{movementId}",
+        "definition": {
+          "entityName": "SupplyMovement",
+          "schema": {
+            "$ref": "#/backend/entities/SupplyMovement"
+          },
+          "description": "Stores the historical log of all supply movements.",
+          "params": [
+            {
+              "name": "movementId",
+              "description": "Unique identifier for the supply movement record."
             }
           ]
         }
@@ -929,3 +1096,4 @@
     "reasoning": "This Firestore data structure is designed to support AeroTrack's aircraft maintenance management features, focusing on supply and tool control, operation recording, and image storage. The structure prioritizes authorization independence through denormalization where needed and adheres to structural segregation principles to ensure consistent security postures within collections.  Path-based ownership is used for user-related data (none explicitly defined, but included for future expansion). Collaborative data patterns, utilizing membership maps, are employed where applicable. \n\nSpecifically, authorization independence is achieved by denormalizing necessary authorization data (like supplier or employee IDs) directly into subcollections when access needs to be controlled at the subcollection level without relying on `get()` calls to parent documents.  For example, the OperationRecord collection includes the employeeId to track which employee performed the operation and use it for authorization.  This denormalization is critical for atomic operations and simplifies security rule implementation. QAPs (Rules are not Filters) are supported through structural segregation. Each top-level collection is treated as having homogeneous security requirements. Additionally, the use of employeeId as a foreign key in relevant collections like OperationRecord allows for efficient querying and filtering based on employee-specific operations. This design facilitates secure list operations because rules can be written based on the contents of the document itself, not on related documents."
   }
 }
+

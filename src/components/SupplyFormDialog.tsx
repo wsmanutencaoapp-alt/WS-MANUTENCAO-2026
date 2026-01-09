@@ -67,6 +67,7 @@ const formSchema = z.object({
   partNumber: z.string(),
   unidadeMedida: z.enum(['UN', 'KG', 'MT', 'LT', 'CX']),
   imageUrl: z.string().optional(),
+  documentoUrl: z.string().optional(),
   
   // Aba 2: Rastreabilidade
   exigeLote: z.boolean().default(false),
@@ -106,8 +107,10 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const [isSaving, setIsSaving] = useState(false);
   
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [documentoFile, setDocumentoFile] = useState<File | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   
   const addressesQuery = useMemoFirebase(() => (
       firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
@@ -132,6 +135,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       estoqueMaximo: 0,
       localizacaoPadrao: '',
       imageUrl: '',
+      documentoUrl: '',
     },
   });
 
@@ -140,7 +144,9 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const resetFormAndClose = () => {
     form.reset();
     setPreviewImage(null);
+    setDocumentoFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (docInputRef.current) docInputRef.current.value = '';
     onClose();
   }
 
@@ -153,10 +159,11 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
         descricao: '', partNumber: '', unidadeMedida: 'UN', familia: 'CT',
         exigeLote: false, exigeSerialNumber: false, exigeValidade: false,
         estoqueMinimo: 0, estoqueMaximo: 0, localizacaoPadrao: '',
-        imageUrl: '',
+        imageUrl: '', documentoUrl: '',
       });
       setPreviewImage(null);
     }
+    setDocumentoFile(null);
   }, [supply, form, isOpen]);
 
   useEffect(() => {
@@ -196,6 +203,13 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       reader.readAsDataURL(file);
     }
   };
+  
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setDocumentoFile(file);
+    }
+  };
 
 
   const handleSave = async (values: z.infer<typeof formSchema>) => {
@@ -211,7 +225,22 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
           finalImageUrl = await getDownloadURL(snapshot.ref);
       }
       
-      const dataToSave = { ...values, imageUrl: finalImageUrl };
+      let finalDocumentoUrl = supply?.documentoUrl || '';
+      if (documentoFile) {
+        if(supply?.documentoUrl) {
+            try {
+                const oldDocRef = storageRef(storage, supply.documentoUrl);
+                await deleteObject(oldDocRef);
+            } catch(e: any) {
+                if(e.code !== 'storage/object-not-found') throw e;
+            }
+        }
+        const docRef = storageRef(storage, `supply_master_docs/${tempId}/${documentoFile.name}`);
+        await uploadBytes(docRef, documentoFile);
+        finalDocumentoUrl = await getDownloadURL(docRef);
+      }
+      
+      const dataToSave = { ...values, imageUrl: finalImageUrl, documentoUrl: finalDocumentoUrl };
 
       if (supply) {
         // Edit mode
@@ -259,7 +288,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
 
   return (
     <Dialog open={isOpen} onOpenChange={resetFormAndClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>{supply ? 'Editar Item de Suprimento' : 'Novo Item de Suprimento'}</DialogTitle>
           <DialogDescription>
@@ -275,7 +304,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                 <TabsTrigger value="estoque">Estoque</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="identificacao" className="space-y-4 py-4">
+              <TabsContent value="identificacao" className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                    <div className="space-y-4">
                     <FormField
@@ -344,17 +373,33 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                    <div className="space-y-4">
                         <div className="space-y-2">
                             <Label>Foto do Item</Label>
-                            <div className="flex justify-center items-center h-48 w-full bg-muted rounded-md relative">
+                            <div className="flex justify-center items-center h-40 w-full bg-muted rounded-md relative">
                                 {previewImage ? <Image src={previewImage} alt="Preview" fill className="object-contain rounded-md" /> : <ImageIcon className="h-10 w-10 text-muted-foreground" />}
                             </div>
                             <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2"/>Carregar Foto</Button>
                             <Input type="file" ref={fileInputRef} onChange={handleImageChange} className="hidden" accept="image/*"/>
-                       </div>
+                        </div>
+                         <div className="space-y-2">
+                            <Label>Documento Principal (FISPQ, Ficha, etc.)</Label>
+                             <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => docInputRef.current?.click()}>
+                                {documentoFile ? <FileText className="mr-2 text-green-600"/> : <Upload className="mr-2"/>}
+                                <span className='truncate'>{documentoFile ? documentoFile.name : 'Anexar/Trocar Documento'}</span>
+                             </Button>
+                            <Input type="file" ref={docInputRef} onChange={handleDocumentChange} className="hidden"/>
+                            {!documentoFile && supply?.documentoUrl && (
+                                <Button asChild variant="link" size="sm" className="p-0 h-auto">
+                                    <a href={supply.documentoUrl} target="_blank" rel="noopener noreferrer">
+                                        <ExternalLink className="mr-1 h-3 w-3"/>
+                                        Ver documento atual
+                                    </a>
+                                </Button>
+                            )}
+                        </div>
                    </div>
                  </div>
               </TabsContent>
 
-              <TabsContent value="rastreabilidade" className="space-y-4 py-4">
+              <TabsContent value="rastreabilidade" className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
                 <p className="text-sm text-muted-foreground">Regras definidas pela família <span className='font-bold'>{familia}</span>:</p>
                 <div className="space-y-4 rounded-md border p-4">
                   <FormField
@@ -413,7 +458,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                  )}
               </TabsContent>
 
-              <TabsContent value="estoque" className="space-y-4 py-4">
+              <TabsContent value="estoque" className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}

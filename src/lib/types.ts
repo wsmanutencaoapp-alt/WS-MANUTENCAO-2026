@@ -27,7 +27,7 @@ export type Supply = {
   
   // Anexos
   imageUrl?: string;
-  // documentoUrl foi movido para SupplyStock
+  documentoUrl?: string;
 };
 
 export type SupplyStock = {
