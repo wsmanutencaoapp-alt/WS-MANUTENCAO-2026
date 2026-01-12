@@ -120,14 +120,17 @@ service cloud.firestore {
     }
 
     match /cost_centers/{costCenterId} {
-      allow read: if hasPermission('compras');
-      allow write: if hasPermission('financeiro');
+      allow read: if hasPermission('compras') || hasPermission('financeiro') || hasPermission('cadastros');
+      allow write: if hasPermission('financeiro') || hasPermission('cadastros');
     }
 
     match /purchase_requisitions/{requisitionId} {
-        allow read, write: if hasPermission('compras');
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('compras');
+        
         match /items/{itemId} {
-            allow read, write: if hasPermission('compras');
+            allow read: if isAuthenticated();
+            allow write: if hasPermission('compras');
         }
     }
 
@@ -138,5 +141,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
