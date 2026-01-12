@@ -114,6 +114,18 @@ service cloud.firestore {
         allow read, write: if hasPermission('cadastros');
     }
 
+    match /cost_centers/{costCenterId} {
+      allow read: if hasPermission('compras');
+      allow write: if hasPermission('financeiro');
+    }
+
+    match /purchase_requisitions/{requisitionId} {
+        allow read, write: if hasPermission('compras');
+        match /items/{itemId} {
+            allow read, write: if hasPermission('compras');
+        }
+    }
+
     // This collection is used for generating sequential IDs.
     // Any authenticated user can read and write to it within a transaction.
     match /counters/{counterId} {
