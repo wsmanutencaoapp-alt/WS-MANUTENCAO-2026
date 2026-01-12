@@ -72,6 +72,7 @@ const CadastroCentroDeCustoPage = () => {
   const [formData, setFormData] = useState<Partial<CostCenter>>({
     code: '',
     description: '',
+    sector: '',
   });
   
   const costCentersQuery = useMemoFirebase(
@@ -89,7 +90,7 @@ const CadastroCentroDeCustoPage = () => {
   };
 
   const resetForm = () => {
-    setFormData({ code: '', description: '' });
+    setFormData({ code: '', description: '', sector: '' });
     setEditingCostCenter(null);
   };
   
@@ -105,8 +106,8 @@ const CadastroCentroDeCustoPage = () => {
 
   const handleSave = async () => {
     if (!firestore) return;
-    if (!formData.code || !formData.description) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Código e descrição são obrigatórios.' });
+    if (!formData.code || !formData.description || !formData.sector) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Código, descrição e setor são obrigatórios.' });
         return;
     }
 
@@ -129,6 +130,7 @@ const CadastroCentroDeCustoPage = () => {
             const dataToSave = { 
                 code: formData.code,
                 description: formData.description,
+                sector: formData.sector,
             };
             await addDoc(collection(firestore, 'cost_centers'), dataToSave);
             toast({ title: 'Sucesso!', description: `Centro de custo ${formData.code} cadastrado.` });
@@ -187,16 +189,18 @@ const CadastroCentroDeCustoPage = () => {
               <TableRow>
                 <TableHead>Código</TableHead>
                 <TableHead>Descrição</TableHead>
+                <TableHead>Setor</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && <TableRow><TableCell colSpan={3} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>}
-              {error && <TableRow><TableCell colSpan={3} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
+              {isLoading && <TableRow><TableCell colSpan={4} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>}
+              {error && <TableRow><TableCell colSpan={4} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
               {!isLoading && costCenters?.map(cc => (
                   <TableRow key={cc.docId}>
                     <TableCell className="font-mono">{cc.code}</TableCell>
                     <TableCell>{cc.description}</TableCell>
+                    <TableCell>{cc.sector}</TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button variant="outline" size="icon" onClick={() => handleOpenDialog(cc)}>
                         <Edit className="h-4 w-4" />
@@ -247,6 +251,10 @@ const CadastroCentroDeCustoPage = () => {
              <div className="space-y-1">
                 <Label htmlFor="description">Descrição</Label>
                 <Input id="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Ex: Manutenção de Células"/>
+            </div>
+            <div className="space-y-1">
+                <Label htmlFor="sector">Setor</Label>
+                <Input id="sector" value={formData.sector || ''} onChange={handleInputChange} placeholder="Ex: Manutenção, TI, Marketing"/>
             </div>
           </div>
           <DialogFooter>

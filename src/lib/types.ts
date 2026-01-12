@@ -229,6 +229,7 @@ export type CostCenter = {
     id: string;
     code: string;
     description: string;
+    sector: string;
 };
 
 export type PurchaseRequisition = {

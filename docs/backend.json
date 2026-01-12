@@ -401,9 +401,10 @@
       "properties": {
         "id": { "type": "string", "description": "Unique ID for the cost center." },
         "code": { "type": "string", "description": "The code for the cost center (e.g., 'TI-01', 'MKT-02')." },
-        "description": { "type": "string", "description": "Description of the cost center." }
+        "description": { "type": "string", "description": "Description of the cost center." },
+        "sector": { "type": "string", "description": "The sector the cost center belongs to." }
       },
-      "required": ["code", "description"]
+      "required": ["code", "description", "sector"]
     },
     "PurchaseRequisition": {
       "$schema": "http://json-schema.org/draft-07/schema#",
