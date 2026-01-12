@@ -45,25 +45,25 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
       enabled: !!requisition,
   });
 
-  // Fetch master data for all items once
-  const { data: masterData, isLoading: isLoadingMasterData } = useCollection<WithDocId<Supply | Tool>>(
+  const supplyIds = useMemo(() => items?.filter(i => i.itemType === 'supply').map(i => i.itemId) || [], [items]);
+  const toolIds = useMemo(() => items?.filter(i => i.itemType === 'tool').map(i => i.itemId) || [], [items]);
+
+  // Fetch supply master data
+  const { data: supplyMasterData, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(
     useMemoFirebase(() => {
-      if (!firestore || !items || items.length === 0) return null;
-      const supplyIds = items.filter(i => i.itemType === 'supply').map(i => i.itemId);
-      const toolIds = items.filter(i => i.itemType === 'tool').map(i => i.itemId);
-      const allIds = [...new Set([...supplyIds, ...toolIds])];
-      if (allIds.length === 0) return null;
-      
-      const suppliesRef = collection(firestore, 'supplies');
-      const toolsRef = collection(firestore, 'tools');
-      
-      // Since we can't query two collections at once, we need two separate queries.
-      // This is a limitation, for a real app a denormalized 'items' collection would be better.
-      // For now, we'll just query supplies and tools separately.
-      // A more robust solution might involve cloud functions to denormalize data.
-      return query(collection(firestore, 'supplies'), where(documentId(), 'in', allIds.slice(0, 10))); // Firestore 'in' query limit is 10
-    }, [firestore, items])
+      if (!firestore || supplyIds.length === 0) return null;
+      return query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds));
+    }, [firestore, supplyIds])
   );
+
+  // Fetch tool master data
+  const { data: toolMasterData, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(
+    useMemoFirebase(() => {
+      if (!firestore || toolIds.length === 0) return null;
+      return query(collection(firestore, 'tools'), where(documentId(), 'in', toolIds));
+    }, [firestore, toolIds])
+  );
+
 
   const costCenterQuery = useMemoFirebase(() => {
     if (!firestore || !requisition) return null;
@@ -74,13 +74,17 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
 
 
   const enrichedItems = useMemo((): RequisitionItemWithDetails[] => {
-    if (!items || !masterData) return [];
-    const masterDataMap = new Map(masterData.map(d => [d.docId, d]));
+    if (!items) return [];
+    const masterDataMap = new Map([
+        ...(supplyMasterData?.map(d => [d.docId, d]) || []),
+        ...(toolMasterData?.map(d => [d.docId, d]) || [])
+    ]);
+
     return items.map(item => ({
       ...item,
       details: masterDataMap.get(item.itemId) || { descricao: 'Item não encontrado', codigo: 'N/A' },
     }));
-  }, [items, masterData]);
+  }, [items, supplyMasterData, toolMasterData]);
 
 
   const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
@@ -92,7 +96,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     }
   }
 
-  const isLoading = isLoadingItems || isLoadingMasterData;
+  const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
