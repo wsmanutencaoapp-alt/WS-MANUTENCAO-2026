@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, addDoc, writeBatch, doc, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, addDoc, writeBatch, doc, where, getDocs, orderBy, getDoc } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,11 +97,11 @@ const RequisicaoCompraPage = () => {
         const batch = writeBatch(firestore);
         
         const counterRef = doc(firestore, 'counters', 'purchaseRequisitions');
-        const counterSnapshot = await getDocs(query(collection(firestore, 'counters'), where(documentId(), '==', 'purchaseRequisitions')));
+        const counterSnapshot = await getDoc(counterRef);
 
         let lastId = 0;
-        if (!counterSnapshot.empty) {
-            lastId = counterSnapshot.docs[0].data().lastId || 0;
+        if (counterSnapshot.exists()) {
+            lastId = counterSnapshot.data().lastId || 0;
         }
         const newId = lastId + 1;
         const protocol = `SC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
@@ -136,10 +136,10 @@ const RequisicaoCompraPage = () => {
             batch.set(itemRef, itemData);
         }
         
-        if (counterSnapshot.empty) {
-            batch.set(counterRef, { lastId: newId });
-        } else {
+        if (counterSnapshot.exists()) {
             batch.update(counterRef, { lastId: newId });
+        } else {
+            batch.set(counterRef, { lastId: newId });
         }
         
         await batch.commit();
