@@ -4,7 +4,7 @@ import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { DayPicker, DropdownProps } from "react-day-picker"
 import { ptBR } from 'date-fns/locale';
-import { format, parse } from 'date-fns';
+import { format, parse, isValid } from 'date-fns';
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
@@ -20,68 +20,28 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
-  value: controlledValue,
-  onValueChange,
   ...props
 }: CalendarProps) {
-  const [inputValue, setInputValue] = React.useState(controlledValue ? format(new Date(controlledValue), 'dd/MM/yyyy') : "");
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(controlledValue ? new Date(controlledValue) : undefined);
-
-  React.useEffect(() => {
-    if (controlledValue) {
-        const newDate = new Date(controlledValue);
-        if (!isNaN(newDate.getTime())) {
-            setSelectedDate(newDate);
-            setInputValue(format(newDate, 'dd/MM/yyyy'));
-        }
-    } else {
-        setSelectedDate(undefined);
-        setInputValue("");
-    }
-  }, [controlledValue]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInputValue(value);
-    if (value.length === 10) {
-      const parsedDate = parse(value, 'dd/MM/yyyy', new Date());
-      if (!isNaN(parsedDate.getTime())) {
-        setSelectedDate(parsedDate);
-        if (onValueChange && props.onSelect) {
-            props.onSelect(parsedDate, parsedDate, {} as any, e);
-        }
-      }
-    }
-  };
-
-  const handleDaySelect = (date: Date | undefined, selectedDay: Date, modifiers: any, e: any) => {
-    if(date){
-        setSelectedDate(date);
-        setInputValue(format(date, 'dd/MM/yyyy'));
-        if (props.onSelect) {
-            props.onSelect(date, selectedDay, modifiers, e);
-        }
-    }
-  };
   
-  function CustomCaption(props: DropdownProps) {
-    const { fromDate, toDate, fromMonth, toMonth, fromYear, toYear } = props;
-    const [currentMonth, setCurrentMonth] = React.useState(props.displayMonth);
+  const [currentMonth, setCurrentMonth] = React.useState(props.selected ? new Date(props.selected as Date) : new Date());
 
-    const handleMonthChange = (month: Date) => {
-        setCurrentMonth(month);
-        props.onMonthChange?.(month);
-    };
-
-    const handleYearChange = (year: number) => {
+  function CustomCaption(props: any) {
+    
+    const handleYearChange = (year: string) => {
         const newMonth = new Date(currentMonth);
-        newMonth.setFullYear(year);
-        handleMonthChange(newMonth);
+        newMonth.setFullYear(parseInt(year, 10));
+        setCurrentMonth(newMonth);
     };
 
+    const handleMonthChange = (month: string) => {
+       const newMonth = new Date(currentMonth);
+       newMonth.setMonth(parseInt(month, 10));
+       setCurrentMonth(newMonth);
+    }
+    
     const years: number[] = [];
-    const startYear = fromYear || new Date().getFullYear() - 100;
-    const endYear = toYear || new Date().getFullYear() + 10;
+    const startYear = new Date().getFullYear() - 10;
+    const endYear = new Date().getFullYear() + 10;
     for (let i = startYear; i <= endYear; i++) {
         years.push(i);
     }
@@ -90,11 +50,7 @@ function Calendar({
         <div className="flex justify-between items-center px-2 mb-2">
             <Select
                 value={currentMonth.getMonth().toString()}
-                onValueChange={(value) => {
-                    const newMonth = new Date(currentMonth);
-                    newMonth.setMonth(parseInt(value, 10));
-                    handleMonthChange(newMonth);
-                }}
+                onValueChange={handleMonthChange}
             >
                 <SelectTrigger className="w-auto text-sm focus:ring-0 focus:ring-offset-0 border-0 h-auto p-0 m-0">
                   <SelectValue placeholder={format(currentMonth, 'MMMM', { locale: ptBR })} />
@@ -110,7 +66,7 @@ function Calendar({
 
             <Select
                 value={currentMonth.getFullYear().toString()}
-                onValueChange={(value) => handleYearChange(parseInt(value, 10))}
+                onValueChange={handleYearChange}
             >
                 <SelectTrigger className="w-auto text-sm focus:ring-0 focus:ring-offset-0 border-0 h-auto p-0 m-0">
                     <SelectValue placeholder={currentMonth.getFullYear()} />
@@ -129,13 +85,6 @@ function Calendar({
 
   return (
     <div>
-        <Input
-            type="text"
-            placeholder="dd/mm/aaaa"
-            value={inputValue}
-            onChange={handleInputChange}
-            className="mb-2"
-        />
         <DayPicker
           showOutsideDays={showOutsideDays}
           className={cn("p-0", className)}
@@ -184,8 +133,8 @@ function Calendar({
             Caption: (props) => <CustomCaption {...props} />,
           }}
           locale={ptBR}
-          selected={selectedDate}
-          onSelect={handleDaySelect}
+          month={currentMonth}
+          onMonthChange={setCurrentMonth}
           {...props}
         />
     </div>
