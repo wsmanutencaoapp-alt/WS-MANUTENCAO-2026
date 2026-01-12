@@ -234,11 +234,15 @@ export type CostCenter = {
 
 export type PurchaseRequisition = {
   id?: string;
+  protocol?: string;
   requesterId: string;
+  requesterName: string;
   costCenterId: string;
   neededByDate: string;
   status: 'Aberta' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída';
   createdAt: string;
+  priority: 'Normal' | 'Urgente' | 'Muito Urgente';
+  purchaseReason: string;
 };
 
 export type PurchaseRequisitionItem = {

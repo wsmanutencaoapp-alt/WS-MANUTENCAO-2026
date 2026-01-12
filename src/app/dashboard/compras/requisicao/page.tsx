@@ -26,11 +26,14 @@ import type { Supply, CostCenter, PurchaseRequisition, PurchaseRequisitionItem, 
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-
+import { Textarea } from '@/components/ui/textarea';
 
 type RequisitionableItem = (WithDocId<Supply> | WithDocId<Tool>) & { itemType: 'supply' | 'tool' };
-type CartItem = RequisitionableItem & { requisitionQuantity: number };
-
+type CartItem = RequisitionableItem & { 
+    requisitionQuantity: number;
+    estimatedPrice?: number;
+    notes?: string;
+};
 
 const RequisicaoCompraPage = () => {
   const { user } = useUser();
@@ -45,10 +48,13 @@ const RequisicaoCompraPage = () => {
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('supplies');
 
+  // New state for header fields
+  const [priority, setPriority] = useState<'Normal' | 'Urgente' | 'Muito Urgente'>('Normal');
+  const [purchaseReason, setPurchaseReason] = useState('');
+
   const suppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
   const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery);
   
-  // Query for tool models (STD and GSE) - now filtering by sequencial 0
   const toolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools'), where('sequencial', '==', 0)) : null, [firestore]);
   const { data: allTools, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery);
 
@@ -56,11 +62,10 @@ const RequisicaoCompraPage = () => {
   const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery);
 
   const catalogItems = useMemo((): RequisitionableItem[] => {
-    const suppliesWithTpe = allSupplies?.map(s => ({...s, itemType: 'supply' as const })) || [];
+    const suppliesWithType = allSupplies?.map(s => ({...s, itemType: 'supply' as const })) || [];
     const toolsWithType = allTools?.map(t => ({...t, itemType: 'tool' as const })) || [];
-    return [...suppliesWithTpe, ...toolsWithType];
+    return [...suppliesWithType, ...toolsWithType];
   }, [allSupplies, allTools]);
-
 
   const filteredItems = useMemo(() => {
     if (!catalogItems) return [];
@@ -86,16 +91,15 @@ const RequisicaoCompraPage = () => {
   }, [catalogItems, cart, searchTerm, activeTab]);
 
   const addToCart = (item: RequisitionableItem) => {
-    setCart(prev => [...prev, { ...item, requisitionQuantity: 1 }]);
+    setCart(prev => [...prev, { ...item, requisitionQuantity: 1, estimatedPrice: 0, notes: '' }]);
   };
 
   const removeFromCart = (docId: string) => {
     setCart(prev => prev.filter(item => item.docId !== docId));
   };
 
-  const updateQuantity = (docId: string, quantity: number) => {
-    const numQuantity = Math.max(1, quantity);
-    setCart(prev => prev.map(item => item.docId === docId ? { ...item, requisitionQuantity: numQuantity } : item));
+  const updateCartItem = (docId: string, field: keyof CartItem, value: any) => {
+    setCart(prev => prev.map(item => item.docId === docId ? { ...item, [field]: value } : item));
   };
 
   const handleSubmitRequisition = async () => {
@@ -103,18 +107,10 @@ const RequisicaoCompraPage = () => {
         toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado.' });
         return;
     }
-    if (cart.length === 0) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'O carrinho está vazio.' });
-        return;
-    }
-    if (!costCenterId) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um centro de custo.' });
-        return;
-    }
-    if (!neededByDate) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Selecione a data de necessidade.' });
-        return;
-    }
+    if (cart.length === 0) { toast({ variant: 'destructive', title: 'Erro', description: 'O carrinho está vazio.' }); return; }
+    if (!costCenterId) { toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um centro de custo.' }); return; }
+    if (!neededByDate) { toast({ variant: 'destructive', title: 'Erro', description: 'Selecione a data de necessidade.' }); return; }
+    if (!purchaseReason) { toast({ variant: 'destructive', title: 'Erro', description: 'O motivo da compra é obrigatório.' }); return; }
 
     setIsSubmitting(true);
     try {
@@ -123,10 +119,13 @@ const RequisicaoCompraPage = () => {
 
         const requisitionData: Omit<PurchaseRequisition, 'id'> = {
             requesterId: user.uid,
+            requesterName: user.displayName || user.email || 'Desconhecido',
             costCenterId: costCenterId,
             neededByDate: neededByDate.toISOString(),
             status: 'Aberta',
             createdAt: new Date().toISOString(),
+            priority: priority,
+            purchaseReason: purchaseReason,
         };
         batch.set(requisitionRef, requisitionData);
 
@@ -136,16 +135,20 @@ const RequisicaoCompraPage = () => {
                 itemId: item.docId,
                 itemType: item.itemType,
                 quantity: item.requisitionQuantity,
+                estimatedPrice: item.estimatedPrice,
+                notes: item.notes,
             };
             batch.set(itemRef, itemData);
         }
         
         await batch.commit();
 
-        toast({ title: 'Sucesso!', description: 'Sua requisição de compra foi criada e enviada para o próximo passo.' });
+        toast({ title: 'Sucesso!', description: 'Sua requisição de compra foi criada.' });
         setCart([]);
         setCostCenterId('');
         setNeededByDate(undefined);
+        setPurchaseReason('');
+        setPriority('Normal');
     } catch(err) {
         console.error("Erro ao criar requisição:", err);
         toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível criar a requisição.' });
@@ -227,45 +230,80 @@ const RequisicaoCompraPage = () => {
           <CardContent className="space-y-4">
              <div className="space-y-1.5">
                 <Label>Itens no Carrinho ({cart.length})</Label>
-                <ScrollArea className="h-64 border rounded-md p-2">
+                <ScrollArea className="h-48 border rounded-md p-2">
                     {cart.length === 0 ? (
                         <p className="text-center text-sm text-muted-foreground p-4">Seu carrinho está vazio.</p>
                     ) : (
                         <div className="space-y-3">
                         {cart.map(item => (
-                            <div key={item.docId} className="flex items-center gap-2 p-2 border rounded-md">
-                                <div className="flex-1 text-sm">
-                                    <p className="font-bold truncate">{item.descricao}</p>
-                                    <p className="font-mono text-xs text-muted-foreground">{item.codigo}</p>
+                            <div key={item.docId} className="p-2 border rounded-md space-y-2">
+                                <div className="flex items-start gap-2">
+                                    <div className="flex-1 text-sm">
+                                        <p className="font-bold truncate">{item.descricao}</p>
+                                        <p className="font-mono text-xs text-muted-foreground">{item.codigo}</p>
+                                    </div>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.docId)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
                                 </div>
-                                <Input 
-                                    type="number" 
-                                    value={item.requisitionQuantity}
-                                    onChange={(e) => updateQuantity(item.docId, parseInt(e.target.value))}
-                                    className="w-16 h-8 text-center"
-                                    min="1"
+                                <div className="grid grid-cols-2 gap-2">
+                                     <Input 
+                                        type="number" 
+                                        placeholder="Qtd."
+                                        value={item.requisitionQuantity}
+                                        onChange={(e) => updateCartItem(item.docId, 'requisitionQuantity', Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="h-8 text-center"
+                                        min="1"
+                                    />
+                                    <Input
+                                        type="number"
+                                        placeholder="Preço Est. (R$)"
+                                        value={item.estimatedPrice}
+                                        onChange={(e) => updateCartItem(item.docId, 'estimatedPrice', parseFloat(e.target.value) || 0)}
+                                        className="h-8 text-center"
+                                     />
+                                </div>
+                                <Input
+                                    placeholder="Observação / Link de referência..."
+                                    value={item.notes}
+                                    onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
+                                    className="h-8 text-sm"
                                 />
-                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeFromCart(item.docId)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
                             </div>
                         ))}
                         </div>
                     )}
                 </ScrollArea>
              </div>
-             <div className="space-y-1.5">
-                <Label htmlFor="costCenter">Centro de Custo <span className="text-destructive">*</span></Label>
-                 <Select value={costCenterId} onValueChange={setCostCenterId} disabled={isLoadingCostCenters}>
-                    <SelectTrigger id="costCenter">
-                        <SelectValue placeholder={isLoadingCostCenters ? "Carregando..." : "Selecione o C.C."} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {costCenters?.map(cc => (
-                            <SelectItem key={cc.docId} value={cc.docId}>({cc.code}) {cc.description}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+              <div className="space-y-1.5">
+                <Label htmlFor="purchaseReason">Motivo da Compra <span className="text-destructive">*</span></Label>
+                <Textarea id="purchaseReason" value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} placeholder="Ex: Item para manutenção corretiva da aeronave PR-ABC." />
+            </div>
+             <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                    <Label htmlFor="costCenter">Centro de Custo <span className="text-destructive">*</span></Label>
+                    <Select value={costCenterId} onValueChange={setCostCenterId} disabled={isLoadingCostCenters}>
+                        <SelectTrigger id="costCenter">
+                            <SelectValue placeholder={isLoadingCostCenters ? "Carregando..." : "Selecione"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {costCenters?.map(cc => (
+                                <SelectItem key={cc.docId} value={cc.docId}>({cc.code}) {cc.description}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div className="space-y-1.5">
+                    <Label htmlFor="priority">Prioridade <span className="text-destructive">*</span></Label>
+                    <Select value={priority} onValueChange={(v) => setPriority(v as any)}>
+                        <SelectTrigger id="priority"><SelectValue/></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Normal">Normal</SelectItem>
+                            <SelectItem value="Urgente">Urgente</SelectItem>
+                            <SelectItem value="Muito Urgente">Muito Urgente</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
             <div className="space-y-1.5">
                 <Label>Data de Necessidade <span className="text-destructive">*</span></Label>
@@ -280,10 +318,7 @@ const RequisicaoCompraPage = () => {
                     <Calendar
                         mode="single"
                         selected={neededByDate}
-                        onSelect={(date) => {
-                            setNeededByDate(date);
-                            setIsDatePopoverOpen(false);
-                        }}
+                        onSelect={(date) => { setNeededByDate(date); setIsDatePopoverOpen(false); }}
                         initialFocus
                     />
                   </PopoverContent>
@@ -291,7 +326,7 @@ const RequisicaoCompraPage = () => {
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={handleSubmitRequisition} disabled={isSubmitting || cart.length === 0 || !costCenterId || !neededByDate}>
+            <Button className="w-full" onClick={handleSubmitRequisition} disabled={isSubmitting || cart.length === 0 || !costCenterId || !neededByDate || !purchaseReason}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Enviar Requisição
             </Button>
@@ -303,5 +338,3 @@ const RequisicaoCompraPage = () => {
 };
 
 export default RequisicaoCompraPage;
-
-    
