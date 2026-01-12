@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId } from 'firebase/firestore';
 import type { PurchaseRequisition, CostCenter, Tool, Supply } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -75,16 +75,15 @@ const ControleComprasPage = () => {
   });
 
   const costCenterIds = useMemo(() => {
-    if (!requisitions) return [];
+    if (!requisitions || requisitions.length === 0) return [];
     return [...new Set(requisitions.map(r => r.costCenterId))];
   }, [requisitions]);
 
   const costCentersQuery = useMemoFirebase(() => {
       if (!firestore || costCenterIds.length === 0) return null;
-      // Esta query pode falhar se costCenterIds tiver mais de 10 itens, uma limitação do 'in'.
       // Para uma aplicação em larga escala, seria melhor buscar todos os centros de custo e mapear.
       // Por agora, esta abordagem é mais eficiente para um número menor de requisições.
-      return query(collection(firestore, 'cost_centers'), where(doc.id, 'in', costCenterIds));
+      return query(collection(firestore, 'cost_centers'), where(documentId(), 'in', costCenterIds));
   }, [firestore, costCenterIds.join(',')]);
 
   const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery, {
