@@ -17,7 +17,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject, uploadString } from 'firebase/storage';
-import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
+import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage, useDoc } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -43,8 +43,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2, Edit } from 'lucide-react';
-import type { Tool } from '@/lib/types';
+import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2, Edit, Check, ChevronsUpDown } from 'lucide-react';
+import type { Tool, Employee, Address } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import Image from 'next/image';
@@ -56,6 +56,9 @@ import LabelPrintDialog from '@/components/LabelPrintDialog';
 import { useRouter } from 'next/navigation';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 
 
 const familiaSuggestions: { [key in Tool['familia']]?: Tool['classificacao'] } = {
@@ -63,7 +66,7 @@ const familiaSuggestions: { [key in Tool['familia']]?: Tool['classificacao'] } =
 };
 
 const CadastroFerramentasPage = () => {
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
   const { toast } = useToast();
@@ -91,14 +94,32 @@ const CadastroFerramentasPage = () => {
   const [generatedCode, setGeneratedCode] = useState('Gerado Automaticamente');
   const [toolImage, setToolImage] = useState<string | null>(null);
   const [docEngenhariaFile, setDocEngenhariaFile] = useState<File | null>(null);
+  
+  const [availableAddresses, setAvailableAddresses] = useState<{value: string, label: string}[]>([]);
+  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
 
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData, isLoading: isEmployeeLoading } = useDoc<Employee>(userDocRef);
 
-  const allToolsQuery = useMemoFirebase(() => (
-    firestore ? query(collection(firestore, 'tools'), orderBy('codigo')) : null
-  ), [firestore]);
+  const canFetchTools = useMemo(() => {
+    if (isEmployeeLoading || !employeeData) return false;
+    return employeeData.accessLevel === 'Admin' || (employeeData.permissions?.ferramentaria ?? false);
+  }, [employeeData, isEmployeeLoading]);
+
+  const allToolsQuery = useMemoFirebase(() => {
+    if (firestore && canFetchTools) {
+      return query(collection(firestore, 'tools'), orderBy('codigo'));
+    }
+    return null;
+  }, [firestore, canFetchTools]);
   
   const { data: allTools, isLoading: isLoadingTools, error: toolsError } = useCollection<Tool>(allToolsQuery, {
-    queryKey: [allToolsQueryKey]
+    queryKey: [allToolsQueryKey],
+    enabled: canFetchTools,
   });
 
   const [modelos, ferramentasUnicas] = useMemo(() => {
@@ -114,6 +135,30 @@ const CadastroFerramentasPage = () => {
     });
     return [modelos, unicas];
   }, [allTools]);
+  
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      if (!isFormDialogOpen || !firestore) return;
+      setIsLoadingAddresses(true);
+      try {
+        const addressesRef = collection(firestore, 'addresses');
+        const qAddresses = query(addressesRef, where('setor', '==', '01')); // Ferramentaria
+        const addressesSnapshot = await getDocs(qAddresses);
+        
+        const allFerramentariaAddresses = addressesSnapshot.docs
+          .map(doc => doc.data() as Address)
+          .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
+            
+        setAvailableAddresses(allFerramentariaAddresses);
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar endereços.' });
+      } finally {
+        setIsLoadingAddresses(false);
+      }
+    };
+
+    fetchAddresses();
+  }, [isFormDialogOpen, firestore, toast]);
   
 
   useEffect(() => {
@@ -213,88 +258,108 @@ const CadastroFerramentasPage = () => {
     }
   
     setIsSaving(true);
-  
-    try {
-        const tempId = doc(collection(firestore, 'temp')).id;
-        const toolDocId = editingTool?.docId || tempId;
-        
-        let imageUrl = editingTool?.imageUrl;
-        if (toolImage && toolImage.startsWith('data:')) {
-            imageUrl = await uploadImageAsDataUrl(toolImage, `tool_images/${toolDocId}.jpg`);
-        }
+    
+    const tempId = doc(collection(firestore, 'temp')).id;
+    const toolDocId = editingTool?.docId || tempId;
+    
+    let imageUrl = editingTool?.imageUrl;
+    if (toolImage && toolImage.startsWith('data:')) {
+        imageUrl = await uploadImageAsDataUrl(toolImage, `tool_images/${toolDocId}.jpg`).catch((err) => {
+            console.error("Image upload failed:", err);
+            throw err;
+        });
+    }
 
-        let docEngenhariaUrl = editingTool?.doc_engenharia_url;
-        if (docEngenhariaFile) {
-            docEngenhariaUrl = await uploadFile(docEngenhariaFile, `doc_engenharia/${toolDocId}_${docEngenhariaFile.name}`);
+    let docEngenhariaUrl = editingTool?.doc_engenharia_url;
+    if (docEngenhariaFile) {
+        docEngenhariaUrl = await uploadFile(docEngenhariaFile, `doc_engenharia/${toolDocId}_${docEngenhariaFile.name}`).catch((err) => {
+            console.error("Doc upload failed:", err);
+            throw err;
+        });
+    }
+    
+    const baseToolData: Partial<Tool> = {
+        ...newFerramenta,
+        valor_estimado: Number(newFerramenta.valor_estimado) || 0,
+        imageUrl: imageUrl,
+        doc_engenharia_url: docEngenhariaUrl
+    };
+    Object.keys(baseToolData).forEach(key => baseToolData[key as keyof Partial<Tool>] === undefined && delete baseToolData[key as keyof Partial<Tool>]);
+    
+    if (!editingTool) { // Creating new tool
+        const { tipo, familia, classificacao } = newFerramenta;
+        if (!tipo || !familia || !classificacao) {
+            toast({ variant: "destructive", description: "Tipo, Família e Classificação são obrigatórios." });
+            setIsSaving(false);
+            return;
         }
         
-        const baseToolData: Partial<Tool> = {
-            ...newFerramenta,
-            valor_estimado: Number(newFerramenta.valor_estimado) || 0,
-            imageUrl: imageUrl,
-            doc_engenharia_url: docEngenhariaUrl
-        };
-        // Remove undefined properties to avoid overwriting existing data with nothing
-        Object.keys(baseToolData).forEach(key => baseToolData[key as keyof Partial<Tool>] === undefined && delete baseToolData[key as keyof Partial<Tool>]);
-        
-        if (!editingTool) { // Creating new tool
-          const { tipo, familia, classificacao } = newFerramenta;
-          if (!tipo || !familia || !classificacao) {
-              toast({ variant: "destructive", description: "Tipo, Família e Classificação são obrigatórios." });
-              setIsSaving(false);
-              return;
-          }
-
+        let sequencial = 0;
+        if(!isTemplate) {
           const counterRef = doc(firestore, 'counters', `${tipo}-${familia}-${classificacao}`);
-          
-          let sequencial = 0;
-          if(!isTemplate) {
+          try {
             sequencial = await runTransaction(firestore, async (transaction) => {
                 const counterDoc = await transaction.get(counterRef);
                 if (!counterDoc.exists()) {
                     transaction.set(counterRef, { lastId: 0 });
                     return 0;
                 }
-                const newId = (counterDoc.data()?.lastId || 0) + 1;
+                const newId = (counterDoc.data()?.lastId ?? 0) + 1;
                 transaction.update(counterRef, { lastId: newId });
                 return newId;
             });
+          } catch(e) {
+              errorEmitter.emit('permission-error', new FirestorePermissionError({
+                  path: counterRef.path, operation: 'write', requestResourceData: { lastId: 'increment' }
+              }));
+              setIsSaving(false);
+              return;
           }
-           
-          const codigoCompleto = `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;
-          const status: Tool['status'] = tipo === 'EQV' ? 'Pendente' : 'Disponível';
-
-          const toolData: Omit<Tool, 'id'> = {
-              ...(baseToolData as Omit<Tool, 'id' | 'codigo' | 'sequencial' | 'status' | 'enderecamento'>),
-              codigo: codigoCompleto,
-              sequencial: sequencial,
-              status: status,
-              enderecamento: isTemplate ? 'LOGICA' : (baseToolData.enderecamento || ''),
-          };
-            
-          const docRef = await addDoc(collection(firestore, 'tools'), toolData);
-            
-          if (!isTemplate) {
-            setToolsToPrint([{...toolData, docId: docRef.id}]);
-            setIsLabelPrintOpen(true);
-          }
-          toast({ title: "Sucesso!", description: `Ferramenta/Modelo ${codigoCompleto} criada.` });
-
-        } else { // Updating existing tool
-            const toolRef = doc(firestore, 'tools', editingTool.docId);
-            await updateDoc(toolRef, baseToolData);
-            toast({ title: "Sucesso!", description: `Ferramenta/Modelo atualizada.` });
         }
-        
-        resetForm();
-        setIsFormDialogOpen(false);
-        queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
+       
+        const codigoCompleto = `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`;
+        const status: Tool['status'] = tipo === 'EQV' ? 'Pendente' : 'Disponível';
 
-    } catch (error) {
-      console.error("Erro ao salvar:", error);
-      toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível salvar. Verifique as permissões.` });
-    } finally {
-      setIsSaving(false);
+        const toolData: Omit<Tool, 'id'> = {
+            ...(baseToolData as Omit<Tool, 'id' | 'codigo' | 'sequencial' | 'status' | 'enderecamento'>),
+            codigo: codigoCompleto,
+            sequencial: sequencial,
+            status: status,
+            enderecamento: isTemplate ? 'LOGICA' : (baseToolData.enderecamento || ''),
+        };
+        
+        const toolsCollection = collection(firestore, 'tools');
+        addDoc(toolsCollection, toolData).then((docRef) => {
+            if (!isTemplate) {
+              setToolsToPrint([{...toolData, docId: docRef.id}]);
+              setIsLabelPrintOpen(true);
+            }
+            toast({ title: "Sucesso!", description: `Ferramenta/Modelo ${codigoCompleto} criada.` });
+            resetForm();
+            setIsFormDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
+            setIsSaving(false);
+        }).catch(() => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: toolsCollection.path, operation: 'create', requestResourceData: toolData
+            }));
+            setIsSaving(false);
+        });
+
+    } else { // Updating existing tool
+        const toolRef = doc(firestore, 'tools', editingTool.docId);
+        updateDoc(toolRef, baseToolData).then(() => {
+            toast({ title: "Sucesso!", description: `Ferramenta/Modelo atualizada.` });
+            resetForm();
+            setIsFormDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
+            setIsSaving(false);
+        }).catch(() => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: toolRef.path, operation: 'update', requestResourceData: baseToolData
+            }));
+            setIsSaving(false);
+        });
     }
   };
 
@@ -304,10 +369,9 @@ const CadastroFerramentasPage = () => {
         return;
     }
     setIsDeleting(true);
-    try {
-        const docRef = doc(firestore, 'tools', tool.docId);
-        await deleteDoc(docRef);
-
+    const docRef = doc(firestore, 'tools', tool.docId);
+    
+    deleteDoc(docRef).then(async () => {
         if (tool.imageUrl) {
             try {
               const imageRef = storageRef(storage, tool.imageUrl);
@@ -316,7 +380,6 @@ const CadastroFerramentasPage = () => {
                if (err.code !== 'storage/object-not-found') console.warn("Could not delete image:", err)
             }
         }
-
         if (tool.doc_engenharia_url) {
             try {
               const docUrlRef = storageRef(storage, tool.doc_engenharia_url);
@@ -325,15 +388,13 @@ const CadastroFerramentasPage = () => {
                if (err.code !== 'storage/object-not-found') console.warn("Could not delete engineering doc:", err)
             }
         }
-
         toast({ title: 'Sucesso', description: 'Modelo/Ferramenta excluído.' });
         queryClient.invalidateQueries({ queryKey: [allToolsQueryKey] });
-    } catch (error) {
-        console.error("Erro ao excluir:", error);
-        toast({ variant: 'destructive', title: 'Erro ao Excluir', description: 'Não foi possível excluir o item.' });
-    } finally {
         setIsDeleting(false);
-    }
+    }).catch(() => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+        setIsDeleting(false);
+    });
   };
 
   const handleOpenEditDialog = (tool: WithDocId<Tool>) => {
@@ -479,7 +540,48 @@ const CadastroFerramentasPage = () => {
                          <>
                             <div className="col-span-1">
                                 <Label htmlFor="enderecamento">Endereçamento <span className='text-destructive'>*</span></Label>
-                                <Input id="enderecamento" value={newFerramenta.enderecamento || ''} onChange={handleInputChange} required placeholder="Ex: GAV-01-A" />
+                                <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      aria-expanded={isAddressPopoverOpen}
+                                      className="w-full justify-between font-normal"
+                                      disabled={isLoadingAddresses}
+                                    >
+                                      {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : newFerramenta.enderecamento || "Selecione um endereço..."}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                                      <Command>
+                                      <CommandInput placeholder="Pesquisar endereço..." />
+                                      <CommandList>
+                                          <CommandEmpty>Nenhum endereço disponível.</CommandEmpty>
+                                          <CommandGroup>
+                                          {availableAddresses.map((addr) => (
+                                              <CommandItem
+                                              key={addr.value}
+                                              value={addr.value}
+                                              onSelect={(currentValue) => {
+                                                  handleSelectChange('enderecamento', currentValue === newFerramenta.enderecamento ? "" : currentValue)
+                                                  setIsAddressPopoverOpen(false)
+                                              }}
+                                              >
+                                              <Check
+                                                  className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  newFerramenta.enderecamento === addr.value ? "opacity-100" : "opacity-0"
+                                                  )}
+                                              />
+                                              {addr.label}
+                                              </CommandItem>
+                                          ))}
+                                          </CommandGroup>
+                                      </CommandList>
+                                      </Command>
+                                  </PopoverContent>
+                                </Popover>
                             </div>
                              <div className="col-span-1">
                                 <Label htmlFor="status">Status Inicial</Label>

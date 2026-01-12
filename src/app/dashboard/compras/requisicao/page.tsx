@@ -130,6 +130,7 @@ const RequisicaoCompraPage = () => {
                 itemType: item.itemType,
                 quantity: item.requisitionQuantity,
                 estimatedPrice: item.estimatedPrice || 0,
+                status: 'Pendente',
                 notes: item.notes,
                 attachmentUrl: item.attachmentUrl,
             };

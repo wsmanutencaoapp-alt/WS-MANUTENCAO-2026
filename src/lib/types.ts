@@ -2,6 +2,7 @@
 
 
 
+
 export type Supply = {
   id?: string;
   // Identificação
@@ -252,7 +253,7 @@ export type PurchaseRequisition = {
   costCenterId: string;
   neededByDate: string; // ISO date string
   type: 'Solicitação de Compra' | 'Ordem de Compra';
-  status: 'Aberta' | 'Parcialmente Atendida' | 'Totalmente Atendida' | 'Cancelada' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída';
+  status: 'Aberta' | 'Parcialmente Atendida' | 'Totalmente Atendida' | 'Cancelada' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída' | 'Em Revisão';
   rejectionReason?: string;
   createdAt: string; // ISO date string
   priority: 'Normal' | 'Urgente' | 'Muito Urgente';
