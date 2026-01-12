@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, runTransaction, doc } from 'firebase/firestore';
 import type { PurchaseRequisition, CostCenter } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -22,10 +22,12 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, Eye } from 'lucide-react';
+import { Loader2, Search, Eye, FileSync } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
@@ -50,17 +52,21 @@ const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
 
 const GestaoDeComprasPage = () => {
   const firestore = useFirestore();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [isConverting, setIsConverting] = useState<string | null>(null);
 
-
+  const queryKey = 'allPurchaseRequisitions';
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'purchase_requisitions'), orderBy('createdAt', 'desc'));
   }, [firestore]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
-      queryKey: ['allPurchaseRequisitions']
+      queryKey: [queryKey]
   });
 
   const costCentersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'cost_centers')) : null, [firestore]);
@@ -85,6 +91,53 @@ const GestaoDeComprasPage = () => {
         req.status.toLowerCase().includes(lowercasedTerm)
     );
   }, [requisitions, searchTerm, costCenterMap]);
+  
+  const handleConvertToOC = async (req: WithDocId<PurchaseRequisition>) => {
+      if (!firestore) return;
+      setIsConverting(req.docId);
+
+      try {
+          const counterRef = doc(firestore, 'counters', 'purchaseOrders');
+          const newProtocolNumber = await runTransaction(firestore, async (transaction) => {
+              const counterDoc = await transaction.get(counterRef);
+              let lastId = 0;
+              if (counterDoc.exists()) {
+                  lastId = counterDoc.data().lastId || 0;
+              }
+              const newId = lastId + 1;
+              const newProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
+              
+              if(counterDoc.exists()) {
+                transaction.update(counterRef, { lastId: newId });
+              } else {
+                transaction.set(counterRef, { lastId: newId });
+              }
+
+              return newProtocol;
+          });
+
+          const reqRef = doc(firestore, 'purchase_requisitions', req.docId);
+          await runTransaction(firestore, async (transaction) => {
+            transaction.update(reqRef, {
+                type: 'Ordem de Compra',
+                originalProtocol: req.protocol,
+                protocol: newProtocolNumber,
+            });
+          });
+
+          toast({
+              title: "Sucesso!",
+              description: `Requisição ${req.protocol} convertida para Ordem de Compra ${newProtocolNumber}.`
+          });
+          queryClient.invalidateQueries({ queryKey: [queryKey] });
+
+      } catch (err) {
+          console.error("Erro ao converter para OC:", err);
+          toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível converter a requisição.' });
+      } finally {
+          setIsConverting(null);
+      }
+  };
 
   const isLoading = isLoadingRequisitions || isLoadingCostCenters;
 
@@ -116,36 +169,39 @@ const GestaoDeComprasPage = () => {
                   <TableHead>Protocolo</TableHead>
                   <TableHead>Data da Requisição</TableHead>
                   <TableHead>Solicitante</TableHead>
-                  <TableHead>Centro de Custo</TableHead>
-                  <TableHead>Data de Necessidade</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading && (
-                  <TableRow><TableCell colSpan={8} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                 )}
                 {requisitionsError && (
-                  <TableRow><TableCell colSpan={8} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
                 )}
                 {!isLoading && filteredRequisitions.length === 0 && (
-                   <TableRow><TableCell colSpan={8} className="h-24 text-center">Nenhuma requisição encontrada.</TableCell></TableRow>
+                   <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição encontrada.</TableCell></TableRow>
                 )}
                 {!isLoading && filteredRequisitions.map(req => (
                   <TableRow key={req.docId}>
                     <TableCell><Badge variant={getStatusVariant(req.status)}>{req.status}</Badge></TableCell>
-                    <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
+                    <TableCell className="font-mono">
+                      {req.protocol || req.docId.substring(0, 8)}
+                      {req.originalProtocol && <p className="text-xs text-muted-foreground font-sans">(Origem: {req.originalProtocol})</p>}
+                    </TableCell>
                     <TableCell>{format(new Date(req.createdAt), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{req.requesterName}</TableCell>
-                    <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
-                    <TableCell>{format(new Date(req.neededByDate), 'dd/MM/yyyy')}</TableCell>
                     <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(req)}>
-                         <Eye className="mr-2 h-4 w-4" />
-                         Ver Itens
+                    <TableCell className="text-right space-x-1">
+                      <Button variant="outline" size="icon" onClick={() => setSelectedRequisition(req)} title="Ver Itens">
+                         <Eye className="h-4 w-4" />
                       </Button>
+                      {req.status === 'Aprovada' && req.type === 'Solicitação de Compra' && (
+                          <Button variant="default" size="icon" onClick={() => handleConvertToOC(req)} disabled={isConverting === req.docId} title="Converter para Ordem de Compra">
+                              {isConverting === req.docId ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileSync className="h-4 w-4"/>}
+                          </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

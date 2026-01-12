@@ -234,7 +234,8 @@ export type CostCenter = {
 
 export type PurchaseRequisition = {
   id?: string;
-  protocol?: string;
+  protocol: string;
+  originalProtocol?: string;
   requesterId: string;
   requesterName: string;
   costCenterId: string;
@@ -266,5 +267,3 @@ export type Notification = {
     read: boolean;
     createdAt: string; // ISO date string
 };
-
-    

@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -53,7 +51,6 @@ const RequisicaoCompraPage = () => {
   
   const [priority, setPriority] = useState<PurchaseRequisition['priority']>('Normal');
   const [purchaseReason, setPurchaseReason] = useState('');
-  const [requisitionType, setRequisitionType] = useState<PurchaseRequisition['type']>('Solicitação de Compra');
 
 
   const suppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
@@ -122,7 +119,7 @@ const RequisicaoCompraPage = () => {
             createdAt: new Date().toISOString(),
             priority: priority,
             purchaseReason: purchaseReason,
-            type: requisitionType,
+            type: 'Solicitação de Compra', // Always starts as SC
         };
         batch.set(requisitionRef, requisitionData);
 
@@ -139,7 +136,12 @@ const RequisicaoCompraPage = () => {
             batch.set(itemRef, itemData);
         }
         
-        batch.update(counterRef, { lastId: newId });
+        if (counterSnapshot.empty) {
+            batch.set(counterRef, { lastId: newId });
+        } else {
+            batch.update(counterRef, { lastId: newId });
+        }
+        
         await batch.commit();
 
         toast({ title: 'Sucesso!', description: 'Sua requisição de compra foi enviada para aprovação.' });
@@ -148,7 +150,6 @@ const RequisicaoCompraPage = () => {
         setNeededByDate(undefined);
         setPurchaseReason('');
         setPriority('Normal');
-        setRequisitionType('Solicitação de Compra');
     } catch(err) {
         console.error("Erro ao criar requisição:", err);
         toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível criar a requisição.' });
@@ -176,29 +177,19 @@ const RequisicaoCompraPage = () => {
             <Card className="w-full mt-4">
                 <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    Nova Requisição
+                    Nova Solicitação de Compra
                 </CardTitle>
-                <CardDescription>Preencha os dados da requisição e adicione os itens necessários.</CardDescription>
+                <CardDescription>Preencha os dados da solicitação e adicione os itens necessários.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                 {/* Header Fields */}
                 <div className="space-y-4 rounded-lg border p-4">
-                    <h3 className="font-semibold text-lg">Detalhes da Requisição</h3>
+                    <h3 className="font-semibold text-lg">Detalhes da Solicitação</h3>
                     <div className="space-y-1.5">
                         <Label htmlFor="purchaseReason">Motivo da Compra <span className="text-destructive">*</span></Label>
                         <Textarea id="purchaseReason" value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} placeholder="Ex: Item para manutenção corretiva da aeronave PR-ABC." />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="requisitionType">Tipo de Requisição <span className="text-destructive">*</span></Label>
-                            <Select value={requisitionType} onValueChange={(v) => setRequisitionType(v as any)}>
-                                <SelectTrigger id="requisitionType"><SelectValue/></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Solicitação de Compra">Solicitação de Compra</SelectItem>
-                                    <SelectItem value="Ordem de Compra">Ordem de Compra</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="costCenter">Centro de Custo <span className="text-destructive">*</span></Label>
                             <Select value={costCenterId} onValueChange={setCostCenterId} disabled={isLoadingCostCenters}>
@@ -248,7 +239,7 @@ const RequisicaoCompraPage = () => {
                 {/* Cart Items */}
                 <div className="space-y-4">
                     <div className='flex justify-between items-center'>
-                        <h3 className="font-semibold text-lg">Itens da Requisição ({cart.length})</h3>
+                        <h3 className="font-semibold text-lg">Itens da Solicitação ({cart.length})</h3>
                         <Button variant="outline" onClick={() => setIsSelectorOpen(true)}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Adicionar Item ao Carrinho
