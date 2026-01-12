@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, Eye } from 'lucide-react';
+import { Loader2, Search, Eye, Edit } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
@@ -165,7 +165,13 @@ export default function MyRequisitionsTable() {
                     <TableCell>{format(new Date(req.createdAt), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
                     <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
+                       {req.status === 'Em Revisão' && (
+                        <Button variant="secondary" size="sm">
+                            <Edit className="mr-2 h-4 w-4" />
+                            Revisar
+                        </Button>
+                       )}
                       <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(req)}>
                          <Eye className="mr-2 h-4 w-4" />
                          Ver Itens
