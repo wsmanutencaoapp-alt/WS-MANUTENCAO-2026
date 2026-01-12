@@ -25,7 +25,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Upload, FileText, ChevronsUpDown, Check, Info, ShoppingBag } from 'lucide-react';
+import { Loader2, Search, Upload, FileText, ChevronsUpDown, Check, Info, ShoppingBag, List } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { ScrollArea } from './ui/scroll-area';
@@ -33,7 +33,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Textarea } from './ui/textarea';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card } from './ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Separator } from './ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
@@ -83,6 +83,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   
   const [supplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
   const [activeQuotationIndex, setActiveQuotationIndex] = useState<number | null>(null);
+  const [isItemsDialogOpen, setIsItemsDialogOpen] = useState(false);
+
 
   const suppliersQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'suppliers')) : null), [firestore]);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<WithDocId<Supplier>>(suppliersQuery, {
@@ -109,13 +111,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   
   const handleSupplierSelect = (supplier: WithDocId<Supplier>) => {
     if (activeQuotationIndex === null) return;
-    const updatedQuotations = [...quotations];
-    updatedQuotations[activeQuotationIndex] = {
-      ...updatedQuotations[activeQuotationIndex],
-      supplierId: supplier.docId,
-      supplierName: supplier.name,
-    };
-    setQuotations(updatedQuotations);
+    handleQuotationChange(activeQuotationIndex, 'supplierId', supplier.docId);
+    handleQuotationChange(activeQuotationIndex, 'supplierName', supplier.name);
     setSupplierSelectorOpen(false);
     setActiveQuotationIndex(null);
   };
@@ -264,30 +261,32 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen && !isItemsDialogOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
             <DialogDescription>
-              Insira os orçamentos para os itens selecionados.
+              Insira os orçamentos para os itens selecionados e gere a Ordem de Compra.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[75vh] py-4">
-            <div className="md:col-span-1 space-y-4">
-              <h3 className="font-semibold text-lg">Itens para Cotação</h3>
-              <ScrollArea className='h-96'>
-                  <div className="space-y-2">
-                      {items.map(item => (
-                          <div key={item.docId} className="text-sm border rounded-md p-3">
-                              <p className="font-bold">{item.details?.descricao || 'Item não encontrado'}</p>
-                              <p>Quantidade: <span className="font-medium">{item.quantity}</span></p>
-                          </div>
-                      ))}
-                  </div>
-              </ScrollArea>
-            </div>
-            
-            <div className="md:col-span-2 space-y-4">
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-4 py-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">Resumo da Cotação</CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm text-muted-foreground">Itens para cotar</p>
+                        <p className="text-xl font-bold">{items.length}</p>
+                    </div>
+                    <Button variant="outline" onClick={() => setIsItemsDialogOpen(true)}>
+                        <List className="mr-2 h-4 w-4" />
+                        Ver Itens da Cotação
+                    </Button>
+                </CardContent>
+            </Card>
+
+            <div className="space-y-4">
                <div className="flex flex-col">
                   <h3 className="font-semibold text-lg">Orçamentos</h3>
                   <p className="text-sm text-muted-foreground">* Selecione o orçamento vencedor</p>
@@ -363,6 +362,28 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         </DialogContent>
       </Dialog>
       
+       <Dialog open={isItemsDialogOpen} onOpenChange={setIsItemsDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Itens da Cotação</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-96 my-4">
+            <div className="space-y-2 pr-6">
+              {items.map(item => (
+                <div key={item.docId} className="text-sm border rounded-md p-3">
+                  <p className="font-bold">{item.details?.descricao || 'Item não encontrado'}</p>
+                  <p>Código: <span className="font-mono text-muted-foreground">{item.details?.codigo}</span></p>
+                  <p>Quantidade: <span className="font-medium">{item.quantity}</span></p>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button onClick={() => setIsItemsDialogOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <SupplierSelectorDialog 
         isOpen={supplierSelectorOpen}
         onClose={() => setSupplierSelectorOpen(false)}
