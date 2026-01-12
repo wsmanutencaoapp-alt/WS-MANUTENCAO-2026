@@ -27,7 +27,7 @@ interface PurchaseRequisitionDetailsDialogProps {
   requisition: WithDocId<PurchaseRequisition> | null;
   isOpen: boolean;
   onClose: () => void;
-  onActionSuccess: () => void;
+  onActionSuccess?: () => void; // Made optional
 }
 
 export type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
@@ -104,7 +104,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   const handleQuotationSuccess = () => {
     setItemForQuotation(null);
     queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
-    onActionSuccess();
+    onActionSuccess?.();
   }
 
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
@@ -220,7 +220,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                                </a>
                           </div>
                       )}
-                      {item.status === 'Pendente' && (
+                      {item.status === 'Pendente' && requisition?.status === 'Aprovada' && (
                          <div className="flex justify-end pt-2">
                             <Button size="sm" onClick={() => setItemForQuotation(item)}>
                                 <ShoppingBag className="mr-2 h-4 w-4" />
