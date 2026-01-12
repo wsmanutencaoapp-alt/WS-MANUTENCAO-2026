@@ -48,8 +48,8 @@ const RequisicaoCompraPage = () => {
   const suppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
   const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery);
   
-  // Query for tool models (STD and GSE)
-  const toolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools'), where('tipo', 'in', ['STD', 'GSE'])) : null, [firestore]);
+  // Query for tool models (STD and GSE) - now filtering by sequencial 0
+  const toolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools'), where('sequencial', '==', 0)) : null, [firestore]);
   const { data: allTools, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery);
 
   const costCentersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'cost_centers')) : null, [firestore]);
@@ -303,3 +303,5 @@ const RequisicaoCompraPage = () => {
 };
 
 export default RequisicaoCompraPage;
+
+    
