@@ -25,9 +25,10 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Search, Eye, FileSync } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
+
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {

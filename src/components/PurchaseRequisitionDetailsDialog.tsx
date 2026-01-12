@@ -16,8 +16,7 @@ import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Loader2, Package, Tag, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, Package, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 
@@ -53,7 +52,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     useMemoFirebase(() => {
       if (!firestore || supplyIds.length === 0) return null;
       return query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds));
-    }, [firestore, supplyIds])
+    }, [firestore, supplyIds]), { enabled: supplyIds.length > 0 }
   );
 
   // Fetch tool master data
@@ -61,7 +60,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     useMemoFirebase(() => {
       if (!firestore || toolIds.length === 0) return null;
       return query(collection(firestore, 'tools'), where(documentId(), 'in', toolIds));
-    }, [firestore, toolIds])
+    }, [firestore, toolIds]), { enabled: toolIds.length > 0 }
   );
 
 
@@ -87,7 +86,8 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   }, [items, supplyMasterData, toolMasterData]);
 
 
-  const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
+  const getPriorityVariant = (priority?: PurchaseRequisition['priority']) => {
+    if (!priority) return 'secondary';
     switch(priority) {
         case 'Normal': return 'secondary';
         case 'Urgente': return 'warning';
@@ -137,7 +137,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                     <AlertTriangle className="h-4 w-4 mt-0.5 text-muted-foreground"/>
                     <div>
                         <p className="text-muted-foreground">Prioridade</p>
-                        <Badge variant={getPriorityVariant(requisition?.priority || 'Normal')}>{requisition?.priority}</Badge>
+                        <Badge variant={getPriorityVariant(requisition?.priority)}>{requisition?.priority}</Badge>
                     </div>
                   </div>
               </div>
@@ -155,7 +155,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0"/>
                             <div>
                                 <p className="font-semibold">Motivo da Revisão/Recusa</p>
-                                <p className="font-medium">{requisition?.rejectionReason}</p>
+                                <p className="font-medium">{requisition.rejectionReason}</p>
                             </div>
                         </div>
                     </>
