@@ -153,6 +153,7 @@ export type Permissions = {
   calibracao?: boolean;
   compras_aprovacoes?: boolean;
   compras_controle?: boolean;
+  compras_requisicao?: boolean;
   financeiro_visao-geral?: boolean;
   financeiro_orcamento?: boolean;
   financeiro_budget?: boolean;
@@ -222,4 +223,28 @@ export type Address = {
   detalhe?: string;
   codigoCompleto: string;
   createdAt: string; // ISO date string
+};
+
+export type CostCenter = {
+    id: string;
+    code: string;
+    description: string;
+};
+
+export type PurchaseRequisition = {
+  id?: string;
+  requesterId: string;
+  costCenterId: string;
+  neededByDate: string;
+  status: 'Aberta' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída';
+  createdAt: string;
+};
+
+export type PurchaseRequisitionItem = {
+    id?: string;
+    supplyId: string;
+    quantity: number;
+    estimatedPrice?: number;
+    notes?: string;
+    attachmentUrl?: string;
 };
