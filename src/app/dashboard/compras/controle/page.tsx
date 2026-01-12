@@ -51,7 +51,7 @@ const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
     }
 }
 
-const GestaoDeComprasPage = () => {
+export default function GestaoDeComprasPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -220,5 +220,3 @@ const GestaoDeComprasPage = () => {
     </>
   );
 };
-
-export default GestaoDeComprasPage;
