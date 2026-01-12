@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, addDoc, writeBatch, doc, where } from 'firebase/firestore';
+import { collection, query, addDoc, writeBatch, doc, where, getDocs, orderBy } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { Supply, CostCenter, PurchaseRequisition, PurchaseRequisitionItem, Tool } from '@/lib/types';
+import type { Supply, CostCenter, PurchaseRequisition, PurchaseRequisitionItem, Tool, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Textarea } from '@/components/ui/textarea';
 import ItemSelectorDialog from '@/components/ItemSelectorDialog';
@@ -44,7 +44,6 @@ const RequisicaoCompraPage = () => {
   const [costCenterId, setCostCenterId] = useState('');
   const [neededByDate, setNeededByDate] = useState<Date | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   
   const [priority, setPriority] = useState<PurchaseRequisition['priority']>('Normal');
@@ -94,14 +93,27 @@ const RequisicaoCompraPage = () => {
     setIsSubmitting(true);
     try {
         const batch = writeBatch(firestore);
+        
+        const counterRef = doc(firestore, 'counters', 'purchaseRequisitions');
+        const counterSnapshot = await getDocs(query(collection(firestore, 'counters'), where(doc.name, '==', 'purchaseRequisitions')));
+
+        let lastId = 0;
+        if (!counterSnapshot.empty) {
+            lastId = counterSnapshot.docs[0].data().lastId || 0;
+        }
+        const newId = lastId + 1;
+        const protocol = `SC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
+
+        
         const requisitionRef = doc(collection(firestore, 'purchase_requisitions'));
 
         const requisitionData: Omit<PurchaseRequisition, 'id'> = {
+            protocol: protocol,
             requesterId: user.uid,
             requesterName: user.displayName || user.email || 'Desconhecido',
             costCenterId: costCenterId,
             neededByDate: neededByDate.toISOString(),
-            status: 'Em Aprovação', // Send directly to approval
+            status: 'Aberta',
             createdAt: new Date().toISOString(),
             priority: priority,
             purchaseReason: purchaseReason,
@@ -122,6 +134,7 @@ const RequisicaoCompraPage = () => {
             batch.set(itemRef, itemData);
         }
         
+        batch.update(counterRef, { lastId: newId });
         await batch.commit();
 
         toast({ title: 'Sucesso!', description: 'Sua requisição de compra foi enviada para aprovação.' });
@@ -195,7 +208,7 @@ const RequisicaoCompraPage = () => {
                   </div>
                   <div className="space-y-1.5">
                       <Label>Data de Necessidade <span className="text-destructive">*</span></Label>
-                      <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
+                      <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="w-full justify-start text-left font-normal">
                             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -206,7 +219,7 @@ const RequisicaoCompraPage = () => {
                           <Calendar
                               mode="single"
                               selected={neededByDate}
-                              onSelect={(date) => { setNeededByDate(date); setIsDatePopoverOpen(false); }}
+                              onSelect={setNeededByDate}
                               initialFocus
                           />
                         </PopoverContent>
