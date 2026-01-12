@@ -58,6 +58,9 @@ type QuotationFormState = {
   paymentTerms: string;
   attachmentUrl?: string;
   attachmentFile?: File | null;
+  // UI State
+  isPopoverOpen: boolean;
+  supplierSearch: string;
 };
 
 const emptyQuotation: QuotationFormState = {
@@ -67,60 +70,9 @@ const emptyQuotation: QuotationFormState = {
   deliveryTime: '',
   paymentTerms: '',
   attachmentFile: null,
+  isPopoverOpen: false,
+  supplierSearch: '',
 };
-
-// Component for a single Supplier Selector Popover
-function SupplierSelector({ index, quotation, onSupplierSelect, suppliers, isLoading }: {
-  index: number;
-  quotation: QuotationFormState;
-  onSupplierSelect: (index: number, supplier: WithDocId<Supplier>) => void;
-  suppliers: WithDocId<Supplier>[];
-  isLoading: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-
-  const filteredSuppliers = useMemo(() => {
-    if (!suppliers) return [];
-    if (!search) return suppliers;
-    return suppliers.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
-  }, [suppliers, search]);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="w-full justify-between font-normal" disabled={isLoading}>
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : quotation.supplierName || "Selecione..."}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
-        <Command>
-          <CommandInput
-            placeholder="Pesquisar..."
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            <CommandEmpty>Nenhum fornecedor encontrado.</CommandEmpty>
-            <CommandGroup>
-              {filteredSuppliers.map(s => (
-                <CommandItem key={s.docId} value={s.name} onSelect={() => {
-                  onSupplierSelect(index, s);
-                  setOpen(false);
-                }}>
-                  <Check className={cn("mr-2 h-4 w-4", quotation.supplierId === s.docId ? "opacity-100" : "opacity-0")} />
-                  {s.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 
 export default function QuotationDialog({ isOpen, onClose, onSuccess, requisition, items }: QuotationDialogProps) {
   const firestore = useFirestore();
@@ -128,7 +80,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [quotations, setQuotations] = useState<QuotationFormState[]>([emptyQuotation, emptyQuotation, emptyQuotation]);
+  const [quotations, setQuotations] = useState<QuotationFormState[]>([
+    {...emptyQuotation}, {...emptyQuotation}, {...emptyQuotation}
+  ]);
   const [selectedQuotationIndex, setSelectedQuotationIndex] = useState<number | null>(null);
   const [justification, setJustification] = useState('');
   const [purchaseOrderNotes, setPurchaseOrderNotes] = useState('');
@@ -143,9 +97,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   useEffect(() => {
     if (isOpen) {
         setQuotations([
-            { supplierId: '', supplierName: '', totalValue: '', deliveryTime: '', paymentTerms: '', attachmentFile: null },
-            { supplierId: '', supplierName: '', totalValue: '', deliveryTime: '', paymentTerms: '', attachmentFile: null },
-            { supplierId: '', supplierName: '', totalValue: '', deliveryTime: '', paymentTerms: '', attachmentFile: null },
+            {...emptyQuotation}, {...emptyQuotation}, {...emptyQuotation}
         ]);
         setSelectedQuotationIndex(null);
         setJustification('');
@@ -162,6 +114,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const handleSupplierSelect = (index: number, supplier: WithDocId<Supplier>) => {
     handleQuotationChange(index, 'supplierId', supplier.docId);
     handleQuotationChange(index, 'supplierName', supplier.name);
+    handleQuotationChange(index, 'isPopoverOpen', false);
   };
   
   const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -342,13 +295,34 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                            <Separator />
                            <div className="space-y-1.5">
                                <Label>Fornecedor</Label>
-                                <SupplierSelector
-                                    index={index}
-                                    quotation={q}
-                                    onSupplierSelect={handleSupplierSelect}
-                                    suppliers={suppliers || []}
-                                    isLoading={isLoadingSuppliers}
-                                />
+                               <Popover open={q.isPopoverOpen} onOpenChange={(isOpen) => handleQuotationChange(index, 'isPopoverOpen', isOpen)}>
+                                  <PopoverTrigger asChild>
+                                      <Button variant="outline" className="w-full justify-between font-normal" disabled={isLoadingSuppliers}>
+                                      {isLoadingSuppliers ? <Loader2 className="h-4 w-4 animate-spin" /> : q.supplierName || "Selecione..."}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                                      <Command>
+                                          <CommandInput
+                                            placeholder="Pesquisar..."
+                                            value={q.supplierSearch}
+                                            onValueChange={(value) => handleQuotationChange(index, 'supplierSearch', value)}
+                                          />
+                                          <CommandList>
+                                            <CommandEmpty>Nenhum fornecedor encontrado.</CommandEmpty>
+                                            <CommandGroup>
+                                              {(suppliers || []).filter(s => s.name.toLowerCase().includes(q.supplierSearch.toLowerCase())).map(s => (
+                                                <CommandItem key={s.docId} value={s.name} onSelect={() => handleSupplierSelect(index, s)}>
+                                                  <Check className={cn("mr-2 h-4 w-4", q.supplierId === s.docId ? "opacity-100" : "opacity-0")} />
+                                                  {s.name}
+                                                </CommandItem>
+                                              ))}
+                                            </CommandGroup>
+                                          </CommandList>
+                                      </Command>
+                                  </PopoverContent>
+                               </Popover>
                            </div>
 
                            <div className="grid grid-cols-2 gap-4">
