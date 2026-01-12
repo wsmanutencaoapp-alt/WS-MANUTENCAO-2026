@@ -239,7 +239,9 @@ export type PurchaseRequisition = {
   requesterName: string;
   costCenterId: string;
   neededByDate: string;
-  status: 'Aberta' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída';
+  type: 'Solicitação de Compra' | 'Ordem de Compra';
+  status: 'Aberta' | 'Em Aprovação' | 'Em Revisão' | 'Aprovada' | 'Recusada' | 'Concluída';
+  rejectionReason?: string;
   createdAt: string;
   priority: 'Normal' | 'Urgente' | 'Muito Urgente';
   purchaseReason: string;

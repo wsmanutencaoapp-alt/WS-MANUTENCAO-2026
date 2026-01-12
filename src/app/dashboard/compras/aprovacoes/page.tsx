@@ -21,24 +21,24 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, Eye, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Search, Eye, CheckCircle, XCircle, MessageSquareWarning } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
 
 
 type RequisitionWithTotal = WithDocId<PurchaseRequisition> & {
@@ -54,12 +54,17 @@ const AprovacoesComprasPage = () => {
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionsWithTotals, setRequisitionsWithTotals] = useState<RequisitionWithTotal[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [decisionState, setDecisionState] = useState<{
+      isOpen: boolean;
+      requisitionId: string | null;
+      type: 'reject' | 'review';
+      reason: string;
+  }>({ isOpen: false, requisitionId: null, type: 'reject', reason: '' });
 
   const queryKey = 'pendingPurchaseRequisitions';
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    // Por enquanto, vamos pegar as "Abertas" para simular o fluxo. O ideal seria ter um status "Em Aprovação"
-    return query(collection(firestore, 'purchase_requisitions'), where('status', '==', 'Aberta'));
+    return query(collection(firestore, 'purchase_requisitions'), where('status', 'in', ['Em Aprovação', 'Em Revisão']));
   }, [firestore]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
@@ -76,7 +81,6 @@ const AprovacoesComprasPage = () => {
       return new Map(costCenters.map(cc => [cc.docId, `${cc.code} - ${cc.description}`]));
   }, [costCenters]);
 
-  // Efeito para calcular os totais quando as requisições ou itens mudarem
   useMemo(() => {
     if (!requisitions || !firestore) return;
 
@@ -98,16 +102,20 @@ const AprovacoesComprasPage = () => {
     calculateTotals();
   }, [requisitions, firestore]);
 
-  const handleDecision = async (requisitionId: string, decision: 'Aprovada' | 'Recusada') => {
+  const handleDecision = async (requisitionId: string, newStatus: 'Aprovada' | 'Recusada' | 'Em Revisão', reason?: string) => {
       if (!firestore) return;
       setIsProcessing(requisitionId);
       const reqRef = doc(firestore, 'purchase_requisitions', requisitionId);
       try {
-          await updateDoc(reqRef, { status: decision });
+          const updateData: { status: string; rejectionReason?: string } = { status: newStatus };
+          if (reason) {
+              updateData.rejectionReason = reason;
+          }
+          await updateDoc(reqRef, updateData);
           toast({
-              title: `Requisição ${decision}`,
-              description: `A requisição foi marcada como ${decision.toLowerCase()}.`,
-              variant: decision === 'Recusada' ? 'destructive' : 'default',
+              title: `Requisição ${newStatus}`,
+              description: `A requisição foi marcada como ${newStatus.toLowerCase()}.`,
+              variant: newStatus === 'Recusada' ? 'destructive' : 'default',
           });
           queryClient.invalidateQueries({ queryKey: [queryKey] });
           queryClient.invalidateQueries({ queryKey: ['allPurchaseRequisitions'] });
@@ -116,9 +124,13 @@ const AprovacoesComprasPage = () => {
           toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível processar a sua decisão.' });
       } finally {
           setIsProcessing(null);
+          setDecisionState({ isOpen: false, requisitionId: null, type: 'reject', reason: '' });
       }
   }
 
+  const openDecisionDialog = (reqId: string, type: 'reject' | 'review') => {
+      setDecisionState({ isOpen: true, requisitionId: reqId, type, reason: '' });
+  }
 
   const filteredRequisitions = useMemo(() => {
     if (!requisitionsWithTotals) return [];
@@ -133,6 +145,18 @@ const AprovacoesComprasPage = () => {
 
   const isLoading = isLoadingRequisitions || isLoadingCostCenters;
 
+  const getStatusVariant = (status: PurchaseRequisition['status']) => {
+    const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
+        'Aberta': 'secondary',
+        'Em Aprovação': 'default',
+        'Em Revisão': 'warning',
+        'Aprovada': 'success',
+        'Recusada': 'destructive',
+        'Concluída': 'secondary',
+    };
+    return variants[status] || 'secondary';
+  }
+
   return (
     <>
       <div className="space-y-6">
@@ -141,7 +165,7 @@ const AprovacoesComprasPage = () => {
           <CardHeader>
             <CardTitle>Requisições Pendentes</CardTitle>
             <CardDescription>
-              Analise, aprove ou recuse as requisições de compra pendentes.
+              Analise, aprove ou recuse as requisições de compra que aguardam sua ação.
             </CardDescription>
             <div className="relative pt-4">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -157,11 +181,11 @@ const AprovacoesComprasPage = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Protocolo</TableHead>
                   <TableHead>Solicitante</TableHead>
-                  <TableHead>Centro de Custo</TableHead>
                   <TableHead>Valor Total</TableHead>
-                  <TableHead>Data de Necessidade</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -176,45 +200,31 @@ const AprovacoesComprasPage = () => {
                    <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição pendente de aprovação.</TableCell></TableRow>
                 )}
                 {!isLoading && filteredRequisitions.map(req => (
-                  <TableRow key={req.docId}>
+                  <TableRow key={req.docId} className={cn(req.type === 'Ordem de Compra' && 'bg-blue-50 dark:bg-blue-900/20')}>
+                    <TableCell>
+                      <Badge variant={req.type === 'Ordem de Compra' ? 'default' : 'secondary'}>{req.type}</Badge>
+                    </TableCell>
                     <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
                     <TableCell>{req.requesterName}</TableCell>
-                    <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
                     <TableCell className="font-medium">{req.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                    <TableCell>{format(new Date(req.neededByDate), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell className="text-right space-x-2">
+                     <TableCell>
+                        <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right space-x-1">
                         {isProcessing === req.docId ? <Loader2 className="animate-spin h-5 w-5 ml-auto"/> : (
                             <>
-                                <Button variant="ghost" size="icon" onClick={() => setSelectedRequisition(req)}>
+                                <Button variant="ghost" size="icon" onClick={() => setSelectedRequisition(req)} title="Ver Itens">
                                     <Eye className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700" onClick={() => handleDecision(req.docId, 'Aprovada')}>
+                                <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700" onClick={() => handleDecision(req.docId, 'Aprovada')} title="Aprovar">
                                     <CheckCircle className="h-5 w-5" />
                                 </Button>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700">
-                                            <XCircle className="h-5 w-5" />
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                        <AlertDialogTitle>Confirmar Recusa</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Tem certeza que deseja <span className="font-bold text-destructive">recusar</span> esta requisição de compra? Esta ação não poderá ser desfeita.
-                                        </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            onClick={() => handleDecision(req.docId, 'Recusada')}
-                                            className="bg-destructive hover:bg-destructive/90"
-                                        >
-                                            Sim, Recusar
-                                        </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
+                                 <Button variant="ghost" size="icon" className="text-orange-500 hover:text-orange-600" onClick={() => openDecisionDialog(req.docId, 'review')} title="Pedir Revisão">
+                                    <MessageSquareWarning className="h-5 w-5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => openDecisionDialog(req.docId, 'reject')} title="Rejeitar">
+                                    <XCircle className="h-5 w-5" />
+                                </Button>
                             </>
                         )}
                     </TableCell>
@@ -231,6 +241,38 @@ const AprovacoesComprasPage = () => {
         isOpen={!!selectedRequisition}
         onClose={() => setSelectedRequisition(null)}
       />
+
+       <Dialog open={decisionState.isOpen} onOpenChange={() => setDecisionState(prev => ({...prev, isOpen: false}))}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>
+                      {decisionState.type === 'reject' ? 'Rejeitar Requisição' : 'Pedir Revisão da Requisição'}
+                  </DialogTitle>
+                  <DialogDescription>
+                      Por favor, informe o motivo para esta ação. A justificativa será enviada ao solicitante.
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="py-4 space-y-2">
+                  <Label htmlFor="reason">Justificativa <span className="text-destructive">*</span></Label>
+                  <Textarea
+                      id="reason"
+                      value={decisionState.reason}
+                      onChange={(e) => setDecisionState(prev => ({...prev, reason: e.target.value}))}
+                      placeholder="Ex: Item fora de especificação, valor acima do orçado, etc."
+                  />
+              </div>
+              <DialogFooter>
+                  <Button variant="ghost" onClick={() => setDecisionState(prev => ({...prev, isOpen: false}))}>Cancelar</Button>
+                  <Button
+                      onClick={() => handleDecision(decisionState.requisitionId!, decisionState.type === 'reject' ? 'Recusada' : 'Em Revisão', decisionState.reason)}
+                      disabled={!decisionState.reason || isProcessing === decisionState.requisitionId}
+                      variant={decisionState.type === 'reject' ? 'destructive' : 'default'}
+                  >
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'Confirmar'}
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </>
   );
 };

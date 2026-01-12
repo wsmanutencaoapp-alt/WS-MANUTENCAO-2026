@@ -418,12 +418,14 @@
         "requesterName": { "type": "string", "description": "Name of the user who created the request." },
         "costCenterId": { "type": "string", "description": "ID of the associated Cost Center." },
         "neededByDate": { "type": "string", "format": "date", "description": "The date when the items are needed." },
-        "status": { "type": "string", "enum": ["Aberta", "Em Aprovação", "Aprovada", "Recusada", "Concluída"], "description": "Current status of the requisition." },
+        "type": { "type": "string", "enum": ["Solicitação de Compra", "Ordem de Compra"], "description": "The type of purchase request."},
+        "status": { "type": "string", "enum": ["Aberta", "Em Aprovação", "Em Revisão", "Aprovada", "Recusada", "Concluída"], "description": "Current status of the requisition." },
+        "rejectionReason": { "type": "string", "description": "Reason for rejection or revision request." },
         "createdAt": { "type": "string", "format": "date-time" },
         "priority": { "type": "string", "enum": ["Normal", "Urgente", "Muito Urgente"], "description": "The priority of the purchase requisition." },
         "purchaseReason": { "type": "string", "description": "The reason or justification for the purchase." }
       },
-      "required": ["requesterId", "requesterName", "costCenterId", "neededByDate", "status", "createdAt", "priority", "purchaseReason"]
+      "required": ["requesterId", "requesterName", "costCenterId", "neededByDate", "status", "createdAt", "priority", "purchaseReason", "type"]
     },
     "PurchaseRequisitionItem": {
       "$schema": "http://json-schema.org/draft-07/schema#",

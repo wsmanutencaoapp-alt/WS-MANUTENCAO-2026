@@ -28,20 +28,15 @@ import { format } from 'date-fns';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
-  switch (status) {
-    case 'Aberta':
-      return 'default';
-    case 'Em Aprovação':
-      return 'secondary';
-    case 'Aprovada':
-      return 'success';
-    case 'Recusada':
-      return 'destructive';
-    case 'Concluída':
-      return 'outline';
-    default:
-      return 'secondary';
-  }
+  const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
+    'Aberta': 'secondary',
+    'Em Aprovação': 'default',
+    'Em Revisão': 'warning',
+    'Aprovada': 'success',
+    'Recusada': 'destructive',
+    'Concluída': 'secondary',
+  };
+  return variants[status] || 'secondary';
 };
 
 const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {

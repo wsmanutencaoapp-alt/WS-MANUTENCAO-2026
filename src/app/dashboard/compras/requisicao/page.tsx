@@ -47,8 +47,10 @@ const RequisicaoCompraPage = () => {
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   
-  const [priority, setPriority] = useState<'Normal' | 'Urgente' | 'Muito Urgente'>('Normal');
+  const [priority, setPriority] = useState<PurchaseRequisition['priority']>('Normal');
   const [purchaseReason, setPurchaseReason] = useState('');
+  const [requisitionType, setRequisitionType] = useState<PurchaseRequisition['type']>('Solicitação de Compra');
+
 
   const suppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
   const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery, {queryKey: ['allSuppliesForReq']});
@@ -99,10 +101,11 @@ const RequisicaoCompraPage = () => {
             requesterName: user.displayName || user.email || 'Desconhecido',
             costCenterId: costCenterId,
             neededByDate: neededByDate.toISOString(),
-            status: 'Aberta',
+            status: 'Em Aprovação', // Send directly to approval
             createdAt: new Date().toISOString(),
             priority: priority,
             purchaseReason: purchaseReason,
+            type: requisitionType,
         };
         batch.set(requisitionRef, requisitionData);
 
@@ -121,12 +124,13 @@ const RequisicaoCompraPage = () => {
         
         await batch.commit();
 
-        toast({ title: 'Sucesso!', description: 'Sua requisição de compra foi criada.' });
+        toast({ title: 'Sucesso!', description: 'Sua requisição de compra foi enviada para aprovação.' });
         setCart([]);
         setCostCenterId('');
         setNeededByDate(undefined);
         setPurchaseReason('');
         setPriority('Normal');
+        setRequisitionType('Solicitação de Compra');
     } catch(err) {
         console.error("Erro ao criar requisição:", err);
         toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível criar a requisição.' });
@@ -142,7 +146,7 @@ const RequisicaoCompraPage = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart />
-            Nova Requisição de Compra
+            Nova Requisição
           </CardTitle>
           <CardDescription>Preencha os dados da requisição e adicione os itens necessários.</CardDescription>
         </CardHeader>
@@ -154,8 +158,18 @@ const RequisicaoCompraPage = () => {
                   <Label htmlFor="purchaseReason">Motivo da Compra <span className="text-destructive">*</span></Label>
                   <Textarea id="purchaseReason" value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} placeholder="Ex: Item para manutenção corretiva da aeronave PR-ABC." />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-1.5">
+                      <Label htmlFor="requisitionType">Tipo de Requisição <span className="text-destructive">*</span></Label>
+                      <Select value={requisitionType} onValueChange={(v) => setRequisitionType(v as any)}>
+                          <SelectTrigger id="requisitionType"><SelectValue/></SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="Solicitação de Compra">Solicitação de Compra</SelectItem>
+                              <SelectItem value="Ordem de Compra">Ordem de Compra</SelectItem>
+                          </SelectContent>
+                      </Select>
+                  </div>
+                   <div className="space-y-1.5">
                       <Label htmlFor="costCenter">Centro de Custo <span className="text-destructive">*</span></Label>
                       <Select value={costCenterId} onValueChange={setCostCenterId} disabled={isLoadingCostCenters}>
                           <SelectTrigger id="costCenter">
@@ -276,7 +290,7 @@ const RequisicaoCompraPage = () => {
         <CardFooter>
           <Button className="w-full" onClick={handleSubmitRequisition} disabled={isSubmitting || cart.length === 0 || !costCenterId || !neededByDate || !purchaseReason}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Enviar Requisição
+              Enviar para Aprovação
           </Button>
         </CardFooter>
       </Card>
