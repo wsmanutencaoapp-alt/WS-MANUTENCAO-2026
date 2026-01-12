@@ -53,6 +53,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const CadastroFornecedoresPage = () => {
   const firestore = useFirestore();
@@ -114,16 +116,24 @@ const CadastroFornecedoresPage = () => {
             name: formData.name,
             cnpj: formData.cnpj,
             contactEmail: formData.contactEmail,
-            contactPhone: formData.contactPhone,
-            rating: formData.rating,
+            contactPhone: formData.contactPhone || '',
+            rating: formData.rating || 0,
         };
 
         if (editingSupplier) {
             const docRef = doc(firestore, 'suppliers', editingSupplier.docId);
-            await updateDoc(docRef, dataToSave);
+            updateDoc(docRef, dataToSave).catch(() => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path, operation: 'update', requestResourceData: dataToSave
+                }));
+            });
             toast({ title: 'Sucesso!', description: 'Fornecedor atualizado.' });
         } else {
-            await addDoc(collection(firestore, 'suppliers'), dataToSave);
+            addDoc(collection(firestore, 'suppliers'), dataToSave).catch(() => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'suppliers', operation: 'create', requestResourceData: dataToSave
+                }));
+            });
             toast({ title: 'Sucesso!', description: `Fornecedor ${formData.name} cadastrado.` });
         }
 
@@ -131,6 +141,8 @@ const CadastroFornecedoresPage = () => {
         setIsDialogOpen(false);
         resetForm();
     } catch (e: any) {
+        // This catch block might not be reached if the promise is not awaited,
+        // but it's good practice to keep it.
         console.error("Erro ao salvar fornecedor: ", e);
         toast({ variant: 'destructive', title: 'Erro na Operação', description: e.message });
     } finally {
@@ -145,8 +157,9 @@ const CadastroFornecedoresPage = () => {
       toast({ title: 'Sucesso!', description: 'Fornecedor excluído.' });
       queryClient.invalidateQueries({ queryKey });
     } catch (e: any) {
-       console.error("Erro ao excluir fornecedor: ", e);
-       toast({ variant: 'destructive', title: 'Erro na Operação', description: e.message });
+       errorEmitter.emit('permission-error', new FirestorePermissionError({
+           path: `suppliers/${supplierId}`, operation: 'delete'
+       }));
     }
   };
 

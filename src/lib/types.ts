@@ -3,6 +3,7 @@
 
 
 
+
 export type Supply = {
   id?: string;
   // Identificação
@@ -157,7 +158,7 @@ export type Permissions = {
   compras_aprovacoes?: boolean;
   compras_controle?: boolean;
   compras_requisicao?: boolean;
-  financeiro_visao-geral?: boolean;
+  financeiro_visao_geral?: boolean;
   financeiro_orcamento?: boolean;
   financeiro_budget?: boolean;
   financeiro_despesas?: boolean;
@@ -168,7 +169,9 @@ export type Permissions = {
   cadastros?: boolean;
   cadastros_ferramentas?: boolean;
   cadastros_suprimentos?: boolean;
+  cadastros_fornecedores?: boolean;
   cadastros_enderecos?: boolean;
+  cadastros_centro_custo?: boolean;
   engenharia?: boolean;
   engenharia_aprovacoes?: boolean;
   engenharia_projetos?: boolean;

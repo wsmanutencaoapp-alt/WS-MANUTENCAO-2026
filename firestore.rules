@@ -59,8 +59,8 @@ service cloud.firestore {
     }
     
     match /suppliers/{supplierId} {
-      allow read: if hasPermission('compras');
-      allow write: if hasPermission('compras');
+      allow read: if hasPermission('cadastros_fornecedores');
+      allow write: if hasPermission('cadastros_fornecedores');
     }
     
     match /operation_records/{operationRecordId} {

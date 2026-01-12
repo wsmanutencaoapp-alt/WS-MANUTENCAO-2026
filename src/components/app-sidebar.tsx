@@ -77,6 +77,7 @@ const allNavItems: NavItem[] = [
     subItems: [
         { href: '/dashboard/cadastros/ferramentas', label: 'Ferramentas', permission: 'cadastros_ferramentas' },
         { href: '/dashboard/cadastros/suprimentos', label: 'Suprimentos', permission: 'cadastros_suprimentos' },
+        { href: '/dashboard/cadastros/fornecedores', label: 'Fornecedores', permission: 'cadastros_fornecedores' },
         { href: '/dashboard/cadastros/enderecos', label: 'Endereços', permission: 'cadastros_enderecos' },
         { href: '/dashboard/cadastros/centro-de-custo', label: 'Centro de Custo', permission: 'cadastros_centro_custo' },
     ]
