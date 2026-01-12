@@ -148,6 +148,18 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                         <p className="font-medium">{requisition?.purchaseReason}</p>
                     </div>
                 </div>
+                {requisition?.rejectionReason && (
+                    <>
+                        <Separator />
+                        <div className="flex items-start gap-2 text-sm text-orange-600 dark:text-orange-400">
+                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0"/>
+                            <div>
+                                <p className="font-semibold">Motivo da Revisão/Recusa</p>
+                                <p className="font-medium">{requisition?.rejectionReason}</p>
+                            </div>
+                        </div>
+                    </>
+                )}
           </div>
           
           {/* Items List */}
