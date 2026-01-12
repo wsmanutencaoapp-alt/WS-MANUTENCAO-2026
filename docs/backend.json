@@ -759,6 +759,22 @@
         "requestedAt",
         "toolIds"
       ]
+    },
+    "Notification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Notification",
+      "type": "object",
+      "description": "Represents a user notification.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "The UID of the user this notification is for." },
+        "title": { "type": "string", "description": "The title of the notification." },
+        "message": { "type": "string", "description": "The main content of the notification." },
+        "link": { "type": "string", "description": "A URL to navigate to when the notification is clicked." },
+        "read": { "type": "boolean", "description": "Whether the notification has been read." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "message", "link", "read", "createdAt"]
     }
   },
   "auth": {
@@ -809,6 +825,10 @@
         "definition": { "schema": { "$ref": "#/backend/entities/Employee" }, "description": "Stores employee information." }
       },
       {
+        "path": "/employees/{employeeId}/notifications/{notificationId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/Notification" }, "description": "Stores user-specific notifications." }
+      },
+      {
         "path": "/expenses/{expenseId}",
         "definition": { "schema": { "$ref": "#/backend/entities/Despesa" }, "description": "Stores financial expense records." }
       },
@@ -831,3 +851,6 @@
     ]
   }
 }
+
+
+    

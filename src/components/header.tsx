@@ -53,6 +53,8 @@ import type { Employee } from '@/lib/types';
 import { useMemo } from 'react';
 import { ThemeToggle } from './theme-toggle';
 import Image from 'next/image';
+import Notifications from './Notifications';
+
 
 const allNavItems: NavItem[] = [
   { 
@@ -276,6 +278,7 @@ export function Header() {
       </Sheet>
       <div className="relative ml-auto flex items-center gap-2 md:grow-0">
         <ThemeToggle />
+        <Notifications />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -337,3 +340,5 @@ export function Header() {
     </header>
   );
 }
+
+    

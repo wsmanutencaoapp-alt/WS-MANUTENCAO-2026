@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, updateDoc, getDocs, documentId } from 'firebase/firestore';
-import type { PurchaseRequisition, PurchaseRequisitionItem, CostCenter, Supply, Tool } from '@/lib/types';
+import { collection, query, where, doc, updateDoc, getDocs, documentId, writeBatch, addDoc } from 'firebase/firestore';
+import type { PurchaseRequisition, PurchaseRequisitionItem, CostCenter, Supply, Tool, Notification } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -59,7 +59,8 @@ const AprovacoesComprasPage = () => {
       requisitionId: string | null;
       type: 'reject' | 'review';
       reason: string;
-  }>({ isOpen: false, requisitionId: null, type: 'reject', reason: '' });
+      requesterId: string | null;
+  }>({ isOpen: false, requisitionId: null, type: 'reject', reason: '', requesterId: null });
 
   const queryKey = 'pendingPurchaseRequisitions';
   const requisitionsQuery = useMemoFirebase(() => {
@@ -102,19 +103,36 @@ const AprovacoesComprasPage = () => {
     calculateTotals();
   }, [requisitions, firestore]);
 
-  const handleDecision = async (requisitionId: string, newStatus: 'Aprovada' | 'Recusada' | 'Em Revisão', reason?: string) => {
+  const handleDecision = async (requisitionId: string, newStatus: 'Aprovada' | 'Recusada' | 'Em Revisão', requesterId: string, reason?: string) => {
       if (!firestore) return;
       setIsProcessing(requisitionId);
+      
+      const batch = writeBatch(firestore);
       const reqRef = doc(firestore, 'purchase_requisitions', requisitionId);
+
+      const updateData: { status: string; rejectionReason?: string } = { status: newStatus };
+      if (reason) {
+          updateData.rejectionReason = reason;
+      }
+      batch.update(reqRef, updateData);
+      
+      // Create notification
+      const notificationRef = doc(collection(firestore, `employees/${requesterId}/notifications`));
+      const notification: Omit<Notification, 'id'> = {
+          userId: requesterId,
+          title: `Requisição ${newStatus}`,
+          message: `Sua requisição ${decisionState.requisitionId?.substring(0,6)} foi marcada como "${newStatus}". ${reason ? `Motivo: ${reason}` : ''}`,
+          link: '/dashboard/compras/requisicao',
+          read: false,
+          createdAt: new Date().toISOString(),
+      };
+      batch.set(notificationRef, notification);
+
       try {
-          const updateData: { status: string; rejectionReason?: string } = { status: newStatus };
-          if (reason) {
-              updateData.rejectionReason = reason;
-          }
-          await updateDoc(reqRef, updateData);
+          await batch.commit();
           toast({
               title: `Requisição ${newStatus}`,
-              description: `A requisição foi marcada como ${newStatus.toLowerCase()}.`,
+              description: `A requisição foi atualizada e o solicitante notificado.`,
               variant: newStatus === 'Recusada' ? 'destructive' : 'default',
           });
           queryClient.invalidateQueries({ queryKey: [queryKey] });
@@ -124,12 +142,12 @@ const AprovacoesComprasPage = () => {
           toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível processar a sua decisão.' });
       } finally {
           setIsProcessing(null);
-          setDecisionState({ isOpen: false, requisitionId: null, type: 'reject', reason: '' });
+          setDecisionState({ isOpen: false, requisitionId: null, type: 'reject', reason: '', requesterId: null });
       }
   }
 
-  const openDecisionDialog = (reqId: string, type: 'reject' | 'review') => {
-      setDecisionState({ isOpen: true, requisitionId: reqId, type, reason: '' });
+  const openDecisionDialog = (reqId: string, type: 'reject' | 'review', requesterId: string) => {
+      setDecisionState({ isOpen: true, requisitionId: reqId, type, reason: '', requesterId });
   }
 
   const filteredRequisitions = useMemo(() => {
@@ -216,13 +234,13 @@ const AprovacoesComprasPage = () => {
                                 <Button variant="ghost" size="icon" onClick={() => setSelectedRequisition(req)} title="Ver Itens">
                                     <Eye className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700" onClick={() => handleDecision(req.docId, 'Aprovada')} title="Aprovar">
+                                <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700" onClick={() => handleDecision(req.docId, 'Aprovada', req.requesterId)} title="Aprovar">
                                     <CheckCircle className="h-5 w-5" />
                                 </Button>
-                                 <Button variant="ghost" size="icon" className="text-orange-500 hover:text-orange-600" onClick={() => openDecisionDialog(req.docId, 'review')} title="Pedir Revisão">
+                                 <Button variant="ghost" size="icon" className="text-orange-500 hover:text-orange-600" onClick={() => openDecisionDialog(req.docId, 'review', req.requesterId)} title="Pedir Revisão">
                                     <MessageSquareWarning className="h-5 w-5" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => openDecisionDialog(req.docId, 'reject')} title="Rejeitar">
+                                <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => openDecisionDialog(req.docId, 'reject', req.requesterId)} title="Rejeitar">
                                     <XCircle className="h-5 w-5" />
                                 </Button>
                             </>
@@ -264,7 +282,7 @@ const AprovacoesComprasPage = () => {
               <DialogFooter>
                   <Button variant="ghost" onClick={() => setDecisionState(prev => ({...prev, isOpen: false}))}>Cancelar</Button>
                   <Button
-                      onClick={() => handleDecision(decisionState.requisitionId!, decisionState.type === 'reject' ? 'Recusada' : 'Em Revisão', decisionState.reason)}
+                      onClick={() => handleDecision(decisionState.requisitionId!, decisionState.type === 'reject' ? 'Recusada' : 'Em Revisão', decisionState.requesterId!, decisionState.reason)}
                       disabled={!decisionState.reason || isProcessing === decisionState.requisitionId}
                       variant={decisionState.type === 'reject' ? 'destructive' : 'default'}
                   >
@@ -278,3 +296,5 @@ const AprovacoesComprasPage = () => {
 };
 
 export default AprovacoesComprasPage;
+
+    

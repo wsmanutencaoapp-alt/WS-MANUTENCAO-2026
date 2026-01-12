@@ -256,3 +256,15 @@ export type PurchaseRequisitionItem = {
     notes?: string;
     attachmentUrl?: string;
 };
+
+export type Notification = {
+    id?: string;
+    userId: string;
+    title: string;
+    message: string;
+    link: string;
+    read: boolean;
+    createdAt: string; // ISO date string
+};
+
+    

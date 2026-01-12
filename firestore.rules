@@ -89,6 +89,11 @@ service cloud.firestore {
                       !('accessLevel' in request.resource.data) &&
                       !('permissions' in request.resource.data) &&
                       !('status' in request.resource.data));
+      
+      match /notifications/{notificationId} {
+        // A user can only access their own notifications
+        allow read, write: if request.auth.uid == employeeId;
+      }
     }
     
     match /expenses/{expenseId} {
@@ -133,3 +138,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
