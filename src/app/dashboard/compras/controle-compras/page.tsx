@@ -72,9 +72,10 @@ const ControleComprasPage = () => {
   const [requisitionForQuotation, setRequisitionForQuotation] = useState<WithDocId<PurchaseRequisition> | null>(null);
 
   const queryKey = 'approvedPurchaseRequisitions';
+  // Simplificando a query para evitar a necessidade de índices compostos complexos no Firestore
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Solicitação de Compra'), where('status', 'in', ['Aprovada', 'Parcialmente Atendida']));
+    return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Solicitação de Compra'));
   }, [firestore]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
@@ -104,17 +105,19 @@ const ControleComprasPage = () => {
   const sortedAndFilteredRequisitions = useMemo(() => {
     if (!requisitions) return [];
 
-    let filtered = requisitions;
+    // Filtro de status feito no lado do cliente
+    let relevantRequisitions = requisitions.filter(req => ['Aprovada', 'Parcialmente Atendida', 'Em Cotação'].includes(req.status));
+
     if (searchTerm) {
         const lowercasedTerm = searchTerm.toLowerCase();
-        filtered = requisitions.filter(req => 
+        relevantRequisitions = relevantRequisitions.filter(req => 
             (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
             req.requesterName.toLowerCase().includes(lowercasedTerm) ||
             (costCenterMap.get(req.costCenterId) || '').toLowerCase().includes(lowercasedTerm)
         );
     }
     
-    return filtered.sort((a, b) => {
+    return relevantRequisitions.sort((a, b) => {
         const priorityA = priorityOrder[a.priority] || 3;
         const priorityB = priorityOrder[b.priority] || 3;
         if (priorityA !== priorityB) {
@@ -144,7 +147,7 @@ const ControleComprasPage = () => {
         <h1 className="text-2xl font-bold">Controle de Compras</h1>
         <Card>
           <CardHeader>
-            <CardTitle>Requisições Aprovadas</CardTitle>
+            <CardTitle>Requisições Aprovadas e Em Cotação</CardTitle>
             <CardDescription>
               Gerencie as requisições de compra aprovadas e inicie o processo de cotação e compra.
             </CardDescription>
@@ -179,7 +182,7 @@ const ControleComprasPage = () => {
                   <TableRow><TableCell colSpan={7} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
                 )}
                 {!isLoading && sortedAndFilteredRequisitions.length === 0 && (
-                   <TableRow><TableCell colSpan={7} className="h-24 text-center">Nenhuma requisição aprovada encontrada.</TableCell></TableRow>
+                   <TableRow><TableCell colSpan={7} className="h-24 text-center">Nenhuma requisição aprovada ou em cotação encontrada.</TableCell></TableRow>
                 )}
                 {!isLoading && sortedAndFilteredRequisitions.map(req => (
                   <TableRow key={req.docId}>
@@ -198,7 +201,7 @@ const ControleComprasPage = () => {
                        </Button>
                        <Button size="sm" onClick={() => handleStartPurchaseProcess(req)}>
                            <ShoppingBag className="mr-2 h-4 w-4"/>
-                           Iniciar Processo
+                           {req.status === 'Em Cotação' ? 'Gerenciar Cotação' : 'Iniciar Processo'}
                        </Button>
                     </TableCell>
                   </TableRow>
@@ -230,5 +233,3 @@ const ControleComprasPage = () => {
 };
 
 export default ControleComprasPage;
-
-      
