@@ -95,6 +95,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         setSelectedQuotationIndex(null);
         setJustification('');
         setPurchaseOrderNotes('');
+        setSupplierSearch('');
     }
   }, [isOpen, items]);
 
@@ -113,6 +114,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     };
     setQuotations(updatedQuotations);
     setActivePopover(null);
+    setSupplierSearch('');
   };
   
   const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
