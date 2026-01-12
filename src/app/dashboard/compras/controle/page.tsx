@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, runTransaction, doc, where } from 'firebase/firestore';
+import { collection, query, orderBy, runTransaction, doc, getDocs, where } from 'firebase/firestore';
 import type { PurchaseRequisition, CostCenter } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -70,22 +69,11 @@ export default function GestaoDeComprasPage() {
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
       queryKey: [queryKey]
   });
-
-  const costCenterIds = useMemo(() => {
-    if (!requisitions) return [];
-    return [...new Set(requisitions.map(r => r.costCenterId))];
-  }, [requisitions]);
-
-  const costCentersQuery = useMemoFirebase(() => {
-      if (!firestore || costCenterIds.length === 0) return null;
-      // The documentId() function is available by default, no special import needed for it.
-      return query(collection(firestore, 'cost_centers'), where(doc.name, 'in', costCenterIds));
-  }, [firestore, costCenterIds]);
-
-  const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery, {
-      queryKey: ['costCentersForMyReqs', costCenterIds.join(',')],
-      enabled: costCenterIds.length > 0,
-  });
+  
+  const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(
+    useMemoFirebase(() => (firestore ? query(collection(firestore, 'cost_centers')) : null), [firestore]),
+    { queryKey: ['allCostCentersForGestao'] }
+  );
   
   const costCenterMap = useMemo(() => {
       if (!costCenters) return new Map<string, string>();
@@ -224,11 +212,13 @@ export default function GestaoDeComprasPage() {
         </Card>
       </div>
 
-      <PurchaseRequisitionDetailsDialog
-        requisition={selectedRequisition}
-        isOpen={!!selectedRequisition}
-        onClose={() => setSelectedRequisition(null)}
-      />
+      {selectedRequisition && (
+        <PurchaseRequisitionDetailsDialog
+          requisition={selectedRequisition}
+          isOpen={!!selectedRequisition}
+          onClose={() => setSelectedRequisition(null)}
+        />
+      )}
     </>
   );
 };

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -49,27 +48,25 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   const toolIds = useMemo(() => items?.filter(i => i.itemType === 'tool').map(i => i.itemId) || [], [items]);
 
   // Fetch supply master data
-  const { data: supplyMasterData, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(
-    useMemoFirebase(() => {
+  const suppliesQuery = useMemoFirebase(() => {
       if (!firestore || supplyIds.length === 0) return null;
       return query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds));
-    }, [firestore, supplyIds.join(',')]), { enabled: supplyIds.length > 0 && isOpen }
-  );
+  }, [firestore, supplyIds.join(',')]);
+  const { data: supplyMasterData, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery, { enabled: supplyIds.length > 0 && isOpen });
 
   // Fetch tool master data
-  const { data: toolMasterData, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(
-    useMemoFirebase(() => {
-      if (!firestore || toolIds.length === 0) return null;
-      return query(collection(firestore, 'tools'), where(documentId(), 'in', toolIds));
-    }, [firestore, toolIds.join(',')]), { enabled: toolIds.length > 0 && isOpen }
-  );
+  const toolsQuery = useMemoFirebase(() => {
+    if (!firestore || toolIds.length === 0) return null;
+    return query(collection(firestore, 'tools'), where(documentId(), 'in', toolIds));
+  }, [firestore, toolIds.join(',')]);
+  const { data: toolMasterData, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery, { enabled: toolIds.length > 0 && isOpen });
 
 
   const costCenterQuery = useMemoFirebase(() => {
     if (!firestore || !requisition) return null;
     return query(collection(firestore, 'cost_centers'), where(documentId(), '==', requisition.costCenterId));
   }, [firestore, requisition]);
-  const { data: costCenterData } = useCollection<WithDocId<CostCenter>>(costCenterQuery, { queryKey: ['costCenterForReq', requisition?.costCenterId], enabled: !!requisition && isOpen });
+  const { data: costCenterData, isLoading: isLoadingCostCenter } = useCollection<WithDocId<CostCenter>>(costCenterQuery, { queryKey: ['costCenterForReq', requisition?.costCenterId], enabled: !!requisition && isOpen });
   const costCenter = useMemo(() => costCenterData?.[0], [costCenterData]);
 
 
@@ -97,7 +94,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     }
   }
 
-  const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools;
+  const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
