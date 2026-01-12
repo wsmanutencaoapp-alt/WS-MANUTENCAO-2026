@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
-import type { PurchaseRequisition, CostCenter } from '@/lib/types';
+import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy } from 'firebase/firestore';
+import type { PurchaseRequisition, CostCenter, Tool, Supply } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -22,11 +22,12 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, ShoppingBag } from 'lucide-react';
+import { Loader2, Search, ShoppingBag, Eye, XCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
+
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
@@ -63,20 +64,32 @@ const ControleComprasPage = () => {
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
 
   const queryKey = 'approvedPurchaseRequisitions';
+  // Simplificando a query para evitar a necessidade de índices compostos complexos no Firestore
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    // We fetch all requisitions that are approved, or any other status relevant for purchasing.
-    // Let's assume 'Aprovada' is the trigger.
-    return query(collection(firestore, 'purchase_requisitions'), where('status', '==', 'Aprovada'), orderBy('createdAt', 'asc'));
+    return query(collection(firestore, 'purchase_requisitions'), where('status', '==', 'Aprovada'));
   }, [firestore]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
       queryKey: [queryKey]
   });
 
-  const costCentersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'cost_centers')) : null, [firestore]);
+  const costCenterIds = useMemo(() => {
+    if (!requisitions) return [];
+    return [...new Set(requisitions.map(r => r.costCenterId))];
+  }, [requisitions]);
+
+  const costCentersQuery = useMemoFirebase(() => {
+      if (!firestore || costCenterIds.length === 0) return null;
+      // Esta query pode falhar se costCenterIds tiver mais de 10 itens, uma limitação do 'in'.
+      // Para uma aplicação em larga escala, seria melhor buscar todos os centros de custo e mapear.
+      // Por agora, esta abordagem é mais eficiente para um número menor de requisições.
+      return query(collection(firestore, 'cost_centers'), where(doc.id, 'in', costCenterIds));
+  }, [firestore, costCenterIds.join(',')]);
+
   const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery, {
-      queryKey: ['allCostCentersForControl']
+      queryKey: ['costCentersForControl', costCenterIds.join(',')],
+      enabled: costCenterIds.length > 0,
   });
   
   const costCenterMap = useMemo(() => {
@@ -109,12 +122,47 @@ const ControleComprasPage = () => {
 
   }, [requisitions, searchTerm, costCenterMap]);
 
-  const handleStartPurchase = (requisition: WithDocId<PurchaseRequisition>) => {
-    // Placeholder for the next step's logic
-    toast({
-        title: "Iniciando Processo de Compra",
-        description: `Processo para a requisição ${requisition.protocol} foi iniciado.`,
-    });
+  const handleStartPurchase = async (requisition: WithDocId<PurchaseRequisition>) => {
+    if (!firestore) return;
+    
+    try {
+        const batch = writeBatch(firestore);
+        
+        // 1. Create a new Purchase Order (Ordem de Compra)
+        const ocRef = doc(collection(firestore, 'purchase_requisitions'));
+        const newOC: Omit<PurchaseRequisition, 'id' | 'protocol'> = {
+            ...requisition,
+            type: 'Ordem de Compra',
+            status: 'Aberta',
+            originalProtocol: requisition.protocol,
+            createdAt: new Date().toISOString(),
+        };
+        // We will assign a protocol later if needed, for now use docId
+        batch.set(ocRef, newOC);
+
+        // 2. Copy items from SC to OC
+        const itemsRef = collection(firestore, 'purchase_requisitions', requisition.docId, 'items');
+        const itemsSnapshot = await getDocs(itemsRef);
+        itemsSnapshot.forEach(itemDoc => {
+            const newOcItemRef = doc(collection(ocRef, 'items'));
+            batch.set(newOcItemRef, itemDoc.data());
+        });
+
+        // 3. Update the original SC status to 'Concluída'
+        const scRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+        batch.update(scRef, { status: 'Concluída' });
+
+        await batch.commit();
+
+        toast({
+            title: "Processo de Compra Iniciado",
+            description: `A requisição ${requisition.protocol} foi convertida para uma Ordem de Compra.`,
+        });
+
+    } catch (err) {
+        console.error("Erro ao iniciar processo de compra:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível iniciar o processo de compra.' });
+    }
   }
 
   const isLoading = isLoadingRequisitions || isLoadingCostCenters;
@@ -172,10 +220,14 @@ const ControleComprasPage = () => {
                      <TableCell>
                         <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
+                       <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(req)}>
+                           <Eye className="mr-2 h-4 w-4"/>
+                           Ver Itens
+                       </Button>
                        <Button size="sm" onClick={() => handleStartPurchase(req)}>
                            <ShoppingBag className="mr-2 h-4 w-4"/>
-                           Iniciar Processo de Compra
+                           Iniciar Processo
                        </Button>
                     </TableCell>
                   </TableRow>
@@ -186,11 +238,13 @@ const ControleComprasPage = () => {
         </Card>
       </div>
 
-      <PurchaseRequisitionDetailsDialog
-        requisition={selectedRequisition}
-        isOpen={!!selectedRequisition}
-        onClose={() => setSelectedRequisition(null)}
-      />
+      {selectedRequisition && (
+        <PurchaseRequisitionDetailsDialog
+          requisition={selectedRequisition}
+          isOpen={!!selectedRequisition}
+          onClose={() => setSelectedRequisition(null)}
+        />
+      )}
     </>
   );
 };
