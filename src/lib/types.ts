@@ -1,6 +1,7 @@
 
 
 
+
 export type Supply = {
   id?: string;
   // Identificação
@@ -273,7 +274,7 @@ export type PurchaseRequisitionItem = {
     itemType: 'supply' | 'tool';
     quantity: number;
     estimatedPrice?: number;
-    status: 'Pendente' | 'Cotado' | 'Recebido'; // Status within the original SC
+    status: 'Pendente' | 'Em Cotação' | 'Cotado' | 'Recebido' | 'Cancelado';
     notes?: string;
     attachmentUrl?: string;
 };
@@ -296,5 +297,3 @@ export type Supplier = {
     contactPhone?: string;
     rating?: number;
 };
-
-      

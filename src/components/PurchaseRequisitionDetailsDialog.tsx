@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, documentId } from 'firebase/firestore';
 import {
@@ -16,22 +16,29 @@ import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import { Loader2, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info, ShoppingBag } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
+import QuotationDialog from './QuotationDialog';
+import { useQueryClient } from '@tanstack/react-query';
+
 
 interface PurchaseRequisitionDetailsDialogProps {
   requisition: WithDocId<PurchaseRequisition> | null;
   isOpen: boolean;
   onClose: () => void;
+  onActionSuccess: () => void;
 }
 
-type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
+export type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
   details: Partial<WithDocId<Supply> | WithDocId<Tool>>;
 };
 
-export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose }: PurchaseRequisitionDetailsDialogProps) {
+export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose, onActionSuccess }: PurchaseRequisitionDetailsDialogProps) {
   const firestore = useFirestore();
+  const queryClient = useQueryClient();
+
+  const [itemForQuotation, setItemForQuotation] = useState<RequisitionItemWithDetails | null>(null);
 
   // Fetch requisition items
   const itemsQuery = useMemoFirebase(() => {
@@ -93,11 +100,18 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
         default: return 'secondary';
     }
   }
+  
+  const handleQuotationSuccess = () => {
+    setItemForQuotation(null);
+    queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
+    onActionSuccess();
+  }
 
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <>
+    <Dialog open={isOpen && !itemForQuotation} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Detalhes da Requisição</DialogTitle>
@@ -184,6 +198,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                           <div className="flex-1 text-sm">
                               <p className="font-bold">{item.details.descricao}</p>
                               <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
+                              <p><Badge variant={item.status === 'Pendente' ? 'default' : 'success'}>{item.status}</Badge></p>
                           </div>
                           <div className="text-right">
                               <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
@@ -205,6 +220,14 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                                </a>
                           </div>
                       )}
+                      {item.status === 'Pendente' && (
+                         <div className="flex justify-end pt-2">
+                            <Button size="sm" onClick={() => setItemForQuotation(item)}>
+                                <ShoppingBag className="mr-2 h-4 w-4" />
+                                Iniciar Cotação para este Item
+                            </Button>
+                         </div>
+                      )}
                   </div>
               ))}
           </div>
@@ -216,5 +239,16 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {itemForQuotation && requisition && (
+      <QuotationDialog
+        isOpen={!!itemForQuotation}
+        onClose={() => setItemForQuotation(null)}
+        requisition={requisition}
+        item={itemForQuotation}
+        onSuccess={handleQuotationSuccess}
+      />
+    )}
+    </>
   );
 }

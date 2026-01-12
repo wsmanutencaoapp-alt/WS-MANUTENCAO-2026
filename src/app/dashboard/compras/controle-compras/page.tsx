@@ -69,10 +69,8 @@ const ControleComprasPage = () => {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
-  const [requisitionForQuotation, setRequisitionForQuotation] = useState<WithDocId<PurchaseRequisition> | null>(null);
 
   const queryKey = 'approvedPurchaseRequisitions';
-  // Simplificando a query para evitar a necessidade de índices compostos complexos no Firestore
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Solicitação de Compra'));
@@ -105,7 +103,6 @@ const ControleComprasPage = () => {
   const sortedAndFilteredRequisitions = useMemo(() => {
     if (!requisitions) return [];
 
-    // Filtro de status feito no lado do cliente
     let relevantRequisitions = requisitions.filter(req => ['Aprovada', 'Parcialmente Atendida', 'Em Cotação'].includes(req.status));
 
     if (searchTerm) {
@@ -127,13 +124,9 @@ const ControleComprasPage = () => {
     });
 
   }, [requisitions, searchTerm, costCenterMap]);
-
-  const handleStartPurchaseProcess = async (requisition: WithDocId<PurchaseRequisition>) => {
-    setRequisitionForQuotation(requisition);
-  }
   
-  const handleQuotationSuccess = () => {
-    setRequisitionForQuotation(null);
+  const handleSuccess = () => {
+    setSelectedRequisition(null);
     queryClient.invalidateQueries({ queryKey });
     queryClient.invalidateQueries({ queryKey: 'pendingPurchaseRequisitions' });
   };
@@ -195,13 +188,9 @@ const ControleComprasPage = () => {
                         <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                       <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(req)}>
+                       <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
                            <Eye className="mr-2 h-4 w-4"/>
-                           Ver Itens
-                       </Button>
-                       <Button size="sm" onClick={() => handleStartPurchaseProcess(req)}>
-                           <ShoppingBag className="mr-2 h-4 w-4"/>
-                           {req.status === 'Em Cotação' ? 'Gerenciar Cotação' : 'Iniciar Processo'}
+                           Ver e Atender Itens
                        </Button>
                     </TableCell>
                   </TableRow>
@@ -217,15 +206,7 @@ const ControleComprasPage = () => {
           requisition={selectedRequisition}
           isOpen={!!selectedRequisition}
           onClose={() => setSelectedRequisition(null)}
-        />
-      )}
-      
-      {requisitionForQuotation && (
-        <QuotationDialog
-            isOpen={!!requisitionForQuotation}
-            onClose={() => setRequisitionForQuotation(null)}
-            requisition={requisitionForQuotation}
-            onSuccess={handleQuotationSuccess}
+          onActionSuccess={handleSuccess}
         />
       )}
     </>

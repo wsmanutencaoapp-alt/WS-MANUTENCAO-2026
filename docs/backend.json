@@ -405,43 +405,73 @@
       },
       "required": ["code", "description", "sector"]
     },
+     "Quotation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Quotation",
+      "type": "object",
+      "description": "Represents a single quotation from a supplier for a set of items.",
+      "properties": {
+        "supplierId": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "totalValue": { "type": "number" },
+        "deliveryTime": { "type": "number", "description": "Delivery time in days." },
+        "paymentTerms": { "type": "string" },
+        "attachmentUrl": { "type": "string", "format": "uri" }
+      },
+      "required": ["supplierId", "supplierName", "totalValue", "deliveryTime", "paymentTerms"]
+    },
     "PurchaseRequisition": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "PurchaseRequisition",
       "type": "object",
-      "description": "Represents the header of a purchase requisition (SC).",
+      "description": "Represents both a Purchase Requisition (SC) and a Purchase Order (OC).",
       "properties": {
         "id": { "type": "string" },
         "protocol": { "type": "string", "description": "Human-readable protocol number (SC- or OC-)." },
-        "originalProtocol": { "type": "string", "description": "If converted, stores the original SC protocol number for traceability." },
-        "requesterId": { "type": "string", "description": "UID of the user who created the request." },
-        "requesterName": { "type": "string", "description": "Name of the user who created the request." },
-        "costCenterId": { "type": "string", "description": "ID of the associated Cost Center." },
-        "neededByDate": { "type": "string", "format": "date", "description": "The date when the items are needed." },
-        "type": { "type": "string", "enum": ["Solicitação de Compra", "Ordem de Compra"], "description": "The type of purchase request."},
-        "status": { "type": "string", "enum": ["Aberta", "Em Aprovação", "Em Revisão", "Aprovada", "Recusada", "Concluída"], "description": "Current status of the requisition." },
-        "rejectionReason": { "type": "string", "description": "Reason for rejection or revision request." },
+        "originalRequisitionId": { "type": "string", "description": "If this is an OC, this links back to the original SC." },
+        "requesterId": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "costCenterId": { "type": "string" },
+        "neededByDate": { "type": "string", "format": "date" },
+        "type": { "type": "string", "enum": ["Solicitação de Compra", "Ordem de Compra"], "description": "Distinguishes between a requisition and an order." },
+        "status": {
+          "type": "string",
+          "enum": ["Aberta", "Parcialmente Atendida", "Totalmente Atendida", "Cancelada", "Em Cotação", "Em Aprovação", "Aprovada", "Recusada", "Concluída", "Em Revisão"],
+          "description": "Current status of the document."
+        },
+        "rejectionReason": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "priority": { "type": "string", "enum": ["Normal", "Urgente", "Muito Urgente"], "description": "The priority of the purchase requisition." },
-        "purchaseReason": { "type": "string", "description": "The reason or justification for the purchase." }
+        "priority": { "type": "string", "enum": ["Normal", "Urgente", "Muito Urgente"] },
+        "purchaseReason": { "type": "string" },
+        "quotations": {
+          "type": "array",
+          "items": { "$ref": "#/backend/entities/Quotation" }
+        },
+        "selectedQuotationIndex": { "type": "number" },
+        "expensiveChoiceJustification": { "type": "string" },
+        "purchaseOrderNotes": { "type": "string" },
+        "supplierId": { "type": "string", "description": "ID of the chosen supplier for the OC." },
+        "totalValue": { "type": "number", "description": "Final total value for the OC." },
+        "paymentTerms": { "type": "string", "description": "Final payment terms for the OC." }
       },
-      "required": ["protocol", "requesterId", "requesterName", "costCenterId", "neededByDate", "status", "createdAt", "priority", "purchaseReason", "type"]
+      "required": ["protocol", "requesterId", "requesterName", "costCenterId", "neededByDate", "type", "status", "createdAt", "priority", "purchaseReason"]
     },
     "PurchaseRequisitionItem": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "PurchaseRequisitionItem",
       "type": "object",
-      "description": "Represents a single item within a purchase requisition.",
+      "description": "Represents a single item within a purchase requisition or order.",
       "properties": {
         "id": { "type": "string" },
-        "itemId": { "type": "string", "description": "ID of the requested Supply or Tool item." },
-        "itemType": { "type": "string", "enum": ["supply", "tool"], "description": "The type of item being requested." },
+        "itemId": { "type": "string" },
+        "itemType": { "type": "string", "enum": ["supply", "tool"] },
         "quantity": { "type": "number" },
-        "estimatedPrice": { "type": "number", "description": "Estimated price per unit." },
-        "notes": { "type": "string", "description": "Additional notes or specifications for the item." },
-        "attachmentUrl": { "type": "string", "format": "uri", "description": "URL for an attached photo or reference." }
+        "estimatedPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pendente", "Em Cotação", "Cotado", "Recebido", "Cancelado"], "description": "Tracks the status of an individual item within the original SC." },
+        "notes": { "type": "string" },
+        "attachmentUrl": { "type": "string", "format": "uri" }
       },
-      "required": ["itemId", "itemType", "quantity"]
+      "required": ["itemId", "itemType", "quantity", "status"]
     },
     "Employee": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -842,11 +872,11 @@
       },
       {
         "path": "/purchase_requisitions/{requisitionId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/PurchaseRequisition" }, "description": "Stores the header for purchase requisitions." }
+        "definition": { "schema": { "$ref": "#/backend/entities/PurchaseRequisition" }, "description": "Stores the header for purchase requisitions and orders." }
       },
       {
         "path": "/purchase_requisitions/{requisitionId}/items/{itemId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/PurchaseRequisitionItem" }, "description": "Stores the items within a specific purchase requisition." }
+        "definition": { "schema": { "$ref": "#/backend/entities/PurchaseRequisitionItem" }, "description": "Stores the items within a specific purchase requisition or order." }
       }
     ]
   }
