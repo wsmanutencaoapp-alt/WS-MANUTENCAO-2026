@@ -9,7 +9,8 @@ import {
   writeBatch,
   getDocs,
   updateDoc,
-  addDoc
+  addDoc,
+  runTransaction
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -55,9 +56,9 @@ type QuotationFormState = {
   paymentTerms: string;
   attachmentUrl?: string;
   attachmentFile?: File | null;
-  // UI State
-  isPopoverOpen: boolean;
+  // UI State for search
   supplierSearch: string;
+  isPopoverOpen: boolean;
 };
 
 const emptyQuotation: QuotationFormState = {
@@ -67,8 +68,8 @@ const emptyQuotation: QuotationFormState = {
   deliveryTime: '',
   paymentTerms: '',
   attachmentFile: null,
-  isPopoverOpen: false,
   supplierSearch: '',
+  isPopoverOpen: false,
 };
 
 export default function QuotationDialog({ isOpen, onClose, onSuccess, requisition, items }: QuotationDialogProps) {
@@ -109,9 +110,15 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   };
   
   const handleSupplierSelect = (index: number, supplier: WithDocId<Supplier>) => {
-    handleQuotationChange(index, 'supplierId', supplier.docId);
-    handleQuotationChange(index, 'supplierName', supplier.name);
-    handleQuotationChange(index, 'isPopoverOpen', false);
+    const updatedQuotations = [...quotations];
+    updatedQuotations[index] = {
+      ...updatedQuotations[index],
+      supplierId: supplier.docId,
+      supplierName: supplier.name,
+      supplierSearch: supplier.name,
+      isPopoverOpen: false, // Close popover on select
+    };
+    setQuotations(updatedQuotations);
   };
   
   const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,6 +126,12 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           handleQuotationChange(index, 'attachmentFile', e.target.files[0]);
       }
   }
+
+  const handlePopoverOpenChange = (index: number, open: boolean) => {
+    const updatedQuotations = [...quotations];
+    updatedQuotations[index] = { ...updatedQuotations[index], isPopoverOpen: open };
+    setQuotations(updatedQuotations);
+  };
   
   const filledQuotations = useMemo(() => quotations.filter(q => q.supplierId && q.totalValue && q.deliveryTime && q.paymentTerms), [quotations]);
   
@@ -157,7 +170,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         const counterRef = doc(firestore, 'counters', 'purchaseOrders');
         let newId;
 
-        // This transaction logic is overly complex, but necessary to handle the case where the counter doesn't exist yet.
         await runTransaction(firestore, async (transaction) => {
             const counterDoc = await transaction.get(counterRef);
             let lastId = 0;
@@ -300,34 +312,30 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                            <Separator />
                            <div className="space-y-1.5">
                                <Label>Fornecedor</Label>
-                               <Popover open={q.isPopoverOpen} onOpenChange={(isOpen) => handleQuotationChange(index, 'isPopoverOpen', isOpen)}>
-                                  <PopoverTrigger asChild>
-                                      <Button variant="outline" className="w-full justify-between font-normal" disabled={isLoadingSuppliers}>
-                                      {isLoadingSuppliers ? <Loader2 className="h-4 w-4 animate-spin" /> : q.supplierName || "Selecione..."}
-                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
-                                      <Command>
-                                          <CommandInput
-                                            placeholder="Pesquisar..."
-                                            value={q.supplierSearch}
-                                            onValueChange={(value) => handleQuotationChange(index, 'supplierSearch', value)}
-                                          />
-                                          <CommandList>
-                                            <CommandEmpty>Nenhum fornecedor encontrado.</CommandEmpty>
-                                            <CommandGroup>
-                                              {(suppliers || []).filter(s => s.name.toLowerCase().includes(q.supplierSearch.toLowerCase())).map(s => (
-                                                <CommandItem key={s.docId} value={s.name} onSelect={() => handleSupplierSelect(index, s)}>
-                                                  <Check className={cn("mr-2 h-4 w-4", q.supplierId === s.docId ? "opacity-100" : "opacity-0")} />
-                                                  {s.name}
-                                                </CommandItem>
-                                              ))}
-                                            </CommandGroup>
-                                          </CommandList>
-                                      </Command>
-                                  </PopoverContent>
-                               </Popover>
+                                <Popover open={q.isPopoverOpen} onOpenChange={(open) => handlePopoverOpenChange(index, open)}>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-between font-normal" disabled={isLoadingSuppliers}>
+                                            {isLoadingSuppliers ? <Loader2 className="h-4 w-4 animate-spin" /> : q.supplierName || "Selecione..."}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                                        <Command>
+                                            <CommandInput placeholder="Pesquisar..." />
+                                            <CommandList>
+                                                <CommandEmpty>Nenhum fornecedor encontrado.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {(suppliers || []).map(s => (
+                                                        <CommandItem key={s.docId} value={s.name} onSelect={() => handleSupplierSelect(index, s)}>
+                                                            <Check className={cn("mr-2 h-4 w-4", q.supplierId === s.docId ? "opacity-100" : "opacity-0")} />
+                                                            {s.name}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
                            </div>
 
                            <div className="grid grid-cols-2 gap-4">
