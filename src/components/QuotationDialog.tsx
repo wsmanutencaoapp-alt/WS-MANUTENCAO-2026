@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card } from './ui/card';
 import { Separator } from './ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import SupplierSelectorDialog from './SupplierSelectorDialog';
 
@@ -263,7 +264,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   return (
     <>
-      <Dialog open={isOpen && !supplierSelectorOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
