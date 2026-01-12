@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, getDocs, doc } from 'firebase/firestore';
-import type { PurchaseRequisition, PurchaseRequisitionItem, CostCenter } from '@/lib/types';
+import { collection, query, orderBy } from 'firebase/firestore';
+import type { PurchaseRequisition, CostCenter } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Search, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   switch (status) {
@@ -56,6 +56,8 @@ const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
 const GestaoDeComprasPage = () => {
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
+
 
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -92,70 +94,78 @@ const GestaoDeComprasPage = () => {
   const isLoading = isLoadingRequisitions || isLoadingCostCenters;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Gestão de Compras</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Painel de Requisições</CardTitle>
-          <CardDescription>
-            Acompanhe e gerencie todas as requisições de compra da empresa.
-          </CardDescription>
-          <div className="relative pt-4">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Pesquisar por protocolo, solicitante, status..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Status</TableHead>
-                <TableHead>Protocolo</TableHead>
-                <TableHead>Data da Requisição</TableHead>
-                <TableHead>Solicitante</TableHead>
-                <TableHead>Centro de Custo</TableHead>
-                <TableHead>Data de Necessidade</TableHead>
-                <TableHead>Prioridade</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && (
-                <TableRow><TableCell colSpan={8} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
-              )}
-              {requisitionsError && (
-                <TableRow><TableCell colSpan={8} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
-              )}
-              {!isLoading && filteredRequisitions.length === 0 && (
-                 <TableRow><TableCell colSpan={8} className="h-24 text-center">Nenhuma requisição encontrada.</TableCell></TableRow>
-              )}
-              {!isLoading && filteredRequisitions.map(req => (
-                <TableRow key={req.docId}>
-                  <TableCell><Badge variant={getStatusVariant(req.status)}>{req.status}</Badge></TableCell>
-                  <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
-                  <TableCell>{format(new Date(req.createdAt), 'dd/MM/yyyy')}</TableCell>
-                  <TableCell>{req.requesterName}</TableCell>
-                  <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
-                  <TableCell>{format(new Date(req.neededByDate), 'dd/MM/yyyy')}</TableCell>
-                  <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm">
-                       <Eye className="mr-2 h-4 w-4" />
-                       Ver Itens
-                    </Button>
-                  </TableCell>
+    <>
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Gestão de Compras</h1>
+        <Card>
+          <CardHeader>
+            <CardTitle>Painel de Requisições</CardTitle>
+            <CardDescription>
+              Acompanhe e gerencie todas as requisições de compra da empresa.
+            </CardDescription>
+            <div className="relative pt-4">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar por protocolo, solicitante, status..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Protocolo</TableHead>
+                  <TableHead>Data da Requisição</TableHead>
+                  <TableHead>Solicitante</TableHead>
+                  <TableHead>Centro de Custo</TableHead>
+                  <TableHead>Data de Necessidade</TableHead>
+                  <TableHead>Prioridade</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+              </TableHeader>
+              <TableBody>
+                {isLoading && (
+                  <TableRow><TableCell colSpan={8} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                )}
+                {requisitionsError && (
+                  <TableRow><TableCell colSpan={8} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
+                )}
+                {!isLoading && filteredRequisitions.length === 0 && (
+                   <TableRow><TableCell colSpan={8} className="h-24 text-center">Nenhuma requisição encontrada.</TableCell></TableRow>
+                )}
+                {!isLoading && filteredRequisitions.map(req => (
+                  <TableRow key={req.docId}>
+                    <TableCell><Badge variant={getStatusVariant(req.status)}>{req.status}</Badge></TableCell>
+                    <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
+                    <TableCell>{format(new Date(req.createdAt), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell>{req.requesterName}</TableCell>
+                    <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
+                    <TableCell>{format(new Date(req.neededByDate), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(req)}>
+                         <Eye className="mr-2 h-4 w-4" />
+                         Ver Itens
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      <PurchaseRequisitionDetailsDialog
+        requisition={selectedRequisition}
+        isOpen={!!selectedRequisition}
+        onClose={() => setSelectedRequisition(null)}
+      />
+    </>
   );
 };
 
