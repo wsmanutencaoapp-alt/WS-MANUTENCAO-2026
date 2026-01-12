@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -9,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ShoppingCart, PlusCircle, Trash2, CalendarIcon, PackageSearch } from 'lucide-react';
+import { Loader2, ShoppingCart, PlusCircle, Trash2, CalendarIcon, PackageSearch, ListChecks } from 'lucide-react';
 import Image from 'next/image';
 import {
   Select,
@@ -26,6 +27,9 @@ import type { Supply, CostCenter, PurchaseRequisition, PurchaseRequisitionItem, 
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Textarea } from '@/components/ui/textarea';
 import ItemSelectorDialog from '@/components/ItemSelectorDialog';
+import MyRequisitionsTable from '@/components/MyRequisitionsTable';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 type RequisitionableItem = (WithDocId<Supply> | WithDocId<Tool>) & { itemType: 'supply' | 'tool' };
 type CartItem = RequisitionableItem & { 
@@ -155,158 +159,176 @@ const RequisicaoCompraPage = () => {
 
   return (
     <>
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart />
-            Nova Requisição
-          </CardTitle>
-          <CardDescription>Preencha os dados da requisição e adicione os itens necessários.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Header Fields */}
-          <div className="space-y-4 rounded-lg border p-4">
-              <h3 className="font-semibold text-lg">Detalhes da Requisição</h3>
-             <div className="space-y-1.5">
-                  <Label htmlFor="purchaseReason">Motivo da Compra <span className="text-destructive">*</span></Label>
-                  <Textarea id="purchaseReason" value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} placeholder="Ex: Item para manutenção corretiva da aeronave PR-ABC." />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-1.5">
-                      <Label htmlFor="requisitionType">Tipo de Requisição <span className="text-destructive">*</span></Label>
-                      <Select value={requisitionType} onValueChange={(v) => setRequisitionType(v as any)}>
-                          <SelectTrigger id="requisitionType"><SelectValue/></SelectTrigger>
-                          <SelectContent>
-                              <SelectItem value="Solicitação de Compra">Solicitação de Compra</SelectItem>
-                              <SelectItem value="Ordem de Compra">Ordem de Compra</SelectItem>
-                          </SelectContent>
-                      </Select>
-                  </div>
-                   <div className="space-y-1.5">
-                      <Label htmlFor="costCenter">Centro de Custo <span className="text-destructive">*</span></Label>
-                      <Select value={costCenterId} onValueChange={setCostCenterId} disabled={isLoadingCostCenters}>
-                          <SelectTrigger id="costCenter">
-                              <SelectValue placeholder={isLoadingCostCenters ? "Carregando..." : "Selecione"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                              {costCenters?.map(cc => (
-                                  <SelectItem key={cc.docId} value={cc.docId}>({cc.code}) {cc.description}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                      <Label htmlFor="priority">Prioridade <span className="text-destructive">*</span></Label>
-                      <Select value={priority} onValueChange={(v) => setPriority(v as any)}>
-                          <SelectTrigger id="priority"><SelectValue/></SelectTrigger>
-                          <SelectContent>
-                              <SelectItem value="Normal">Normal</SelectItem>
-                              <SelectItem value="Urgente">Urgente</SelectItem>
-                              <SelectItem value="Muito Urgente">Muito Urgente</SelectItem>
-                          </SelectContent>
-                      </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                      <Label>Data de Necessidade <span className="text-destructive">*</span></Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full justify-start text-left font-normal">
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {neededByDate ? format(neededByDate, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                              mode="single"
-                              selected={neededByDate}
-                              onSelect={setNeededByDate}
-                              initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                  </div>
-              </div>
-          </div>
-          
-          {/* Cart Items */}
-          <div className="space-y-4">
-            <div className='flex justify-between items-center'>
-                <h3 className="font-semibold text-lg">Itens da Requisição ({cart.length})</h3>
-                <Button variant="outline" onClick={() => setIsSelectorOpen(true)}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Adicionar Item ao Carrinho
-                </Button>
-            </div>
-            <ScrollArea className="h-64 border rounded-md">
-                {cart.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                        <PackageSearch className="h-10 w-10 mb-2"/>
-                        <p>Seu carrinho está vazio.</p>
-                        <p className="text-sm">Clique em "Adicionar Item" para começar.</p>
+      <h1 className="text-2xl font-bold mb-6">Requisição de Compra</h1>
+      <Tabs defaultValue="new" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="new">
+                <ShoppingCart className="mr-2 h-4 w-4"/>
+                Nova Requisição
+            </TabsTrigger>
+            <TabsTrigger value="history">
+                <ListChecks className="mr-2 h-4 w-4"/>
+                Minhas Solicitações
+            </TabsTrigger>
+        </TabsList>
+        <TabsContent value="new">
+            <Card className="w-full mt-4">
+                <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    Nova Requisição
+                </CardTitle>
+                <CardDescription>Preencha os dados da requisição e adicione os itens necessários.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                {/* Header Fields */}
+                <div className="space-y-4 rounded-lg border p-4">
+                    <h3 className="font-semibold text-lg">Detalhes da Requisição</h3>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="purchaseReason">Motivo da Compra <span className="text-destructive">*</span></Label>
+                        <Textarea id="purchaseReason" value={purchaseReason} onChange={(e) => setPurchaseReason(e.target.value)} placeholder="Ex: Item para manutenção corretiva da aeronave PR-ABC." />
                     </div>
-                ) : (
-                    <div className="space-y-3 p-3">
-                    {cart.map(item => (
-                        <Card key={item.docId} className="p-3 shadow-none">
-                            <div className="flex items-start gap-4">
-                                <Image
-                                    src={item.imageUrl || 'https://picsum.photos/seed/item/64/64'}
-                                    alt={item.descricao}
-                                    width={48}
-                                    height={48}
-                                    className="rounded-md aspect-square object-cover"
-                                />
-                                <div className="flex-1 text-sm space-y-2">
-                                    <p className="font-bold">{item.descricao}</p>
-                                    <p className="font-mono text-xs text-muted-foreground">{item.codigo}</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        <Input 
-                                            type="number" 
-                                            placeholder="Qtd."
-                                            value={item.requisitionQuantity}
-                                            onChange={(e) => updateCartItem(item.docId, 'requisitionQuantity', Math.max(1, parseInt(e.target.value) || 1))}
-                                            className="h-8 text-center"
-                                            min="1"
-                                        />
-                                        <Input
-                                            type="number"
-                                            placeholder="Preço Est. (R$)"
-                                            value={item.estimatedPrice || ''}
-                                            onChange={(e) => updateCartItem(item.docId, 'estimatedPrice', parseFloat(e.target.value) || undefined)}
-                                            className="h-8 text-center"
-                                        />
-                                    </div>
-                                    <Input
-                                        placeholder="Observação (opcional)"
-                                        value={item.notes || ''}
-                                        onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
-                                        className="h-8 text-sm"
-                                    />
-                                    <Input
-                                        placeholder="Link de referência (opcional)"
-                                        value={item.attachmentUrl || ''}
-                                        onChange={(e) => updateCartItem(item.docId, 'attachmentUrl', e.target.value)}
-                                        className="h-8 text-sm"
-                                    />
-                                </div>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.docId)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="requisitionType">Tipo de Requisição <span className="text-destructive">*</span></Label>
+                            <Select value={requisitionType} onValueChange={(v) => setRequisitionType(v as any)}>
+                                <SelectTrigger id="requisitionType"><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Solicitação de Compra">Solicitação de Compra</SelectItem>
+                                    <SelectItem value="Ordem de Compra">Ordem de Compra</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="costCenter">Centro de Custo <span className="text-destructive">*</span></Label>
+                            <Select value={costCenterId} onValueChange={setCostCenterId} disabled={isLoadingCostCenters}>
+                                <SelectTrigger id="costCenter">
+                                    <SelectValue placeholder={isLoadingCostCenters ? "Carregando..." : "Selecione"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {costCenters?.map(cc => (
+                                        <SelectItem key={cc.docId} value={cc.docId}>({cc.code}) {cc.description}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="priority">Prioridade <span className="text-destructive">*</span></Label>
+                            <Select value={priority} onValueChange={(v) => setPriority(v as any)}>
+                                <SelectTrigger id="priority"><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Normal">Normal</SelectItem>
+                                    <SelectItem value="Urgente">Urgente</SelectItem>
+                                    <SelectItem value="Muito Urgente">Muito Urgente</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Data de Necessidade <span className="text-destructive">*</span></Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {neededByDate ? format(neededByDate, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
                                 </Button>
-                            </div>
-                        </Card>
-                    ))}
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={neededByDate}
+                                    onSelect={setNeededByDate}
+                                    initialFocus
+                                />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
-                )}
-            </ScrollArea>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button className="w-full" onClick={handleSubmitRequisition} disabled={isSubmitting || cart.length === 0 || !costCenterId || !neededByDate || !purchaseReason}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Enviar para Aprovação
-          </Button>
-        </CardFooter>
-      </Card>
+                </div>
+                
+                {/* Cart Items */}
+                <div className="space-y-4">
+                    <div className='flex justify-between items-center'>
+                        <h3 className="font-semibold text-lg">Itens da Requisição ({cart.length})</h3>
+                        <Button variant="outline" onClick={() => setIsSelectorOpen(true)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Adicionar Item ao Carrinho
+                        </Button>
+                    </div>
+                    <ScrollArea className="h-64 border rounded-md">
+                        {cart.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                                <PackageSearch className="h-10 w-10 mb-2"/>
+                                <p>Seu carrinho está vazio.</p>
+                                <p className="text-sm">Clique em "Adicionar Item" para começar.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 p-3">
+                            {cart.map(item => (
+                                <Card key={item.docId} className="p-3 shadow-none">
+                                    <div className="flex items-start gap-4">
+                                        <Image
+                                            src={item.imageUrl || 'https://picsum.photos/seed/item/64/64'}
+                                            alt={item.descricao}
+                                            width={48}
+                                            height={48}
+                                            className="rounded-md aspect-square object-cover"
+                                        />
+                                        <div className="flex-1 text-sm space-y-2">
+                                            <p className="font-bold">{item.descricao}</p>
+                                            <p className="font-mono text-xs text-muted-foreground">{item.codigo}</p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                <Input 
+                                                    type="number" 
+                                                    placeholder="Qtd."
+                                                    value={item.requisitionQuantity}
+                                                    onChange={(e) => updateCartItem(item.docId, 'requisitionQuantity', Math.max(1, parseInt(e.target.value) || 1))}
+                                                    className="h-8 text-center"
+                                                    min="1"
+                                                />
+                                                <Input
+                                                    type="number"
+                                                    placeholder="Preço Est. (R$)"
+                                                    value={item.estimatedPrice || ''}
+                                                    onChange={(e) => updateCartItem(item.docId, 'estimatedPrice', parseFloat(e.target.value) || undefined)}
+                                                    className="h-8 text-center"
+                                                />
+                                            </div>
+                                            <Input
+                                                placeholder="Observação (opcional)"
+                                                value={item.notes || ''}
+                                                onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                            <Input
+                                                placeholder="Link de referência (opcional)"
+                                                value={item.attachmentUrl || ''}
+                                                onChange={(e) => updateCartItem(item.docId, 'attachmentUrl', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.docId)}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </div>
+                                </Card>
+                            ))}
+                            </div>
+                        )}
+                    </ScrollArea>
+                </div>
+                </CardContent>
+                <CardFooter>
+                <Button className="w-full" onClick={handleSubmitRequisition} disabled={isSubmitting || cart.length === 0 || !costCenterId || !neededByDate || !purchaseReason}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Enviar para Aprovação
+                </Button>
+                </CardFooter>
+            </Card>
+        </TabsContent>
+        <TabsContent value="history">
+            <MyRequisitionsTable />
+        </TabsContent>
+      </Tabs>
+
 
        <ItemSelectorDialog
           isOpen={isSelectorOpen}
@@ -349,3 +371,5 @@ const RequisicaoCompraPage = () => {
 };
 
 export default RequisicaoCompraPage;
+
+    
