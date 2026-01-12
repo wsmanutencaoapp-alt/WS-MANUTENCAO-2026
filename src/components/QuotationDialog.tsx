@@ -81,6 +81,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const [purchaseOrderNotes, setPurchaseOrderNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [activePopover, setActivePopover] = useState<number | null>(null);
+  const [supplierSearch, setSupplierSearch] = useState('');
 
   const suppliersQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'suppliers')) : null), [firestore]);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<WithDocId<Supplier>>(suppliersQuery, {
@@ -248,6 +249,13 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
   }
 
+  const filteredSuppliers = useMemo(() => {
+      if (!suppliers) return [];
+      if (!supplierSearch) return suppliers;
+      return suppliers.filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()));
+  }, [suppliers, supplierSearch]);
+
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl">
@@ -299,8 +307,14 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                                    </Button>
                                    </PopoverTrigger>
                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
-                                       <Command><CommandInput placeholder="Pesquisar..."/><CommandList><CommandEmpty>Nenhum fornecedor.</CommandEmpty><CommandGroup>
-                                        {suppliers?.map(s => (
+                                       <Command>
+                                        <CommandInput 
+                                            placeholder="Pesquisar..." 
+                                            value={supplierSearch}
+                                            onValueChange={setSupplierSearch}
+                                        />
+                                        <CommandList><CommandEmpty>Nenhum fornecedor.</CommandEmpty><CommandGroup>
+                                        {filteredSuppliers.map(s => (
                                             <CommandItem key={s.docId} value={s.name} onSelect={() => handleSupplierSelect(index, s)}>
                                                 <Check className={cn("mr-2 h-4 w-4", q.supplierId === s.docId ? "opacity-100" : "opacity-0")}/>
                                                 {s.name}
