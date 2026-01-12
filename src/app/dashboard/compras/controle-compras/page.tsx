@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId } from 'firebase/firestore';
+import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId, updateDoc } from 'firebase/firestore';
 import type { PurchaseRequisition, CostCenter, Tool, Supply } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -22,18 +22,20 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, ShoppingBag, Eye, XCircle } from 'lucide-react';
+import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
+import { useQueryClient } from '@tanstack/react-query';
+import QuotationDialog from '@/components/QuotationDialog';
 
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
     'Aberta': 'secondary',
+    'Em Cotação': 'default',
     'Em Aprovação': 'default',
-    'Em Revisão': 'warning',
     'Aprovada': 'success',
     'Recusada': 'destructive',
     'Concluída': 'secondary',
@@ -59,15 +61,16 @@ const priorityOrder: Record<PurchaseRequisition['priority'], number> = {
 const ControleComprasPage = () => {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [requisitionForQuotation, setRequisitionForQuotation] = useState<WithDocId<PurchaseRequisition> | null>(null);
 
   const queryKey = 'approvedPurchaseRequisitions';
-  // Simplificando a query para evitar a necessidade de índices compostos complexos no Firestore
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'purchase_requisitions'), where('status', '==', 'Aprovada'));
+    return query(collection(firestore, 'purchase_requisitions'), where('status', 'in', ['Aprovada', 'Em Cotação']));
   }, [firestore]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
@@ -81,8 +84,6 @@ const ControleComprasPage = () => {
 
   const costCentersQuery = useMemoFirebase(() => {
       if (!firestore || costCenterIds.length === 0) return null;
-      // Para uma aplicação em larga escala, seria melhor buscar todos os centros de custo e mapear.
-      // Por agora, esta abordagem é mais eficiente para um número menor de requisições.
       return query(collection(firestore, 'cost_centers'), where(documentId(), 'in', costCenterIds));
   }, [firestore, costCenterIds.join(',')]);
 
@@ -109,7 +110,6 @@ const ControleComprasPage = () => {
         );
     }
     
-    // Sort by priority first, then by creation date
     return filtered.sort((a, b) => {
         const priorityA = priorityOrder[a.priority] || 3;
         const priorityB = priorityOrder[b.priority] || 3;
@@ -121,48 +121,16 @@ const ControleComprasPage = () => {
 
   }, [requisitions, searchTerm, costCenterMap]);
 
-  const handleStartPurchase = async (requisition: WithDocId<PurchaseRequisition>) => {
-    if (!firestore) return;
-    
-    try {
-        const batch = writeBatch(firestore);
-        
-        // 1. Create a new Purchase Order (Ordem de Compra)
-        const ocRef = doc(collection(firestore, 'purchase_requisitions'));
-        const newOC: Omit<PurchaseRequisition, 'id' | 'protocol'> = {
-            ...requisition,
-            type: 'Ordem de Compra',
-            status: 'Aberta',
-            originalProtocol: requisition.protocol,
-            createdAt: new Date().toISOString(),
-        };
-        // We will assign a protocol later if needed, for now use docId
-        batch.set(ocRef, newOC);
-
-        // 2. Copy items from SC to OC
-        const itemsRef = collection(firestore, 'purchase_requisitions', requisition.docId, 'items');
-        const itemsSnapshot = await getDocs(itemsRef);
-        itemsSnapshot.forEach(itemDoc => {
-            const newOcItemRef = doc(collection(ocRef, 'items'));
-            batch.set(newOcItemRef, itemDoc.data());
-        });
-
-        // 3. Update the original SC status to 'Concluída'
-        const scRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-        batch.update(scRef, { status: 'Concluída' });
-
-        await batch.commit();
-
-        toast({
-            title: "Processo de Compra Iniciado",
-            description: `A requisição ${requisition.protocol} foi convertida para uma Ordem de Compra.`,
-        });
-
-    } catch (err) {
-        console.error("Erro ao iniciar processo de compra:", err);
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível iniciar o processo de compra.' });
-    }
+  const handleStartPurchaseProcess = async (requisition: WithDocId<PurchaseRequisition>) => {
+    setRequisitionForQuotation(requisition);
   }
+  
+  const handleQuotationSuccess = () => {
+    setRequisitionForQuotation(null);
+    queryClient.invalidateQueries({ queryKey });
+    queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
+  };
+
 
   const isLoading = isLoadingRequisitions || isLoadingCostCenters;
 
@@ -224,10 +192,17 @@ const ControleComprasPage = () => {
                            <Eye className="mr-2 h-4 w-4"/>
                            Ver Itens
                        </Button>
-                       <Button size="sm" onClick={() => handleStartPurchase(req)}>
-                           <ShoppingBag className="mr-2 h-4 w-4"/>
-                           Iniciar Processo
-                       </Button>
+                       {req.status === 'Aprovada' ? (
+                            <Button size="sm" onClick={() => handleStartPurchaseProcess(req)}>
+                               <ShoppingBag className="mr-2 h-4 w-4"/>
+                               Iniciar Processo
+                           </Button>
+                       ) : (
+                            <Button size="sm" variant="secondary" onClick={() => handleStartPurchaseProcess(req)}>
+                                <FileText className="mr-2 h-4 w-4"/>
+                                Gerenciar Cotação
+                            </Button>
+                       )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -242,6 +217,15 @@ const ControleComprasPage = () => {
           requisition={selectedRequisition}
           isOpen={!!selectedRequisition}
           onClose={() => setSelectedRequisition(null)}
+        />
+      )}
+      
+      {requisitionForQuotation && (
+        <QuotationDialog
+            isOpen={!!requisitionForQuotation}
+            onClose={() => setRequisitionForQuotation(null)}
+            requisition={requisitionForQuotation}
+            onSuccess={handleQuotationSuccess}
         />
       )}
     </>

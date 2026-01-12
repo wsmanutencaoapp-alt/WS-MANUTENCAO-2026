@@ -232,6 +232,15 @@ export type CostCenter = {
     sector: string;
 };
 
+export type Quotation = {
+  supplierId: string;
+  supplierName: string;
+  totalValue: number;
+  deliveryTime: number; // in days
+  paymentTerms: string;
+  attachmentUrl?: string;
+};
+
 export type PurchaseRequisition = {
   id?: string;
   protocol: string;
@@ -241,11 +250,20 @@ export type PurchaseRequisition = {
   costCenterId: string;
   neededByDate: string;
   type: 'Solicitação de Compra' | 'Ordem de Compra';
-  status: 'Aberta' | 'Em Aprovação' | 'Em Revisão' | 'Aprovada' | 'Recusada' | 'Concluída';
+  status: 'Aberta' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída';
   rejectionReason?: string;
   createdAt: string;
   priority: 'Normal' | 'Urgente' | 'Muito Urgente';
   purchaseReason: string;
+  // Quotation fields
+  quotations?: Quotation[];
+  selectedQuotationIndex?: number;
+  expensiveChoiceJustification?: string;
+  purchaseOrderNotes?: string;
+  // Final Purchase info
+  supplierId?: string;
+  totalValue?: number;
+  paymentTerms?: string;
 };
 
 export type PurchaseRequisitionItem = {
@@ -266,4 +284,13 @@ export type Notification = {
     link: string;
     read: boolean;
     createdAt: string; // ISO date string
+};
+
+export type Supplier = {
+    id?: string;
+    name: string;
+    cnpj: string;
+    contactEmail: string;
+    contactPhone?: string;
+    rating?: number;
 };
