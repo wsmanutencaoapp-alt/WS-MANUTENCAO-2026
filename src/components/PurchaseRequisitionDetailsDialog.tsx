@@ -52,7 +52,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     useMemoFirebase(() => {
       if (!firestore || supplyIds.length === 0) return null;
       return query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds));
-    }, [firestore, supplyIds]), { enabled: supplyIds.length > 0 }
+    }, [firestore, supplyIds.join(',')]), { enabled: supplyIds.length > 0 }
   );
 
   // Fetch tool master data
@@ -60,7 +60,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     useMemoFirebase(() => {
       if (!firestore || toolIds.length === 0) return null;
       return query(collection(firestore, 'tools'), where(documentId(), 'in', toolIds));
-    }, [firestore, toolIds]), { enabled: toolIds.length > 0 }
+    }, [firestore, toolIds.join(',')]), { enabled: toolIds.length > 0 }
   );
 
 
