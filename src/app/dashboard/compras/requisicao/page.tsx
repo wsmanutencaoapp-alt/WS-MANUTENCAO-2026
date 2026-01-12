@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, addDoc, writeBatch, doc } from 'firebase/firestore';
+import { collection, query, addDoc, writeBatch, doc, where } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,10 +22,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { Supply, CostCenter, PurchaseRequisition, PurchaseRequisitionItem } from '@/lib/types';
+import type { Supply, CostCenter, PurchaseRequisition, PurchaseRequisitionItem, Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 
-type CartItem = WithDocId<Supply> & { requisitionQuantity: number };
+
+type RequisitionableItem = (WithDocId<Supply> | WithDocId<Tool>) & { itemType: 'supply' | 'tool' };
+type CartItem = RequisitionableItem & { requisitionQuantity: number };
+
 
 const RequisicaoCompraPage = () => {
   const { user } = useUser();
@@ -38,28 +43,49 @@ const RequisicaoCompraPage = () => {
   const [neededByDate, setNeededByDate] = useState<Date | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('supplies');
 
   const suppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
   const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery);
   
+  // Query for tool models (STD and GSE)
+  const toolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools'), where('tipo', 'in', ['STD', 'GSE'])) : null, [firestore]);
+  const { data: allTools, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery);
+
   const costCentersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'cost_centers')) : null, [firestore]);
   const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery);
 
-  const filteredSupplies = useMemo(() => {
-    if (!allSupplies) return [];
+  const catalogItems = useMemo((): RequisitionableItem[] => {
+    const suppliesWithTpe = allSupplies?.map(s => ({...s, itemType: 'supply' as const })) || [];
+    const toolsWithType = allTools?.map(t => ({...t, itemType: 'tool' as const })) || [];
+    return [...suppliesWithTpe, ...toolsWithType];
+  }, [allSupplies, allTools]);
+
+
+  const filteredItems = useMemo(() => {
+    if (!catalogItems) return [];
     const cartIds = new Set(cart.map(item => item.docId));
-    const availableItems = allSupplies.filter(item => !cartIds.has(item.docId));
+    
+    let availableItems = catalogItems.filter(item => !cartIds.has(item.docId));
+
+    if(activeTab === 'supplies') {
+        availableItems = availableItems.filter(item => item.itemType === 'supply');
+    } else {
+        availableItems = availableItems.filter(item => item.itemType === 'tool');
+    }
 
     if (!searchTerm) return availableItems;
+
     const lowercasedTerm = searchTerm.toLowerCase();
     return availableItems.filter(item => 
       item.descricao.toLowerCase().includes(lowercasedTerm) || 
       item.codigo.toLowerCase().includes(lowercasedTerm) ||
-      (item.partNumber && item.partNumber.toLowerCase().includes(lowercasedTerm))
+      (item.itemType === 'supply' && (item as Supply).partNumber && (item as Supply).partNumber.toLowerCase().includes(lowercasedTerm)) ||
+      (item.itemType === 'tool' && (item as Tool).pn_fabricante && (item as Tool).pn_fabricante.toLowerCase().includes(lowercasedTerm))
     );
-  }, [allSupplies, cart, searchTerm]);
+  }, [catalogItems, cart, searchTerm, activeTab]);
 
-  const addToCart = (item: WithDocId<Supply>) => {
+  const addToCart = (item: RequisitionableItem) => {
     setCart(prev => [...prev, { ...item, requisitionQuantity: 1 }]);
   };
 
@@ -107,9 +133,9 @@ const RequisicaoCompraPage = () => {
         for (const item of cart) {
             const itemRef = doc(collection(firestore, 'purchase_requisitions', requisitionRef.id, 'items'));
             const itemData: Omit<PurchaseRequisitionItem, 'id'> = {
-                supplyId: item.docId,
+                itemId: item.docId,
+                itemType: item.itemType,
                 quantity: item.requisitionQuantity,
-                // estimatedPrice and notes can be added later
             };
             batch.set(itemRef, itemData);
         }
@@ -131,32 +157,39 @@ const RequisicaoCompraPage = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Coluna do Catálogo */}
       <div className="lg:col-span-2">
         <Card>
           <CardHeader>
-            <CardTitle>Catálogo de Materiais e Serviços</CardTitle>
+            <CardTitle>Catálogo de Materiais e Ferramentas</CardTitle>
             <CardDescription>Selecione os itens que você precisa.</CardDescription>
-            <div className="relative pt-4">
-               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-               <Input
-                   placeholder="Pesquisar por código, P/N ou descrição..."
-                   value={searchTerm}
-                   onChange={(e) => setSearchTerm(e.target.value)}
-                   className="w-full rounded-lg bg-background pl-8"
-               />
+            <div className="pt-4 flex flex-col gap-4">
+                 <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Pesquisar por código, P/N ou descrição..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full rounded-lg bg-background pl-8"
+                    />
+                 </div>
+                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="supplies">Suprimentos</TabsTrigger>
+                        <TabsTrigger value="tools">Ferramentas (Modelos)</TabsTrigger>
+                    </TabsList>
+                 </Tabs>
             </div>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[60vh]">
-              {isLoadingSupplies ? (
+              {(isLoadingSupplies || isLoadingTools) ? (
                 <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>
               ) : (
                 <div className="space-y-3">
-                  {filteredSupplies.map(item => (
+                  {filteredItems.map(item => (
                     <div key={item.docId} className="flex items-center gap-4 p-2 border rounded-lg">
                       <Image 
-                        src={item.imageUrl || 'https://picsum.photos/seed/supply/64/64'}
+                        src={item.imageUrl || 'https://picsum.photos/seed/item/64/64'}
                         alt={item.descricao}
                         width={48}
                         height={48}
@@ -164,8 +197,11 @@ const RequisicaoCompraPage = () => {
                       />
                       <div className="flex-1 text-sm">
                         <p className="font-bold">{item.descricao}</p>
-                        <p className="font-mono text-xs text-muted-foreground">{item.codigo} / {item.partNumber || 'N/A'}</p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                            {item.codigo} / {item.itemType === 'supply' ? (item as WithDocId<Supply>).partNumber : (item as WithDocId<Tool>).pn_fabricante || 'N/A'}
+                        </p>
                       </div>
+                      <Badge variant="outline">{item.itemType === 'supply' ? 'Suprimento' : 'Ferramenta'}</Badge>
                       <Button size="sm" variant="outline" onClick={() => addToCart(item)}>
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Adicionar
@@ -179,7 +215,6 @@ const RequisicaoCompraPage = () => {
         </Card>
       </div>
 
-      {/* Coluna do Carrinho */}
       <div>
         <Card>
           <CardHeader>

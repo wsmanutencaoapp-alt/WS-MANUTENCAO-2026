@@ -242,7 +242,8 @@ export type PurchaseRequisition = {
 
 export type PurchaseRequisitionItem = {
     id?: string;
-    supplyId: string;
+    itemId: string; // ID of the Supply or Tool item
+    itemType: 'supply' | 'tool';
     quantity: number;
     estimatedPrice?: number;
     notes?: string;
