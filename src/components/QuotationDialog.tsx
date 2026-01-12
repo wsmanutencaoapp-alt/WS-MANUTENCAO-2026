@@ -30,14 +30,13 @@ import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation 
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { ScrollArea } from './ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { Textarea } from './ui/textarea';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card } from './ui/card';
 import { Separator } from './ui/separator';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
+import SupplierSelectorDialog from './SupplierSelectorDialog';
 
 
 interface QuotationDialogProps {
@@ -56,9 +55,6 @@ type QuotationFormState = {
   paymentTerms: string;
   attachmentUrl?: string;
   attachmentFile?: File | null;
-  // UI State for search
-  supplierSearch: string;
-  isPopoverOpen: boolean;
 };
 
 const emptyQuotation: QuotationFormState = {
@@ -68,8 +64,6 @@ const emptyQuotation: QuotationFormState = {
   deliveryTime: '',
   paymentTerms: '',
   attachmentFile: null,
-  supplierSearch: '',
-  isPopoverOpen: false,
 };
 
 export default function QuotationDialog({ isOpen, onClose, onSuccess, requisition, items }: QuotationDialogProps) {
@@ -86,6 +80,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const [purchaseOrderNotes, setPurchaseOrderNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
+  const [supplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
+  const [activeQuotationIndex, setActiveQuotationIndex] = useState<number | null>(null);
+
   const suppliersQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'suppliers')) : null), [firestore]);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<WithDocId<Supplier>>(suppliersQuery, {
     queryKey: ['allSuppliersForQuotation'],
@@ -109,16 +106,17 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     setQuotations(updatedQuotations);
   };
   
-  const handleSupplierSelect = (index: number, supplier: WithDocId<Supplier>) => {
+  const handleSupplierSelect = (supplier: WithDocId<Supplier>) => {
+    if (activeQuotationIndex === null) return;
     const updatedQuotations = [...quotations];
-    updatedQuotations[index] = {
-      ...updatedQuotations[index],
+    updatedQuotations[activeQuotationIndex] = {
+      ...updatedQuotations[activeQuotationIndex],
       supplierId: supplier.docId,
       supplierName: supplier.name,
-      supplierSearch: supplier.name,
-      isPopoverOpen: false, // Close popover on select
     };
     setQuotations(updatedQuotations);
+    setSupplierSelectorOpen(false);
+    setActiveQuotationIndex(null);
   };
   
   const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,12 +124,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           handleQuotationChange(index, 'attachmentFile', e.target.files[0]);
       }
   }
-
-  const handlePopoverOpenChange = (index: number, open: boolean) => {
-    const updatedQuotations = [...quotations];
-    updatedQuotations[index] = { ...updatedQuotations[index], isPopoverOpen: open };
-    setQuotations(updatedQuotations);
-  };
   
   const filledQuotations = useMemo(() => quotations.filter(q => q.supplierId && q.totalValue && q.deliveryTime && q.paymentTerms), [quotations]);
   
@@ -270,118 +262,113 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
-          <DialogDescription>
-            Insira os orçamentos para os itens selecionados.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[75vh] py-4">
-          <div className="md:col-span-1 space-y-4">
-            <h3 className="font-semibold text-lg">Itens para Cotação</h3>
-            <ScrollArea className='h-96'>
-                <div className="space-y-2">
-                    {items.map(item => (
-                        <div key={item.docId} className="text-sm border rounded-md p-3">
-                            <p className="font-bold">{item.details?.descricao || 'Item não encontrado'}</p>
-                            <p>Quantidade: <span className="font-medium">{item.quantity}</span></p>
-                        </div>
-                    ))}
-                </div>
-            </ScrollArea>
-          </div>
-          
-          <div className="md:col-span-2 space-y-4">
-             <div className="flex flex-col">
-                <h3 className="font-semibold text-lg">Orçamentos</h3>
-                <p className="text-sm text-muted-foreground">* Selecione o orçamento vencedor</p>
-             </div>
-             <RadioGroup value={selectedQuotationIndex?.toString()} onValueChange={(v) => setSelectedQuotationIndex(Number(v))}>
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-                    {quotations.map((q, index) => (
-                       <Card key={index} className="p-4 space-y-3">
-                           <div className="flex items-center justify-between">
-                               <Label htmlFor={`q-${index}`} className="font-bold text-base flex items-center gap-2">
-                                  <RadioGroupItem value={index.toString()} id={`q-${index}`} />
-                                  Orçamento #{index + 1}
-                               </Label>
-                                {index === cheapestIndex && <Badge variant="success">Mais Barato</Badge>}
-                           </div>
-                           <Separator />
-                           <div className="space-y-1.5">
-                               <Label>Fornecedor</Label>
-                                <Popover open={q.isPopoverOpen} onOpenChange={(open) => handlePopoverOpenChange(index, open)}>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between font-normal" disabled={isLoadingSuppliers}>
-                                            {isLoadingSuppliers ? <Loader2 className="h-4 w-4 animate-spin" /> : q.supplierName || "Selecione..."}
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
-                                        <Command>
-                                            <CommandInput placeholder="Pesquisar..." />
-                                            <CommandList>
-                                                <CommandEmpty>Nenhum fornecedor encontrado.</CommandEmpty>
-                                                <CommandGroup>
-                                                    {(suppliers || []).map(s => (
-                                                        <CommandItem key={s.docId} value={s.name} onSelect={() => handleSupplierSelect(index, s)}>
-                                                            <Check className={cn("mr-2 h-4 w-4", q.supplierId === s.docId ? "opacity-100" : "opacity-0")} />
-                                                            {s.name}
-                                                        </CommandItem>
-                                                    ))}
-                                                </CommandGroup>
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                           </div>
-
-                           <div className="grid grid-cols-2 gap-4">
-                               <div className="space-y-1.5"><Label>Valor Total (R$)</Label><Input type="number" value={q.totalValue} onChange={(e) => handleQuotationChange(index, 'totalValue', e.target.value)} /></div>
-                               <div className="space-y-1.5"><Label>Prazo (dias)</Label><Input type="number" value={q.deliveryTime} onChange={(e) => handleQuotationChange(index, 'deliveryTime', e.target.value)} /></div>
-                           </div>
-                            <div className="space-y-1.5"><Label>Cond. Pagamento</Label><Input value={q.paymentTerms} onChange={(e) => handleQuotationChange(index, 'paymentTerms', e.target.value)} placeholder="Ex: 30/60/90" /></div>
-                            <div className="space-y-1.5"><Label>Anexo</Label>
-                                <Button asChild variant="outline" size="sm" className="w-full">
-                                    <label className="cursor-pointer"><Upload className="mr-2"/>{q.attachmentFile ? <span className='truncate'>{q.attachmentFile.name}</span> : 'Anexar Orçamento'}<Input type="file" className="sr-only" onChange={(e) => handleFileChange(index, e)}/></label>
-                                </Button>
-                            </div>
-                       </Card>
-                    ))}
-                </div>
-            </RadioGroup>
+    <>
+      <Dialog open={isOpen && !supplierSelectorOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
+            <DialogDescription>
+              Insira os orçamentos para os itens selecionados.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[75vh] py-4">
+            <div className="md:col-span-1 space-y-4">
+              <h3 className="font-semibold text-lg">Itens para Cotação</h3>
+              <ScrollArea className='h-96'>
+                  <div className="space-y-2">
+                      {items.map(item => (
+                          <div key={item.docId} className="text-sm border rounded-md p-3">
+                              <p className="font-bold">{item.details?.descricao || 'Item não encontrado'}</p>
+                              <p>Quantidade: <span className="font-medium">{item.quantity}</span></p>
+                          </div>
+                      ))}
+                  </div>
+              </ScrollArea>
+            </div>
             
-            <div className="space-y-2 mt-4">
-                {(isJustificationRequired || (filledQuotations.length > 0 && filledQuotations.length < 3)) && (
-                    <div className="space-y-1.5 animate-in fade-in-50">
-                        <Label htmlFor="justification" className={cn(isJustificationRequired && "text-destructive", "flex items-center gap-1")}>
-                            <Info className="h-4 w-4" /> Justificativa <span className="text-destructive">*</span>
-                        </Label>
-                        <Textarea id="justification" value={justification} onChange={(e) => setJustification(e.target.value)} placeholder={isJustificationRequired ? "Justifique a escolha pelo orçamento que não é o mais barato." : "Justifique por que há menos de 3 orçamentos."} />
-                    </div>
-                )}
-                <div className="space-y-1.5">
-                    <Label htmlFor="purchaseOrderNotes">Observações da Ordem de Compra</Label>
-                    <Textarea id="purchaseOrderNotes" value={purchaseOrderNotes} onChange={(e) => setPurchaseOrderNotes(e.target.value)} placeholder="Informações adicionais para a OC, como dados de entrega, contato, etc." />
-                </div>
+            <div className="md:col-span-2 space-y-4">
+               <div className="flex flex-col">
+                  <h3 className="font-semibold text-lg">Orçamentos</h3>
+                  <p className="text-sm text-muted-foreground">* Selecione o orçamento vencedor</p>
+               </div>
+               <RadioGroup value={selectedQuotationIndex?.toString()} onValueChange={(v) => setSelectedQuotationIndex(Number(v))}>
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+                      {quotations.map((q, index) => (
+                         <Card key={index} className="p-4 space-y-3">
+                             <div className="flex items-center justify-between">
+                                 <Label htmlFor={`q-${index}`} className="font-bold text-base flex items-center gap-2">
+                                    <RadioGroupItem value={index.toString()} id={`q-${index}`} />
+                                    Orçamento #{index + 1}
+                                 </Label>
+                                 {index === cheapestIndex && <Badge variant="success">Mais Barato</Badge>}
+                             </div>
+                             <Separator />
+                             <div className="space-y-1.5">
+                                 <Label>Fornecedor</Label>
+                                 <Button 
+                                    variant="outline" 
+                                    className="w-full justify-between font-normal" 
+                                    onClick={() => { setActiveQuotationIndex(index); setSupplierSelectorOpen(true); }}
+                                    disabled={isLoadingSuppliers}
+                                >
+                                    {isLoadingSuppliers ? <Loader2 className="h-4 w-4 animate-spin"/> : q.supplierName || "Selecione..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                             </div>
+
+                             <div className="grid grid-cols-2 gap-4">
+                                 <div className="space-y-1.5"><Label>Valor Total (R$)</Label><Input type="number" value={q.totalValue} onChange={(e) => handleQuotationChange(index, 'totalValue', e.target.value)} /></div>
+                                 <div className="space-y-1.5"><Label>Prazo (dias)</Label><Input type="number" value={q.deliveryTime} onChange={(e) => handleQuotationChange(index, 'deliveryTime', e.target.value)} /></div>
+                             </div>
+                              <div className="space-y-1.5"><Label>Cond. Pagamento</Label><Input value={q.paymentTerms} onChange={(e) => handleQuotationChange(index, 'paymentTerms', e.target.value)} placeholder="Ex: 30/60/90" /></div>
+                              <div className="space-y-1.5"><Label>Anexo</Label>
+                                  <Button asChild variant="outline" size="sm" className="w-full">
+                                      <label className="cursor-pointer"><Upload className="mr-2"/>{q.attachmentFile ? <span className='truncate'>{q.attachmentFile.name}</span> : 'Anexar Orçamento'}<Input type="file" className="sr-only" onChange={(e) => handleFileChange(index, e)}/></label>
+                                  </Button>
+                              </div>
+                         </Card>
+                      ))}
+                  </div>
+              </RadioGroup>
+              
+              <div className="space-y-2 mt-4">
+                  {(isJustificationRequired || (filledQuotations.length > 0 && filledQuotations.length < 3)) && (
+                      <div className="space-y-1.5 animate-in fade-in-50">
+                          <Label htmlFor="justification" className={cn(isJustificationRequired && "text-destructive", "flex items-center gap-1")}>
+                              <Info className="h-4 w-4" /> Justificativa <span className="text-destructive">*</span>
+                          </Label>
+                          <Textarea id="justification" value={justification} onChange={(e) => setJustification(e.target.value)} placeholder={isJustificationRequired ? "Justifique a escolha pelo orçamento que não é o mais barato." : "Justifique por que há menos de 3 orçamentos."} />
+                      </div>
+                  )}
+                  <div className="space-y-1.5">
+                      <Label htmlFor="purchaseOrderNotes">Observações da Ordem de Compra</Label>
+                      <Textarea id="purchaseOrderNotes" value={purchaseOrderNotes} onChange={(e) => setPurchaseOrderNotes(e.target.value)} placeholder="Informações adicionais para a OC, como dados de entrega, contato, etc." />
+                  </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-          <Button variant="secondary" onClick={handleSaveDraft} disabled={isSaving || filledQuotations.length === 0}>
-             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-             Salvar Rascunho
-          </Button>
-          <Button onClick={handleSendForApproval} disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar e Enviar para Aprovação
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
+            <Button variant="secondary" onClick={handleSaveDraft} disabled={isSaving || filledQuotations.length === 0}>
+               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+               Salvar Rascunho
+            </Button>
+            <Button onClick={handleSendForApproval} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar e Enviar para Aprovação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <SupplierSelectorDialog 
+        isOpen={supplierSelectorOpen}
+        onClose={() => setSupplierSelectorOpen(false)}
+        onSelect={handleSupplierSelect}
+        suppliers={suppliers || []}
+        isLoading={isLoadingSuppliers}
+      />
+    </>
   );
 }
