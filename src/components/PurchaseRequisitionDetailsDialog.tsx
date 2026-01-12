@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -16,7 +17,7 @@ import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import { Loader2, Package, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 
@@ -30,7 +31,7 @@ type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
   details: Partial<WithDocId<Supply> | WithDocId<Tool>>;
 };
 
-export function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose }: PurchaseRequisitionDetailsDialogProps) {
+export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose }: PurchaseRequisitionDetailsDialogProps) {
   const firestore = useFirestore();
 
   // Fetch requisition items
@@ -41,7 +42,7 @@ export function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose 
   
   const { data: items, isLoading: isLoadingItems, error: itemsError } = useCollection<WithDocId<PurchaseRequisitionItem>>(itemsQuery, {
       queryKey: ['requisitionItems', requisition?.docId],
-      enabled: !!requisition,
+      enabled: !!requisition && isOpen,
   });
 
   const supplyIds = useMemo(() => items?.filter(i => i.itemType === 'supply').map(i => i.itemId) || [], [items]);
@@ -52,7 +53,7 @@ export function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose 
     useMemoFirebase(() => {
       if (!firestore || supplyIds.length === 0) return null;
       return query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds));
-    }, [firestore, supplyIds.join(',')]), { enabled: supplyIds.length > 0 }
+    }, [firestore, supplyIds.join(',')]), { enabled: supplyIds.length > 0 && isOpen }
   );
 
   // Fetch tool master data
@@ -60,7 +61,7 @@ export function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose 
     useMemoFirebase(() => {
       if (!firestore || toolIds.length === 0) return null;
       return query(collection(firestore, 'tools'), where(documentId(), 'in', toolIds));
-    }, [firestore, toolIds.join(',')]), { enabled: toolIds.length > 0 }
+    }, [firestore, toolIds.join(',')]), { enabled: toolIds.length > 0 && isOpen }
   );
 
 
@@ -68,7 +69,7 @@ export function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose 
     if (!firestore || !requisition) return null;
     return query(collection(firestore, 'cost_centers'), where(documentId(), '==', requisition.costCenterId));
   }, [firestore, requisition]);
-  const { data: costCenterData } = useCollection<WithDocId<CostCenter>>(costCenterQuery, { queryKey: ['costCenterForReq', requisition?.costCenterId], enabled: !!requisition });
+  const { data: costCenterData } = useCollection<WithDocId<CostCenter>>(costCenterQuery, { queryKey: ['costCenterForReq', requisition?.costCenterId], enabled: !!requisition && isOpen });
   const costCenter = useMemo(() => costCenterData?.[0], [costCenterData]);
 
 
