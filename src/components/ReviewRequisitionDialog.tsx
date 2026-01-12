@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, getDocs, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, getDocs, doc, writeBatch, where } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Textarea } from './ui/textarea';
 
 type RequisitionableItem = (WithDocId<Supply> | WithDocId<Tool>) & { itemType: 'supply' | 'tool' };
 type CartItem = RequisitionableItem & {
@@ -47,6 +48,20 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [initialData, setInitialData] = useState<{
+    costCenterId: string,
+    neededByDate: Date | undefined,
+    priority: PurchaseRequisition['priority'],
+    purchaseReason: string,
+    type: PurchaseRequisition['type']
+  }>({
+      costCenterId: '',
+      neededByDate: undefined,
+      priority: 'Normal',
+      purchaseReason: '',
+      type: 'Solicitação de Compra'
+  });
+
 
   // Fetch all master data to map item details
   const suppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
@@ -69,6 +84,14 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
 
         setIsLoading(true);
         try {
+            setInitialData({
+                costCenterId: requisition.costCenterId,
+                neededByDate: new Date(requisition.neededByDate),
+                priority: requisition.priority,
+                purchaseReason: requisition.purchaseReason,
+                type: requisition.type
+            });
+
             const itemsRef = collection(firestore, 'purchase_requisitions', requisition.docId, 'items');
             const itemsSnapshot = await getDocs(itemsRef);
             
@@ -98,7 +121,7 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
         }
     };
     
-    if (isOpen) {
+    if (isOpen && masterDataMap.size > 0) {
         fetchRequisitionItems();
     }
   }, [requisition, isOpen, firestore, toast, masterDataMap]);
@@ -130,14 +153,14 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
         const batch = writeBatch(firestore);
         const requisitionRef = doc(firestore, 'purchase_requisitions', requisition.docId);
 
-        // Update requisition status
+        // Update requisition status back to 'Aberta' to re-enter the approval flow
         batch.update(requisitionRef, { status: 'Aberta' });
 
-        // Update or create items
+        // Process updated and new items
         for (const item of cart) {
             const itemRef = item.existingItemId
                 ? doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.existingItemId)
-                : doc(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
+                : doc(collection(firestore, 'purchase_requisitions', requisition.docId, 'items')); // For items added during edit
             
             const itemData: Omit<PurchaseRequisitionItem, 'id'> = {
                 itemId: item.docId,
@@ -147,10 +170,10 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
                 notes: item.notes,
                 attachmentUrl: item.attachmentUrl,
             };
-            batch.set(itemRef, itemData);
+            batch.set(itemRef, itemData, { merge: true }); // Use merge to be safe
         }
 
-        // Delete items
+        // Delete items that were removed
         for (const itemIdToDelete of deletedItemIds) {
             const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', itemIdToDelete);
             batch.delete(itemRef);
@@ -200,7 +223,7 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
                                         <div className="flex items-start gap-4">
                                             <Image
                                                 src={item.imageUrl || 'https://picsum.photos/seed/item/64/64'}
-                                                alt={item.descricao}
+                                                alt={item.descricao || 'Item sem descrição'}
                                                 width={48}
                                                 height={48}
                                                 className="rounded-md aspect-square object-cover"
@@ -225,11 +248,11 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
                                                         className="h-8 text-center"
                                                     />
                                                 </div>
-                                                <Input
+                                                <Textarea
                                                     placeholder="Observação (opcional)"
                                                     value={item.notes || ''}
                                                     onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
-                                                    className="h-8 text-sm"
+                                                    className="h-16 text-sm"
                                                 />
                                             </div>
                                             <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.docId, item.existingItemId)}>
