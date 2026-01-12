@@ -26,6 +26,9 @@ import { Loader2, Search, Eye, Edit } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
+import ReviewRequisitionDialog from '@/components/ReviewRequisitionDialog'; // Import new component
+import { useQueryClient } from '@tanstack/react-query';
+
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
@@ -51,8 +54,10 @@ const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
 export default function MyRequisitionsTable() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -65,6 +70,7 @@ export default function MyRequisitionsTable() {
     return employeeData.accessLevel === 'Admin' || (employeeData.permissions?.compras ?? false);
   }, [employeeData]);
 
+  const queryKey = ['myPurchaseRequisitions', canViewAll, user?.uid];
 
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore || !user || isEmployeeLoading) return null;
@@ -81,7 +87,7 @@ export default function MyRequisitionsTable() {
   }, [firestore, user, canViewAll, isEmployeeLoading]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
-      queryKey: ['myPurchaseRequisitions', canViewAll, user?.uid],
+      queryKey,
       enabled: !isEmployeeLoading && !!user,
   });
 
@@ -115,6 +121,11 @@ export default function MyRequisitionsTable() {
         (costCenterMap.get(req.costCenterId) || '').toLowerCase().includes(lowercasedTerm)
     );
   }, [requisitions, searchTerm, costCenterMap]);
+
+  const handleReviewSuccess = () => {
+    setRequisitionToReview(null);
+    queryClient.invalidateQueries({ queryKey });
+  }
 
   const isLoading = isLoadingRequisitions || isLoadingCostCenters || isEmployeeLoading;
 
@@ -167,7 +178,7 @@ export default function MyRequisitionsTable() {
                     <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
                     <TableCell className="text-right space-x-2">
                        {req.status === 'Em Revisão' && (
-                        <Button variant="secondary" size="sm">
+                        <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(req)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Revisar
                         </Button>
@@ -189,6 +200,15 @@ export default function MyRequisitionsTable() {
         isOpen={!!selectedRequisition}
         onClose={() => setSelectedRequisition(null)}
       />
+
+      {requisitionToReview && (
+          <ReviewRequisitionDialog
+            requisition={requisitionToReview}
+            isOpen={!!requisitionToReview}
+            onClose={() => setRequisitionToReview(null)}
+            onSuccess={handleReviewSuccess}
+          />
+      )}
     </>
   );
 };
