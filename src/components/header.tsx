@@ -28,6 +28,7 @@ import {
   LayoutDashboard,
   Package,
   History,
+  FileSignature,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -95,13 +96,14 @@ const allNavItems: NavItem[] = [
     ]
   },
   { 
-    href: '/dashboard/compras',
+    href: '/dashboard/compras', 
     icon: ShoppingCart, 
     label: 'Compras',
     permission: 'compras',
     subItems: [
+        { href: '/dashboard/compras/requisicao', label: 'Requisição de Compra', permission: 'compras_requisicao', icon: FileSignature },
         { href: '/dashboard/compras/aprovacoes', label: 'Aprovações', permission: 'compras_aprovacoes' },
-        { href: '/dashboard/compras/controle', label: 'Controle', permission: 'compras_controle' },
+        { href: '/dashboard/compras/controle', label: 'Gestão de Compras', permission: 'compras_controle' },
     ]
   },
   {

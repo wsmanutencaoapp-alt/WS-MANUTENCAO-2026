@@ -25,6 +25,7 @@ import {
   Search,
   Package,
   History,
+  FileSignature,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -84,8 +85,9 @@ const allNavItems: NavItem[] = [
     label: 'Compras',
     permission: 'compras',
     subItems: [
+        { href: '/dashboard/compras/requisicao', label: 'Requisição de Compra', permission: 'compras_requisicao', icon: FileSignature },
         { href: '/dashboard/compras/aprovacoes', label: 'Aprovações', permission: 'compras_aprovacoes' },
-        { href: '/dashboard/compras/controle', label: 'Controle', permission: 'compras_controle' },
+        { href: '/dashboard/compras/controle', label: 'Gestão de Compras', permission: 'compras_controle' },
     ]
   },
   {

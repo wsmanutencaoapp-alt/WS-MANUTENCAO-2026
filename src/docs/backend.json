@@ -87,80 +87,25 @@
       "type": "object",
       "description": "Represents the master data for a supply item.",
       "properties": {
-        "codigo": {
-          "type": "string",
-          "description": "Unique, system-generated code for the supply item."
-        },
-        "descricao": {
-          "type": "string",
-          "description": "Detailed description of the supply item."
-        },
-        "partNumber": {
-          "type": "string",
-          "description": "Manufacturer's Part Number."
-        },
-        "unidadeMedida": {
-          "type": "string",
-          "enum": ["UN", "KG", "MT", "LT", "CX"],
-          "description": "Unit of measure for the supply."
-        },
-        "familia": {
-          "type": "string",
-          "enum": ["MP", "CT", "CG", "CP", "PA"],
-          "description": "The family/category of the supply item."
-        },
-        "exigeLote": {
-          "type": "boolean",
-          "description": "Indicates if lot tracking is required."
-        },
-        "exigeSerialNumber": {
-          "type": "boolean",
-          "description": "Indicates if serial number tracking is required."
-        },
-        "exigeValidade": {
-          "type": "boolean",
-          "description": "Indicates if expiration date tracking is required."
-        },
-        "tipoMaterial": {
-          "type": "string",
-          "enum": ["Metal", "Polímero", "Tecido", "Outro"],
-          "description": "Specific material type, used for 'Matéria-Prima' family."
-        },
-        "estoqueMinimo": {
-          "type": "number",
-          "description": "The minimum stock level before a reorder is triggered."
-        },
-        "estoqueMaximo": {
-          "type": "number",
-          "description": "The maximum stock level to avoid over-purchasing."
-        },
-        "localizacaoPadrao": {
-          "type": "string",
-          "description": "Default storage address for this supply item."
-        },
-        "imageUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of the supply item's photo."
-        },
-        "documentoUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of the supply item's master document (e.g., technical sheet)."
-        }
+        "codigo": { "type": "string", "description": "Unique, system-generated code for the supply item." },
+        "descricao": { "type": "string", "description": "Detailed description of the supply item." },
+        "partNumber": { "type": "string", "description": "Manufacturer's Part Number." },
+        "unidadeMedida": { "type": "string", "enum": ["UN", "KG", "MT", "LT", "CX"], "description": "Unit of measure for the supply." },
+        "familia": { "type": "string", "enum": ["MP", "CT", "CG", "CP", "PA"], "description": "The family/category of the supply item." },
+        "exigeLote": { "type": "boolean", "description": "Indicates if lot tracking is required." },
+        "exigeSerialNumber": { "type": "boolean", "description": "Indicates if serial number tracking is required." },
+        "exigeValidade": { "type": "boolean", "description": "Indicates if expiration date tracking is required." },
+        "tipoMaterial": { "type": "string", "enum": ["Metal", "Polímero", "Tecido", "Outro"], "description": "Specific material type, used for 'Matéria-Prima' family." },
+        "estoqueMinimo": { "type": "number", "description": "The minimum stock level before a reorder is triggered." },
+        "estoqueMaximo": { "type": "number", "description": "The maximum stock level to avoid over-purchasing." },
+        "localizacaoPadrao": { "type": "string", "description": "Default storage address for this supply item." },
+        "unidadeSecundaria": { "type": "string", "enum": ["G", "ML", "CM", "MM"], "description": "Secondary unit for consumption (e.g., grams)." },
+        "fatorConversao": { "type": "number", "description": "Conversion factor from primary to secondary unit (e.g., 1 UN = 1000 G)." },
+        "pesoBruto": { "type": "number", "description": "Gross weight in the secondary unit, including packaging." },
+        "imageUrl": { "type": "string", "format": "uri", "description": "URL of the supply item's photo." },
+        "documentoUrl": { "type": "string", "format": "uri", "description": "URL of the supply item's master document (e.g., technical sheet)." }
       },
-      "required": [
-        "codigo",
-        "descricao",
-        "unidadeMedida",
-        "familia",
-        "exigeLote",
-        "exigeSerialNumber",
-        "exigeValidade",
-        "estoqueMinimo",
-        "estoqueMaximo",
-        "localizacaoPadrao"
-      ]
+      "required": [ "codigo", "descricao", "unidadeMedida", "familia", "exigeLote", "exigeSerialNumber", "exigeValidade", "estoqueMinimo", "estoqueMaximo", "localizacaoPadrao" ]
     },
     "SupplyStock": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -168,46 +113,16 @@
       "type": "object",
       "description": "Represents a specific batch of a supply item at a specific location.",
       "properties": {
-        "loteInterno": {
-          "type": "string",
-          "description": "System-generated lot number for this specific entry."
-        },
-        "loteFornecedor": {
-          "type": "string",
-          "description": "Optional lot number provided by the supplier."
-        },
-        "quantidade": {
-          "type": "number",
-          "description": "The quantity of items in this specific stock."
-        },
-        "localizacao": {
-          "type": "string",
-          "description": "The physical address code where this stock is stored."
-        },
-        "dataEntrada": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The timestamp when this stock was entered."
-        },
-        "dataValidade": {
-          "type": "string",
-          "format": "date",
-          "description": "The expiration date for this stock, if applicable."
-        },
-        "custoUnitario": {
-          "type": "number",
-          "description": "The cost per unit for this specific entry."
-        },
-        "status": {
-          "type": "string",
-          "enum": ["Disponível", "Reservado", "Bloqueado"],
-          "description": "The current status of this specific stock."
-        },
-        "documentoUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of a document attached to this specific lot."
-        }
+        "loteInterno": { "type": "string", "description": "System-generated lot number for this specific entry." },
+        "loteFornecedor": { "type": "string", "description": "Optional lot number provided by the supplier." },
+        "quantidade": { "type": "number", "description": "The quantity of items in the primary unit of measure." },
+        "pesoLiquido": { "type": "number", "description": "The current quantity in the secondary unit of measure (e.g., remaining grams)." },
+        "localizacao": { "type": "string", "description": "The physical address code where this stock is stored." },
+        "dataEntrada": { "type": "string", "format": "date-time", "description": "The timestamp when this stock was entered." },
+        "dataValidade": { "type": "string", "format": "date", "description": "The expiration date for this stock, if applicable." },
+        "custoUnitario": { "type": "number", "description": "The cost per unit for this specific entry." },
+        "status": { "type": "string", "enum": ["Disponível", "Reservado", "Bloqueado"], "description": "The current status of this specific stock." },
+        "documentoUrl": { "type": "string", "format": "uri", "description": "URL of a document attached to this specific lot." }
       },
       "required": ["loteInterno", "quantidade", "localizacao", "dataEntrada", "status"]
     },
@@ -229,9 +144,13 @@
           "type": "string",
           "description": "The code of the master supply item for easy querying."
         },
+        "loteFornecedor": {
+          "type": "string",
+          "description": "Supplier lot number, denormalized for history."
+        },
         "type": {
           "type": "string",
-          "enum": ["entrada", "saida", "ajuste"],
+          "enum": ["entrada", "saida", "ajuste", "devolucao"],
           "description": "The type of movement."
         },
         "quantity": {
@@ -450,6 +369,10 @@
           "type": "string",
           "description": "Name of the supplier."
         },
+        "cnpj": {
+          "type": "string",
+          "description": "The supplier's unique tax identifier (CNPJ)."
+        },
         "contactEmail": {
           "type": "string",
           "description": "Email address of the supplier's contact person.",
@@ -458,82 +381,59 @@
         "contactPhone": {
           "type": "string",
           "description": "Phone number of the supplier's contact person."
+        },
+        "rating": {
+          "type": "number",
+          "description": "Supplier performance rating (e.g., 1-5)."
         }
       },
       "required": [
-        "id",
         "name",
-        "contactEmail",
-        "contactPhone"
+        "cnpj",
+        "contactEmail"
       ]
     },
-    "OperationRecord": {
+    "CostCenter": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "OperationRecord",
+      "title": "CostCenter",
       "type": "object",
-      "description": "Represents a record of an operation performed within the system.",
+      "description": "Represents a cost center for budget allocation and expense tracking.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the OperationRecord entity."
-        },
-        "timestamp": {
-          "type": "string",
-          "description": "Timestamp of when the operation was performed.",
-          "format": "date-time"
-        },
-        "operationType": {
-          "type": "string",
-          "description": "Type of operation performed (e.g., 'Supply Reorder', 'Tool Calibration')."
-        },
-        "description": {
-          "type": "string",
-          "description": "Detailed description of the operation."
-        },
-        "employeeId": {
-          "type": "string",
-          "description": "Reference to Employee who performed the operation. (Relationship: Employee 1:N OperationRecord)"
-        }
+        "id": { "type": "string", "description": "Unique ID for the cost center." },
+        "code": { "type": "string", "description": "The code for the cost center (e.g., 'TI-01', 'MKT-02')." },
+        "description": { "type": "string", "description": "Description of the cost center." }
       },
-      "required": [
-        "id",
-        "timestamp",
-        "operationType",
-        "description",
-        "employeeId"
-      ]
+      "required": ["code", "description"]
     },
-    "Image": {
+    "PurchaseRequisition": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Image",
+      "title": "PurchaseRequisition",
       "type": "object",
-      "description": "Represents an image stored within the system.",
+      "description": "Represents the header of a purchase requisition (SC).",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Image entity."
-        },
-        "filename": {
-          "type": "string",
-          "description": "Name of the image file."
-        },
-        "url": {
-          "type": "string",
-          "description": "URL where the image is stored.",
-          "format": "uri"
-        },
-        "uploadTimestamp": {
-          "type": "string",
-          "description": "Timestamp of when the image was uploaded.",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "requesterId": { "type": "string", "description": "UID of the user who created the request." },
+        "costCenterId": { "type": "string", "description": "ID of the associated Cost Center." },
+        "neededByDate": { "type": "string", "format": "date", "description": "The date when the items are needed." },
+        "status": { "type": "string", "enum": ["Aberta", "Em Aprovação", "Aprovada", "Recusada", "Concluída"], "description": "Current status of the requisition." },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "filename",
-        "url",
-        "uploadTimestamp"
-      ]
+      "required": ["requesterId", "costCenterId", "neededByDate", "status", "createdAt"]
+    },
+    "PurchaseRequisitionItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PurchaseRequisitionItem",
+      "type": "object",
+      "description": "Represents a single item within a purchase requisition.",
+      "properties": {
+        "id": { "type": "string" },
+        "supplyId": { "type": "string", "description": "ID of the requested Supply item." },
+        "quantity": { "type": "number" },
+        "estimatedPrice": { "type": "number", "description": "Estimated price per unit." },
+        "notes": { "type": "string", "description": "Additional notes or specifications for the item." },
+        "attachmentUrl": { "type": "string", "format": "uri", "description": "URL for an attached photo or reference." }
+      },
+      "required": ["supplyId", "quantity"]
     },
     "Employee": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -862,238 +762,66 @@
     "structure": [
       {
         "path": "/addresses/{addressId}",
-        "definition": {
-          "entityName": "Address",
-          "schema": {
-            "$ref": "#/backend/entities/Address"
-          },
-          "description": "Stores hierarchical storage addresses.",
-          "params": [
-            {
-              "name": "addressId",
-              "description": "Unique identifier for the address."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/Address" }, "description": "Stores hierarchical storage addresses." }
       },
       {
         "path": "/budgets/{budgetId}",
-        "definition": {
-          "entityName": "Budget",
-          "schema": {
-            "$ref": "#/backend/entities/Budget"
-          },
-          "description": "Stores budget allocations for different sectors.",
-          "params": [
-            {
-              "name": "budgetId",
-              "description": "Unique identifier for the budget record."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/Budget" }, "description": "Stores budget allocations for different sectors." }
       },
       {
         "path": "/supplies/{supplyId}",
-        "definition": {
-          "entityName": "Supply",
-          "schema": {
-            "$ref": "#/backend/entities/Supply"
-          },
-          "description": "Stores the master data for supply items.",
-          "params": [
-            {
-              "name": "supplyId",
-              "description": "Unique identifier for the supply item."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/Supply" }, "description": "Stores the master data for supply items." }
       },
       {
         "path": "/supplies/{supplyId}/stock/{stockId}",
-        "definition": {
-          "entityName": "SupplyStock",
-          "schema": {
-            "$ref": "#/backend/entities/SupplyStock"
-          },
-          "description": "Stores individual, trackable batches of supplies as a subcollection of the master supply item.",
-          "params": [
-            {
-              "name": "supplyId",
-              "description": "The ID of the parent supply item."
-            },
-            {
-              "name": "stockId",
-              "description": "Unique identifier for the supply stock record."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/SupplyStock" }, "description": "Stores individual, trackable batches of supplies as a subcollection of the master supply item." }
       },
       {
         "path": "/supply_movements/{movementId}",
-        "definition": {
-          "entityName": "SupplyMovement",
-          "schema": {
-            "$ref": "#/backend/entities/SupplyMovement"
-          },
-          "description": "Stores the historical log of all supply movements.",
-          "params": [
-            {
-              "name": "movementId",
-              "description": "Unique identifier for the supply movement record."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/SupplyMovement" }, "description": "Stores the historical log of all supply movements." }
       },
       {
         "path": "/tools/{toolId}",
-        "definition": {
-          "entityName": "Tool",
-          "schema": {
-            "$ref": "#/backend/entities/Tool"
-          },
-          "description": "Stores aircraft maintenance tools and their calibration details based on intelligent taxonomy.",
-          "params": [
-            {
-              "name": "toolId",
-              "description": "Unique identifier for the tool."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/Tool" }, "description": "Stores aircraft maintenance tools and their calibration details based on intelligent taxonomy." }
       },
        {
         "path": "/kits/{kitId}",
-        "definition": {
-          "entityName": "Kit",
-          "schema": {
-            "$ref": "#/backend/entities/Kit"
-          },
-          "description": "Stores tool kits, each containing references to multiple tools.",
-          "params": [
-            {
-              "name": "kitId",
-              "description": "Unique identifier for the tool kit."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/Kit" }, "description": "Stores tool kits, each containing references to multiple tools." }
       },
       {
         "path": "/tools/{toolId}/calibration_history/{calibrationId}",
-        "definition": {
-          "entityName": "CalibrationRecord",
-          "schema": {
-            "$ref": "#/backend/entities/CalibrationRecord"
-          },
-          "description": "Stores the historical records of all calibrations for a specific tool, ensuring traceability.",
-          "params": [
-            {
-              "name": "toolId",
-              "description": "The ID of the parent tool."
-            },
-            {
-              "name": "calibrationId",
-              "description": "Unique identifier for the calibration record."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/CalibrationRecord" }, "description": "Stores the historical records of all calibrations for a specific tool, ensuring traceability." }
       },
       {
         "path": "/suppliers/{supplierId}",
-        "definition": {
-          "entityName": "Supplier",
-          "schema": {
-            "$ref": "#/backend/entities/Supplier"
-          },
-          "description": "Stores information about suppliers of aircraft maintenance supplies.",
-          "params": [
-            {
-              "name": "supplierId",
-              "description": "Unique identifier for the supplier."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/operation_records/{operationRecordId}",
-        "definition": {
-          "entityName": "OperationRecord",
-          "schema": {
-            "$ref": "#/backend/entities/OperationRecord"
-          },
-          "description": "Stores records of operations performed in the system. Includes employeeId to track which employee performed the operation.",
-          "params": [
-            {
-              "name": "operationRecordId",
-              "description": "Unique identifier for the operation record."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/images/{imageId}",
-        "definition": {
-          "entityName": "Image",
-          "schema": {
-            "$ref": "#/backend/entities/Image"
-          },
-          "description": "Stores images used within the system.",
-          "params": [
-            {
-              "name": "imageId",
-              "description": "Unique identifier for the image."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/Supplier" }, "description": "Stores information about suppliers of aircraft maintenance supplies." }
       },
       {
         "path": "/employees/{employeeId}",
-        "definition": {
-          "entityName": "Employee",
-          "schema": {
-            "$ref": "#/backend/entities/Employee"
-          },
-          "description": "Stores employee information.",
-          "params": [
-            {
-              "name": "employeeId",
-              "description": "Unique identifier for the employee."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/Employee" }, "description": "Stores employee information." }
       },
       {
         "path": "/expenses/{expenseId}",
-        "definition": {
-          "entityName": "Despesa",
-          "schema": {
-            "$ref": "#/backend/entities/Despesa"
-          },
-          "description": "Stores financial expense records.",
-          "params": [
-            {
-              "name": "expenseId",
-              "description": "Unique identifier for the expense record."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/Despesa" }, "description": "Stores financial expense records." }
       },
       {
         "path": "/tool_requests/{requestId}",
-        "definition": {
-          "entityName": "ToolRequest",
-          "schema": {
-            "$ref": "#/backend/entities/ToolRequest"
-          },
-          "description": "Stores requests for tool loans.",
-          "params": [
-            {
-              "name": "requestId",
-              "description": "Unique identifier for the tool loan request."
-            }
-          ]
-        }
+        "definition": { "schema": { "$ref": "#/backend/entities/ToolRequest" }, "description": "Stores requests for tool loans." }
+      },
+      {
+        "path": "/cost_centers/{costCenterId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/CostCenter" }, "description": "Stores cost center master data." }
+      },
+      {
+        "path": "/purchase_requisitions/{requisitionId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/PurchaseRequisition" }, "description": "Stores the header for purchase requisitions." }
+      },
+      {
+        "path": "/purchase_requisitions/{requisitionId}/items/{itemId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/PurchaseRequisitionItem" }, "description": "Stores the items within a specific purchase requisition." }
       }
-    ],
-    "reasoning": "This Firestore data structure is designed to support AeroTrack's aircraft maintenance management features, focusing on supply and tool control, operation recording, and image storage. The structure prioritizes authorization independence through denormalization where needed and adheres to structural segregation principles to ensure consistent security postures within collections.  Path-based ownership is used for user-related data (none explicitly defined, but included for future expansion). Collaborative data patterns, utilizing membership maps, are employed where applicable. \n\nSpecifically, authorization independence is achieved by denormalizing necessary authorization data (like supplier or employee IDs) directly into subcollections when access needs to be controlled at the subcollection level without relying on `get()` calls to parent documents.  For example, the OperationRecord collection includes the employeeId to track which employee performed the operation and use it for authorization.  This denormalization is critical for atomic operations and simplifies security rule implementation. QAPs (Rules are not Filters) are supported through structural segregation. Each top-level collection is treated as having homogeneous security requirements. Additionally, the use of employeeId as a foreign key in relevant collections like OperationRecord allows for efficient querying and filtering based on employee-specific operations. This design facilitates secure list operations because rules can be written based on the contents of the document itself, not on related documents."
+    ]
   }
 }
 
+    
