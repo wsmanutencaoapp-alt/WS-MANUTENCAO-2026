@@ -13,6 +13,7 @@ export const availableModules: { id: string; label: string, isModule?: boolean }
     { id: 'cadastros_ferramentas', label: '-> Ferramentas', isModule: false },
     { id: 'cadastros_suprimentos', label: '-> Suprimentos', isModule: false },
     { id: 'cadastros_enderecos', label: '-> Endereços', isModule: false },
+    { id: 'cadastros_centro_custo', label: '-> Centro de Custo', isModule: false },
     { id: 'compras', label: 'Compras (Módulo)', isModule: true },
     { id: 'compras_aprovacoes', label: '-> Aprovações', isModule: false },
     { id: 'compras_controle', label: '-> Controle', isModule: false },

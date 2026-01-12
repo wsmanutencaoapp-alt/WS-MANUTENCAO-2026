@@ -27,21 +27,23 @@ service cloud.firestore {
     }
 
     match /supplies/{supplyId} {
+      // Any authenticated user can read supplies master data
       allow read: if isAuthenticated();
       allow write: if hasPermission('suprimentos');
-    }
-    
-    match /supply_stock/{stockId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('suprimentos');
+      
+      // Allow authenticated users to read stock, but only permitted users to write.
+      match /stock/{stockId} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('suprimentos');
+      }
     }
     
     match /supply_movements/{movementId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('suprimentos');
+      allow read, write: if hasPermission('suprimentos');
     }
 
     match /tools/{toolId} {
+      // Any authenticated user can read tools, but only those with permission can write.
       allow read: if isAuthenticated();
       allow create, update, delete: if hasPermission('ferramentaria');
       
@@ -110,6 +112,18 @@ service cloud.firestore {
     match /addresses/{addressId} {
         // Any authenticated and active user can manage addresses.
         allow read, write: if hasPermission('cadastros');
+    }
+
+    match /cost_centers/{costCenterId} {
+      allow read: if hasPermission('compras') || hasPermission('financeiro') || hasPermission('cadastros');
+      allow write: if hasPermission('financeiro') || hasPermission('cadastros');
+    }
+
+    match /purchase_requisitions/{requisitionId} {
+        allow read, write: if hasPermission('compras');
+        match /items/{itemId} {
+            allow read, write: if hasPermission('compras');
+        }
     }
 
     // This collection is used for generating sequential IDs.
