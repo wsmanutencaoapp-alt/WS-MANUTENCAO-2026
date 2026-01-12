@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -99,7 +100,7 @@ const RequisicaoCompraPage = () => {
         const batch = writeBatch(firestore);
         
         const counterRef = doc(firestore, 'counters', 'purchaseRequisitions');
-        const counterSnapshot = await getDocs(query(collection(firestore, 'counters'), where(doc.name, '==', 'purchaseRequisitions')));
+        const counterSnapshot = await getDocs(query(collection(firestore, 'counters'), where(documentId(), '==', 'purchaseRequisitions')));
 
         let lastId = 0;
         if (!counterSnapshot.empty) {
@@ -276,21 +277,29 @@ const RequisicaoCompraPage = () => {
                                             <p className="font-bold">{item.descricao}</p>
                                             <p className="font-mono text-xs text-muted-foreground">{item.codigo}</p>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                <Input 
-                                                    type="number" 
-                                                    placeholder="Qtd."
-                                                    value={item.requisitionQuantity}
-                                                    onChange={(e) => updateCartItem(item.docId, 'requisitionQuantity', Math.max(1, parseInt(e.target.value) || 1))}
-                                                    className="h-8 text-center"
-                                                    min="1"
-                                                />
-                                                <Input
-                                                    type="number"
-                                                    placeholder="Preço Est. (R$)"
-                                                    value={item.estimatedPrice || ''}
-                                                    onChange={(e) => updateCartItem(item.docId, 'estimatedPrice', parseFloat(e.target.value) || undefined)}
-                                                    className="h-8 text-center"
-                                                />
+                                                 <div>
+                                                    <Label htmlFor={`quantity-${item.docId}`} className="text-xs text-muted-foreground">Quantidade</Label>
+                                                    <Input 
+                                                        id={`quantity-${item.docId}`}
+                                                        type="number" 
+                                                        placeholder="Qtd."
+                                                        value={item.requisitionQuantity}
+                                                        onChange={(e) => updateCartItem(item.docId, 'requisitionQuantity', Math.max(1, parseInt(e.target.value) || 1))}
+                                                        className="h-8 text-center"
+                                                        min="1"
+                                                    />
+                                                 </div>
+                                                 <div>
+                                                     <Label htmlFor={`price-${item.docId}`} className="text-xs text-muted-foreground">Preço Estimado (R$)</Label>
+                                                    <Input
+                                                        id={`price-${item.docId}`}
+                                                        type="number"
+                                                        placeholder="Preço Est. (R$)"
+                                                        value={item.estimatedPrice || ''}
+                                                        onChange={(e) => updateCartItem(item.docId, 'estimatedPrice', parseFloat(e.target.value) || undefined)}
+                                                        className="h-8 text-center"
+                                                    />
+                                                 </div>
                                             </div>
                                             <Input
                                                 placeholder="Observação (opcional)"
@@ -371,5 +380,3 @@ const RequisicaoCompraPage = () => {
 };
 
 export default RequisicaoCompraPage;
-
-    
