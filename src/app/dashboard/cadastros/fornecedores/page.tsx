@@ -70,6 +70,7 @@ const CadastroFornecedoresPage = () => {
     cnpj: '',
     contactEmail: '',
     contactPhone: '',
+    segmento: '',
     rating: 0,
   });
   
@@ -88,7 +89,7 @@ const CadastroFornecedoresPage = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', cnpj: '', contactEmail: '', contactPhone: '', rating: 0 });
+    setFormData({ name: '', cnpj: '', contactEmail: '', contactPhone: '', segmento: '', rating: 0 });
     setEditingSupplier(null);
   };
   
@@ -117,6 +118,7 @@ const CadastroFornecedoresPage = () => {
             cnpj: formData.cnpj,
             contactEmail: formData.contactEmail,
             contactPhone: formData.contactPhone || '',
+            segmento: formData.segmento || '',
             rating: formData.rating || 0,
         };
 
@@ -187,18 +189,20 @@ const CadastroFornecedoresPage = () => {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>CNPJ</TableHead>
+                <TableHead>Segmento</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>}
-              {error && <TableRow><TableCell colSpan={5} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
+              {isLoading && <TableRow><TableCell colSpan={6} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>}
+              {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
               {!isLoading && suppliers?.map(s => (
                   <TableRow key={s.docId}>
                     <TableCell className="font-medium">{s.name}</TableCell>
                     <TableCell>{s.cnpj}</TableCell>
+                    <TableCell>{s.segmento}</TableCell>
                     <TableCell>{s.contactEmail}</TableCell>
                     <TableCell>{s.contactPhone}</TableCell>
                     <TableCell className="text-right space-x-2">
@@ -245,7 +249,8 @@ const CadastroFornecedoresPage = () => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-1"><Label htmlFor="name">Nome</Label><Input id="name" value={formData.name || ''} onChange={handleInputChange}/></div>
-             <div className="space-y-1"><Label htmlFor="cnpj">CNPJ</Label><Input id="cnpj" value={formData.cnpj || ''} onChange={handleInputChange}/></div>
+            <div className="space-y-1"><Label htmlFor="cnpj">CNPJ</Label><Input id="cnpj" value={formData.cnpj || ''} onChange={handleInputChange}/></div>
+            <div className="space-y-1"><Label htmlFor="segmento">Segmento</Label><Input id="segmento" value={formData.segmento || ''} onChange={handleInputChange} placeholder="Ex: Usinagem, Matéria-Prima"/></div>
             <div className="space-y-1"><Label htmlFor="contactEmail">E-mail</Label><Input id="contactEmail" type="email" value={formData.contactEmail || ''} onChange={handleInputChange}/></div>
             <div className="space-y-1"><Label htmlFor="contactPhone">Telefone</Label><Input id="contactPhone" value={formData.contactPhone || ''} onChange={handleInputChange}/></div>
           </div>
@@ -264,3 +269,5 @@ const CadastroFornecedoresPage = () => {
 };
 
 export default CadastroFornecedoresPage;
+
+    

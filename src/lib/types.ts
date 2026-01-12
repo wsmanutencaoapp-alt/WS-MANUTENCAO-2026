@@ -1,9 +1,4 @@
 
-
-
-
-
-
 export type Supply = {
   id?: string;
   // Identificação
@@ -299,5 +294,8 @@ export type Supplier = {
     cnpj: string;
     contactEmail: string;
     contactPhone?: string;
+    segmento?: string;
     rating?: number;
 };
+
+    

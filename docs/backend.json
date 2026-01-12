@@ -381,6 +381,10 @@
           "type": "string",
           "description": "Phone number of the supplier's contact person."
         },
+        "segmento": {
+          "type": "string",
+          "description": "Business segment of the supplier (e.g., 'Usinagem', 'Matéria-Prima')."
+        },
         "rating": {
           "type": "number",
           "description": "Supplier performance rating (e.g., 1-5)."
@@ -881,6 +885,6 @@
     ]
   }
 }
-
-
       
+
+    
