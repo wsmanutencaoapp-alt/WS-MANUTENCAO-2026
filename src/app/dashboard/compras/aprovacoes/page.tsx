@@ -62,9 +62,10 @@ const AprovacoesComprasPage = () => {
   }>({ isOpen: false, requisition: null, type: 'reject', reason: '' });
 
   const queryKey = 'pendingPurchaseRequisitions';
+  // Updated query to fetch OCs needing approval and SCs for initial approval
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'purchase_requisitions'), where('status', 'in', ['Em Aprovação', 'Em Revisão', 'Aberta']));
+    return query(collection(firestore, 'purchase_requisitions'), where('status', 'in', ['Em Aprovação', 'Aberta']));
   }, [firestore]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
@@ -87,14 +88,19 @@ const AprovacoesComprasPage = () => {
     const calculateTotals = async () => {
         const enrichedReqs: RequisitionWithTotal[] = [];
         for (const req of requisitions) {
-            const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
-            const itemsSnapshot = await getDocs(itemsRef);
-            let totalValue = 0;
-            itemsSnapshot.forEach(doc => {
-                const item = doc.data() as PurchaseRequisitionItem;
-                totalValue += (item.estimatedPrice || 0) * item.quantity;
-            });
-            enrichedReqs.push({ ...req, totalValue });
+            // For OCs, the total is already on the document. For SCs, we calculate it.
+            if (req.type === 'Ordem de Compra') {
+                enrichedReqs.push({ ...req, totalValue: req.totalValue || 0 });
+            } else {
+                const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
+                const itemsSnapshot = await getDocs(itemsRef);
+                let totalValue = 0;
+                itemsSnapshot.forEach(doc => {
+                    const item = doc.data() as PurchaseRequisitionItem;
+                    totalValue += (item.estimatedPrice || 0) * item.quantity;
+                });
+                enrichedReqs.push({ ...req, totalValue });
+            }
         }
         setRequisitionsWithTotals(enrichedReqs);
     };
@@ -170,6 +176,10 @@ const AprovacoesComprasPage = () => {
         'Aprovada': 'success',
         'Recusada': 'destructive',
         'Concluída': 'secondary',
+        'Parcialmente Atendida': 'warning',
+        'Totalmente Atendida': 'success',
+        'Cancelada': 'destructive',
+        'Em Cotação': 'default',
     };
     return variants[status] || 'secondary';
   }
@@ -177,12 +187,12 @@ const AprovacoesComprasPage = () => {
   return (
     <>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Aprovação de Requisições de Compra</h1>
+        <h1 className="text-2xl font-bold">Aprovação de Requisições e Ordens</h1>
         <Card>
           <CardHeader>
-            <CardTitle>Requisições Pendentes</CardTitle>
+            <CardTitle>Requisições e Ordens Pendentes</CardTitle>
             <CardDescription>
-              Analise, aprove ou recuse as requisições de compra que aguardam sua ação.
+              Analise, aprove ou recuse documentos que aguardam sua ação.
             </CardDescription>
             <div className="relative pt-4">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -263,7 +273,7 @@ const AprovacoesComprasPage = () => {
           <DialogContent>
               <DialogHeader>
                   <DialogTitle>
-                      {decisionState.type === 'reject' ? 'Rejeitar Requisição' : 'Pedir Revisão da Requisição'}
+                      {decisionState.type === 'reject' ? 'Rejeitar Documento' : 'Pedir Revisão do Documento'}
                   </DialogTitle>
                   <DialogDescription>
                       Por favor, informe o motivo para esta ação. A justificativa será enviada ao solicitante.
@@ -295,3 +305,5 @@ const AprovacoesComprasPage = () => {
 };
 
 export default AprovacoesComprasPage;
+
+      

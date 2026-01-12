@@ -40,6 +40,9 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Recusada': 'destructive',
     'Concluída': 'secondary',
     'Em Revisão': 'warning',
+    'Parcialmente Atendida': 'warning',
+    'Totalmente Atendida': 'success',
+    'Cancelada': 'destructive'
   };
   return variants[status] || 'secondary';
 };
@@ -71,7 +74,7 @@ const ControleComprasPage = () => {
   const queryKey = 'approvedPurchaseRequisitions';
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'purchase_requisitions'), where('status', 'in', ['Aprovada', 'Em Cotação']));
+    return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Solicitação de Compra'), where('status', 'in', ['Aprovada', 'Parcialmente Atendida']));
   }, [firestore]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
@@ -193,17 +196,10 @@ const ControleComprasPage = () => {
                            <Eye className="mr-2 h-4 w-4"/>
                            Ver Itens
                        </Button>
-                       {req.status === 'Aprovada' ? (
-                            <Button size="sm" onClick={() => handleStartPurchaseProcess(req)}>
-                               <ShoppingBag className="mr-2 h-4 w-4"/>
-                               Iniciar Processo
-                           </Button>
-                       ) : (
-                            <Button size="sm" variant="secondary" onClick={() => handleStartPurchaseProcess(req)}>
-                                <FileText className="mr-2 h-4 w-4"/>
-                                Gerenciar Cotação
-                            </Button>
-                       )}
+                       <Button size="sm" onClick={() => handleStartPurchaseProcess(req)}>
+                           <ShoppingBag className="mr-2 h-4 w-4"/>
+                           Iniciar Processo
+                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -234,3 +230,5 @@ const ControleComprasPage = () => {
 };
 
 export default ControleComprasPage;
+
+      

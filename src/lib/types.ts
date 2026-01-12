@@ -1,5 +1,6 @@
 
 
+
 export type Supply = {
   id?: string;
   // Identificação
@@ -244,27 +245,27 @@ export type Quotation = {
 export type PurchaseRequisition = {
   id?: string;
   protocol: string;
-  originalProtocol?: string;
+  originalRequisitionId?: string; // Links an OC back to its original SC
   requesterId: string;
   requesterName: string;
   costCenterId: string;
-  neededByDate: string;
+  neededByDate: string; // ISO date string
   type: 'Solicitação de Compra' | 'Ordem de Compra';
-  status: 'Aberta' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída';
+  status: 'Aberta' | 'Parcialmente Atendida' | 'Totalmente Atendida' | 'Cancelada' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída';
   rejectionReason?: string;
-  createdAt: string;
+  createdAt: string; // ISO date string
   priority: 'Normal' | 'Urgente' | 'Muito Urgente';
   purchaseReason: string;
-  // Quotation fields
+  // OC Specific fields
   quotations?: Quotation[];
   selectedQuotationIndex?: number;
   expensiveChoiceJustification?: string;
   purchaseOrderNotes?: string;
-  // Final Purchase info
   supplierId?: string;
   totalValue?: number;
   paymentTerms?: string;
 };
+
 
 export type PurchaseRequisitionItem = {
     id?: string;
@@ -272,6 +273,7 @@ export type PurchaseRequisitionItem = {
     itemType: 'supply' | 'tool';
     quantity: number;
     estimatedPrice?: number;
+    status: 'Pendente' | 'Cotado' | 'Recebido'; // Status within the original SC
     notes?: string;
     attachmentUrl?: string;
 };
@@ -294,3 +296,5 @@ export type Supplier = {
     contactPhone?: string;
     rating?: number;
 };
+
+      
