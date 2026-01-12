@@ -159,7 +159,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                         id={`select-item-${item.docId}`}
                         checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
                         onCheckedChange={() => handleItemSelection(item)}
-                        disabled={item.status !== 'Pendente' && item.status !== 'Em Cotação'}
+                        disabled={item.status !== 'Pendente'}
                         className="mt-1"
                       />
                       <Image
