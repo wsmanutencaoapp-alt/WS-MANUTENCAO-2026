@@ -5,13 +5,10 @@ import { useFirestore, useCollection, useMemoFirebase, useStorage } from '@/fire
 import {
   collection,
   query,
-  where,
-  documentId,
   doc,
   writeBatch,
   getDocs,
   updateDoc,
-  runTransaction,
   addDoc
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -27,8 +24,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Upload, FileText, ChevronsUpDown, Check, Trash2, Info, ShoppingCart } from 'lucide-react';
-import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Tool, Supply, Quotation } from '@/lib/types';
+import { Loader2, Search, Upload, FileText, ChevronsUpDown, Check, Info, ShoppingBag } from 'lucide-react';
+import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { ScrollArea } from './ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
@@ -158,12 +155,23 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         });
         
         const counterRef = doc(firestore, 'counters', 'purchaseOrders');
-        const counterSnapshot = await getDocs(query(collection(firestore, 'counters'), where(documentId(), '==', 'purchaseOrders')));
-        let lastId = 0;
-        if (!counterSnapshot.empty) {
-            lastId = counterSnapshot.docs[0].data().lastId || 0;
+        let newId;
+
+        // This transaction logic is overly complex, but necessary to handle the case where the counter doesn't exist yet.
+        await runTransaction(firestore, async (transaction) => {
+            const counterDoc = await transaction.get(counterRef);
+            let lastId = 0;
+            if (counterDoc.exists()) {
+                lastId = counterDoc.data()?.lastId || 0;
+            }
+            newId = lastId + 1;
+            transaction.set(counterRef, { lastId: newId }, { merge: true });
+        });
+
+        if (newId === undefined) {
+          throw new Error("Não foi possível gerar um novo número de protocolo para a OC.");
         }
-        const newId = lastId + 1;
+
         const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
         
         const ocRef = doc(collection(firestore, 'purchase_requisitions'));
@@ -203,9 +211,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             const { details, ...baseItem } = item;
             batch.set(ocItemRef, { ...baseItem, status: 'Pendente' });
         }
-
-        const counterDocRef = doc(firestore, 'counters', 'purchaseOrders');
-        batch.set(counterDocRef, { lastId: newId });
 
         await batch.commit();
 
