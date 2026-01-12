@@ -64,7 +64,7 @@ const AprovacoesComprasPage = () => {
   const queryKey = 'pendingPurchaseRequisitions';
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'purchase_requisitions'), where('status', 'in', ['Em Aprovação', 'Em Revisão']));
+    return query(collection(firestore, 'purchase_requisitions'), where('status', 'in', ['Em Aprovação', 'Em Revisão', 'Aberta']));
   }, [firestore]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
