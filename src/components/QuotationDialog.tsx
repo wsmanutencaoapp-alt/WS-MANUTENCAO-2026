@@ -47,7 +47,7 @@ interface QuotationDialogProps {
   onClose: () => void;
   onSuccess: () => void;
   requisition: WithDocId<PurchaseRequisition>;
-  item: RequisitionItemWithDetails;
+  items: RequisitionItemWithDetails[];
 }
 
 type QuotationFormState = {
@@ -69,7 +69,7 @@ const emptyQuotation: QuotationFormState = {
   attachmentFile: null,
 };
 
-export default function QuotationDialog({ isOpen, onClose, onSuccess, requisition, item }: QuotationDialogProps) {
+export default function QuotationDialog({ isOpen, onClose, onSuccess, requisition, items }: QuotationDialogProps) {
   const firestore = useFirestore();
   const storage = useStorage();
   const { toast } = useToast();
@@ -82,24 +82,20 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const [isSaving, setIsSaving] = useState(false);
   const [activePopover, setActivePopover] = useState<number | null>(null);
 
-  // Data fetching
   const suppliersQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'suppliers')) : null), [firestore]);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<WithDocId<Supplier>>(suppliersQuery, {
     queryKey: ['allSuppliersForQuotation'],
     enabled: isOpen,
   });
 
-  // Load existing quotation data when dialog opens
   useEffect(() => {
     if (isOpen) {
-        // Since we are now handling one item at a time, we don't load previous quotations.
-        // The user is creating a new OC from a specific SC item.
         setQuotations([emptyQuotation, emptyQuotation, emptyQuotation]);
         setSelectedQuotationIndex(null);
         setJustification('');
         setPurchaseOrderNotes('');
     }
-  }, [isOpen, item]);
+  }, [isOpen, items]);
 
   const handleQuotationChange = (index: number, field: keyof QuotationFormState, value: any) => {
     const updatedQuotations = [...quotations];
@@ -147,16 +143,17 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   }, [selectedQuotationIndex, cheapestIndex]);
   
   const generateOC = async (finalStatus: 'Em Cotação' | 'Em Aprovação'): Promise<void> => {
-     if (!firestore || !storage || !requisition || !item) return Promise.reject("Serviços não disponíveis.");
+     if (!firestore || !storage || !requisition || !items || items.length === 0) return Promise.reject("Dados inválidos.");
      setIsSaving(true);
      try {
         const batch = writeBatch(firestore);
 
-        // 1. Update the status of the item in the original SC
-        const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.docId);
-        batch.update(originalItemRef, { status: 'Em Cotação' });
+        const itemIdsBeingProcessed = new Set(items.map(item => item.docId));
+        itemIdsBeingProcessed.forEach(itemId => {
+            const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', itemId);
+            batch.update(originalItemRef, { status: 'Em Cotação' });
+        });
         
-        // 2. Create the new Purchase Order (OC) document
         const counterRef = doc(firestore, 'counters', 'purchaseOrders');
         const counterSnapshot = await getDocs(query(collection(firestore, 'counters'), where(documentId(), '==', 'purchaseOrders')));
         let lastId = 0;
@@ -183,7 +180,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             });
         }
         
-        const chosenQuotation = selectedQuotationIndex !== null ? finalQuotations[selectedQuotationIndex] : null;
+        const chosenQuotation = selectedQuotationIndex !== null ? finalQuotations.find((q, i) => i === selectedQuotationIndex) : null;
 
         const ocData: Omit<PurchaseRequisition, 'id'> = {
             protocol: ocProtocol, originalRequisitionId: requisition.docId,
@@ -191,31 +188,30 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             costCenterId: requisition.costCenterId, neededByDate: requisition.neededByDate,
             type: 'Ordem de Compra', status: finalStatus, createdAt: new Date().toISOString(),
             priority: requisition.priority, purchaseReason: requisition.purchaseReason,
-            quotations: finalQuotations, selectedQuotationIndex: selectedQuotationIndex,
+            quotations: finalQuotations, selectedQuotationIndex: selectedQuotationIndex ?? undefined,
             expensiveChoiceJustification: justification, purchaseOrderNotes: purchaseOrderNotes,
             supplierId: chosenQuotation?.supplierId, totalValue: chosenQuotation?.totalValue,
             paymentTerms: chosenQuotation?.paymentTerms,
         };
         batch.set(ocRef, ocData);
         
-        // 3. Create the item subdocument for the new OC
-        const ocItemRef = doc(collection(ocRef, 'items'));
-        const { details, ...baseItem } = item;
-        batch.set(ocItemRef, { ...baseItem, status: 'Pendente' });
+        for (const item of items) {
+            const ocItemRef = doc(collection(ocRef, 'items'));
+            const { details, ...baseItem } = item;
+            batch.set(ocItemRef, { ...baseItem, status: 'Pendente' });
+        }
 
-        // 4. Update the counter
         const counterDocRef = doc(firestore, 'counters', 'purchaseOrders');
         batch.set(counterDocRef, { lastId: newId });
 
         await batch.commit();
 
      } catch(err) {
-        throw err; // Re-throw para ser pego no handler do botão
+        throw err;
      } finally {
         setIsSaving(false);
      }
   }
-
 
   const handleSaveDraft = async () => {
     try {
@@ -258,17 +254,22 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         <DialogHeader>
           <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
           <DialogDescription>
-            Insira os orçamentos para o item <span className="font-bold">{item.details?.descricao}</span>.
+            Insira os orçamentos para os itens selecionados.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 max-h-[75vh] py-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[75vh] py-4">
           <div className="md:col-span-1 space-y-4">
-            <h3 className="font-semibold text-lg">Item da Requisição</h3>
-            <div className="text-sm border rounded-md p-3">
-                <p className="font-bold">{item.details?.descricao || 'Item não encontrado'}</p>
-                <p>Quantidade: <span className="font-medium">{item.quantity}</span></p>
-                {item.notes && <p className="text-xs text-muted-foreground">Obs: {item.notes}</p>}
-            </div>
+            <h3 className="font-semibold text-lg">Itens para Cotação</h3>
+            <ScrollArea className='h-96'>
+                <div className="space-y-2">
+                    {items.map(item => (
+                        <div key={item.docId} className="text-sm border rounded-md p-3">
+                            <p className="font-bold">{item.details?.descricao || 'Item não encontrado'}</p>
+                            <p>Quantidade: <span className="font-medium">{item.quantity}</span></p>
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
           </div>
           
           <div className="md:col-span-2 space-y-4">
@@ -277,7 +278,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                 <p className="text-sm text-muted-foreground">* Selecione o orçamento vencedor</p>
              </div>
              <RadioGroup value={selectedQuotationIndex?.toString()} onValueChange={(v) => setSelectedQuotationIndex(Number(v))}>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
                     {quotations.map((q, index) => (
                        <Card key={index} className="p-4 space-y-3">
                            <div className="flex items-center justify-between">

@@ -70,9 +70,10 @@ const ControleComprasPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
 
-  const queryKey = 'approvedPurchaseRequisitions';
+  const queryKey = 'allPurchaseRequisitionsForControl';
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
+    // Simplified query to fetch all purchase requisitions
     return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Solicitação de Compra'));
   }, [firestore]);
   
@@ -103,6 +104,7 @@ const ControleComprasPage = () => {
   const sortedAndFilteredRequisitions = useMemo(() => {
     if (!requisitions) return [];
 
+    // Filter client-side
     let relevantRequisitions = requisitions.filter(req => ['Aprovada', 'Parcialmente Atendida', 'Em Cotação'].includes(req.status));
 
     if (searchTerm) {

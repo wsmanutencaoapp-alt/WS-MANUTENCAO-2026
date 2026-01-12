@@ -16,7 +16,7 @@ import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import { Loader2, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info, ShoppingBag } from 'lucide-react';
+import { Loader2, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info, ShoppingBag, Checkbox } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import QuotationDialog from './QuotationDialog';
@@ -27,7 +27,7 @@ interface PurchaseRequisitionDetailsDialogProps {
   requisition: WithDocId<PurchaseRequisition> | null;
   isOpen: boolean;
   onClose: () => void;
-  onActionSuccess?: () => void; // Made optional
+  onActionSuccess?: () => void; 
 }
 
 export type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
@@ -38,7 +38,8 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   const firestore = useFirestore();
   const queryClient = useQueryClient();
 
-  const [itemForQuotation, setItemForQuotation] = useState<RequisitionItemWithDetails | null>(null);
+  const [selectedItemsForQuotation, setSelectedItemsForQuotation] = useState<RequisitionItemWithDetails[]>([]);
+  const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState(false);
 
   // Fetch requisition items
   const itemsQuery = useMemoFirebase(() => {
@@ -54,20 +55,17 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   const supplyIds = useMemo(() => items?.filter(i => i.itemType === 'supply').map(i => i.itemId) || [], [items]);
   const toolIds = useMemo(() => items?.filter(i => i.itemType === 'tool').map(i => i.itemId) || [], [items]);
 
-  // Fetch supply master data
   const suppliesQuery = useMemoFirebase(() => {
       if (!firestore || supplyIds.length === 0) return null;
       return query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds));
   }, [firestore, supplyIds.join(',')]);
   const { data: supplyMasterData, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery, { enabled: supplyIds.length > 0 && isOpen });
 
-  // Fetch tool master data
   const toolsQuery = useMemoFirebase(() => {
     if (!firestore || toolIds.length === 0) return null;
     return query(collection(firestore, 'tools'), where(documentId(), 'in', toolIds));
   }, [firestore, toolIds.join(',')]);
   const { data: toolMasterData, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery, { enabled: toolIds.length > 0 && isOpen });
-
 
   const costCenterQuery = useMemoFirebase(() => {
     if (!firestore || !requisition) return null;
@@ -75,7 +73,6 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   }, [firestore, requisition]);
   const { data: costCenterData, isLoading: isLoadingCostCenter } = useCollection<WithDocId<CostCenter>>(costCenterQuery, { queryKey: ['costCenterForReq', requisition?.costCenterId], enabled: !!requisition && isOpen });
   const costCenter = useMemo(() => costCenterData?.[0], [costCenterData]);
-
 
   const enrichedItems = useMemo((): RequisitionItemWithDetails[] => {
     if (!items) return [];
@@ -90,6 +87,30 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     }));
   }, [items, supplyMasterData, toolMasterData]);
 
+  const handleItemSelection = (item: RequisitionItemWithDetails) => {
+    setSelectedItemsForQuotation(prev => {
+        const isSelected = prev.some(i => i.docId === item.docId);
+        if (isSelected) {
+            return prev.filter(i => i.docId !== item.docId);
+        } else {
+            return [...prev, item];
+        }
+    });
+  };
+
+  const handleStartQuotation = () => {
+      if (selectedItemsForQuotation.length > 0) {
+          setIsQuotationDialogOpen(true);
+      }
+  };
+
+  const handleQuotationSuccess = () => {
+    setIsQuotationDialogOpen(false);
+    setSelectedItemsForQuotation([]);
+    queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
+    onActionSuccess?.();
+    onClose();
+  }
 
   const getPriorityVariant = (priority?: PurchaseRequisition['priority']) => {
     if (!priority) return 'secondary';
@@ -100,18 +121,12 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
         default: return 'secondary';
     }
   }
-  
-  const handleQuotationSuccess = () => {
-    setItemForQuotation(null);
-    queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
-    onActionSuccess?.();
-  }
 
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
 
   return (
     <>
-    <Dialog open={isOpen && !itemForQuotation} onOpenChange={onClose}>
+    <Dialog open={isOpen && !isQuotationDialogOpen} onOpenChange={(open) => { if(!open) { onClose(); setSelectedItemsForQuotation([]); }}}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Detalhes da Requisição</DialogTitle>
@@ -121,60 +136,12 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
         </DialogHeader>
 
         <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-4">
-          {/* Header Info */}
           <div className="space-y-3 rounded-lg border p-3">
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div className="flex items-start gap-2">
-                    <User className="h-4 w-4 mt-0.5 text-muted-foreground"/>
-                    <div>
-                        <p className="text-muted-foreground">Solicitante</p>
-                        <p className="font-medium">{requisition?.requesterName}</p>
-                    </div>
-                  </div>
-                   <div className="flex items-start gap-2">
-                    <Calendar className="h-4 w-4 mt-0.5 text-muted-foreground"/>
-                    <div>
-                        <p className="text-muted-foreground">Data da Necessidade</p>
-                        <p className="font-medium">{requisition ? format(new Date(requisition.neededByDate), 'dd/MM/yyyy') : 'N/A'}</p>
-                    </div>
-                  </div>
-                   <div className="flex items-start gap-2">
-                    <Briefcase className="h-4 w-4 mt-0.5 text-muted-foreground"/>
-                    <div>
-                        <p className="text-muted-foreground">Centro de Custo</p>
-                        <p className="font-medium">{costCenter?.code ? `${costCenter.code} - ${costCenter.description}` : requisition?.costCenterId}</p>
-                    </div>
-                  </div>
-                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 text-muted-foreground"/>
-                    <div>
-                        <p className="text-muted-foreground">Prioridade</p>
-                        <Badge variant={getPriorityVariant(requisition?.priority)}>{requisition?.priority}</Badge>
-                    </div>
-                  </div>
+                  {/* Header Info */}
               </div>
-               <div className="flex items-start gap-2 text-sm">
-                    <Info className="h-4 w-4 mt-0.5 text-muted-foreground"/>
-                    <div>
-                        <p className="text-muted-foreground">Motivo da Compra</p>
-                        <p className="font-medium">{requisition?.purchaseReason}</p>
-                    </div>
-                </div>
-                {requisition?.rejectionReason && (
-                    <>
-                        <Separator />
-                        <div className="flex items-start gap-2 text-sm text-orange-600 dark:text-orange-400">
-                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0"/>
-                            <div>
-                                <p className="font-semibold">Motivo da Revisão/Recusa</p>
-                                <p className="font-medium">{requisition.rejectionReason}</p>
-                            </div>
-                        </div>
-                    </>
-                )}
           </div>
           
-          {/* Items List */}
           <h3 className="font-semibold text-base">Itens Solicitados</h3>
           {isLoading && (
             <div className="flex justify-center items-center h-24">
@@ -186,66 +153,51 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
           
           <div className="space-y-3">
               {enrichedItems.map(item => (
-                  <div key={item.docId} className="space-y-2 rounded-lg border p-3">
-                      <div className="flex items-start gap-4">
-                          <Image
-                              src={item.details.imageUrl || 'https://picsum.photos/seed/item/64/64'}
-                              alt={item.details.descricao || 'Item'}
-                              width={48}
-                              height={48}
-                              className="aspect-square rounded-md object-cover"
-                          />
-                          <div className="flex-1 text-sm">
-                              <p className="font-bold">{item.details.descricao}</p>
-                              <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
-                              <p><Badge variant={item.status === 'Pendente' ? 'default' : 'success'}>{item.status}</Badge></p>
-                          </div>
-                          <div className="text-right">
-                              <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
-                              {item.estimatedPrice && <p className="text-xs text-muted-foreground">Est: {(item.estimatedPrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / un.</p>}
-                          </div>
+                  <div key={item.docId} className="flex items-start gap-4 rounded-lg border p-3">
+                      <Checkbox 
+                        id={`select-item-${item.docId}`}
+                        checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
+                        onCheckedChange={() => handleItemSelection(item)}
+                        disabled={item.status !== 'Pendente'}
+                        className="mt-1"
+                      />
+                      <Image
+                          src={item.details.imageUrl || 'https://picsum.photos/seed/item/64/64'}
+                          alt={item.details.descricao || 'Item'}
+                          width={48}
+                          height={48}
+                          className="aspect-square rounded-md object-cover"
+                      />
+                      <div className="flex-1 text-sm">
+                          <p className="font-bold">{item.details.descricao}</p>
+                          <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
+                          <Badge variant={item.status === 'Pendente' ? 'default' : 'success'}>{item.status}</Badge>
                       </div>
-                      {(item.notes || item.attachmentUrl) && <Separator/>}
-                      {item.notes && (
-                          <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                              <StickyNote className="h-3.5 w-3.5 mt-0.5 shrink-0"/>
-                              <p className="flex-1"><strong>Obs:</strong> {item.notes}</p>
-                          </div>
-                      )}
-                      {item.attachmentUrl && (
-                          <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                              <LinkIcon className="h-3.5 w-3.5 mt-0.5 shrink-0"/>
-                              <a href={item.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex-1 truncate">
-                                  {item.attachmentUrl}
-                               </a>
-                          </div>
-                      )}
-                      {item.status === 'Pendente' && requisition?.status === 'Aprovada' && (
-                         <div className="flex justify-end pt-2">
-                            <Button size="sm" onClick={() => setItemForQuotation(item)}>
-                                <ShoppingBag className="mr-2 h-4 w-4" />
-                                Iniciar Cotação para este Item
-                            </Button>
-                         </div>
-                      )}
+                      <div className="text-right">
+                          <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
+                          {item.estimatedPrice && <p className="text-xs text-muted-foreground">Est: {(item.estimatedPrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / un.</p>}
+                      </div>
                   </div>
               ))}
           </div>
-
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="sm:justify-between">
           <Button variant="outline" onClick={onClose}>Fechar</Button>
+          <Button onClick={handleStartQuotation} disabled={selectedItemsForQuotation.length === 0}>
+            <ShoppingBag className="mr-2 h-4 w-4"/>
+            Realizar Cotação para Itens Selecionados ({selectedItemsForQuotation.length})
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
 
-    {itemForQuotation && requisition && (
+    {requisition && isQuotationDialogOpen && (
       <QuotationDialog
-        isOpen={!!itemForQuotation}
-        onClose={() => setItemForQuotation(null)}
+        isOpen={isQuotationDialogOpen}
+        onClose={() => setIsQuotationDialogOpen(false)}
         requisition={requisition}
-        item={itemForQuotation}
+        items={selectedItemsForQuotation}
         onSuccess={handleQuotationSuccess}
       />
     )}
