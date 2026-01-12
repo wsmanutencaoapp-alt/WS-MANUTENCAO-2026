@@ -27,7 +27,7 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
+import { PurchaseRequisitionDetailsDialog } from '@/components/PurchaseRequisitionDetailsDialog';
 
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {

@@ -30,7 +30,7 @@ type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
   details: Partial<WithDocId<Supply> | WithDocId<Tool>>;
 };
 
-export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose }: PurchaseRequisitionDetailsDialogProps) {
+export function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose }: PurchaseRequisitionDetailsDialogProps) {
   const firestore = useFirestore();
 
   // Fetch requisition items
