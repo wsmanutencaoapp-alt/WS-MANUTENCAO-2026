@@ -44,12 +44,12 @@ export default function ItemSelectorDialog<T>({
 
   const handleSelect = (item: T) => {
     onSelect(item);
-    onClose();
+    // Do not close the dialog, allow multiple selections
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -58,10 +58,11 @@ export default function ItemSelectorDialog<T>({
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Pesquisar..."
+              placeholder="Pesquisar por código, P/N ou descrição..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8"
+              autoFocus
             />
           </div>
           <ScrollArea className="h-72 border rounded-md">
@@ -69,7 +70,7 @@ export default function ItemSelectorDialog<T>({
               {isLoading && <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" />}
               {!isLoading && filteredItems.length === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">
-                  Nenhum item encontrado.
+                  {searchTerm ? 'Nenhum item encontrado.' : 'Digite para começar a buscar.'}
                 </p>
               )}
               {!isLoading && filteredItems.map((item, index) => (
