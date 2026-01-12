@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -33,6 +34,7 @@ type CartItem = RequisitionableItem & {
     requisitionQuantity: number;
     estimatedPrice?: number;
     notes?: string;
+    attachmentUrl?: string;
 };
 
 const RequisicaoCompraPage = () => {
@@ -91,7 +93,7 @@ const RequisicaoCompraPage = () => {
   }, [catalogItems, cart, searchTerm, activeTab]);
 
   const addToCart = (item: RequisitionableItem) => {
-    setCart(prev => [...prev, { ...item, requisitionQuantity: 1, estimatedPrice: 0, notes: '' }]);
+    setCart(prev => [...prev, { ...item, requisitionQuantity: 1, estimatedPrice: 0, notes: '', attachmentUrl: '' }]);
   };
 
   const removeFromCart = (docId: string) => {
@@ -137,6 +139,7 @@ const RequisicaoCompraPage = () => {
                 quantity: item.requisitionQuantity,
                 estimatedPrice: item.estimatedPrice,
                 notes: item.notes,
+                attachmentUrl: item.attachmentUrl,
             };
             batch.set(itemRef, itemData);
         }
@@ -264,9 +267,15 @@ const RequisicaoCompraPage = () => {
                                      />
                                 </div>
                                 <Input
-                                    placeholder="Observação / Link de referência..."
+                                    placeholder="Observação (opcional)"
                                     value={item.notes}
                                     onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
+                                    className="h-8 text-sm"
+                                />
+                                 <Input
+                                    placeholder="Link de referência (opcional)"
+                                    value={item.attachmentUrl}
+                                    onChange={(e) => updateCartItem(item.docId, 'attachmentUrl', e.target.value)}
                                     className="h-8 text-sm"
                                 />
                             </div>
