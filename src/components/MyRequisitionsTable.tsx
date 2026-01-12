@@ -22,12 +22,18 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, Eye, Edit } from 'lucide-react';
+import { Loader2, Search, Eye, Edit, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
-import ReviewRequisitionDialog from '@/components/ReviewRequisitionDialog'; // Import new component
+import ReviewRequisitionDialog from '@/components/ReviewRequisitionDialog'; 
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
@@ -131,6 +137,7 @@ export default function MyRequisitionsTable() {
 
   return (
     <>
+      <TooltipProvider>
         <Card className="mt-4">
           <CardHeader>
             <CardTitle>Histórico de Solicitações</CardTitle>
@@ -156,27 +163,49 @@ export default function MyRequisitionsTable() {
                   <TableHead>Data da Requisição</TableHead>
                   <TableHead>Centro de Custo</TableHead>
                   <TableHead>Prioridade</TableHead>
+                  <TableHead>Observação</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading && (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                 )}
                 {requisitionsError && (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
                 )}
                 {!isLoading && filteredRequisitions.length === 0 && (
-                   <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição encontrada.</TableCell></TableRow>
+                   <TableRow><TableCell colSpan={7} className="h-24 text-center">Nenhuma requisição encontrada.</TableCell></TableRow>
                 )}
-                {!isLoading && filteredRequisitions.map(req => (
-                  <TableRow key={req.docId}>
-                    <TableCell><Badge variant={getStatusVariant(req.status)}>{req.status}</Badge></TableCell>
-                    <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
-                    <TableCell>{format(new Date(req.createdAt), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
-                    <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
-                    <TableCell className="text-right space-x-2">
+                {!isLoading && filteredRequisitions.map(req => {
+                  const showReason = (req.status === 'Recusada' || req.status === 'Em Revisão') && req.rejectionReason;
+                  return (
+                    <TableRow key={req.docId}>
+                      <TableCell>
+                          <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
+                      </TableCell>
+                      <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
+                      <TableCell>{format(new Date(req.createdAt), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
+                      <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                         {showReason ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1 cursor-help">
+                                <AlertCircle className="h-4 w-4 text-orange-500" />
+                                <span className="truncate">{req.rejectionReason}</span>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{req.rejectionReason}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right space-x-2">
                        {req.status === 'Em Revisão' && (
                         <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(req)}>
                             <Edit className="mr-2 h-4 w-4" />
@@ -187,13 +216,15 @@ export default function MyRequisitionsTable() {
                          <Eye className="mr-2 h-4 w-4" />
                          Ver Itens
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
+      </TooltipProvider>
 
       <PurchaseRequisitionDetailsDialog
         requisition={selectedRequisition}
