@@ -141,9 +141,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   }, [quotations, filledQuotations]);
 
   const isJustificationRequired = useMemo(() => {
-      if(selectedQuotationIndex === null || cheapestIndex === -1) return false;
-      return selectedQuotationIndex !== cheapestIndex;
-  }, [selectedQuotationIndex, cheapestIndex]);
+      const choseMoreExpensive = selectedQuotationIndex !== null && cheapestIndex !== -1 && selectedQuotationIndex !== cheapestIndex;
+      const lessThanThreeQuotes = filledQuotations.length > 0 && filledQuotations.length < 3;
+      return choseMoreExpensive || lessThanThreeQuotes;
+  }, [selectedQuotationIndex, cheapestIndex, filledQuotations.length]);
   
   const generateOC = async (finalStatus: 'Em Cotação' | 'Em Aprovação'): Promise<void> => {
      if (!firestore || !storage || !requisition || !items || items.length === 0) return Promise.reject("Dados inválidos.");
@@ -239,12 +240,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um orçamento vencedor.' });
         return;
     }
-     if (filledQuotations.length > 0 && filledQuotations.length < 3 && !justification) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'É necessário justificar por que não há 3 orçamentos.' });
-        return;
-    }
-    if (isJustificationRequired && !justification) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Justifique a escolha do orçamento que não é o mais barato.' });
+     if (isJustificationRequired && !justification) {
+        let reason = selectedQuotationIndex !== cheapestIndex ? "Justifique a escolha pelo orçamento que não é o mais barato." : "Justifique por que há menos de 3 orçamentos.";
+        toast({ variant: 'destructive', title: 'Erro', description: reason });
         return;
     }
     
@@ -332,12 +330,12 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
               </RadioGroup>
               
               <div className="space-y-2 mt-4">
-                  {(isJustificationRequired || (filledQuotations.length > 0 && filledQuotations.length < 3)) && (
-                      <div className="space-y-1.5 animate-in fade-in-50">
-                          <Label htmlFor="justification" className={cn(isJustificationRequired && "text-destructive", "flex items-center gap-1")}>
+                  {isJustificationRequired && (
+                      <div className="space-y-1.5 animate-in fade-in-50 border border-orange-500 bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
+                          <Label htmlFor="justification" className="text-orange-800 dark:text-orange-300 flex items-center gap-1">
                               <Info className="h-4 w-4" /> Justificativa <span className="text-destructive">*</span>
                           </Label>
-                          <Textarea id="justification" value={justification} onChange={(e) => setJustification(e.target.value)} placeholder={isJustificationRequired ? "Justifique a escolha pelo orçamento que não é o mais barato." : "Justifique por que há menos de 3 orçamentos."} />
+                          <Textarea id="justification" value={justification} onChange={(e) => setJustification(e.target.value)} placeholder={selectedQuotationIndex !== cheapestIndex ? "Justifique a escolha pelo orçamento que não é o mais barato." : "Justifique por que há menos de 3 orçamentos."} />
                       </div>
                   )}
                   <div className="space-y-1.5">
