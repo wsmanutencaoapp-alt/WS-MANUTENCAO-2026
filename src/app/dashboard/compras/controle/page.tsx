@@ -71,9 +71,18 @@ export default function GestaoDeComprasPage() {
       queryKey: [queryKey]
   });
 
-  const costCentersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'cost_centers')) : null, [firestore]);
+  const costCenterIds = useMemo(() => {
+    if (!requisitions) return [];
+    return [...new Set(requisitions.map(r => r.costCenterId))];
+  }, [requisitions]);
+
+  const costCentersQuery = useMemoFirebase(() => {
+      if (!firestore || costCenterIds.length === 0) return null;
+      return query(collection(firestore, 'cost_centers'), where(doc.name, 'in', costCenterIds));
+  }, [firestore, costCenterIds]);
   const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery, {
-      queryKey: ['allCostCentersForCompras']
+      queryKey: ['costCentersForMyReqs', costCenterIds.join(',')],
+      enabled: costCenterIds.length > 0,
   });
   
   const costCenterMap = useMemo(() => {
