@@ -1,6 +1,6 @@
 'use client';
 
-export default function ControlePage() {
+export default function ControleComprasPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Controle de Compras</h1>

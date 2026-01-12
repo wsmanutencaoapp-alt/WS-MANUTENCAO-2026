@@ -29,6 +29,7 @@ import {
   Package,
   History,
   FileSignature,
+  FileCog,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -106,7 +107,7 @@ const allNavItems: NavItem[] = [
     subItems: [
         { href: '/dashboard/compras/requisicao', label: 'Requisição de Compra', permission: 'compras_requisicao', icon: FileSignature },
         { href: '/dashboard/compras/aprovacoes', label: 'Aprovações', permission: 'compras_aprovacoes' },
-        { href: '/dashboard/compras/controle', label: 'Gestão de Compras', permission: 'compras_controle' },
+        { href: '/dashboard/compras/controle-compras', icon: FileCog, label: 'Controle de Compras', permission: 'compras_controle' },
     ]
   },
   {

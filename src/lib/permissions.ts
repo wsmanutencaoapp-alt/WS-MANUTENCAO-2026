@@ -15,8 +15,9 @@ export const availableModules: { id: string; label: string, isModule?: boolean }
     { id: 'cadastros_enderecos', label: '-> Endereços', isModule: false },
     { id: 'cadastros_centro_custo', label: '-> Centro de Custo', isModule: false },
     { id: 'compras', label: 'Compras (Módulo)', isModule: true },
+    { id: 'compras_requisicao', label: '-> Requisição de Compra', isModule: false },
     { id: 'compras_aprovacoes', label: '-> Aprovações', isModule: false },
-    { id: 'compras_controle', label: '-> Controle', isModule: false },
+    { id: 'compras_controle', label: '-> Controle de Compras', isModule: false },
     { id: 'engenharia', label: 'Engenharia (Módulo)', isModule: true },
     { id: 'engenharia_aprovacoes', label: '-> Aprovações', isModule: false },
     { id: 'engenharia_projetos', label: '-> Projetos', isModule: false },
@@ -53,8 +54,14 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
     
     // Find the permission that is the best match for the current path
     for (const p of sortedPermissions) {
-        const permissionPath = `/dashboard/${p.id.replace(/_/g, '/')}`;
-        if (path.startsWith(permissionPath)) {
+        let permissionPath = p.id.replace(/_/g, '/');
+        if (p.id === 'compras_controle') {
+            permissionPath = 'compras/controle-compras';
+        }
+        
+        const fullPermissionPath = `/dashboard/${permissionPath}`;
+
+        if (path.startsWith(fullPermissionPath)) {
             return p.id;
         }
     }
