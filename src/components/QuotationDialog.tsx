@@ -34,6 +34,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Textarea } from './ui/textarea';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
+import { Card } from './ui/card';
 
 interface QuotationDialogProps {
   isOpen: boolean;
