@@ -39,6 +39,7 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Aprovada': 'success',
     'Recusada': 'destructive',
     'Concluída': 'secondary',
+    'Em Revisão': 'warning',
   };
   return variants[status] || 'secondary';
 };
@@ -128,7 +129,7 @@ const ControleComprasPage = () => {
   const handleQuotationSuccess = () => {
     setRequisitionForQuotation(null);
     queryClient.invalidateQueries({ queryKey });
-    queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
+    queryClient.invalidateQueries({ queryKey: 'pendingPurchaseRequisitions' });
   };
 
 

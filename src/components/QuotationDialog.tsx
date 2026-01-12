@@ -10,6 +10,7 @@ import {
   doc,
   writeBatch,
   getDocs,
+  updateDoc,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -25,7 +26,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, Upload, FileText, ChevronsUpDown, Check, Trash2, Info } from 'lucide-react';
-import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Tool, Supply } from '@/lib/types';
+import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Tool, Supply, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { ScrollArea } from './ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
@@ -91,13 +92,21 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       queryKey: ['requisitionItemsForQuotation', requisition?.docId],
       enabled: !!requisition && isOpen,
   });
-
+  
+  // Load existing quotation data when dialog opens
   useEffect(() => {
     if (isOpen) {
-      setQuotations([emptyQuotation, emptyQuotation, emptyQuotation]);
-      setSelectedQuotationIndex(null);
-      setJustification('');
-      setPurchaseOrderNotes('');
+        const initialQuotations = requisition.quotations 
+            ? [
+                ...requisition.quotations.map(q => ({...q, totalValue: q.totalValue || '', deliveryTime: q.deliveryTime || ''})),
+                ...Array(Math.max(0, 3 - requisition.quotations.length)).fill(emptyQuotation)
+              ]
+            : [emptyQuotation, emptyQuotation, emptyQuotation];
+
+        setQuotations(initialQuotations as QuotationFormState[]);
+        setSelectedQuotationIndex(requisition.selectedQuotationIndex ?? null);
+        setJustification(requisition.expensiveChoiceJustification || '');
+        setPurchaseOrderNotes(requisition.purchaseOrderNotes || '');
     }
   }, [isOpen, requisition]);
 
@@ -145,36 +154,15 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       if(selectedQuotationIndex === null || cheapestIndex === -1) return false;
       return selectedQuotationIndex !== cheapestIndex;
   }, [selectedQuotationIndex, cheapestIndex]);
-
-
-  const handleSave = async () => {
-    if (!firestore || !storage || !requisition) return;
-
-    if (filledQuotations.length === 0) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Preencha pelo menos um orçamento completo.' });
-        return;
-    }
-    if (selectedQuotationIndex === null) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um orçamento vencedor.' });
-        return;
-    }
-     if (filledQuotations.length < 3 && !justification) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'É necessário justificar por que não há 3 orçamentos.' });
-        return;
-    }
-    if (isJustificationRequired && !justification) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Justifique a escolha do orçamento que não é o mais barato.' });
-        return;
-    }
-
-    setIsSaving(true);
-    
-    try {
-        const batch = writeBatch(firestore);
-        const ocRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-
-        const finalQuotations = [];
-        for (const [index, q] of quotations.entries()) {
+  
+  const saveQuotations = async (finalStatus: 'Em Cotação' | 'Em Aprovação'): Promise<void> => {
+     if (!firestore || !storage || !requisition) return Promise.reject("Serviços não disponíveis.");
+     setIsSaving(true);
+     try {
+        const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+        
+        const finalQuotations: Quotation[] = [];
+        for (const q of quotations) {
             if (!q.supplierId) continue;
             
             let attachmentUrl = q.attachmentUrl || '';
@@ -193,27 +181,62 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             });
         }
         
-        batch.update(ocRef, {
-            type: 'Ordem de Compra',
-            status: 'Em Aprovação',
+        const updateData: Partial<PurchaseRequisition> = {
+            status: finalStatus,
             quotations: finalQuotations,
             selectedQuotationIndex: selectedQuotationIndex,
             expensiveChoiceJustification: justification,
             purchaseOrderNotes: purchaseOrderNotes,
-        });
+        };
+        
+        if (finalStatus === 'Em Aprovação') {
+            updateData.type = 'Ordem de Compra';
+        }
+        
+        await updateDoc(reqRef, updateData);
 
-        await batch.commit();
+     } catch(err) {
+        throw err; // Re-throw para ser pego no handler do botão
+     } finally {
+        setIsSaving(false);
+     }
+  }
 
+
+  const handleSaveDraft = async () => {
+    try {
+        await saveQuotations('Em Cotação');
+        toast({ title: "Rascunho Salvo!", description: "Os dados da cotação foram salvos." });
+        onSuccess();
+    } catch(err: any) {
+        console.error("Erro ao salvar rascunho:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar o rascunho da cotação.' });
+    }
+  };
+  
+  const handleSendForApproval = async () => {
+    if (selectedQuotationIndex === null) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um orçamento vencedor.' });
+        return;
+    }
+     if (filledQuotations.length < 3 && !justification) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'É necessário justificar por que não há 3 orçamentos.' });
+        return;
+    }
+    if (isJustificationRequired && !justification) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Justifique a escolha do orçamento que não é o mais barato.' });
+        return;
+    }
+    
+    try {
+        await saveQuotations('Em Aprovação');
         toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
         onSuccess();
     } catch (err: any) {
-        console.error("Erro ao salvar cotação: ", err);
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar a cotação.' });
-    } finally {
-        setIsSaving(false);
+        console.error("Erro ao enviar para aprovação:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível enviar para aprovação.' });
     }
-
-  };
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -242,7 +265,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           </div>
           
           <div className="md:col-span-2 space-y-4">
-             <h3 className="font-semibold text-lg">Orçamentos</h3>
+             <div className="flex flex-col">
+                <h3 className="font-semibold text-lg">Orçamentos</h3>
+                <p className="text-sm text-muted-foreground">* Selecionar orçamento vencedor</p>
+             </div>
              <RadioGroup value={selectedQuotationIndex?.toString()} onValueChange={(v) => setSelectedQuotationIndex(Number(v))}>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                     {quotations.map((q, index) => (
@@ -293,7 +319,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             </RadioGroup>
             
             <div className="space-y-2 mt-4">
-                {(isJustificationRequired || filledQuotations.length < 3) && (
+                {(isJustificationRequired || (filledQuotations.length > 0 && filledQuotations.length < 3)) && (
                     <div className="space-y-1.5 animate-in fade-in-50">
                         <Label htmlFor="justification" className={cn(isJustificationRequired && "text-destructive", "flex items-center gap-1")}>
                             <Info className="h-4 w-4" /> Justificativa <span className="text-destructive">*</span>
@@ -311,7 +337,11 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button variant="secondary" onClick={handleSaveDraft} disabled={isSaving || filledQuotations.length === 0}>
+             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+             Salvar Rascunho
+          </Button>
+          <Button onClick={handleSendForApproval} disabled={isSaving}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Salvar e Enviar para Aprovação
           </Button>
