@@ -64,6 +64,10 @@ const emptyQuotation: QuotationFormState = {
   attachmentFile: null,
 };
 
+type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
+  details: Partial<WithDocId<Supply> | WithDocId<Tool>>;
+};
+
 export default function QuotationDialog({ isOpen, onClose, onSuccess, requisition }: QuotationDialogProps) {
   const firestore = useFirestore();
   const storage = useStorage();
@@ -77,6 +81,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const [isSaving, setIsSaving] = useState(false);
   const [activePopover, setActivePopover] = useState<number | null>(null);
 
+  // Data fetching
   const suppliersQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'suppliers')) : null), [firestore]);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<WithDocId<Supplier>>(suppliersQuery, {
     queryKey: ['allSuppliersForQuotation'],
@@ -87,12 +92,34 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     if (!firestore || !requisition) return null;
     return query(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
   }, [firestore, requisition]);
-  
   const { data: items, isLoading: isLoadingItems } = useCollection<WithDocId<PurchaseRequisitionItem>>(itemsQuery, {
-      queryKey: ['requisitionItemsForQuotation', requisition?.docId],
-      enabled: !!requisition && isOpen,
+    queryKey: ['requisitionItemsForQuotation', requisition?.docId],
+    enabled: !!requisition && isOpen,
   });
+
+  const allSuppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
+  const { data: allSupplies, isLoading: isLoadingSuppliesMaster } = useCollection<WithDocId<Supply>>(allSuppliesQuery, { queryKey: ['allSuppliesMasterForQuotation'], enabled: isOpen });
   
+  const allToolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools')) : null, [firestore]);
+  const { data: allTools, isLoading: isLoadingToolsMaster } = useCollection<WithDocId<Tool>>(allToolsQuery, { queryKey: ['allToolsMasterForQuotation'], enabled: isOpen });
+
+  const enrichedItems = useMemo((): RequisitionItemWithDetails[] => {
+    if (!items || !allSupplies || !allTools) return [];
+
+    const masterDataMap = new Map([
+        ...allSupplies.map(s => [s.docId, s]),
+        ...allTools.map(t => [t.docId, t])
+    ]);
+    
+    return items.map(item => ({
+      ...item,
+      details: masterDataMap.get(item.itemId) || { descricao: 'Item não encontrado', codigo: 'N/A' },
+    }));
+
+  }, [items, allSupplies, allTools]);
+
+  const isLoading = isLoadingItems || isLoadingSuppliesMaster || isLoadingToolsMaster;
+
   // Load existing quotation data when dialog opens
   useEffect(() => {
     if (isOpen) {
@@ -252,15 +279,18 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           <div className="md:col-span-1 space-y-4">
             <h3 className="font-semibold text-lg">Itens da Requisição</h3>
             <ScrollArea className="h-full border rounded-md p-4">
-                {isLoadingItems && <Loader2 className="animate-spin mx-auto"/>}
-                {items?.map((item, index) => (
+                {isLoading && <Loader2 className="animate-spin mx-auto"/>}
+                {!isLoading && enrichedItems?.map((item, index) => (
                     <div key={item.docId} className="text-sm">
-                        <p className="font-bold">{item.details?.descricao || 'Carregando...'}</p>
+                        <p className="font-bold">{item.details?.descricao || 'Item não encontrado'}</p>
                         <p>Quantidade: <span className="font-medium">{item.quantity}</span></p>
                         {item.notes && <p className="text-xs text-muted-foreground">Obs: {item.notes}</p>}
-                        {index < items.length - 1 && <Separator className="my-2"/>}
+                        {index < enrichedItems.length - 1 && <Separator className="my-2"/>}
                     </div>
                 ))}
+                {!isLoading && !enrichedItems?.length && (
+                    <p className="text-sm text-muted-foreground text-center">Nenhum item na requisição.</p>
+                )}
             </ScrollArea>
           </div>
           
