@@ -32,7 +32,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Textarea } from './ui/textarea';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from './ui/card';
 import { Separator } from './ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
@@ -75,20 +75,15 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [quotations, setQuotations] = useState<QuotationFormState[]>([]);
   const [selectedQuotationIndex, setSelectedQuotationIndex] = useState<number | null>(null);
-  const [justification, setJustification] = useState('');
-  const [purchaseOrderNotes, setPurchaseOrderNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
   const [supplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
   const [activeQuotationIndex, setActiveQuotationIndex] = useState<number | null>(null);
-  const [isJustificationDialogOpen, setIsJustificationDialogOpen] = useState(false);
-
+  
   const currentItem = useMemo(() => items[currentItemIndex], [items, currentItemIndex]);
 
   useEffect(() => {
     if (isOpen && currentItem) {
-        setJustification('');
-        setPurchaseOrderNotes('');
         const itemQuotes = currentItem.quotations || [];
         const initialQuotes = Array.from({ length: 3 }).map((_, i) => {
             const q = itemQuotes[i];
@@ -126,11 +121,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           handleQuotationChange(index, 'attachmentFile', e.target.files[0]);
       }
   }
-
-  const filledQuotations = useMemo(() => quotations.filter(q => q.supplierId && q.totalValue && q.deliveryTime && q.paymentTerms), [quotations]);
   
   const cheapestIndex = useMemo(() => {
-    if (filledQuotations.length === 0) return null;
     let minPrice = Infinity;
     let minIndex: number | null = null;
     quotations.forEach((q, index) => {
@@ -145,25 +137,11 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     return minIndex;
   }, [quotations]);
 
-  const isJustificationRequired = useMemo(() => {
-      if (selectedQuotationIndex === null) return false;
-      const choseMoreExpensive = cheapestIndex !== null && selectedQuotationIndex !== cheapestIndex;
-      const lessThanThreeQuotes = filledQuotations.length > 0 && filledQuotations.length < 3;
-      return choseMoreExpensive || lessThanThreeQuotes;
-  }, [selectedQuotationIndex, cheapestIndex, filledQuotations.length]);
-  
-  const getJustificationReason = () => {
-    if (selectedQuotationIndex !== null && cheapestIndex !== null && selectedQuotationIndex !== cheapestIndex) {
-      return "Sua escolha não é o orçamento mais barato. Por favor, justifique.";
-    }
-    if (filledQuotations.length > 0 && filledQuotations.length < 3) {
-      return "Você preencheu menos de 3 orçamentos. Por favor, justifique.";
-    }
-    return "É necessário fornecer uma justificativa.";
-  };
 
-  const saveCurrentItemQuotations = async (status: PurchaseRequisitionItem['status'] = 'Em Cotação') => {
+  const saveCurrentItemQuotations = async () => {
       if (!firestore || !storage || !requisition || !currentItem) throw new Error("Dados da sessão inválidos.");
+      
+      const batch = writeBatch(firestore);
       
       const finalQuotations: Quotation[] = [];
       for (const q of quotations) {
@@ -184,28 +162,26 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
 
       const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
-      await updateDoc(itemRef, {
+      batch.update(itemRef, {
           quotations: finalQuotations,
-          selectedQuotationIndex: selectedQuotationIndex,
-          status: status
+          status: 'Em Cotação'
       });
       
-      return finalQuotations;
+      // Update the main requisition status if it's the first time
+      if (requisition.status === 'Aprovada') {
+          const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+          batch.update(reqRef, { status: 'Em Cotação' });
+      }
+
+      await batch.commit();
   };
   
   const handleSaveProgress = async () => {
       setIsSaving(true);
       try {
-          await saveCurrentItemQuotations('Em Cotação');
-          // Update the main requisition status if it's the first time
-          if (requisition.status !== 'Em Cotação' && requisition.status !== 'Parcialmente Atendida') {
-              const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-              await updateDoc(reqRef, { status: 'Em Cotação' });
-          }
-          
+          await saveCurrentItemQuotations();
           toast({ title: "Progresso Salvo!", description: "As cotações para este item foram salvas." });
           onSuccess();
-          // Do not close, allow to continue
       } catch (err: any) {
           console.error("Erro ao salvar progresso:", err);
           toast({ variant: 'destructive', title: 'Erro ao Salvar', description: err.message });
@@ -215,10 +191,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   }
 
 
-  const handleGenerateOC = async (justificationText: string) => {
-    // This function will now be responsible for generating the OC for all items, not just one
-    // It should be called after all quotations are done.
-    // For now, let's assume it's called per-item.
+  const handleMarkAsFinished = async () => {
     if (selectedQuotationIndex === null) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Selecione a cotação vencedora para este item.' });
       return;
@@ -226,22 +199,22 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     
     setIsSaving(true);
     try {
-        await saveCurrentItemQuotations('Cotado');
-        toast({ title: "Item Finalizado!", description: `O item ${currentItem.details.codigo} foi cotado e marcado como finalizado.` });
+        const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
+        await updateDoc(itemRef, {
+            selectedQuotationIndex: selectedQuotationIndex,
+            status: 'Cotado'
+        });
 
-        // Check if all items in the original list are now 'Cotado'
-        const allItemsRef = collection(firestore, 'purchase_requisitions', requisition.docId, 'items');
-        const allItemsSnapshot = await getDocs(allItemsRef);
-        const allItemsData = allItemsSnapshot.docs.map(d => d.data() as PurchaseRequisitionItem);
-        const allItemsQuoted = allItemsData.every(item => item.status === 'Cotado');
+        toast({ title: "Item Finalizado!", description: `O item ${currentItem.details.codigo} foi cotado.` });
         
-        if (allItemsQuoted) {
-            // Logic to generate the OC would go here, which is a larger scope
-            toast({ title: 'Pronto para OC!', description: "Todos os itens foram cotados. A geração da Ordem de Compra pode ser implementada." });
+        onSuccess(); // This will trigger a refetch in the parent component
+        
+        // Move to next item or close if it's the last one
+        if (currentItemIndex < items.length - 1) {
+            handleNext();
+        } else {
+            onClose();
         }
-        
-        onSuccess();
-        onClose();
         
     } catch (err: any) {
         toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
@@ -265,7 +238,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   return (
     <>
-      <Dialog open={isOpen && !isJustificationDialogOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
@@ -345,38 +318,15 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
              </div>
              <div className="flex gap-2">
                 <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-                <Button onClick={() => handleGenerateOC('')} disabled={isSaving || selectedQuotationIndex === null || filledQuotations.length === 0}>
+                <Button onClick={handleMarkAsFinished} disabled={isSaving || selectedQuotationIndex === null}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Finalizar Cotação do Item
+                    Marcar Item como Cotado
                 </Button>
             </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
-       <Dialog open={isJustificationDialogOpen} onOpenChange={setIsJustificationDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Justificativa Necessária</DialogTitle>
-            <DialogDescription>{getJustificationReason()}</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="justification-dialog">Justificativa <span className="text-destructive">*</span></Label>
-            <Textarea
-              id="justification-dialog"
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              className="mt-1"
-              placeholder="Forneça uma justificativa clara para sua escolha."
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsJustificationDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={() => handleGenerateOC(justification)} disabled={!justification || isSaving}>Confirmar e Gerar OC</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <SupplierSelectorDialog 
         isOpen={supplierSelectorOpen}
         onClose={() => setSupplierSelectorOpen(false)}

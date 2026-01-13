@@ -16,14 +16,12 @@ import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import { Loader2, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info, ShoppingBag, Award, FileText } from 'lucide-react';
+import { Loader2, ShoppingBag, User, Calendar, Briefcase, Info } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import QuotationDialog from './QuotationDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { cn } from '@/lib/utils';
 
 
 interface PurchaseRequisitionDetailsDialogProps {
@@ -42,6 +40,8 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   const queryClient = useQueryClient();
 
   const [requisition, setRequisition] = useState<WithDocId<PurchaseRequisition> | null>(initialRequisition);
+  const [enrichedItems, setEnrichedItems] = useState<RequisitionItemWithDetails[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [selectedItemsForQuotation, setSelectedItemsForQuotation] = useState<RequisitionItemWithDetails[]>([]);
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState(false);
@@ -52,62 +52,70 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
         return;
     };
     
+    // Listen for real-time updates on the main requisition document
     const unsub = onSnapshot(doc(firestore, 'purchase_requisitions', initialRequisition.docId), (doc) => {
         if (doc.exists()) {
             setRequisition({ docId: doc.id, ...doc.data() as PurchaseRequisition });
         }
     });
 
-    return () => unsub(); // Unsubscribe on cleanup
+    return () => unsub();
   }, [initialRequisition, firestore]);
-  
-  const itemsQuery = useMemoFirebase(() => {
-    if (!firestore || !requisition?.docId) return null;
-    return query(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
-  }, [firestore, requisition?.docId]);
-  
-  const { data: items, isLoading: isLoadingItems, error: itemsError } = useCollection<WithDocId<PurchaseRequisitionItem>>(itemsQuery, {
-      queryKey: ['requisitionItems', requisition?.docId],
-      enabled: !!requisition && isOpen,
-  });
-
-  const supplyIds = useMemo(() => items?.filter(i => i.itemType === 'supply').map(i => i.itemId) || [], [items]);
-  const toolIds = useMemo(() => items?.filter(i => i.itemType === 'tool').map(i => i.itemId) || [], [items]);
-
-  const suppliesQuery = useMemoFirebase(() => {
-      if (!firestore || supplyIds.length === 0) return null;
-      return query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds));
-  }, [firestore, supplyIds.join(',')]);
-  const { data: supplyMasterData, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery, { enabled: supplyIds.length > 0 && isOpen });
-
-  const toolsQuery = useMemoFirebase(() => {
-    if (!firestore || toolIds.length === 0) return null;
-    return query(collection(firestore, 'tools'), where(documentId(), 'in', toolIds));
-  }, [firestore, toolIds.join(',')]);
-  const { data: toolMasterData, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery, { enabled: toolIds.length > 0 && isOpen });
 
   const costCenterQuery = useMemoFirebase(() => {
     if (!firestore || !requisition) return null;
-    // Use `doc` instead of `query` for a single document fetch
     return doc(firestore, 'cost_centers', requisition.costCenterId);
   }, [firestore, requisition]);
-  const { data: costCenter, isLoading: isLoadingCostCenter } = useDoc<CostCenter>(costCenterQuery, {
+  
+  const { data: costCenter } = useDoc<CostCenter>(costCenterQuery, {
       queryKey: ['costCenterForReq', requisition?.costCenterId],
       enabled: !!requisition && isOpen,
   });
 
-  const enrichedItems = useMemo((): RequisitionItemWithDetails[] => {
-    if (!items) return [];
-    const masterDataMap = new Map([
-        ...(supplyMasterData?.map(d => [d.docId, d]) || []),
-        ...(toolMasterData?.map(d => [d.docId, d]) || [])
-    ]);
+  // Effect to fetch and enrich items whenever the requisition or dialog state changes
+  useEffect(() => {
+    const fetchAndEnrichItems = async () => {
+        if (!firestore || !requisition || !isOpen) {
+          setIsLoading(false);
+          return;
+        };
 
-    return items.map(item => ({
-      ...item,
-      details: masterDataMap.get(item.itemId) || { descricao: 'Item não encontrado', codigo: 'N/A' },
-    }));
-  }, [items, supplyMasterData, toolMasterData]);
+        setIsLoading(true);
+
+        // Fetch items
+        const itemsQuery = query(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
+        const itemsSnapshot = await getDocs(itemsQuery);
+        const items = itemsSnapshot.docs.map(d => ({ ...d.data() as PurchaseRequisitionItem, docId: d.id }));
+
+        // Fetch master data
+        const supplyIds = items.filter(i => i.itemType === 'supply').map(i => i.itemId);
+        const toolIds = items.filter(i => i.itemType === 'tool').map(i => i.itemId);
+
+        const supplyMasterData = supplyIds.length > 0
+            ? (await getDocs(query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds)))).docs.map(d => ({ ...d.data() as Supply, docId: d.id }))
+            : [];
+        
+        const toolMasterData = toolIds.length > 0
+            ? (await getDocs(query(collection(firestore, 'tools'), where(documentId(), 'in', toolIds)))).docs.map(d => ({ ...d.data() as Tool, docId: d.id }))
+            : [];
+
+        const masterDataMap = new Map([
+            ...supplyMasterData.map(d => [d.docId, d]),
+            ...toolMasterData.map(d => [d.docId, d])
+        ]);
+
+        const newEnrichedItems = items.map(item => ({
+          ...item,
+          details: masterDataMap.get(item.itemId) || { descricao: 'Item não encontrado', codigo: 'N/A' },
+        }));
+        
+        setEnrichedItems(newEnrichedItems);
+        setIsLoading(false);
+    };
+    
+    fetchAndEnrichItems();
+  }, [requisition, firestore, isOpen]);
+
 
   const handleItemSelection = (item: RequisitionItemWithDetails) => {
     if (item.status !== 'Pendente' && item.status !== 'Em Cotação') return;
@@ -127,12 +135,19 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
       }
   };
 
-  const handleQuotationSuccess = async () => {
+  const handleQuotationSuccess = () => {
     setIsQuotationDialogOpen(false);
     setSelectedItemsForQuotation([]);
+    
+    // Manually refetch related data
     queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
     queryClient.invalidateQueries({ queryKey: ['allPurchaseRequisitionsForControl'] });
-    if(onActionSuccess) onActionSuccess();
+    if (onActionSuccess) onActionSuccess();
+  }
+  
+  const handleDialogClose = () => {
+    onClose();
+    setSelectedItemsForQuotation([]);
   }
 
   const getPriorityVariant = (priority?: PurchaseRequisition['priority']) => {
@@ -145,15 +160,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     }
   }
   
-  const handleDialogClose = () => {
-    onClose();
-    setSelectedItemsForQuotation([]);
-  }
-
-  const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
   const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
-  
-
 
   return (
     <>
@@ -200,7 +207,6 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
                 <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           )}
-          {itemsError && <p className="text-destructive text-center">Erro ao carregar itens.</p>}
           {!isLoading && enrichedItems.length === 0 && <p className="text-muted-foreground text-center text-sm">Nenhum item nesta requisição.</p>}
           
           <div className="space-y-3">
@@ -265,5 +271,3 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     </>
   );
 }
-
-    

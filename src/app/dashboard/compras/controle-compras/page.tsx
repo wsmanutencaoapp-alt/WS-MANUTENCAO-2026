@@ -143,7 +143,7 @@ const ControleComprasPage = () => {
         let attendedItems = 0;
         itemsSnapshot.forEach(itemDoc => {
             const item = itemDoc.data() as PurchaseRequisitionItem;
-            if (item.status === 'Cotado') {
+            if (item.status === 'Cotado' || item.status === 'Em Cotação') {
                 attendedItems++;
             }
         });
@@ -446,5 +446,3 @@ const ControleComprasPage = () => {
 };
 
 export default ControleComprasPage;
-
-    
