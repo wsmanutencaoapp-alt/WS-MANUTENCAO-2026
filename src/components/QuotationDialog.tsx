@@ -164,13 +164,47 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   };
 
 
-  const handleGenerateOC = async (justificationText: string) => {
+  const handleSendForApproval = async () => {
+    if (selectedQuotationIndex === null) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um orçamento vencedor.' });
+        return;
+    }
+     if (isJustificationRequired) {
+        setIsJustificationDialogOpen(true);
+        return;
+    }
+    
+    try {
+        await handleGenerateOC('', quotations);
+        toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
+        onSuccess();
+    } catch (err: any) {
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível enviar para aprovação.' });
+    }
+  }
+  
+  const handleJustificationSubmit = async () => {
+      if (!justification) {
+          toast({ variant: 'destructive', title: 'Erro', description: 'A justificativa é obrigatória.' });
+          return;
+      }
+      setIsJustificationDialogOpen(false);
+      try {
+          await handleGenerateOC(justification, quotations);
+          toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
+          onSuccess();
+      } catch (err: any) {
+          toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível enviar para aprovação.' });
+      }
+  }
+
+  const handleGenerateOC = async (justificationText: string, currentQuotations: QuotationFormState[]) => {
     if (!firestore || !storage || !user || !requisition || !items.length || selectedQuotationIndex === null) {
       throw new Error("Dados insuficientes para gerar a Ordem de Compra.");
     }
     
-    const chosenQuotationFormState = quotations[selectedQuotationIndex];
-    if (!chosenQuotationFormState || !chosenQuotationFormState.supplierId) {
+    const chosenQuotation = currentQuotations[selectedQuotationIndex];
+    if (!chosenQuotation || !chosenQuotation.supplierId) {
       throw new Error("A cotação escolhida é inválida ou não possui um fornecedor.");
     }
 
@@ -190,7 +224,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       const ocRef = doc(collection(firestore, 'purchase_requisitions'));
       
       const finalQuotations: Quotation[] = [];
-      for (const q of quotations) {
+      for (const q of currentQuotations) {
         if (!q.supplierId) continue;
         let attachmentUrl = q.attachmentUrl || '';
         if (q.attachmentFile) {
@@ -212,9 +246,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         priority: requisition.priority, purchaseReason: requisition.purchaseReason,
         quotations: finalQuotations, selectedQuotationIndex: selectedQuotationIndex,
         expensiveChoiceJustification: justificationText, purchaseOrderNotes: purchaseOrderNotes,
-        supplierId: chosenQuotationFormState.supplierId,
-        totalValue: Number(chosenQuotationFormState.totalValue),
-        paymentTerms: chosenQuotationFormState.paymentTerms,
+        supplierId: chosenQuotation.supplierId,
+        totalValue: Number(chosenQuotation.totalValue),
+        paymentTerms: chosenQuotation.paymentTerms,
       };
 
       const ocBatch = writeBatch(firestore);
@@ -248,41 +282,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     } finally {
       setIsSaving(false);
     }
-  }
-
-  
-  const handleSendForApproval = async () => {
-    if (selectedQuotationIndex === null) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um orçamento vencedor.' });
-        return;
-    }
-     if (isJustificationRequired) {
-        setIsJustificationDialogOpen(true);
-        return;
-    }
-    
-    try {
-        await handleGenerateOC('');
-        toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
-        onSuccess();
-    } catch (err: any) {
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível enviar para aprovação.' });
-    }
-  }
-  
-  const handleJustificationSubmit = async () => {
-      if (!justification) {
-          toast({ variant: 'destructive', title: 'Erro', description: 'A justificativa é obrigatória.' });
-          return;
-      }
-      setIsJustificationDialogOpen(false);
-      try {
-          await handleGenerateOC(justification);
-          toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
-          onSuccess();
-      } catch (err: any) {
-          toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível enviar para aprovação.' });
-      }
   }
 
 
