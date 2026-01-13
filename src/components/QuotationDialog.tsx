@@ -204,12 +204,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         });
       }
       
-      const chosenQuotation = finalQuotations.find(q => q.supplierId === chosenQuotationFormState.supplierId);
-      
-      if (!chosenQuotation) {
-          throw new Error("Erro ao encontrar a cotação final correspondente à seleção.");
-      }
-      
       const ocData: Omit<PurchaseRequisition, 'id'> = {
         protocol: ocProtocol, originalRequisitionId: requisition.docId,
         requesterId: requisition.requesterId, requesterName: requisition.requesterName,
@@ -218,9 +212,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         priority: requisition.priority, purchaseReason: requisition.purchaseReason,
         quotations: finalQuotations, selectedQuotationIndex: selectedQuotationIndex,
         expensiveChoiceJustification: justificationText, purchaseOrderNotes: purchaseOrderNotes,
-        supplierId: chosenQuotation.supplierId,
-        totalValue: chosenQuotation.totalValue,
-        paymentTerms: chosenQuotation.paymentTerms,
+        supplierId: chosenQuotationFormState.supplierId,
+        totalValue: Number(chosenQuotationFormState.totalValue),
+        paymentTerms: chosenQuotationFormState.paymentTerms,
       };
 
       const ocBatch = writeBatch(firestore);
@@ -228,7 +222,16 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       for (const item of items) {
         const ocItemRef = doc(collection(ocRef, 'items'));
         const { details, ...baseItem } = item;
-        ocBatch.set(ocItemRef, { ...baseItem, status: 'Pendente' });
+        const itemData: Omit<PurchaseRequisitionItem, 'id'> = {
+            itemId: baseItem.itemId,
+            itemType: baseItem.itemType,
+            quantity: baseItem.quantity,
+            estimatedPrice: baseItem.estimatedPrice,
+            status: 'Pendente',
+            notes: baseItem.notes,
+            attachmentUrl: baseItem.attachmentUrl
+        }
+        ocBatch.set(ocItemRef, itemData);
       }
       await ocBatch.commit();
 
