@@ -169,7 +169,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     setIsSaving(true);
     
     try {
-      // 1. Generate OC Protocol
       const counterRef = doc(firestore, 'counters', 'purchaseOrders');
       const newId = await runTransaction(firestore, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
@@ -183,12 +182,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       });
       const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
 
-      // 2. Prepare OC Data
       const ocRef = doc(collection(firestore, 'purchase_requisitions'));
       
       const finalQuotations: Quotation[] = [];
       for (const q of quotations) {
-        if (!q.supplierId) continue;
         let attachmentUrl = q.attachmentUrl || '';
         if (q.attachmentFile) {
           const fileRef = storageRef(storage, `quotations/${ocRef.id}/${q.supplierId}-${q.attachmentFile.name}`);
@@ -220,7 +217,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         paymentTerms: chosenQuotation.paymentTerms,
       };
 
-      // 3. Create OC and its items in a batch
       const ocBatch = writeBatch(firestore);
       ocBatch.set(ocRef, ocData);
       for (const item of items) {
@@ -230,7 +226,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
       await ocBatch.commit();
 
-      // 4. AFTER OC creation, update original SC items status
       const scUpdateBatch = writeBatch(firestore);
       for (const item of items) {
           const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.docId);
@@ -240,7 +235,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       
     } catch (err) {
       console.error("Erro ao gerar OC:", err);
-      throw err; // Re-throw to be caught by the calling function
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -258,7 +253,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
     
     try {
-        await handleGenerateOC(''); // Pass empty justification if not required
+        await handleGenerateOC('');
         toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
         onSuccess();
     } catch (err: any) {
