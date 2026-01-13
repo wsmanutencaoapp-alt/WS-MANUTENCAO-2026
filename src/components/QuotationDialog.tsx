@@ -97,19 +97,20 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   useEffect(() => {
     if (isOpen) {
-        // When opening, check the first item for existing quotations to pre-populate the form.
-        // This assumes all items being quoted together will share the same quotations.
-        const firstItemQuotes = items[0]?.quotations || [];
-        const initialQuotes: QuotationFormState[] = Array(3).fill(null).map((_, index) => {
-            if (firstItemQuotes[index]) {
-                const eq = firstItemQuotes[index];
+        const firstItem = items[0];
+        const initialQuotesData = firstItem?.quotations && firstItem.quotations.length > 0
+          ? firstItem.quotations
+          : Array(3).fill(null);
+
+        const initialQuotes: QuotationFormState[] = initialQuotesData.map(q => {
+            if (q && q.supplierId) {
                 return {
-                    supplierId: eq.supplierId,
-                    supplierName: eq.supplierName,
-                    totalValue: eq.totalValue,
-                    deliveryTime: eq.deliveryTime,
-                    paymentTerms: eq.paymentTerms,
-                    attachmentUrl: eq.attachmentUrl,
+                    supplierId: q.supplierId,
+                    supplierName: q.supplierName,
+                    totalValue: q.totalValue,
+                    deliveryTime: q.deliveryTime,
+                    paymentTerms: q.paymentTerms,
+                    attachmentUrl: q.attachmentUrl,
                     attachmentFile: null,
                 };
             }
@@ -117,10 +118,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         });
 
         setQuotations(initialQuotes);
-        // Pre-select the winning quote if it was already chosen
-        setSelectedQuotationIndex(items[0]?.selectedQuotationIndex ?? null);
-
-        // Reset other states
+        setSelectedQuotationIndex(firstItem?.selectedQuotationIndex ?? null);
         setJustification('');
         setPurchaseOrderNotes('');
         setIsSaving(false);
@@ -129,7 +127,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         setIsItemsDialogOpen(false);
         setIsJustificationDialogOpen(false);
     }
-  }, [isOpen, requisition, items]);
+}, [isOpen, items]);
 
   const handleQuotationChange = (index: number, field: keyof QuotationFormState, value: any) => {
     const updatedQuotations = [...quotations];

@@ -440,18 +440,13 @@
         "type": { "type": "string", "enum": ["Solicitação de Compra", "Ordem de Compra"], "description": "Distinguishes between a requisition and an order." },
         "status": {
           "type": "string",
-          "enum": ["Aberta", "Parcialmente Atendida", "Totalmente Atendida", "Cancelada", "Em Cotação", "Em Aprovação", "Aprovada", "Recusada", "Concluída", "Em Revisão"],
+          "enum": ["Aberta", "Parcialmente Atendida", "Totalmente Atendida", "Cancelada", "Em Cotação", "Em Aprovação", "Aprovada", "Recusada", "Concluída", "Em Revisão", "Aguardando Entrega"],
           "description": "Current status of the document."
         },
         "rejectionReason": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "priority": { "type": "string", "enum": ["Normal", "Urgente", "Muito Urgente"] },
         "purchaseReason": { "type": "string" },
-        "quotations": {
-          "type": "array",
-          "items": { "$ref": "#/backend/entities/Quotation" }
-        },
-        "selectedQuotationIndex": { "type": "number" },
         "expensiveChoiceJustification": { "type": "string" },
         "purchaseOrderNotes": { "type": "string" },
         "supplierId": { "type": "string", "description": "ID of the chosen supplier for the OC." },
@@ -473,7 +468,12 @@
         "estimatedPrice": { "type": "number" },
         "status": { "type": "string", "enum": ["Pendente", "Em Cotação", "Cotado", "Recebido", "Cancelado"], "description": "Tracks the status of an individual item within the original SC." },
         "notes": { "type": "string" },
-        "attachmentUrl": { "type": "string", "format": "uri" }
+        "attachmentUrl": { "type": "string", "format": "uri" },
+        "quotations": {
+          "type": "array",
+          "items": { "$ref": "#/backend/entities/Quotation" }
+        },
+        "selectedQuotationIndex": { "type": "number" }
       },
       "required": ["itemId", "itemType", "quantity", "status"]
     },
