@@ -91,6 +91,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   }, [items, supplyMasterData, toolMasterData]);
 
   const handleItemSelection = (item: RequisitionItemWithDetails) => {
+    if (item.status !== 'Pendente') return; // Block selection if not pending
     setSelectedItemsForQuotation(prev => {
         const isSelected = prev.some(i => i.docId === item.docId);
         if (isSelected) {
@@ -124,6 +125,8 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
         default: return 'secondary';
     }
   }
+  
+  const quotationCount = requisition?.quotations?.length || 0;
 
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
   const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
@@ -229,6 +232,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                             id={`select-item-${item.docId}`}
                             checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
                             onCheckedChange={() => handleItemSelection(item)}
+                            disabled={item.status !== 'Pendente'}
                             className="mt-1"
                           />
                       )}
@@ -242,11 +246,16 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                       <div className="flex-1 text-sm">
                           <p className="font-bold">{item.details.descricao}</p>
                           <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
-                          <Badge variant={item.status === 'Pendente' ? 'default' : 'success'}>{item.status}</Badge>
+                          <Badge variant={item.status === 'Pendente' ? 'default' : 'success'}>
+                            {item.status === 'Pendente' ? 'Pendente Cotação' : item.status}
+                          </Badge>
                       </div>
                       <div className="text-right">
                           <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
                           {item.estimatedPrice && <p className="text-xs text-muted-foreground">Est: {(item.estimatedPrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / un.</p>}
+                           {!isPurchaseOrder && (
+                            <Badge variant="outline" className="mt-2">Cotações: {quotationCount}/3</Badge>
+                          )}
                       </div>
                   </div>
               ))}
