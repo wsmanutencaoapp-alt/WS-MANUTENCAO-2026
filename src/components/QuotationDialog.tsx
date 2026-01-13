@@ -38,6 +38,7 @@ import { Separator } from './ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import SupplierSelectorDialog from './SupplierSelectorDialog';
+import { Alert, AlertTitle, AlertDescription } from './ui/alert';
 
 
 interface QuotationDialogProps {
