@@ -14,23 +14,31 @@ import { ScrollArea } from './ui/scroll-area';
 import { Loader2, Search } from 'lucide-react';
 import type { Supplier } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query } from 'firebase/firestore';
 
 interface SupplierSelectorDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (supplier: WithDocId<Supplier>) => void;
-  suppliers: WithDocId<Supplier>[];
-  isLoading: boolean;
 }
 
 export default function SupplierSelectorDialog({
   isOpen,
   onClose,
   onSelect,
-  suppliers,
-  isLoading,
 }: SupplierSelectorDialogProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const firestore = useFirestore();
+
+  const suppliersQuery = useMemoFirebase(() => (
+    firestore ? query(collection(firestore, 'suppliers')) : null
+  ), [firestore]);
+
+  const { data: suppliers, isLoading } = useCollection<WithDocId<Supplier>>(suppliersQuery, {
+    queryKey: ['allSuppliersForSelection'],
+    enabled: isOpen,
+  });
 
   const filteredSuppliers = useMemo(() => {
     if (isLoading || !suppliers) return [];

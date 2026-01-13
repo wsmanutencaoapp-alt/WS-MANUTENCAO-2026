@@ -32,7 +32,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Textarea } from './ui/textarea';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card } from './ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Separator } from './ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
@@ -381,11 +381,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         isOpen={supplierSelectorOpen}
         onClose={() => setSupplierSelectorOpen(false)}
         onSelect={handleSupplierSelect}
-        suppliers={[]}
-        isLoading={false}
       />
     </>
   );
 }
-
-    
