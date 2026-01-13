@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import type { PurchaseRequisition, CostCenter, Tool, Supply, PurchaseRequisitionItem, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -128,33 +128,56 @@ const ControleComprasPage = () => {
       return;
     }
 
-    const fetchProgress = async () => {
-      const enrichedReqs: RequisitionWithProgress[] = [];
-      for (const req of scRequisitions) {
-        if (req.status === 'Totalmente Atendida' || req.status === 'Concluída' || req.status === 'Cancelada' || req.status === 'Recusada') {
-            enrichedReqs.push({ ...req, progress: 100, totalItems: 1 });
-            continue;
-        }
-
+    const unsubscribers = scRequisitions.map(req => {
         const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
-        const itemsSnapshot = await getDocs(itemsRef);
-        const totalItems = itemsSnapshot.size;
-        
-        let attendedItems = 0;
-        itemsSnapshot.forEach(itemDoc => {
-            const item = itemDoc.data() as PurchaseRequisitionItem;
-            if (item.status === 'Cotado' || item.status === 'Em Cotação') {
-                attendedItems++;
-            }
-        });
-        
-        const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
-        enrichedReqs.push({ ...req, progress, totalItems });
-      }
-      setRequisitionsWithProgress(enrichedReqs);
-    };
+        return onSnapshot(itemsRef, (itemsSnapshot) => {
+            const totalItems = itemsSnapshot.size;
+            let attendedItems = 0;
+            itemsSnapshot.forEach(itemDoc => {
+                const item = itemDoc.data() as PurchaseRequisitionItem;
+                if (item.status === 'Cotado' || item.status === 'Recebido') {
+                    attendedItems++;
+                }
+            });
+            const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
 
-    fetchProgress();
+            setRequisitionsWithProgress(prev => {
+                const index = prev.findIndex(r => r.docId === req.docId);
+                const updatedReq = { ...req, progress, totalItems };
+                if (index > -1) {
+                    const newProgress = [...prev];
+                    newProgress[index] = updatedReq;
+                    return newProgress;
+                } else {
+                    return [...prev, updatedReq];
+                }
+            });
+        });
+    });
+
+    // Initial population for requisitions that might not have updates yet
+    const initialEnrichment = async () => {
+        const enrichedReqs: RequisitionWithProgress[] = [];
+        for (const req of scRequisitions) {
+            const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
+            const itemsSnapshot = await getDocs(itemsRef);
+            const totalItems = itemsSnapshot.size;
+            let attendedItems = 0;
+            itemsSnapshot.forEach(itemDoc => {
+                const item = itemDoc.data() as PurchaseRequisitionItem;
+                if (item.status === 'Cotado' || item.status === 'Recebido') {
+                    attendedItems++;
+                }
+            });
+            const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
+            enrichedReqs.push({ ...req, progress, totalItems });
+        }
+        setRequisitionsWithProgress(enrichedReqs);
+    }
+    initialEnrichment();
+
+    return () => unsubscribers.forEach(unsub => unsub());
+
   }, [scRequisitions, firestore]);
   
 

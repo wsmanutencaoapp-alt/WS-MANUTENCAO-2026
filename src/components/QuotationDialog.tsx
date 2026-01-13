@@ -164,11 +164,12 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
       batch.update(itemRef, {
           quotations: finalQuotations,
-          status: 'Em Cotação'
+          status: 'Em Cotação',
+          selectedQuotationIndex: selectedQuotationIndex
       });
       
       // Update the main requisition status if it's the first time
-      if (requisition.status === 'Aprovada') {
+      if (requisition.status === 'Aprovada' || requisition.status === 'Aberta') {
           const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
           batch.update(reqRef, { status: 'Em Cotação' });
       }
@@ -199,9 +200,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     
     setIsSaving(true);
     try {
+        await saveCurrentItemQuotations(); // First, save any pending changes
+
         const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
         await updateDoc(itemRef, {
-            selectedQuotationIndex: selectedQuotationIndex,
             status: 'Cotado'
         });
 
