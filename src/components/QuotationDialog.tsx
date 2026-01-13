@@ -96,7 +96,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   useEffect(() => {
     if (isOpen) {
-        // Deep clone to avoid issues with state updates
         setQuotations(JSON.parse(JSON.stringify([
             {...emptyQuotation}, {...emptyQuotation}, {...emptyQuotation}
         ])));
@@ -129,29 +128,33 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const filledQuotations = useMemo(() => quotations.filter(q => q.supplierId && q.totalValue && q.deliveryTime && q.paymentTerms), [quotations]);
   
   const cheapestIndex = useMemo(() => {
-    if (filledQuotations.length === 0) return -1;
+    if (filledQuotations.length === 0) return null;
+    
     let minPrice = Infinity;
-    let minIndex = -1;
+    let minIndex: number | null = null;
+    
     quotations.forEach((q, index) => {
-        if (!q.supplierId) return;
         const value = Number(q.totalValue);
-        if(!isNaN(value) && value > 0 && value < minPrice) {
-            minPrice = value;
-            minIndex = index;
+        if (q.supplierId && !isNaN(value) && value > 0) {
+            if (value < minPrice) {
+                minPrice = value;
+                minIndex = index;
+            }
         }
     });
+
     return minIndex;
-  }, [quotations]);
+  }, [quotations, filledQuotations.length]);
 
   const isJustificationRequired = useMemo(() => {
       if (selectedQuotationIndex === null) return false;
-      const choseMoreExpensive = selectedQuotationIndex !== cheapestIndex;
+      const choseMoreExpensive = cheapestIndex !== null && selectedQuotationIndex !== cheapestIndex;
       const lessThanThreeQuotes = filledQuotations.length > 0 && filledQuotations.length < 3;
       return choseMoreExpensive || lessThanThreeQuotes;
   }, [selectedQuotationIndex, cheapestIndex, filledQuotations.length]);
   
   const getJustificationReason = () => {
-    if (selectedQuotationIndex !== null && selectedQuotationIndex !== cheapestIndex) {
+    if (selectedQuotationIndex !== null && cheapestIndex !== null && selectedQuotationIndex !== cheapestIndex) {
       return "Sua escolha não é o orçamento mais barato. Por favor, justifique.";
     }
     if (filledQuotations.length > 0 && filledQuotations.length < 3) {
@@ -166,16 +169,18 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       throw new Error("Dados insuficientes para gerar a Ordem de Compra.");
     }
     
+    const chosenQuotationFormState = quotations[selectedQuotationIndex];
+    if (!chosenQuotationFormState || !chosenQuotationFormState.supplierId) {
+      throw new Error("A cotação escolhida é inválida ou não possui um fornecedor.");
+    }
+
     setIsSaving(true);
     
     try {
       const counterRef = doc(firestore, 'counters', 'purchaseOrders');
       const newId = await runTransaction(firestore, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
-        let lastId = 0;
-        if (counterDoc.exists()) {
-          lastId = counterDoc.data()?.lastId || 0;
-        }
+        const lastId = counterDoc.exists() ? counterDoc.data()?.lastId || 0 : 0;
         const newId = lastId + 1;
         transaction.set(counterRef, { lastId: newId }, { merge: true });
         return newId;
@@ -186,6 +191,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       
       const finalQuotations: Quotation[] = [];
       for (const q of quotations) {
+        if (!q.supplierId) continue;
         let attachmentUrl = q.attachmentUrl || '';
         if (q.attachmentFile) {
           const fileRef = storageRef(storage, `quotations/${ocRef.id}/${q.supplierId}-${q.attachmentFile.name}`);
@@ -198,10 +204,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         });
       }
       
-      const chosenQuotation = finalQuotations[selectedQuotationIndex];
+      const chosenQuotation = finalQuotations.find(q => q.supplierId === chosenQuotationFormState.supplierId);
       
-      if (!chosenQuotation || !chosenQuotation.supplierId) {
-          throw new Error("A cotação escolhida é inválida ou não possui um fornecedor.");
+      if (!chosenQuotation) {
+          throw new Error("Erro ao encontrar a cotação final correspondente à seleção.");
       }
       
       const ocData: Omit<PurchaseRequisition, 'id'> = {
