@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, documentId, doc, getDoc, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, documentId, doc, onSnapshot } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -12,12 +12,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
-import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { Loader2, ShoppingBag, User, Calendar, Briefcase, Info } from 'lucide-react';
-import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter, Quotation } from '@/lib/types';
+import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import QuotationDialog from './QuotationDialog';
 import { useQueryClient } from '@tanstack/react-query';
@@ -52,13 +51,14 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
         return;
     };
     
-    const unsub = onSnapshot(doc(firestore, 'purchase_requisitions', initialRequisition.docId), (doc) => {
+    // Listen to changes on the main requisition document
+    const unsubReq = onSnapshot(doc(firestore, 'purchase_requisitions', initialRequisition.docId), (doc) => {
         if (doc.exists()) {
             setRequisition({ docId: doc.id, ...doc.data() as PurchaseRequisition });
         }
     });
 
-    return () => unsub();
+    return () => unsubReq();
   }, [initialRequisition, firestore]);
 
   const costCenterQuery = useMemoFirebase(() => {
@@ -71,17 +71,19 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
       enabled: !!requisition && isOpen,
   });
 
+  // Effect to fetch and enrich items with real-time updates
   useEffect(() => {
-    const fetchAndEnrichItems = async () => {
-        if (!firestore || !requisition || !isOpen) {
-          setIsLoading(false);
-          return;
-        };
+    if (!firestore || !requisition || !isOpen) {
+        setIsLoading(false);
+        return;
+    };
 
-        setIsLoading(true);
+    setIsLoading(true);
 
-        const itemsQuery = query(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
-        const itemsSnapshot = await getDocs(itemsQuery);
+    const itemsQuery = query(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
+
+    // Subscribe to real-time updates on the items subcollection
+    const unsubscribe = onSnapshot(itemsQuery, async (itemsSnapshot) => {
         const items = itemsSnapshot.docs.map(d => ({ ...d.data() as PurchaseRequisitionItem, docId: d.id }));
 
         const supplyIds = items.filter(i => i.itemType === 'supply').map(i => i.itemId);
@@ -107,9 +109,13 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
         
         setEnrichedItems(newEnrichedItems);
         setIsLoading(false);
-    };
+    }, (error) => {
+        console.error("Error fetching items in real-time:", error);
+        setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup the listener
     
-    fetchAndEnrichItems();
   }, [requisition, firestore, isOpen]);
 
 
@@ -134,8 +140,8 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   const handleQuotationSuccess = () => {
     setIsQuotationDialogOpen(false);
     setSelectedItemsForQuotation([]);
-    
-    queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
+    // Invalidation might still be useful as a fallback or for related data,
+    // but the onSnapshot listener is now the primary source of truth for the dialog.
     queryClient.invalidateQueries({ queryKey: ['allPurchaseRequisitionsForControl'] });
     if (onActionSuccess) onActionSuccess();
   }
