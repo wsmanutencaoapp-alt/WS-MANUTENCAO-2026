@@ -44,15 +44,15 @@ type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
     'Aberta': 'secondary',
+    'Em Cotação': 'default',
     'Em Aprovação': 'default',
-    'Em Revisão': 'warning',
     'Aprovada': 'success',
     'Recusada': 'destructive',
     'Concluída': 'secondary',
     'Parcialmente Atendida': 'warning',
     'Totalmente Atendida': 'success',
     'Cancelada': 'destructive',
-    'Em Cotação': 'default',
+    'Aguardando Entrega': 'default',
   };
   return variants[status] || 'secondary';
 };
@@ -121,7 +121,7 @@ export default function MyRequisitionsTable() {
         itemsSnapshot.forEach(doc => {
           const item = doc.data() as PurchaseRequisitionItem;
           // An item is considered "attended" if it has been quoted or processed beyond the pending state.
-          if (['Em Cotação', 'Cotado', 'Recebido', 'Cancelado'].includes(item.status)) {
+          if (['Cotado', 'Recebido', 'Cancelado'].includes(item.status)) {
             attendedItems++;
           }
         });
@@ -286,3 +286,5 @@ export default function MyRequisitionsTable() {
     </>
   );
 };
+
+    

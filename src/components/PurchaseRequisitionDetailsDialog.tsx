@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, where, documentId, doc, getDoc } from 'firebase/firestore';
 import {
   Dialog,
@@ -30,26 +30,33 @@ interface PurchaseRequisitionDetailsDialogProps {
   requisition: WithDocId<PurchaseRequisition> | null;
   isOpen: boolean;
   onClose: () => void;
-  onActionSuccess?: (updatedRequisition?: WithDocId<PurchaseRequisition>) => void; 
+  onActionSuccess?: () => void; 
 }
 
 export type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
   details: Partial<WithDocId<Supply> | WithDocId<Tool>>;
 };
 
-export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose, onActionSuccess }: PurchaseRequisitionDetailsDialogProps) {
+export default function PurchaseRequisitionDetailsDialog({ requisition: initialRequisition, isOpen, onClose, onActionSuccess }: PurchaseRequisitionDetailsDialogProps) {
   const firestore = useFirestore();
   const queryClient = useQueryClient();
 
   const [selectedItemsForQuotation, setSelectedItemsForQuotation] = useState<RequisitionItemWithDetails[]>([]);
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState(false);
   
+  const requisitionDocRef = useMemoFirebase(() => {
+    if (!firestore || !initialRequisition?.docId) return null;
+    return doc(firestore, 'purchase_requisitions', initialRequisition.docId);
+  }, [firestore, initialRequisition?.docId]);
 
-  // Fetch requisition items
+  const { data: requisition, isLoading: isLoadingRequisition } = useDoc<WithDocId<PurchaseRequisition>>(requisitionDocRef, {
+      enabled: isOpen,
+  });
+
   const itemsQuery = useMemoFirebase(() => {
-    if (!firestore || !requisition) return null;
+    if (!firestore || !requisition?.docId) return null;
     return query(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
-  }, [firestore, requisition]);
+  }, [firestore, requisition?.docId]);
   
   const { data: items, isLoading: isLoadingItems, error: itemsError } = useCollection<WithDocId<PurchaseRequisitionItem>>(itemsQuery, {
       queryKey: ['requisitionItems', requisition?.docId],
@@ -92,7 +99,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   }, [items, supplyMasterData, toolMasterData]);
 
   const handleItemSelection = (item: RequisitionItemWithDetails) => {
-    if (item.status !== 'Pendente' && item.status !== 'Em Cotação') return; // Allow selection if in quotation
+    if (item.status !== 'Pendente' && item.status !== 'Em Cotação') return;
     setSelectedItemsForQuotation(prev => {
         const isSelected = prev.some(i => i.docId === item.docId);
         if (isSelected) {
@@ -112,10 +119,9 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   const handleQuotationSuccess = async () => {
     setIsQuotationDialogOpen(false);
     setSelectedItemsForQuotation([]);
-    
-    // Force a refetch of the requisition and its items to update the UI
-    await queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
-    onActionSuccess?.();
+    queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
+    queryClient.invalidateQueries({ queryKey: ['allPurchaseRequisitionsForControl'] });
+    if(onActionSuccess) onActionSuccess();
   }
 
   const getPriorityVariant = (priority?: PurchaseRequisition['priority']) => {
@@ -133,8 +139,10 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     setSelectedItemsForQuotation([]);
   }
 
-  const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
+  const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter || isLoadingRequisition;
   const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
+  const quotationCount = (requisition?.quotations || []).filter(q => q?.totalValue > 0).length;
+
 
   return (
     <>
@@ -173,7 +181,12 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
             </div>
           </div>
 
-          <h3 className="font-semibold text-base mt-4">Itens Solicitados</h3>
+          <div className="flex justify-between items-center mt-4">
+            <h3 className="font-semibold text-base">Itens Solicitados</h3>
+             {!isPurchaseOrder && (
+                <Badge variant="outline">Cotações: {quotationCount}/3</Badge>
+              )}
+          </div>
           {isLoading && (
             <div className="flex justify-center items-center h-24">
                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -183,9 +196,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
           {!isLoading && enrichedItems.length === 0 && <p className="text-muted-foreground text-center text-sm">Nenhum item nesta requisição.</p>}
           
           <div className="space-y-3">
-              {enrichedItems.map(item => {
-                  const quotationCount = (item.quotations || []).filter(q => q?.totalValue > 0).length;
-                  return (
+              {enrichedItems.map(item => (
                       <div key={item.docId} className="flex items-start gap-4 rounded-lg border p-3">
                           {!isPurchaseOrder && (
                               <Checkbox 
@@ -213,13 +224,10 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                           <div className="text-right">
                               <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
                               {item.estimatedPrice && <p className="text-xs text-muted-foreground">Est: {(item.estimatedPrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / un.</p>}
-                              {!isPurchaseOrder && (
-                                <Badge variant="outline" className="mt-2">Cotações: {quotationCount}/3</Badge>
-                              )}
                           </div>
                       </div>
                   )
-              })}
+              )}
           </div>
         </div>
 
@@ -247,3 +255,5 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     </>
   );
 }
+
+    

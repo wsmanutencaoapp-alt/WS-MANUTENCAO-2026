@@ -138,7 +138,7 @@ const ControleComprasPage = () => {
         
         itemsSnapshot.forEach(doc => {
           const item = doc.data() as PurchaseRequisitionItem;
-          if (['Em Cotação', 'Cotado', 'Recebido', 'Cancelado'].includes(item.status)) {
+          if (['Cotado', 'Recebido', 'Cancelado'].includes(item.status)) {
             attendedItems++;
           }
         });
@@ -187,16 +187,12 @@ const ControleComprasPage = () => {
     );
   }, [ocRequisitions, searchTermOC]);
 
-  const handleSuccess = (updatedRequisition?: WithDocId<PurchaseRequisition>) => {
+  const handleSuccess = () => {
     setRequisitionToEdit(null);
+    setSelectedRequisition(null);
     queryClient.invalidateQueries({ queryKey: [scQueryKey] });
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
-    if (updatedRequisition) {
-        setSelectedRequisition(updatedRequisition);
-    } else {
-        setSelectedRequisition(null);
-    }
   };
   
   const handleDeleteRequisition = async (requisitionId: string, type: 'SC' | 'OC') => {
@@ -446,3 +442,5 @@ const ControleComprasPage = () => {
 };
 
 export default ControleComprasPage;
+
+    
