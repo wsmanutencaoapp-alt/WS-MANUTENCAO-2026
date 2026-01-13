@@ -37,18 +37,13 @@ export type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
   details: Partial<WithDocId<Supply> | WithDocId<Tool>>;
 };
 
-export default function PurchaseRequisitionDetailsDialog({ requisition: initialRequisition, isOpen, onClose, onActionSuccess }: PurchaseRequisitionDetailsDialogProps) {
+export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose, onActionSuccess }: PurchaseRequisitionDetailsDialogProps) {
   const firestore = useFirestore();
   const queryClient = useQueryClient();
 
-  const [requisition, setRequisition] = useState(initialRequisition);
   const [selectedItemsForQuotation, setSelectedItemsForQuotation] = useState<RequisitionItemWithDetails[]>([]);
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState(false);
   
-  useEffect(() => {
-    setRequisition(initialRequisition);
-  }, [initialRequisition, isOpen]);
-
 
   // Fetch requisition items
   const itemsQuery = useMemoFirebase(() => {
@@ -97,7 +92,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   }, [items, supplyMasterData, toolMasterData]);
 
   const handleItemSelection = (item: RequisitionItemWithDetails) => {
-    if (item.status !== 'Pendente') return; // Block selection if not pending
+    if (item.status !== 'Pendente' && item.status !== 'Em Cotação') return; // Allow selection if in quotation
     setSelectedItemsForQuotation(prev => {
         const isSelected = prev.some(i => i.docId === item.docId);
         if (isSelected) {
@@ -119,7 +114,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     setSelectedItemsForQuotation([]);
     
     // Force a refetch of the requisition and its items to update the UI
-    queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
+    await queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
     onActionSuccess?.();
   }
 
@@ -133,12 +128,17 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     }
   }
   
+  const handleDialogClose = () => {
+    onClose();
+    setSelectedItemsForQuotation([]);
+  }
+
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
   const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
 
   return (
     <>
-    <Dialog open={isOpen && !isQuotationDialogOpen} onOpenChange={(open) => { if(!open) { onClose(); setSelectedItemsForQuotation([]); }}}>
+    <Dialog open={isOpen && !isQuotationDialogOpen} onOpenChange={(open) => { if(!open) { handleDialogClose(); }}}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Detalhes da Requisição</DialogTitle>
@@ -184,7 +184,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
           
           <div className="space-y-3">
               {enrichedItems.map(item => {
-                  const quotationCount = (item.quotations || []).filter(q => q.totalValue > 0).length;
+                  const quotationCount = (item.quotations || []).filter(q => q?.totalValue > 0).length;
                   return (
                       <div key={item.docId} className="flex items-start gap-4 rounded-lg border p-3">
                           {!isPurchaseOrder && (
@@ -192,7 +192,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
                                 id={`select-item-${item.docId}`}
                                 checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
                                 onCheckedChange={() => handleItemSelection(item)}
-                                disabled={item.status !== 'Pendente'}
+                                disabled={item.status !== 'Pendente' && item.status !== 'Em Cotação'}
                                 className="mt-1"
                               />
                           )}
@@ -224,7 +224,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
         </div>
 
         <DialogFooter className="sm:justify-between">
-          <Button variant="outline" onClick={onClose}>Fechar</Button>
+          <Button variant="outline" onClick={handleDialogClose}>Fechar</Button>
           {!isPurchaseOrder && (
             <Button onClick={handleStartQuotation} disabled={selectedItemsForQuotation.length === 0}>
                 <ShoppingBag className="mr-2 h-4 w-4"/>
