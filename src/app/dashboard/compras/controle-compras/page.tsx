@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2 } from 'lucide-react';
+import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -42,6 +42,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import QuotationDialog from '@/components/QuotationDialog';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import EditRequisitionDialog from '@/components/EditRequisitionDialog';
 
 
 type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
@@ -90,6 +91,7 @@ const ControleComprasPage = () => {
   const [searchTermSC, setSearchTermSC] = useState('');
   const [searchTermOC, setSearchTermOC] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [requisitionToEdit, setRequisitionToEdit] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
@@ -184,6 +186,7 @@ const ControleComprasPage = () => {
 
   const handleSuccess = () => {
     setSelectedRequisition(null);
+    setRequisitionToEdit(null);
     queryClient.invalidateQueries({ queryKey: [scQueryKey] });
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
@@ -291,27 +294,32 @@ const ControleComprasPage = () => {
                                     Ver e Atender Itens
                                 </Button>
                                 {isAdmin && (
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="destructive" size="icon" disabled={isProcessing === req.docId}>
-                                                {isProcessing === req.docId ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Tem certeza que deseja excluir permanentemente a requisição <span className="font-bold">{req.protocol}</span>? Esta ação não pode ser desfeita.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeleteRequisition(req.docId)}>
-                                                    Sim, Excluir
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
+                                    <>
+                                        <Button variant="outline" size="icon" onClick={() => setRequisitionToEdit(req)} title="Editar Requisição">
+                                            <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="destructive" size="icon" disabled={isProcessing === req.docId} title="Excluir Requisição">
+                                                    {isProcessing === req.docId ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Tem certeza que deseja excluir permanentemente a requisição <span className="font-bold">{req.protocol}</span>? Esta ação não pode ser desfeita.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteRequisition(req.docId)}>
+                                                        Sim, Excluir
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </>
                                 )}
                             </TableCell>
                         </TableRow>
@@ -387,6 +395,15 @@ const ControleComprasPage = () => {
           isOpen={!!selectedRequisition}
           onClose={() => setSelectedRequisition(null)}
           onActionSuccess={handleSuccess}
+        />
+      )}
+
+      {requisitionToEdit && (
+        <EditRequisitionDialog
+            requisition={requisitionToEdit}
+            isOpen={!!requisitionToEdit}
+            onClose={() => setRequisitionToEdit(null)}
+            onSuccess={handleSuccess}
         />
       )}
     </>
