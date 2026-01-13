@@ -138,7 +138,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         }
     });
     return minIndex;
-  }, [quotations, filledQuotations]);
+  }, [quotations]);
 
   const isJustificationRequired = useMemo(() => {
       const choseMoreExpensive = selectedQuotationIndex !== null && cheapestIndex !== -1 && selectedQuotationIndex !== cheapestIndex;
