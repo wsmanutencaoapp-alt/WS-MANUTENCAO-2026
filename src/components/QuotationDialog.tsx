@@ -352,7 +352,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                Salvar Rascunho
             </Button>
-            <Button onClick={handleSendForApproval} disabled={isSaving}>
+            <Button onClick={handleSendForApproval} disabled={isSaving || selectedQuotationIndex === null}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar e Enviar para Aprovação
             </Button>
@@ -392,5 +392,3 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     </>
   );
 }
-
-    
