@@ -335,7 +335,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                           <Label htmlFor="justification" className="text-orange-800 dark:text-orange-300 flex items-center gap-1">
                               <Info className="h-4 w-4" /> Justificativa <span className="text-destructive">*</span>
                           </Label>
-                          <Textarea id="justification" value={justification} onChange={(e) => setJustification(e.target.value)} placeholder={selectedQuotationIndex !== cheapestIndex ? "Justifique a escolha pelo orçamento que não é o mais barato." : "Justifique por que há menos de 3 orçamentos."} />
+                          <Textarea id="justification" value={justification} onChange={(e) => setJustification(e.target.value)} placeholder={selectedQuotationIndex !== null && selectedQuotationIndex !== cheapestIndex ? "Justifique a escolha pelo orçamento que não é o mais barato." : "Justifique por que há menos de 3 orçamentos."} />
                       </div>
                   )}
                   <div className="space-y-1.5">
