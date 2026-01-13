@@ -26,7 +26,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Upload, FileText, ChevronsUpDown, Check, Info, ShoppingBag, List } from 'lucide-react';
+import { Loader2, Search, Upload, FileText, ChevronsUpDown, Check, Info, ShoppingBag, List, Save } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { ScrollArea } from './ui/scroll-area';
@@ -81,6 +81,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const [justification, setJustification] = useState('');
   const [purchaseOrderNotes, setPurchaseOrderNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingProgress, setIsSavingProgress] = useState(false);
   
   const [supplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
   const [activeQuotationIndex, setActiveQuotationIndex] = useState<number | null>(null);
@@ -96,7 +97,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   useEffect(() => {
     if (isOpen) {
-        // Assume all items share the same quotations for now, or take the first item's.
         const firstItemQuotes = items[0]?.quotations || [];
         const initialQuotes: QuotationFormState[] = Array(3).fill(null).map((_, index) => {
             if (firstItemQuotes[index]) {
@@ -119,6 +119,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         setJustification('');
         setPurchaseOrderNotes('');
         setIsSaving(false);
+        setIsSavingProgress(false);
         setActiveQuotationIndex(null);
         setIsItemsDialogOpen(false);
         setIsJustificationDialogOpen(false);
@@ -133,13 +134,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   
   const handleSupplierSelect = (supplier: WithDocId<Supplier>) => {
     if (activeQuotationIndex === null) return;
-    const updatedQuotations = [...quotations];
-    updatedQuotations[activeQuotationIndex] = { 
-        ...updatedQuotations[activeQuotationIndex], 
-        supplierId: supplier.docId, 
-        supplierName: supplier.name 
-    };
-    setQuotations(updatedQuotations);
+    handleQuotationChange(activeQuotationIndex, 'supplierId', supplier.docId);
+    handleQuotationChange(activeQuotationIndex, 'supplierName', supplier.name);
     setSupplierSelectorOpen(false);
     setActiveQuotationIndex(null);
   };
@@ -185,7 +181,57 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     return "É necessário fornecer uma justificativa.";
   };
   
-  const handleGenerateOC = async (quotes: QuotationFormState[], justificationText: string) => {
+  const saveQuotationsToItems = async (quotes: QuotationFormState[], status: 'Pendente' | 'Em Cotação' = 'Em Cotação'): Promise<Quotation[]> => {
+      if (!firestore || !storage || !requisition) throw new Error("Serviços ou requisição indisponíveis.");
+
+      const finalQuotations: Quotation[] = [];
+      for (const q of quotes) {
+          if (!q.supplierId) continue;
+          let attachmentUrl = q.attachmentUrl || '';
+          if (q.attachmentFile) {
+            const fileRef = storageRef(storage, `quotations/${requisition.docId}/${q.supplierId}-${q.attachmentFile.name}`);
+            await uploadBytes(fileRef, q.attachmentFile);
+            attachmentUrl = await getDownloadURL(fileRef);
+          }
+          finalQuotations.push({
+            supplierId: q.supplierId, supplierName: q.supplierName, totalValue: Number(q.totalValue),
+            deliveryTime: Number(q.deliveryTime), paymentTerms: q.paymentTerms, attachmentUrl: attachmentUrl
+          });
+      }
+
+      const batch = writeBatch(firestore);
+      for (const item of items) {
+          const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.docId);
+          batch.update(itemRef, {
+              quotations: finalQuotations,
+              selectedQuotationIndex: selectedQuotationIndex,
+              status: filledQuotations.length > 0 ? status : 'Pendente',
+          });
+      }
+      
+      const scRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+      batch.update(scRef, { status: filledQuotations.length > 0 ? 'Em Cotação' : 'Aprovada' });
+
+      await batch.commit();
+      return finalQuotations;
+  }
+
+  const handleSaveProgress = async () => {
+      setIsSavingProgress(true);
+      try {
+          await saveQuotationsToItems(quotations);
+          toast({ title: "Progresso Salvo!", description: "As cotações foram salvas nos itens." });
+          queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
+      } catch (err: any) {
+          console.error("Erro ao salvar progresso:", err);
+          toast({ variant: 'destructive', title: 'Erro ao Salvar', description: err.message });
+      } finally {
+          setIsSavingProgress(false);
+      }
+  }
+
+
+  const handleGenerateOC = async (quotes: Quotation[], justificationText: string) => {
     if (!firestore || !storage || !user || !requisition || !items.length || selectedQuotationIndex === null) {
       throw new Error("Dados insuficientes para gerar a Ordem de Compra.");
     }
@@ -209,22 +255,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
       
       const ocRef = doc(collection(firestore, 'purchase_requisitions'));
-      
-      const finalQuotations: Quotation[] = [];
-      for (const q of quotes) {
-        if (!q.supplierId) continue;
-        let attachmentUrl = q.attachmentUrl || '';
-        if (q.attachmentFile) {
-          const fileRef = storageRef(storage, `quotations/${ocRef.id}/${q.supplierId}-${q.attachmentFile.name}`);
-          await uploadBytes(fileRef, q.attachmentFile);
-          attachmentUrl = await getDownloadURL(fileRef);
-        }
-        finalQuotations.push({
-          supplierId: q.supplierId, supplierName: q.supplierName, totalValue: Number(q.totalValue),
-          deliveryTime: Number(q.deliveryTime), paymentTerms: q.paymentTerms, attachmentUrl: attachmentUrl
-        });
-      }
-      
+            
       const ocData: Omit<PurchaseRequisition, 'id'> = {
         protocol: ocProtocol, originalRequisitionId: requisition.docId,
         requesterId: requisition.requesterId, requesterName: requisition.requesterName,
@@ -251,24 +282,19 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             status: 'Pendente',
             notes: baseItem.notes,
             attachmentUrl: baseItem.attachmentUrl,
-            quotations: finalQuotations,
+            quotations: quotes,
             selectedQuotationIndex: selectedQuotationIndex
         }
         ocBatch.set(ocItemRef, itemData);
       }
       await ocBatch.commit();
       
+      // Update original SC items status to 'Cotado'
       const scUpdateBatch = writeBatch(firestore);
       for (const item of items) {
           const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.docId);
-          scUpdateBatch.update(originalItemRef, { 
-              status: 'Cotado',
-              quotations: finalQuotations,
-              selectedQuotationIndex: selectedQuotationIndex
-          });
+          scUpdateBatch.update(originalItemRef, { status: 'Cotado' });
       }
-      const scRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-      scUpdateBatch.update(scRef, { status: 'Em Cotação' });
       
       await scUpdateBatch.commit();
       
@@ -292,7 +318,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
     
     try {
-        await handleGenerateOC(quotations, '');
+        const finalQuotes = await saveQuotationsToItems(quotations, 'Cotado');
+        await handleGenerateOC(finalQuotes, '');
         toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
         onSuccess();
     } catch (err: any) {
@@ -307,7 +334,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
       setIsJustificationDialogOpen(false);
       try {
-          await handleGenerateOC(quotations, justification);
+          const finalQuotes = await saveQuotationsToItems(quotations, 'Cotado');
+          await handleGenerateOC(finalQuotes, justification);
           toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
           onSuccess();
       } catch (err: any) {
@@ -397,12 +425,21 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-            <Button onClick={handleSendForApproval} disabled={isSaving || selectedQuotationIndex === null || filledQuotations.length === 0}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Salvar e Enviar para Aprovação
-            </Button>
+          <DialogFooter className="sm:justify-between">
+             <div>
+                <Button variant="secondary" onClick={handleSaveProgress} disabled={isSavingProgress || isSaving}>
+                    {isSavingProgress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Save className="mr-2 h-4 w-4" />
+                    Salvar Progresso
+                </Button>
+             </div>
+             <div className="flex gap-2">
+                <Button variant="outline" onClick={onClose} disabled={isSaving || isSavingProgress}>Cancelar</Button>
+                <Button onClick={handleSendForApproval} disabled={isSaving || isSavingProgress || selectedQuotationIndex === null || filledQuotations.length === 0}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar e Enviar para Aprovação
+                </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -462,5 +499,3 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     </>
   );
 }
-
-    
