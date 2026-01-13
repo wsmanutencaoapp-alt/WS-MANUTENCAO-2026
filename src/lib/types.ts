@@ -257,9 +257,6 @@ export type PurchaseRequisition = {
   createdAt: string; // ISO date string
   priority: 'Normal' | 'Urgente' | 'Muito Urgente';
   purchaseReason: string;
-  // OC Specific fields
-  quotations?: Quotation[];
-  selectedQuotationIndex?: number;
   expensiveChoiceJustification?: string;
   purchaseOrderNotes?: string;
   supplierId?: string;
@@ -277,6 +274,8 @@ export type PurchaseRequisitionItem = {
     status: 'Pendente' | 'Em Cotação' | 'Cotado' | 'Recebido' | 'Cancelado';
     notes?: string;
     attachmentUrl?: string;
+    quotations?: Quotation[];
+    selectedQuotationIndex?: number;
 };
 
 export type Notification = {
@@ -299,4 +298,5 @@ export type Supplier = {
     rating?: number;
 };
 
+    
     

@@ -47,7 +47,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   
   useEffect(() => {
     setRequisition(initialRequisition);
-  }, [initialRequisition]);
+  }, [initialRequisition, isOpen]);
 
 
   // Fetch requisition items
@@ -114,21 +114,13 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
       }
   };
 
-  const handleQuotationSuccess = async (updatedRequisition?: WithDocId<PurchaseRequisition>) => {
+  const handleQuotationSuccess = async () => {
     setIsQuotationDialogOpen(false);
     setSelectedItemsForQuotation([]);
     
-    // Force a refetch of the requisition details to update the quotation count
-    if (firestore && requisition) {
-        const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-        const freshReq = await getDoc(reqRef);
-        if (freshReq.exists()) {
-            setRequisition({ ...freshReq.data() as PurchaseRequisition, docId: freshReq.id });
-        }
-    }
-    
+    // Force a refetch of the requisition and its items to update the UI
     queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
-    onActionSuccess?.(updatedRequisition);
+    onActionSuccess?.();
   }
 
   const getPriorityVariant = (priority?: PurchaseRequisition['priority']) => {
@@ -141,11 +133,6 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     }
   }
   
-  const quotationCount = useMemo(() => {
-      if (!requisition?.quotations) return 0;
-      return requisition.quotations.filter(q => q.totalValue > 0).length;
-  }, [requisition]);
-
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
   const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
 
@@ -186,53 +173,6 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
             </div>
           </div>
 
-           {isPurchaseOrder && requisition?.quotations && (
-             <div className="space-y-3">
-                <h3 className="font-semibold text-base">Cotações Realizadas</h3>
-                {requisition.expensiveChoiceJustification && (
-                    <Alert variant="warning">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Justificativa da Escolha</AlertTitle>
-                      <AlertDescription>
-                        {requisition.expensiveChoiceJustification}
-                      </AlertDescription>
-                    </Alert>
-                )}
-                 <div className="grid grid-cols-1 gap-3">
-                    {requisition.quotations.filter(q => q.totalValue > 0).map((quote, index) => (
-                        <div key={index} className={cn("rounded-lg border p-3", requisition.selectedQuotationIndex === index && "bg-blue-50 dark:bg-blue-900/30 border-blue-400")}>
-                            <div className="flex justify-between items-start">
-                                <h4 className="font-bold">{quote.supplierName}</h4>
-                                {requisition.selectedQuotationIndex === index && <Badge variant="default"><Award className="mr-1 h-3 w-3"/>Vencedor</Badge>}
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
-                                <div>
-                                    <p className="text-muted-foreground">Valor Total</p>
-                                    <p className="font-semibold">{quote.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                </div>
-                                 <div>
-                                    <p className="text-muted-foreground">Prazo</p>
-                                    <p className="font-semibold">{quote.deliveryTime} dias</p>
-                                </div>
-                                 <div>
-                                    <p className="text-muted-foreground">Pagamento</p>
-                                    <p className="font-semibold">{quote.paymentTerms}</p>
-                                </div>
-                            </div>
-                            {quote.attachmentUrl && (
-                                <Button asChild variant="link" size="sm" className="p-0 h-auto mt-2 text-xs">
-                                    <a href={quote.attachmentUrl} target="_blank" rel="noopener noreferrer">
-                                        <FileText className="mr-1 h-3 w-3"/>
-                                        Ver anexo da cotação
-                                    </a>
-                                </Button>
-                            )}
-                        </div>
-                    ))}
-                 </div>
-             </div>
-          )}
-          
           <h3 className="font-semibold text-base mt-4">Itens Solicitados</h3>
           {isLoading && (
             <div className="flex justify-center items-center h-24">
@@ -243,40 +183,43 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
           {!isLoading && enrichedItems.length === 0 && <p className="text-muted-foreground text-center text-sm">Nenhum item nesta requisição.</p>}
           
           <div className="space-y-3">
-              {enrichedItems.map(item => (
-                  <div key={item.docId} className="flex items-start gap-4 rounded-lg border p-3">
-                      {!isPurchaseOrder && (
-                          <Checkbox 
-                            id={`select-item-${item.docId}`}
-                            checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
-                            onCheckedChange={() => handleItemSelection(item)}
-                            disabled={item.status !== 'Pendente'}
-                            className="mt-1"
-                          />
-                      )}
-                      <Image
-                          src={item.details.imageUrl || 'https://picsum.photos/seed/item/64/64'}
-                          alt={item.details.descricao || 'Item'}
-                          width={48}
-                          height={48}
-                          className="aspect-square rounded-md object-cover"
-                      />
-                      <div className="flex-1 text-sm">
-                          <p className="font-bold">{item.details.descricao}</p>
-                          <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
-                          <Badge variant={item.status === 'Pendente' ? 'default' : 'success'}>
-                            {item.status === 'Pendente' ? 'Pendente Cotação' : item.status}
-                          </Badge>
-                      </div>
-                      <div className="text-right">
-                          <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
-                          {item.estimatedPrice && <p className="text-xs text-muted-foreground">Est: {(item.estimatedPrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / un.</p>}
-                           {!isPurchaseOrder && (
-                            <Badge variant="outline" className="mt-2">Cotações: {quotationCount}/3</Badge>
+              {enrichedItems.map(item => {
+                  const quotationCount = (item.quotations || []).filter(q => q.totalValue > 0).length;
+                  return (
+                      <div key={item.docId} className="flex items-start gap-4 rounded-lg border p-3">
+                          {!isPurchaseOrder && (
+                              <Checkbox 
+                                id={`select-item-${item.docId}`}
+                                checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
+                                onCheckedChange={() => handleItemSelection(item)}
+                                disabled={item.status !== 'Pendente'}
+                                className="mt-1"
+                              />
                           )}
+                          <Image
+                              src={item.details.imageUrl || 'https://picsum.photos/seed/item/64/64'}
+                              alt={item.details.descricao || 'Item'}
+                              width={48}
+                              height={48}
+                              className="aspect-square rounded-md object-cover"
+                          />
+                          <div className="flex-1 text-sm">
+                              <p className="font-bold">{item.details.descricao}</p>
+                              <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
+                              <Badge variant={item.status === 'Pendente' ? 'default' : 'success'}>
+                                {item.status === 'Pendente' ? 'Pendente Cotação' : item.status}
+                              </Badge>
+                          </div>
+                          <div className="text-right">
+                              <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
+                              {item.estimatedPrice && <p className="text-xs text-muted-foreground">Est: {(item.estimatedPrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / un.</p>}
+                              {!isPurchaseOrder && (
+                                <Badge variant="outline" className="mt-2">Cotações: {quotationCount}/3</Badge>
+                              )}
+                          </div>
                       </div>
-                  </div>
-              ))}
+                  )
+              })}
           </div>
         </div>
 
@@ -304,3 +247,5 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     </>
   );
 }
+
+    
