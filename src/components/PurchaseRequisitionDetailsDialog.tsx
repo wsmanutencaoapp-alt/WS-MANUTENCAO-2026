@@ -16,12 +16,14 @@ import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import { Loader2, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info, ShoppingBag } from 'lucide-react';
-import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter } from '@/lib/types';
+import { Loader2, StickyNote, Link as LinkIcon, User, Calendar, Briefcase, AlertTriangle, Info, ShoppingBag, Award, FileText } from 'lucide-react';
+import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import QuotationDialog from './QuotationDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { cn } from '@/lib/utils';
 
 
 interface PurchaseRequisitionDetailsDialogProps {
@@ -124,6 +126,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
   }
 
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
+  const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
 
   return (
     <>
@@ -142,8 +145,55 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
                   {/* Header Info */}
               </div>
           </div>
+
+           {isPurchaseOrder && requisition?.quotations && (
+             <div className="space-y-3">
+                <h3 className="font-semibold text-base">Cotações Realizadas</h3>
+                {requisition.expensiveChoiceJustification && (
+                    <Alert variant="warning">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Justificativa da Escolha</AlertTitle>
+                      <AlertDescription>
+                        {requisition.expensiveChoiceJustification}
+                      </AlertDescription>
+                    </Alert>
+                )}
+                 <div className="grid grid-cols-1 gap-3">
+                    {requisition.quotations.filter(q => q.totalValue > 0).map((quote, index) => (
+                        <div key={index} className={cn("rounded-lg border p-3", requisition.selectedQuotationIndex === index && "bg-blue-50 dark:bg-blue-900/30 border-blue-400")}>
+                            <div className="flex justify-between items-start">
+                                <h4 className="font-bold">{quote.supplierName}</h4>
+                                {requisition.selectedQuotationIndex === index && <Badge variant="default"><Award className="mr-1 h-3 w-3"/>Vencedor</Badge>}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                                <div>
+                                    <p className="text-muted-foreground">Valor Total</p>
+                                    <p className="font-semibold">{quote.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                </div>
+                                 <div>
+                                    <p className="text-muted-foreground">Prazo</p>
+                                    <p className="font-semibold">{quote.deliveryTime} dias</p>
+                                </div>
+                                 <div>
+                                    <p className="text-muted-foreground">Pagamento</p>
+                                    <p className="font-semibold">{quote.paymentTerms}</p>
+                                </div>
+                            </div>
+                            {quote.attachmentUrl && (
+                                <Button asChild variant="link" size="sm" className="p-0 h-auto mt-2 text-xs">
+                                    <a href={quote.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                                        <FileText className="mr-1 h-3 w-3"/>
+                                        Ver anexo da cotação
+                                    </a>
+                                </Button>
+                            )}
+                        </div>
+                    ))}
+                 </div>
+             </div>
+          )}
           
-          <h3 className="font-semibold text-base">Itens Solicitados</h3>
+          <h3 className="font-semibold text-base mt-4">Itens Solicitados</h3>
           {isLoading && (
             <div className="flex justify-center items-center h-24">
                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -155,12 +205,14 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
           <div className="space-y-3">
               {enrichedItems.map(item => (
                   <div key={item.docId} className="flex items-start gap-4 rounded-lg border p-3">
-                      <Checkbox 
-                        id={`select-item-${item.docId}`}
-                        checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
-                        onCheckedChange={() => handleItemSelection(item)}
-                        className="mt-1"
-                      />
+                      {!isPurchaseOrder && (
+                          <Checkbox 
+                            id={`select-item-${item.docId}`}
+                            checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
+                            onCheckedChange={() => handleItemSelection(item)}
+                            className="mt-1"
+                          />
+                      )}
                       <Image
                           src={item.details.imageUrl || 'https://picsum.photos/seed/item/64/64'}
                           alt={item.details.descricao || 'Item'}
@@ -184,10 +236,12 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
 
         <DialogFooter className="sm:justify-between">
           <Button variant="outline" onClick={onClose}>Fechar</Button>
-          <Button onClick={handleStartQuotation} disabled={selectedItemsForQuotation.length === 0}>
-            <ShoppingBag className="mr-2 h-4 w-4"/>
-            Realizar Cotação para Itens Selecionados ({selectedItemsForQuotation.length})
-          </Button>
+          {!isPurchaseOrder && (
+            <Button onClick={handleStartQuotation} disabled={selectedItemsForQuotation.length === 0}>
+                <ShoppingBag className="mr-2 h-4 w-4"/>
+                Realizar Cotação para Itens Selecionados ({selectedItemsForQuotation.length})
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
