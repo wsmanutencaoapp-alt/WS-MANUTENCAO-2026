@@ -88,10 +88,13 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
 
   const costCenterQuery = useMemoFirebase(() => {
     if (!firestore || !requisition) return null;
-    return query(collection(firestore, 'cost_centers'), where(documentId(), '==', requisition.costCenterId));
+    // Use `doc` instead of `query` for a single document fetch
+    return doc(firestore, 'cost_centers', requisition.costCenterId);
   }, [firestore, requisition]);
-  const { data: costCenterData, isLoading: isLoadingCostCenter } = useCollection<WithDocId<CostCenter>>(costCenterQuery, { queryKey: ['costCenterForReq', requisition?.costCenterId], enabled: !!requisition && isOpen });
-  const costCenter = useMemo(() => costCenterData?.[0], [costCenterData]);
+  const { data: costCenter, isLoading: isLoadingCostCenter } = useDoc<CostCenter>(costCenterQuery, {
+      queryKey: ['costCenterForReq', requisition?.costCenterId],
+      enabled: !!requisition && isOpen,
+  });
 
   const enrichedItems = useMemo((): RequisitionItemWithDetails[] => {
     if (!items) return [];
@@ -262,3 +265,5 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     </>
   );
 }
+
+    

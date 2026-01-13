@@ -192,17 +192,13 @@ const ControleComprasPage = () => {
     );
   }, [ocRequisitions, searchTermOC]);
 
-  const handleSuccess = (updatedRequisition?: WithDocId<PurchaseRequisition>) => {
+  const handleSuccess = () => {
     setRequisitionToEdit(null);
-    if (updatedRequisition) {
-      // If we get an updated requisition, force update the selected one for dialog refresh
-      setSelectedRequisition(updatedRequisition);
-    } else {
-      setSelectedRequisition(null);
-    }
+    setSelectedRequisition(null);
     queryClient.invalidateQueries({ queryKey: [scQueryKey] });
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
+    queryClient.invalidateQueries({ queryKey: ['myPurchaseRequisitions'] });
   };
   
   const handleDeleteRequisition = async (requisitionId: string, type: 'SC' | 'OC') => {
@@ -430,14 +426,12 @@ const ControleComprasPage = () => {
         </Tabs>
       </div>
 
-      {selectedRequisition && (
-        <PurchaseRequisitionDetailsDialog
-          requisition={selectedRequisition}
-          isOpen={!!selectedRequisition}
-          onClose={() => setSelectedRequisition(null)}
-          onActionSuccess={() => handleSuccess(selectedRequisition)}
-        />
-      )}
+      <PurchaseRequisitionDetailsDialog
+        requisition={selectedRequisition}
+        isOpen={!!selectedRequisition}
+        onClose={() => setSelectedRequisition(null)}
+        onActionSuccess={handleSuccess}
+      />
 
       {requisitionToEdit && (
         <EditRequisitionDialog

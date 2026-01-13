@@ -451,16 +451,7 @@
         "purchaseOrderNotes": { "type": "string" },
         "supplierId": { "type": "string", "description": "ID of the chosen supplier for the OC." },
         "totalValue": { "type": "number", "description": "Final total value for the OC." },
-        "paymentTerms": { "type": "string", "description": "Final payment terms for the OC." },
-        "quotations": {
-          "type": "array",
-          "description": "Stores the 3 quotations for the items in this requisition.",
-          "items": { "$ref": "#/backend/entities/Quotation" }
-        },
-        "selectedQuotationIndex": {
-            "type": "number",
-            "description": "The index of the winning quotation in the 'quotations' array."
-        }
+        "paymentTerms": { "type": "string", "description": "Final payment terms for the OC." }
       },
       "required": ["protocol", "requesterId", "requesterName", "costCenterId", "neededByDate", "type", "status", "createdAt", "priority", "purchaseReason"]
     },
@@ -480,9 +471,13 @@
         "attachmentUrl": { "type": "string", "format": "uri" },
         "quotations": {
           "type": "array",
-          "items": { "$ref": "#/backend/entities/Quotation" }
+          "description": "Stores the 3 quotations for this specific item.",
+          "items": { "$ref": "#/entities/Quotation" }
         },
-        "selectedQuotationIndex": { "type": "number" }
+        "selectedQuotationIndex": {
+            "type": "number",
+            "description": "The index of the winning quotation in the 'quotations' array."
+        }
       },
       "required": ["itemId", "itemType", "quantity", "status"]
     },

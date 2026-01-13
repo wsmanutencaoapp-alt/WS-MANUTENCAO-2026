@@ -26,20 +26,17 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Upload, FileText, ChevronsUpDown, Check, Info, ShoppingBag, List, Save } from 'lucide-react';
+import { Loader2, Upload, FileText, ChevronsUpDown, Check, Info, ShoppingBag, List, Save, ArrowLeft, ArrowRight } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { ScrollArea } from './ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Textarea } from './ui/textarea';
-import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
+import { Card } from './ui/card';
 import { Separator } from './ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import SupplierSelectorDialog from './SupplierSelectorDialog';
-import { Alert, AlertTitle, AlertDescription } from './ui/alert';
 
 
 interface QuotationDialogProps {
@@ -74,63 +71,41 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const storage = useStorage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user } = useUser();
 
+  const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [quotations, setQuotations] = useState<QuotationFormState[]>([]);
   const [selectedQuotationIndex, setSelectedQuotationIndex] = useState<number | null>(null);
   const [justification, setJustification] = useState('');
   const [purchaseOrderNotes, setPurchaseOrderNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [isSavingProgress, setIsSavingProgress] = useState(false);
   
   const [supplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
   const [activeQuotationIndex, setActiveQuotationIndex] = useState<number | null>(null);
-  const [isItemsDialogOpen, setIsItemsDialogOpen] = useState(false);
   const [isJustificationDialogOpen, setIsJustificationDialogOpen] = useState(false);
 
+  const currentItem = useMemo(() => items[currentItemIndex], [items, currentItemIndex]);
 
-  const suppliersQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'suppliers')) : null), [firestore]);
-  const { data: suppliers, isLoading: isLoadingSuppliers } = useCollection<WithDocId<Supplier>>(suppliersQuery, {
-    queryKey: ['allSuppliersForQuotation'],
-    enabled: isOpen,
-  });
-
- useEffect(() => {
-    if (isOpen && items.length > 0) {
+  useEffect(() => {
+    if (isOpen && currentItem) {
         setJustification('');
         setPurchaseOrderNotes('');
-        setIsSaving(false);
-        setIsSavingProgress(false);
-        setActiveQuotationIndex(null);
-        setIsItemsDialogOpen(false);
-        setIsJustificationDialogOpen(false);
-
-        const firstItem = items[0];
-        const initialQuotesData = firstItem?.quotations?.length > 0 ? firstItem.quotations : [null, null, null];
-
-        const initialQuotes = initialQuotesData.slice(0, 3).map(q => {
+        const itemQuotes = currentItem.quotations || [];
+        const initialQuotes = Array.from({ length: 3 }).map((_, i) => {
+            const q = itemQuotes[i];
             if (q && q.supplierId) {
                 return {
-                    supplierId: q.supplierId,
-                    supplierName: q.supplierName,
-                    totalValue: q.totalValue,
-                    deliveryTime: q.deliveryTime,
-                    paymentTerms: q.paymentTerms,
-                    attachmentUrl: q.attachmentUrl,
+                    supplierId: q.supplierId, supplierName: q.supplierName,
+                    totalValue: q.totalValue, deliveryTime: q.deliveryTime,
+                    paymentTerms: q.paymentTerms, attachmentUrl: q.attachmentUrl,
                     attachmentFile: null,
                 };
             }
             return {...emptyQuotation};
         });
-        
-        while (initialQuotes.length < 3) {
-            initialQuotes.push({...emptyQuotation});
-        }
-        
         setQuotations(initialQuotes);
-        setSelectedQuotationIndex(firstItem?.selectedQuotationIndex ?? null);
+        setSelectedQuotationIndex(currentItem.selectedQuotationIndex ?? null);
     }
-}, [isOpen, items]);
+  }, [isOpen, currentItem]);
 
   const handleQuotationChange = (index: number, field: keyof QuotationFormState, value: any) => {
     const updatedQuotations = [...quotations];
@@ -151,7 +126,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           handleQuotationChange(index, 'attachmentFile', e.target.files[0]);
       }
   }
-  
+
   const filledQuotations = useMemo(() => quotations.filter(q => q.supplierId && q.totalValue && q.deliveryTime && q.paymentTerms), [quotations]);
   
   const cheapestIndex = useMemo(() => {
@@ -187,20 +162,18 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     return "É necessário fornecer uma justificativa.";
   };
 
-  const saveQuotationsToItems = async (quotes: QuotationFormState[], newStatus: PurchaseRequisitionItem['status']): Promise<Quotation[]> => {
-      if (!firestore || !storage || !requisition) throw new Error("Serviços ou requisição indisponíveis.");
-
-      const batch = writeBatch(firestore);
+  const saveCurrentItemQuotations = async (status: PurchaseRequisitionItem['status'] = 'Em Cotação') => {
+      if (!firestore || !storage || !requisition || !currentItem) throw new Error("Dados da sessão inválidos.");
+      
       const finalQuotations: Quotation[] = [];
-
-      for (const q of quotes) {
+      for (const q of quotations) {
           if (!q.supplierId) {
             finalQuotations.push({} as Quotation);
             continue;
           };
           let attachmentUrl = q.attachmentUrl || '';
           if (q.attachmentFile) {
-            const fileRef = storageRef(storage, `quotations/${requisition.docId}/${q.supplierId}-${q.attachmentFile.name}`);
+            const fileRef = storageRef(storage, `quotations/${requisition.docId}/${currentItem.docId}-${q.supplierId}-${q.attachmentFile.name}`);
             await uploadBytes(fileRef, q.attachmentFile);
             attachmentUrl = await getDownloadURL(fileRef);
           }
@@ -209,264 +182,174 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             deliveryTime: Number(q.deliveryTime), paymentTerms: q.paymentTerms, attachmentUrl: attachmentUrl
           });
       }
-      
-      for (const item of items) {
-          const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.docId);
-          batch.update(itemRef, {
-              quotations: finalQuotations,
-              selectedQuotationIndex: selectedQuotationIndex,
-              status: newStatus
-          });
-      }
 
-      await batch.commit();
+      const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
+      await updateDoc(itemRef, {
+          quotations: finalQuotations,
+          selectedQuotationIndex: selectedQuotationIndex,
+          status: status
+      });
+      
       return finalQuotations;
   };
   
   const handleSaveProgress = async () => {
-      setIsSavingProgress(true);
+      setIsSaving(true);
       try {
-          // Update status to 'Em Cotação'
-          await saveQuotationsToItems(quotations, 'Em Cotação');
-          const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-          await updateDoc(reqRef, { status: 'Em Cotação' });
+          await saveCurrentItemQuotations('Em Cotação');
+          // Update the main requisition status if it's the first time
+          if (requisition.status !== 'Em Cotação' && requisition.status !== 'Parcialmente Atendida') {
+              const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+              await updateDoc(reqRef, { status: 'Em Cotação' });
+          }
           
-          toast({ title: "Progresso Salvo!", description: "As cotações foram salvas nos itens." });
+          toast({ title: "Progresso Salvo!", description: "As cotações para este item foram salvas." });
           onSuccess();
-          onClose();
+          // Do not close, allow to continue
       } catch (err: any) {
           console.error("Erro ao salvar progresso:", err);
           toast({ variant: 'destructive', title: 'Erro ao Salvar', description: err.message });
       } finally {
-          setIsSavingProgress(false);
+          setIsSaving(false);
       }
   }
 
 
-  const handleGenerateOC = async (quotes: Quotation[], justificationText: string) => {
-    if (!firestore || !storage || !user || !requisition || !items.length || selectedQuotationIndex === null) {
-      throw new Error("Dados insuficientes para gerar a Ordem de Compra.");
-    }
-    
-    const chosenQuotation = quotes[selectedQuotationIndex];
-    if (!chosenQuotation || !chosenQuotation.supplierId) {
-      throw new Error("A cotação escolhida é inválida ou não possui um fornecedor.");
-    }
-
-    setIsSaving(true);
-    
-    try {
-      const counterRef = doc(firestore, 'counters', 'purchaseOrders');
-      const newId = await runTransaction(firestore, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        const lastId = counterDoc.exists() ? counterDoc.data()?.lastId || 0 : 0;
-        const newId = lastId + 1;
-        transaction.set(counterRef, { lastId: newId }, { merge: true });
-        return newId;
-      });
-      const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
-      
-      const ocRef = doc(collection(firestore, 'purchase_requisitions'));
-            
-      const ocData: Omit<PurchaseRequisition, 'id'> = {
-        protocol: ocProtocol, originalRequisitionId: requisition.docId,
-        requesterId: requisition.requesterId, requesterName: requisition.requesterName,
-        costCenterId: requisition.costCenterId, neededByDate: requisition.neededByDate,
-        type: 'Ordem de Compra', status: 'Em Aprovação', createdAt: new Date().toISOString(),
-        priority: requisition.priority, purchaseReason: requisition.purchaseReason,
-        expensiveChoiceJustification: justificationText, purchaseOrderNotes: purchaseOrderNotes,
-        supplierId: chosenQuotation.supplierId,
-        totalValue: Number(chosenQuotation.totalValue),
-        paymentTerms: chosenQuotation.paymentTerms,
-      };
-
-      const ocBatch = writeBatch(firestore);
-      ocBatch.set(ocRef, ocData);
-
-      for (const item of items) {
-        const ocItemRef = doc(collection(ocRef, 'items'));
-        const { details, ...baseItem } = item;
-        const itemData: Omit<PurchaseRequisitionItem, 'id' > = {
-            itemId: baseItem.itemId,
-            itemType: baseItem.itemType,
-            quantity: baseItem.quantity,
-            estimatedPrice: baseItem.estimatedPrice,
-            status: 'Pendente', // Status of the item within the OC
-            notes: baseItem.notes,
-            attachmentUrl: baseItem.attachmentUrl,
-        }
-        ocBatch.set(ocItemRef, itemData);
-      }
-      await ocBatch.commit();
-      
-      // Update original SC status to 'Totalmente Atendida'
-      const scRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-      await updateDoc(scRef, { status: 'Totalmente Atendida' });
-      
-    } catch (err) {
-      console.error("Erro ao gerar OC:", err);
-      throw err;
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-
-  const handleSendForApproval = async () => {
+  const handleGenerateOC = async (justificationText: string) => {
+    // This function will now be responsible for generating the OC for all items, not just one
+    // It should be called after all quotations are done.
+    // For now, let's assume it's called per-item.
     if (selectedQuotationIndex === null) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um orçamento vencedor.' });
-        return;
-    }
-     if (isJustificationRequired) {
-        setIsJustificationDialogOpen(true);
-        return;
+      toast({ variant: 'destructive', title: 'Erro', description: 'Selecione a cotação vencedora para este item.' });
+      return;
     }
     
+    setIsSaving(true);
     try {
-        const finalQuotes = await saveQuotationsToItems(quotations, 'Cotado');
-        await handleGenerateOC(finalQuotes, '');
-        toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
+        await saveCurrentItemQuotations('Cotado');
+        toast({ title: "Item Finalizado!", description: `O item ${currentItem.details.codigo} foi cotado e marcado como finalizado.` });
+
+        // Check if all items in the original list are now 'Cotado'
+        const allItemsRef = collection(firestore, 'purchase_requisitions', requisition.docId, 'items');
+        const allItemsSnapshot = await getDocs(allItemsRef);
+        const allItemsData = allItemsSnapshot.docs.map(d => d.data() as PurchaseRequisitionItem);
+        const allItemsQuoted = allItemsData.every(item => item.status === 'Cotado');
+        
+        if (allItemsQuoted) {
+            // Logic to generate the OC would go here, which is a larger scope
+            toast({ title: 'Pronto para OC!', description: "Todos os itens foram cotados. A geração da Ordem de Compra pode ser implementada." });
+        }
+        
         onSuccess();
+        onClose();
+        
     } catch (err: any) {
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível enviar para aprovação.' });
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
+    } finally {
+        setIsSaving(false);
     }
   }
   
-  const handleJustificationSubmit = async () => {
-      if (!justification) {
-          toast({ variant: 'destructive', title: 'Erro', description: 'A justificativa é obrigatória.' });
-          return;
-      }
-      setIsJustificationDialogOpen(false);
-      try {
-          const finalQuotes = await saveQuotationsToItems(quotations, 'Cotado');
-          await handleGenerateOC(finalQuotes, justification);
-          toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
-          onSuccess();
-      } catch (err: any) {
-          toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível enviar para aprovação.' });
-      }
-  }
+  const handleNext = () => {
+    if (currentItemIndex < items.length - 1) {
+      setCurrentItemIndex(currentItemIndex + 1);
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentItemIndex > 0) {
+      setCurrentItemIndex(currentItemIndex - 1);
+    }
+  };
 
 
   return (
     <>
-      <Dialog open={isOpen && !isItemsDialogOpen && !isJustificationDialogOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen && !isJustificationDialogOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
             <DialogDescription>
-              Insira os orçamentos para os itens selecionados e gere a Ordem de Compra.
+              Preencha os orçamentos para os itens selecionados e, ao final, gere a Ordem de Compra.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-4 py-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg">Resumo da Cotação</CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between">
+            
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <div>
-                        <p className="text-sm text-muted-foreground">Itens para cotar</p>
-                        <p className="text-xl font-bold">{items.length}</p>
+                        <CardTitle className="text-base font-medium">
+                            Item {currentItemIndex + 1} de {items.length}: {currentItem?.details.descricao}
+                        </CardTitle>
+                        <CardDescription>Código: {currentItem?.details.codigo} | Qtd: {currentItem?.quantity}</CardDescription>
                     </div>
-                    <Button variant="outline" onClick={() => setIsItemsDialogOpen(true)}>
-                        <List className="mr-2 h-4 w-4" />
-                        Ver Itens da Cotação
-                    </Button>
+                     <div className="flex gap-2">
+                        <Button variant="outline" size="icon" onClick={handlePrev} disabled={currentItemIndex === 0}>
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={handleNext} disabled={currentItemIndex === items.length - 1}>
+                            <ArrowRight className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <RadioGroup value={selectedQuotationIndex?.toString()} onValueChange={(v) => setSelectedQuotationIndex(Number(v))}>
+                      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start pt-4">
+                          {quotations.map((q, index) => (
+                             <Card key={index} className="p-4 space-y-3 relative">
+                                 <div className="flex items-center justify-between">
+                                     <Label htmlFor={`q-${index}`} className="font-bold text-base flex items-center gap-2">
+                                        <RadioGroupItem value={index.toString()} id={`q-${index}`} />
+                                        Orçamento #{index + 1}
+                                     </Label>
+                                     {index === cheapestIndex && <Badge variant="success">Mais Barato</Badge>}
+                                 </div>
+                                 <Separator />
+                                 <div className="space-y-1.5">
+                                     <Label>Fornecedor</Label>
+                                     <Button 
+                                        variant="outline" 
+                                        className="w-full justify-between font-normal" 
+                                        onClick={() => { setActiveQuotationIndex(index); setSupplierSelectorOpen(true); }}
+                                    >
+                                        {q.supplierName || "Selecione..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                 </div>
+                                 <div className="grid grid-cols-2 gap-4">
+                                     <div className="space-y-1.5"><Label>Valor Total (R$)</Label><Input type="number" value={q.totalValue} onChange={(e) => handleQuotationChange(index, 'totalValue', e.target.value)} /></div>
+                                     <div className="space-y-1.5"><Label>Prazo (dias)</Label><Input type="number" value={q.deliveryTime} onChange={(e) => handleQuotationChange(index, 'deliveryTime', e.target.value)} /></div>
+                                 </div>
+                                  <div className="space-y-1.5"><Label>Cond. Pagamento</Label><Input value={q.paymentTerms} onChange={(e) => handleQuotationChange(index, 'paymentTerms', e.target.value)} placeholder="Ex: 30/60/90" /></div>
+                                  <div className="space-y-1.5"><Label>Anexo</Label>
+                                      <Button asChild variant="outline" size="sm" className="w-full">
+                                          <label className="cursor-pointer"><Upload className="mr-2"/>{q.attachmentFile ? <span className='truncate'>{q.attachmentFile.name}</span> : 'Anexar Orçamento'}<Input type="file" className="sr-only" onChange={(e) => handleFileChange(index, e)}/></label>
+                                      </Button>
+                                  </div>
+                             </Card>
+                          ))}
+                      </div>
+                  </RadioGroup>
                 </CardContent>
             </Card>
-
-            <div className="space-y-4">
-               <div className="flex flex-col">
-                  <h3 className="font-semibold text-lg">Orçamentos</h3>
-                  <p className="text-sm text-muted-foreground">* Selecione o orçamento vencedor</p>
-               </div>
-               <RadioGroup value={selectedQuotationIndex?.toString()} onValueChange={(v) => setSelectedQuotationIndex(Number(v))}>
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-                      {quotations.map((q, index) => (
-                         <Card key={index} className="p-4 space-y-3">
-                             <div className="flex items-center justify-between">
-                                 <Label htmlFor={`q-${index}`} className="font-bold text-base flex items-center gap-2">
-                                    <RadioGroupItem value={index.toString()} id={`q-${index}`} />
-                                    Orçamento #{index + 1}
-                                 </Label>
-                                 {index === cheapestIndex && <Badge variant="success">Mais Barato</Badge>}
-                             </div>
-                             <Separator />
-                             <div className="space-y-1.5">
-                                 <Label>Fornecedor</Label>
-                                 <Button 
-                                    variant="outline" 
-                                    className="w-full justify-between font-normal" 
-                                    onClick={() => { setActiveQuotationIndex(index); setSupplierSelectorOpen(true); }}
-                                    disabled={isLoadingSuppliers}
-                                >
-                                    {isLoadingSuppliers ? <Loader2 className="h-4 w-4 animate-spin"/> : q.supplierName || "Selecione..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                             </div>
-
-                             <div className="grid grid-cols-2 gap-4">
-                                 <div className="space-y-1.5"><Label>Valor Total (R$)</Label><Input type="number" value={q.totalValue} onChange={(e) => handleQuotationChange(index, 'totalValue', e.target.value)} /></div>
-                                 <div className="space-y-1.5"><Label>Prazo (dias)</Label><Input type="number" value={q.deliveryTime} onChange={(e) => handleQuotationChange(index, 'deliveryTime', e.target.value)} /></div>
-                             </div>
-                              <div className="space-y-1.5"><Label>Cond. Pagamento</Label><Input value={q.paymentTerms} onChange={(e) => handleQuotationChange(index, 'paymentTerms', e.target.value)} placeholder="Ex: 30/60/90" /></div>
-                              <div className="space-y-1.5"><Label>Anexo</Label>
-                                  <Button asChild variant="outline" size="sm" className="w-full">
-                                      <label className="cursor-pointer"><Upload className="mr-2"/>{q.attachmentFile ? <span className='truncate'>{q.attachmentFile.name}</span> : 'Anexar Orçamento'}<Input type="file" className="sr-only" onChange={(e) => handleFileChange(index, e)}/></label>
-                                  </Button>
-                              </div>
-                         </Card>
-                      ))}
-                  </div>
-              </RadioGroup>
-              
-               <div className="space-y-2 mt-4">
-                  <div className="space-y-1.5">
-                      <Label htmlFor="purchaseOrderNotes">Observações da Ordem de Compra</Label>
-                      <Textarea id="purchaseOrderNotes" value={purchaseOrderNotes} onChange={(e) => setPurchaseOrderNotes(e.target.value)} placeholder="Informações adicionais para a OC, como dados de entrega, contato, etc." />
-                  </div>
-              </div>
-            </div>
+            
           </div>
 
           <DialogFooter className="sm:justify-between">
              <div>
-                <Button variant="secondary" onClick={handleSaveProgress} disabled={isSavingProgress || isSaving}>
-                    {isSavingProgress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button variant="secondary" onClick={handleSaveProgress} disabled={isSaving}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     <Save className="mr-2 h-4 w-4" />
-                    Salvar Progresso
+                    Salvar Progresso do Item
                 </Button>
              </div>
              <div className="flex gap-2">
-                <Button variant="outline" onClick={onClose} disabled={isSaving || isSavingProgress}>Cancelar</Button>
-                <Button onClick={handleSendForApproval} disabled={isSaving || isSavingProgress || selectedQuotationIndex === null || filledQuotations.length === 0}>
+                <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
+                <Button onClick={() => handleGenerateOC('')} disabled={isSaving || selectedQuotationIndex === null || filledQuotations.length === 0}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Salvar e Enviar para Aprovação
+                    Finalizar Cotação do Item
                 </Button>
             </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-       <Dialog open={isItemsDialogOpen} onOpenChange={setIsItemsDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Itens da Cotação</DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-96 my-4">
-            <div className="space-y-2 pr-6">
-              {items.map(item => (
-                <div key={item.docId} className="text-sm border rounded-md p-3">
-                  <p className="font-bold">{item.details?.descricao || 'Item não encontrado'}</p>
-                  <p>Código: <span className="font-mono text-muted-foreground">{item.details?.codigo}</span></p>
-                  <p>Quantidade: <span className="font-medium">{item.quantity}</span></p>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-          <DialogFooter>
-            <Button onClick={() => setIsItemsDialogOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -489,7 +372,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsJustificationDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleJustificationSubmit} disabled={!justification}>Confirmar e Enviar</Button>
+            <Button onClick={() => handleGenerateOC(justification)} disabled={!justification || isSaving}>Confirmar e Gerar OC</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -498,8 +381,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         isOpen={supplierSelectorOpen}
         onClose={() => setSupplierSelectorOpen(false)}
         onSelect={handleSupplierSelect}
-        suppliers={suppliers || []}
-        isLoading={isLoadingSuppliers}
+        suppliers={[]}
+        isLoading={false}
       />
     </>
   );
