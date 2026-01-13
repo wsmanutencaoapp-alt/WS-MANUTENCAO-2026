@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, documentId, doc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, documentId, doc, onSnapshot, getDocs } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -86,6 +86,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     const unsubscribe = onSnapshot(itemsQuery, async (itemsSnapshot) => {
         const items = itemsSnapshot.docs.map(d => ({ ...d.data() as PurchaseRequisitionItem, docId: d.id }));
 
+        // Fetch master data
         const supplyIds = items.filter(i => i.itemType === 'supply').map(i => i.itemId);
         const toolIds = items.filter(i => i.itemType === 'tool').map(i => i.itemId);
 
