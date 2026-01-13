@@ -74,9 +74,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const queryClient = useQueryClient();
   const { user } = useUser();
 
-  const [quotations, setQuotations] = useState<QuotationFormState[]>([
-    {...emptyQuotation}, {...emptyQuotation}, {...emptyQuotation}
-  ]);
+  const [quotations, setQuotations] = useState<QuotationFormState[]>([]);
   const [selectedQuotationIndex, setSelectedQuotationIndex] = useState<number | null>(null);
   const [justification, setJustification] = useState('');
   const [purchaseOrderNotes, setPurchaseOrderNotes] = useState('');
@@ -96,14 +94,19 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   useEffect(() => {
     if (isOpen) {
-        setQuotations(JSON.parse(JSON.stringify([
+        // Correctly reset the state when the dialog is opened
+        setQuotations([
             {...emptyQuotation}, {...emptyQuotation}, {...emptyQuotation}
-        ])));
+        ]);
         setSelectedQuotationIndex(null);
         setJustification('');
         setPurchaseOrderNotes('');
+        setIsSaving(false);
+        setActiveQuotationIndex(null);
+        setIsItemsDialogOpen(false);
+        setIsJustificationDialogOpen(false);
     }
-  }, [isOpen, items]);
+  }, [isOpen]);
 
   const handleQuotationChange = (index: number, field: keyof QuotationFormState, value: any) => {
     const updatedQuotations = [...quotations];
@@ -160,12 +163,12 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     return "É necessário fornecer uma justificativa.";
   };
   
-  const handleGenerateOC = async (justificationText: string, currentQuotations: QuotationFormState[]) => {
+  const handleGenerateOC = async (justificationText: string) => {
     if (!firestore || !storage || !user || !requisition || !items.length || selectedQuotationIndex === null) {
       throw new Error("Dados insuficientes para gerar a Ordem de Compra.");
     }
     
-    const chosenQuotation = currentQuotations[selectedQuotationIndex];
+    const chosenQuotation = quotations[selectedQuotationIndex];
     if (!chosenQuotation || !chosenQuotation.supplierId) {
       throw new Error("A cotação escolhida é inválida ou não possui um fornecedor.");
     }
@@ -186,7 +189,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       const ocRef = doc(collection(firestore, 'purchase_requisitions'));
       
       const finalQuotations: Quotation[] = [];
-      for (const q of currentQuotations) {
+      for (const q of quotations) {
         if (!q.supplierId) continue;
         let attachmentUrl = q.attachmentUrl || '';
         if (q.attachmentFile) {
@@ -258,7 +261,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
     
     try {
-        await handleGenerateOC('', quotations);
+        await handleGenerateOC('');
         toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
         onSuccess();
     } catch (err: any) {
@@ -273,7 +276,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
       setIsJustificationDialogOpen(false);
       try {
-          await handleGenerateOC(justification, quotations);
+          await handleGenerateOC(justification);
           toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
           onSuccess();
       } catch (err: any) {
