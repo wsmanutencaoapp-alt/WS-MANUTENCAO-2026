@@ -203,6 +203,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       
       const chosenQuotation = finalQuotations[selectedQuotationIndex];
       
+      if (!chosenQuotation || !chosenQuotation.supplierId) {
+          throw new Error("A cotação escolhida é inválida ou não possui um fornecedor.");
+      }
+      
       const ocData: Omit<PurchaseRequisition, 'id'> = {
         protocol: ocProtocol, originalRequisitionId: requisition.docId,
         requesterId: requisition.requesterId, requesterName: requisition.requesterName,
@@ -211,8 +215,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         priority: requisition.priority, purchaseReason: requisition.purchaseReason,
         quotations: finalQuotations, selectedQuotationIndex: selectedQuotationIndex,
         expensiveChoiceJustification: justificationText, purchaseOrderNotes: purchaseOrderNotes,
-        supplierId: chosenQuotation?.supplierId, totalValue: chosenQuotation?.totalValue,
-        paymentTerms: chosenQuotation?.paymentTerms,
+        supplierId: chosenQuotation.supplierId,
+        totalValue: chosenQuotation.totalValue,
+        paymentTerms: chosenQuotation.paymentTerms,
       };
 
       // 3. Create OC and its items in a batch
