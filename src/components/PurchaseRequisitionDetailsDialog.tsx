@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, documentId, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, documentId, doc, getDoc, onSnapshot, getDocs } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -52,7 +52,6 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
         return;
     };
     
-    // Listen for real-time updates on the main requisition document
     const unsub = onSnapshot(doc(firestore, 'purchase_requisitions', initialRequisition.docId), (doc) => {
         if (doc.exists()) {
             setRequisition({ docId: doc.id, ...doc.data() as PurchaseRequisition });
@@ -72,7 +71,6 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
       enabled: !!requisition && isOpen,
   });
 
-  // Effect to fetch and enrich items whenever the requisition or dialog state changes
   useEffect(() => {
     const fetchAndEnrichItems = async () => {
         if (!firestore || !requisition || !isOpen) {
@@ -82,12 +80,10 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
 
         setIsLoading(true);
 
-        // Fetch items
         const itemsQuery = query(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
         const itemsSnapshot = await getDocs(itemsQuery);
         const items = itemsSnapshot.docs.map(d => ({ ...d.data() as PurchaseRequisitionItem, docId: d.id }));
 
-        // Fetch master data
         const supplyIds = items.filter(i => i.itemType === 'supply').map(i => i.itemId);
         const toolIds = items.filter(i => i.itemType === 'tool').map(i => i.itemId);
 
@@ -139,7 +135,6 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     setIsQuotationDialogOpen(false);
     setSelectedItemsForQuotation([]);
     
-    // Manually refetch related data
     queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
     queryClient.invalidateQueries({ queryKey: ['allPurchaseRequisitionsForControl'] });
     if (onActionSuccess) onActionSuccess();
