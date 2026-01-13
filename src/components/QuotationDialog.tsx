@@ -116,8 +116,13 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   
   const handleSupplierSelect = (supplier: WithDocId<Supplier>) => {
     if (activeQuotationIndex === null) return;
-    handleQuotationChange(activeQuotationIndex, 'supplierId', supplier.docId);
-    handleQuotationChange(activeQuotationIndex, 'supplierName', supplier.name);
+    const updatedQuotations = [...quotations];
+    updatedQuotations[activeQuotationIndex] = { 
+        ...updatedQuotations[activeQuotationIndex], 
+        supplierId: supplier.docId, 
+        supplierName: supplier.name 
+    };
+    setQuotations(updatedQuotations);
     setSupplierSelectorOpen(false);
     setActiveQuotationIndex(null);
   };
@@ -368,7 +373,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
           <DialogFooter>
             <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-            <Button onClick={handleSendForApproval} disabled={isSaving || selectedQuotationIndex === null}>
+            <Button onClick={handleSendForApproval} disabled={isSaving || selectedQuotationIndex === null || filledQuotations.length === 0}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar e Enviar para Aprovação
             </Button>
