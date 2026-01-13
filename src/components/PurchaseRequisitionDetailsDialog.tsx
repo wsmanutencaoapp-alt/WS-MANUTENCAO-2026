@@ -30,7 +30,7 @@ interface PurchaseRequisitionDetailsDialogProps {
   requisition: WithDocId<PurchaseRequisition> | null;
   isOpen: boolean;
   onClose: () => void;
-  onActionSuccess?: () => void; 
+  onActionSuccess?: (updatedRequisition?: WithDocId<PurchaseRequisition>) => void; 
 }
 
 export type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
@@ -108,12 +108,14 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
       }
   };
 
-  const handleQuotationSuccess = () => {
+  const handleQuotationSuccess = (updatedRequisition?: WithDocId<PurchaseRequisition>) => {
     setIsQuotationDialogOpen(false);
     setSelectedItemsForQuotation([]);
     queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
-    onActionSuccess?.();
-    onClose();
+    onActionSuccess?.(updatedRequisition);
+    if (!updatedRequisition) {
+      onClose();
+    }
   }
 
   const getPriorityVariant = (priority?: PurchaseRequisition['priority']) => {
@@ -126,7 +128,10 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
     }
   }
   
-  const quotationCount = requisition?.quotations?.length || 0;
+  const quotationCount = useMemo(() => {
+      if (!requisition?.quotations) return 0;
+      return requisition.quotations.filter(q => q.totalValue > 0).length;
+  }, [requisition]);
 
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
   const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
