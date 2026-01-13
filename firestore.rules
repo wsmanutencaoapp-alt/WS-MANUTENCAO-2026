@@ -14,7 +14,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // An admin is a user with Admin level. The status check is handled by hasPermission for non-admins.
+      // An admin is a user with Admin level.
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
              getUserData().accessLevel == 'Admin';
     }
@@ -22,8 +22,7 @@ service cloud.firestore {
     function hasPermission(module) {
       let userData = getUserData();
       // An admin has all permissions.
-      // A regular user must have the specific permission flag and be authenticated.
-      // The active status check is now handled more granularly where needed, not globally here.
+      // A regular user must be authenticated. The active status is now checked in the layout, not globally here for all operations.
       return isAuthenticated() && (isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true));
     }
     
@@ -66,7 +65,6 @@ service cloud.firestore {
     
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
-      // Allow user to create their own record on signup
       allow create: if isOwner(employeeId);
       
       allow update: if isAdmin() || 
@@ -104,12 +102,16 @@ service cloud.firestore {
     }
 
     match /purchase_requisitions/{requisitionId} {
-        // A user can create/update their own SC, or if they have compras permission
-        // A user can create an OC if they have 'compras' permission OR if they are the requester of the original SC
         allow read: if isAuthenticated();
-        allow write: if hasPermission('compras') || 
-                      (request.resource.data.type == 'Ordem de Compra' && request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(request.resource.data.originalRequisitionId)).data.requesterId) ||
-                      (request.resource.data.type == 'Solicitação de Compra' && request.auth.uid == request.resource.data.requesterId);
+
+        allow create: if hasPermission('compras') ||
+                       (request.resource.data.type == 'Solicitação de Compra' && request.auth.uid == request.resource.data.requesterId) ||
+                       (request.resource.data.type == 'Ordem de Compra' && request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(request.resource.data.originalRequisitionId)).data.requesterId);
+
+        allow update: if hasPermission('compras') ||
+                       (request.auth.uid == resource.data.requesterId);
+
+        allow delete: if hasPermission('compras') || isOwner(resource.data.requesterId);
         
         match /items/{itemId} {
             allow read: if isAuthenticated();
