@@ -167,7 +167,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     
     const chosenQuotation = currentQuotations[selectedQuotationIndex];
     if (!chosenQuotation || !chosenQuotation.supplierId) {
-      throw new Error("A cotação escolhida é inválida ou não possui um fornecedor.");
+      throw new Error("A cotação escolhida é invalida ou nao possui um fornecedor.");
     }
 
     setIsSaving(true);
