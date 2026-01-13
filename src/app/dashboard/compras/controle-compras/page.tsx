@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId, updateDoc } from 'firebase/firestore';
-import type { PurchaseRequisition, CostCenter, Tool, Supply, PurchaseRequisitionItem } from '@/lib/types';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId, updateDoc, deleteDoc } from 'firebase/firestore';
+import type { PurchaseRequisition, CostCenter, Tool, Supply, PurchaseRequisitionItem, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -20,9 +20,20 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText } from 'lucide-react';
+import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +83,7 @@ const priorityOrder: Record<PurchaseRequisition['priority'], number> = {
 
 const ControleComprasPage = () => {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -79,7 +91,14 @@ const ControleComprasPage = () => {
   const [searchTermOC, setSearchTermOC] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData, isLoading: isEmployeeLoading } = useDoc<Employee>(userDocRef);
+  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
 
   // Query for SCs
   const scQueryKey = 'allPurchaseRequisitionsForControl';
@@ -169,9 +188,37 @@ const ControleComprasPage = () => {
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
   };
+  
+  const handleDeleteRequisition = async (requisitionId: string) => {
+      if (!firestore) return;
+      setIsProcessing(requisitionId);
+      try {
+          const batch = writeBatch(firestore);
+          const reqRef = doc(firestore, 'purchase_requisitions', requisitionId);
+          
+          // Delete items in subcollection
+          const itemsRef = collection(reqRef, 'items');
+          const itemsSnapshot = await getDocs(itemsRef);
+          itemsSnapshot.forEach(itemDoc => {
+              batch.delete(itemDoc.ref);
+          });
+          
+          // Delete main document
+          batch.delete(reqRef);
+          
+          await batch.commit();
+          toast({ title: 'Sucesso', description: 'Requisição e seus itens foram excluídos.' });
+          queryClient.invalidateQueries({ queryKey: [scQueryKey] });
+      } catch (err) {
+          console.error("Erro ao excluir requisição:", err);
+          toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir a requisição.' });
+      } finally {
+          setIsProcessing(null);
+      }
+  }
 
 
-  const isLoading = isLoadingSCs || isLoadingOCs;
+  const isLoading = isLoadingSCs || isLoadingOCs || isEmployeeLoading;
 
   return (
     <>
@@ -239,10 +286,33 @@ const ControleComprasPage = () => {
                                 ) : <span className="text-xs text-muted-foreground">N/A</span> }
                             </TableCell>
                             <TableCell className="text-right space-x-2">
-                            <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
-                                <Eye className="mr-2 h-4 w-4"/>
-                                Ver e Atender Itens
-                            </Button>
+                                <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
+                                    <Eye className="mr-2 h-4 w-4"/>
+                                    Ver e Atender Itens
+                                </Button>
+                                {isAdmin && (
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" size="icon" disabled={isProcessing === req.docId}>
+                                                {isProcessing === req.docId ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Tem certeza que deseja excluir permanentemente a requisição <span className="font-bold">{req.protocol}</span>? Esta ação não pode ser desfeita.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteRequisition(req.docId)}>
+                                                    Sim, Excluir
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                )}
                             </TableCell>
                         </TableRow>
                         ))}
