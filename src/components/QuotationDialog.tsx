@@ -97,6 +97,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   useEffect(() => {
     if (isOpen) {
+        // When opening, check the first item for existing quotations to pre-populate the form.
+        // This assumes all items being quoted together will share the same quotations.
         const firstItemQuotes = items[0]?.quotations || [];
         const initialQuotes: QuotationFormState[] = Array(3).fill(null).map((_, index) => {
             if (firstItemQuotes[index]) {
@@ -115,7 +117,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         });
 
         setQuotations(initialQuotes);
+        // Pre-select the winning quote if it was already chosen
         setSelectedQuotationIndex(items[0]?.selectedQuotationIndex ?? null);
+
+        // Reset other states
         setJustification('');
         setPurchaseOrderNotes('');
         setIsSaving(false);
@@ -181,12 +186,15 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     return "É necessário fornecer uma justificativa.";
   };
   
-  const saveQuotationsToItems = async (quotes: QuotationFormState[], status: 'Pendente' | 'Em Cotação' = 'Em Cotação'): Promise<Quotation[]> => {
+  const saveQuotationsToItems = async (quotes: QuotationFormState[], status: 'Pendente' | 'Em Cotação' | 'Cotado' = 'Em Cotação'): Promise<Quotation[]> => {
       if (!firestore || !storage || !requisition) throw new Error("Serviços ou requisição indisponíveis.");
 
       const finalQuotations: Quotation[] = [];
       for (const q of quotes) {
-          if (!q.supplierId) continue;
+          if (!q.supplierId) {
+            finalQuotations.push({} as Quotation); // Push empty object to maintain index
+            continue;
+          };
           let attachmentUrl = q.attachmentUrl || '';
           if (q.attachmentFile) {
             const fileRef = storageRef(storage, `quotations/${requisition.docId}/${q.supplierId}-${q.attachmentFile.name}`);
@@ -221,7 +229,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       try {
           await saveQuotationsToItems(quotations);
           toast({ title: "Progresso Salvo!", description: "As cotações foram salvas nos itens." });
-          queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
+          onSuccess();
+          onClose(); // Close dialog after saving progress
       } catch (err: any) {
           console.error("Erro ao salvar progresso:", err);
           toast({ variant: 'destructive', title: 'Erro ao Salvar', description: err.message });
@@ -274,7 +283,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       for (const item of items) {
         const ocItemRef = doc(collection(ocRef, 'items'));
         const { details, ...baseItem } = item;
-        const itemData: Omit<PurchaseRequisitionItem, 'id'> = {
+        const itemData: Omit<PurchaseRequisitionItem, 'id' | 'quotations' | 'selectedQuotationIndex'> & {quotations: Quotation[], selectedQuotationIndex: number | null} = {
             itemId: baseItem.itemId,
             itemType: baseItem.itemType,
             quantity: baseItem.quantity,
@@ -289,7 +298,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
       await ocBatch.commit();
       
-      // Update original SC items status to 'Cotado'
       const scUpdateBatch = writeBatch(firestore);
       for (const item of items) {
           const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.docId);
