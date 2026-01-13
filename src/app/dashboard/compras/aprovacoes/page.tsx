@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where, doc, updateDoc, getDocs, documentId, writeBatch, addDoc } from 'firebase/firestore';
-import type { PurchaseRequisition, PurchaseRequisitionItem, CostCenter, Supply, Tool, Notification } from '@/lib/types';
+import type { PurchaseRequisition, PurchaseRequisitionItem, CostCenter, Supply, Tool, Notification, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -47,6 +47,7 @@ type RequisitionWithTotal = WithDocId<PurchaseRequisition> & {
 
 const AprovacoesComprasPage = () => {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -62,7 +63,7 @@ const AprovacoesComprasPage = () => {
   }>({ isOpen: false, requisition: null, type: 'reject', reason: '' });
 
   const queryKey = 'pendingPurchaseRequisitions';
-  // Updated query to fetch OCs needing approval and SCs for initial approval
+  // Query for requisitions that need some form of approval/action by a manager.
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'purchase_requisitions'), where('status', 'in', ['Em Aprovação', 'Aberta']));
@@ -305,5 +306,3 @@ const AprovacoesComprasPage = () => {
 };
 
 export default AprovacoesComprasPage;
-
-      

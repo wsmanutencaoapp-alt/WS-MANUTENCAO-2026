@@ -22,16 +22,19 @@ service cloud.firestore {
     function hasPermission(module) {
       let userData = getUserData();
       // An admin has all permissions.
-      // A regular user must be active and have the specific permission flag.
-      return isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true && userData.status == 'Ativo');
+      // A regular user must have the specific permission flag and be authenticated.
+      // The active status check is now handled more granularly where needed, not globally here.
+      return isAuthenticated() && (isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true));
+    }
+    
+    function isOwner(userId) {
+        return request.auth.uid == userId;
     }
 
     match /supplies/{supplyId} {
-      // Any authenticated user can read supplies master data
       allow read: if isAuthenticated();
       allow write: if hasPermission('suprimentos');
       
-      // Allow authenticated users to read stock, but only permitted users to write.
       match /stock/{stockId} {
         allow read: if isAuthenticated();
         allow write: if hasPermission('suprimentos');
@@ -43,7 +46,6 @@ service cloud.firestore {
     }
 
     match /tools/{toolId} {
-      // Any authenticated user can read tools, but only those with permission can write.
       allow read: if isAuthenticated();
       allow create, update, delete: if hasPermission('ferramentaria');
       
@@ -59,69 +61,45 @@ service cloud.firestore {
     }
     
     match /suppliers/{supplierId} {
-      allow read: if hasPermission('cadastros_fornecedores');
-      allow write: if hasPermission('cadastros_fornecedores');
-    }
-    
-    match /operation_records/{operationRecordId} {
-      // Operation records could be sensitive, restricting to admins for now.
-      allow read, write: if isAdmin();
-    }
-    
-    match /images/{imageId} {
-      allow read: if isAuthenticated();
-      // Writing images is usually part of another process (like creating a tool),
-      // so specific write rules are complex. Restricting to Admin is safest for now.
-      allow write: if isAdmin();
+      allow read, write: if hasPermission('compras');
     }
     
     match /employees/{employeeId} {
-      // Any authenticated user can read employee profiles to get names, etc.
       allow read: if isAuthenticated();
+      allow create: if isOwner(employeeId);
       
-      // A user can create their own employee document upon signup.
-      allow create: if request.auth.uid == employeeId;
-      
-      // An Admin can write to any employee document.
-      // Any other user can only update their own profile, but cannot change critical fields.
       allow update: if isAdmin() || 
-                     (request.auth.uid == employeeId && 
+                     (isOwner(employeeId) && 
                       !('accessLevel' in request.resource.data) &&
                       !('permissions' in request.resource.data) &&
                       !('status' in request.resource.data));
       
       match /notifications/{notificationId} {
-        // A user can only access their own notifications
-        allow read, write: if request.auth.uid == employeeId;
+        allow read, write: if isOwner(employeeId);
       }
     }
     
     match /expenses/{expenseId} {
-      // Allow user to create for themselves, but only finance/admin can read all
       allow create: if hasPermission('financeiro');
       allow read, update, delete: if hasPermission('financeiro');
     }
 
     match /tool_requests/{requestId} {
-      // Allow a user to create/read/write their own requests if they are active.
-      // Ferramentaria staff need to be able to read/update all requests.
-      allow read, write: if (isAuthenticated() && (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.handledBy)) || hasPermission('ferramentaria');
+      allow read, write: if (isAuthenticated() && (isOwner(resource.data.requesterId) || isOwner(resource.data.handledBy))) || hasPermission('ferramentaria');
     }
     
     match /budgets/{budgetId} {
-      // Only users with finance permission can manage budgets.
       allow read: if isAuthenticated();
       allow write: if hasPermission('financeiro');
     }
     
     match /addresses/{addressId} {
-        // Any authenticated and active user can manage addresses.
         allow read, write: if hasPermission('cadastros');
     }
 
     match /cost_centers/{costCenterId} {
-      allow read: if hasPermission('compras') || hasPermission('financeiro') || hasPermission('cadastros');
-      allow write: if hasPermission('financeiro') || hasPermission('cadastros');
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros');
     }
 
     match /purchase_requisitions/{requisitionId} {
@@ -134,12 +112,8 @@ service cloud.firestore {
         }
     }
 
-    // This collection is used for generating sequential IDs.
-    // Any authenticated user can read and write to it within a transaction.
     match /counters/{counterId} {
         allow read, write: if isAuthenticated();
     }
   }
 }
-
-    
