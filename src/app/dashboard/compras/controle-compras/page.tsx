@@ -135,7 +135,7 @@ const ControleComprasPage = () => {
             let attendedItems = 0;
             itemsSnapshot.forEach(itemDoc => {
                 const item = itemDoc.data() as PurchaseRequisitionItem;
-                if (item.status === 'Cotado' || item.status === 'Recebido') {
+                if (item.status === 'Cotado' || item.status === 'Recebido' || item.status === 'Cancelado') {
                     attendedItems++;
                 }
             });
@@ -154,27 +154,6 @@ const ControleComprasPage = () => {
             });
         });
     });
-
-    // Initial population for requisitions that might not have updates yet
-    const initialEnrichment = async () => {
-        const enrichedReqs: RequisitionWithProgress[] = [];
-        for (const req of scRequisitions) {
-            const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
-            const itemsSnapshot = await getDocs(itemsRef);
-            const totalItems = itemsSnapshot.size;
-            let attendedItems = 0;
-            itemsSnapshot.forEach(itemDoc => {
-                const item = itemDoc.data() as PurchaseRequisitionItem;
-                if (item.status === 'Cotado' || item.status === 'Recebido') {
-                    attendedItems++;
-                }
-            });
-            const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
-            enrichedReqs.push({ ...req, progress, totalItems });
-        }
-        setRequisitionsWithProgress(enrichedReqs);
-    }
-    initialEnrichment();
 
     return () => unsubscribers.forEach(unsub => unsub());
 
@@ -449,12 +428,14 @@ const ControleComprasPage = () => {
         </Tabs>
       </div>
 
-      <PurchaseRequisitionDetailsDialog
-        requisition={selectedRequisition}
-        isOpen={!!selectedRequisition}
-        onClose={() => setSelectedRequisition(null)}
-        onActionSuccess={handleSuccess}
-      />
+      {selectedRequisition && (
+          <PurchaseRequisitionDetailsDialog
+            requisition={selectedRequisition}
+            isOpen={!!selectedRequisition}
+            onClose={() => setSelectedRequisition(null)}
+            onActionSuccess={handleSuccess}
+          />
+      )}
 
       {requisitionToEdit && (
         <EditRequisitionDialog

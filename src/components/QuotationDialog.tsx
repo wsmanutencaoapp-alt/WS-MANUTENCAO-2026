@@ -26,13 +26,11 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, FileText, ChevronsUpDown, Check, Info, ShoppingBag, List, Save, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Loader2, Upload, FileText, ChevronsUpDown, Check, ShoppingBag, Save, ArrowLeft, ArrowRight, PlusCircle, Trash2, Crown } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Textarea } from './ui/textarea';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from './ui/card';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from './ui/card';
 import { Separator } from './ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
@@ -73,82 +71,70 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const queryClient = useQueryClient();
 
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
-  const [quotations, setQuotations] = useState<QuotationFormState[]>([]);
+  const [savedQuotations, setSavedQuotations] = useState<QuotationFormState[]>([]);
+  const [newQuotation, setNewQuotation] = useState<QuotationFormState>(emptyQuotation);
   const [selectedQuotationIndex, setSelectedQuotationIndex] = useState<number | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   
-  const [supplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
-  const [activeQuotationIndex, setActiveQuotationIndex] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSupplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
   
   const currentItem = useMemo(() => items[currentItemIndex], [items, currentItemIndex]);
 
   useEffect(() => {
     if (isOpen && currentItem) {
         const itemQuotes = currentItem.quotations || [];
-        const initialQuotes = Array.from({ length: 3 }).map((_, i) => {
-            const q = itemQuotes[i];
-            if (q && q.supplierId) {
-                return {
-                    supplierId: q.supplierId, supplierName: q.supplierName,
-                    totalValue: q.totalValue, deliveryTime: q.deliveryTime,
-                    paymentTerms: q.paymentTerms, attachmentUrl: q.attachmentUrl,
-                    attachmentFile: null,
-                };
-            }
-            return {...emptyQuotation};
-        });
-        setQuotations(initialQuotes);
+        const initialQuotes = itemQuotes.filter(q => q.supplierId).map(q => ({
+            supplierId: q.supplierId, supplierName: q.supplierName,
+            totalValue: q.totalValue, deliveryTime: q.deliveryTime,
+            paymentTerms: q.paymentTerms, attachmentUrl: q.attachmentUrl,
+            attachmentFile: null,
+        }));
+        setSavedQuotations(initialQuotes);
+        setNewQuotation(emptyQuotation);
         setSelectedQuotationIndex(currentItem.selectedQuotationIndex ?? null);
     }
   }, [isOpen, currentItem]);
 
-  const handleQuotationChange = (index: number, field: keyof QuotationFormState, value: any) => {
-    const updatedQuotations = [...quotations];
-    updatedQuotations[index] = { ...updatedQuotations[index], [field]: value };
-    setQuotations(updatedQuotations);
+  const handleNewQuotationChange = (field: keyof QuotationFormState, value: any) => {
+    setNewQuotation(prev => ({ ...prev, [field]: value }));
   };
   
   const handleSupplierSelect = (supplier: WithDocId<Supplier>) => {
-    if (activeQuotationIndex === null) return;
-    handleQuotationChange(activeQuotationIndex, 'supplierId', supplier.docId);
-    handleQuotationChange(activeQuotationIndex, 'supplierName', supplier.name);
+    handleNewQuotationChange('supplierId', supplier.docId);
+    handleNewQuotationChange('supplierName', supplier.name);
     setSupplierSelectorOpen(false);
-    setActiveQuotationIndex(null);
   };
   
-  const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files?.[0]) {
-          handleQuotationChange(index, 'attachmentFile', e.target.files[0]);
+          handleNewQuotationChange('attachmentFile', e.target.files[0]);
       }
   }
   
-  const cheapestIndex = useMemo(() => {
-    let minPrice = Infinity;
-    let minIndex: number | null = null;
-    quotations.forEach((q, index) => {
-        const value = Number(q.totalValue);
-        if (q.supplierId && !isNaN(value) && value > 0) {
-            if (value < minPrice) {
-                minPrice = value;
-                minIndex = index;
-            }
-        }
-    });
-    return minIndex;
-  }, [quotations]);
+  const handleAddQuotation = () => {
+    if (!newQuotation.supplierId || !newQuotation.totalValue) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Fornecedor e Valor Total são obrigatórios.' });
+        return;
+    }
+    setSavedQuotations(prev => [...prev, newQuotation]);
+    setNewQuotation(emptyQuotation);
+  }
+  
+  const removeQuotation = (index: number) => {
+    setSavedQuotations(prev => prev.filter((_, i) => i !== index));
+    if(selectedQuotationIndex === index) {
+        setSelectedQuotationIndex(null);
+    } else if (selectedQuotationIndex !== null && index < selectedQuotationIndex) {
+        setSelectedQuotationIndex(selectedQuotationIndex - 1);
+    }
+  }
 
 
   const saveCurrentItemQuotations = async () => {
       if (!firestore || !storage || !requisition || !currentItem) throw new Error("Dados da sessão inválidos.");
       
-      const batch = writeBatch(firestore);
-      
       const finalQuotations: Quotation[] = [];
-      for (const q of quotations) {
-          if (!q.supplierId) {
-            finalQuotations.push({} as Quotation);
-            continue;
-          };
+      for (const q of savedQuotations) {
           let attachmentUrl = q.attachmentUrl || '';
           if (q.attachmentFile) {
             const fileRef = storageRef(storage, `quotations/${requisition.docId}/${currentItem.docId}-${q.supplierId}-${q.attachmentFile.name}`);
@@ -162,19 +148,24 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
 
       const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
-      batch.update(itemRef, {
-          quotations: finalQuotations,
-          status: 'Em Cotação',
-          selectedQuotationIndex: selectedQuotationIndex
-      });
+      const updateData: any = {
+        quotations: finalQuotations,
+        selectedQuotationIndex: selectedQuotationIndex
+      };
       
-      // Update the main requisition status if it's the first time
-      if (requisition.status === 'Aprovada' || requisition.status === 'Aberta') {
-          const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-          batch.update(reqRef, { status: 'Em Cotação' });
+      if(finalQuotations.length > 0 && currentItem.status === 'Pendente') {
+        updateData.status = 'Em Cotação';
       }
+      
+      await updateDoc(itemRef, updateData);
 
-      await batch.commit();
+      // Update the main requisition status if needed
+      if (requisition.status === 'Aprovada' || requisition.status === 'Aberta') {
+          if (finalQuotations.length > 0) {
+            const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+            await updateDoc(reqRef, { status: 'Em Cotação' });
+          }
+      }
   };
   
   const handleSaveProgress = async () => {
@@ -182,7 +173,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       try {
           await saveCurrentItemQuotations();
           toast({ title: "Progresso Salvo!", description: "As cotações para este item foram salvas." });
-          onSuccess();
+          onSuccess(); // Triggers a refetch
       } catch (err: any) {
           console.error("Erro ao salvar progresso:", err);
           toast({ variant: 'destructive', title: 'Erro ao Salvar', description: err.message });
@@ -191,27 +182,23 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
   }
 
-
   const handleMarkAsFinished = async () => {
-    if (selectedQuotationIndex === null) {
+    if (selectedQuotationIndex === null && savedQuotations.length > 0) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Selecione a cotação vencedora para este item.' });
       return;
     }
     
     setIsSaving(true);
     try {
-        await saveCurrentItemQuotations(); // First, save any pending changes
+        await saveCurrentItemQuotations();
 
         const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
-        await updateDoc(itemRef, {
-            status: 'Cotado'
-        });
+        await updateDoc(itemRef, { status: 'Cotado' });
 
         toast({ title: "Item Finalizado!", description: `O item ${currentItem.details.codigo} foi cotado.` });
         
-        onSuccess(); // This will trigger a refetch in the parent component
+        onSuccess();
         
-        // Move to next item or close if it's the last one
         if (currentItemIndex < items.length - 1) {
             handleNext();
         } else {
@@ -245,7 +232,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           <DialogHeader>
             <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
             <DialogDescription>
-              Preencha os orçamentos para os itens selecionados e, ao final, gere a Ordem de Compra.
+              Adicione orçamentos para os itens e, ao final, escolha o vencedor.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-4 py-4">
@@ -267,47 +254,68 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
-                    <RadioGroup value={selectedQuotationIndex?.toString()} onValueChange={(v) => setSelectedQuotationIndex(Number(v))}>
-                      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start pt-4">
-                          {quotations.map((q, index) => (
-                             <Card key={index} className="p-4 space-y-3 relative">
-                                 <div className="flex items-center justify-between">
-                                     <Label htmlFor={`q-${index}`} className="font-bold text-base flex items-center gap-2">
-                                        <RadioGroupItem value={index.toString()} id={`q-${index}`} />
-                                        Orçamento #{index + 1}
-                                     </Label>
-                                     {index === cheapestIndex && <Badge variant="success">Mais Barato</Badge>}
-                                 </div>
-                                 <Separator />
-                                 <div className="space-y-1.5">
-                                     <Label>Fornecedor</Label>
-                                     <Button 
-                                        variant="outline" 
-                                        className="w-full justify-between font-normal" 
-                                        onClick={() => { setActiveQuotationIndex(index); setSupplierSelectorOpen(true); }}
-                                    >
-                                        {q.supplierName || "Selecione..."}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                 </div>
-                                 <div className="grid grid-cols-2 gap-4">
-                                     <div className="space-y-1.5"><Label>Valor Total (R$)</Label><Input type="number" value={q.totalValue} onChange={(e) => handleQuotationChange(index, 'totalValue', e.target.value)} /></div>
-                                     <div className="space-y-1.5"><Label>Prazo (dias)</Label><Input type="number" value={q.deliveryTime} onChange={(e) => handleQuotationChange(index, 'deliveryTime', e.target.value)} /></div>
-                                 </div>
-                                  <div className="space-y-1.5"><Label>Cond. Pagamento</Label><Input value={q.paymentTerms} onChange={(e) => handleQuotationChange(index, 'paymentTerms', e.target.value)} placeholder="Ex: 30/60/90" /></div>
-                                  <div className="space-y-1.5"><Label>Anexo</Label>
-                                      <Button asChild variant="outline" size="sm" className="w-full">
-                                          <label className="cursor-pointer"><Upload className="mr-2"/>{q.attachmentFile ? <span className='truncate'>{q.attachmentFile.name}</span> : 'Anexar Orçamento'}<Input type="file" className="sr-only" onChange={(e) => handleFileChange(index, e)}/></label>
-                                      </Button>
-                                  </div>
-                             </Card>
-                          ))}
-                      </div>
-                  </RadioGroup>
+                <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
+                    {/* Coluna de Adicionar Cotação */}
+                    <Card className="p-4 space-y-3 bg-muted/50 border-dashed">
+                        <h3 className="font-semibold">Adicionar Novo Orçamento</h3>
+                         <div className="space-y-1.5">
+                             <Label>Fornecedor</Label>
+                             <Button 
+                                variant="outline" 
+                                className="w-full justify-between font-normal bg-background" 
+                                onClick={() => setSupplierSelectorOpen(true)}
+                            >
+                                {newQuotation.supplierName || "Selecione..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                         </div>
+                         <div className="grid grid-cols-2 gap-4">
+                             <div className="space-y-1.5"><Label>Valor Total (R$)</Label><Input type="number" value={newQuotation.totalValue} onChange={(e) => handleNewQuotationChange('totalValue', e.target.value)} className="bg-background"/></div>
+                             <div className="space-y-1.5"><Label>Prazo (dias)</Label><Input type="number" value={newQuotation.deliveryTime} onChange={(e) => handleNewQuotationChange('deliveryTime', e.target.value)} className="bg-background"/></div>
+                         </div>
+                          <div className="space-y-1.5"><Label>Cond. Pagamento</Label><Input value={newQuotation.paymentTerms} onChange={(e) => handleNewQuotationChange('paymentTerms', e.target.value)} placeholder="Ex: 30/60/90" className="bg-background"/></div>
+                          <div className="space-y-1.5"><Label>Anexo</Label>
+                              <Button asChild variant="outline" size="sm" className="w-full bg-background">
+                                  <label className="cursor-pointer"><Upload className="mr-2"/>{newQuotation.attachmentFile ? <span className='truncate'>{newQuotation.attachmentFile.name}</span> : 'Anexar Orçamento'}<Input type="file" className="sr-only" onChange={handleFileChange}/></label>
+                              </Button>
+                          </div>
+                          <Button className="w-full" onClick={handleAddQuotation} disabled={savedQuotations.length >= 3}>
+                              <PlusCircle className="mr-2 h-4 w-4"/>
+                              Adicionar Orçamento
+                          </Button>
+                    </Card>
+
+                    {/* Coluna de Cotações Salvas */}
+                    <div className="space-y-4">
+                        <h3 className="font-semibold">Orçamentos Criados ({savedQuotations.length})</h3>
+                        {savedQuotations.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-8">Nenhum orçamento adicionado para este item.</p>
+                        )}
+                        {savedQuotations.map((q, index) => (
+                           <Card key={index} className={cn("p-3 relative", selectedQuotationIndex === index && "border-primary ring-2 ring-primary")}>
+                                <div className="flex justify-between items-start">
+                                    <div className="space-y-1">
+                                      <p className="font-bold">{q.supplierName}</p>
+                                      <p className="text-sm text-muted-foreground">{Number(q.totalValue).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} - {q.deliveryTime} dias</p>
+                                      <p className="text-xs text-muted-foreground">{q.paymentTerms}</p>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                       <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1" onClick={() => removeQuotation(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                       {selectedQuotationIndex !== index ? (
+                                           <Button size="sm" variant="outline" className="mt-8" onClick={() => setSelectedQuotationIndex(index)}>
+                                               <Check className="mr-2 h-4 w-4"/>
+                                               Selecionar
+                                           </Button>
+                                       ) : (
+                                            <Badge variant="success" className="mt-8 gap-1"><Crown className="h-3 w-3"/>Vencedor</Badge>
+                                       )}
+                                    </div>
+                                </div>
+                           </Card>
+                        ))}
+                    </div>
                 </CardContent>
             </Card>
-            
           </div>
 
           <DialogFooter className="sm:justify-between">
@@ -320,7 +328,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
              </div>
              <div className="flex gap-2">
                 <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-                <Button onClick={handleMarkAsFinished} disabled={isSaving || selectedQuotationIndex === null}>
+                <Button onClick={handleMarkAsFinished} disabled={isSaving || (savedQuotations.length > 0 && selectedQuotationIndex === null)}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Marcar Item como Cotado
                 </Button>
@@ -330,7 +338,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       </Dialog>
       
       <SupplierSelectorDialog 
-        isOpen={supplierSelectorOpen}
+        isOpen={isSupplierSelectorOpen}
         onClose={() => setSupplierSelectorOpen(false)}
         onSelect={handleSupplierSelect}
       />

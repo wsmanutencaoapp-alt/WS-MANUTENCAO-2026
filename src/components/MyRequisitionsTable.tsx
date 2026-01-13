@@ -26,7 +26,7 @@ import { Loader2, Search, Eye, Edit, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
-import ReviewRequisitionDialog from '@/components/ReviewRequisitionDialog'; 
+import EditRequisitionDialog from '@/components/EditRequisitionDialog'; 
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Tooltip,
@@ -44,7 +44,7 @@ type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
     'Aberta': 'secondary',
-    'Em Cotação': 'default',
+    'Em Cotação': 'warning',
     'Em Aprovação': 'default',
     'Aprovada': 'success',
     'Recusada': 'destructive',
@@ -53,6 +53,7 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Totalmente Atendida': 'success',
     'Cancelada': 'destructive',
     'Aguardando Entrega': 'default',
+    'Em Revisão': 'warning',
   };
   return variants[status] || 'secondary';
 };
@@ -72,7 +73,7 @@ export default function MyRequisitionsTable() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
-  const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [requisitionToEdit, setRequisitionToEdit] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
 
   const userDocRef = useMemoFirebase(
@@ -120,7 +121,6 @@ export default function MyRequisitionsTable() {
         
         itemsSnapshot.forEach(doc => {
           const item = doc.data() as PurchaseRequisitionItem;
-          // An item is considered "attended" if it has been quoted or processed beyond the pending state.
           if (['Cotado', 'Recebido', 'Cancelado'].includes(item.status)) {
             attendedItems++;
           }
@@ -142,7 +142,7 @@ export default function MyRequisitionsTable() {
 
   const costCentersQuery = useMemoFirebase(() => {
       if (!firestore || costCenterIds.length === 0) return null;
-      return query(collection(firestore, 'cost_centers'), where(doc.name, 'in', costCenterIds));
+      return query(collection(firestore, 'cost_centers'), where(documentId(), 'in', costCenterIds));
   }, [firestore, costCenterIds]);
   const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery, {
       queryKey: ['costCentersForMyReqs', costCenterIds.join(',')],
@@ -166,8 +166,8 @@ export default function MyRequisitionsTable() {
     );
   }, [requisitionsWithProgress, searchTerm, costCenterMap]);
 
-  const handleReviewSuccess = () => {
-    setRequisitionToReview(null);
+  const handleEditSuccess = () => {
+    setRequisitionToEdit(null);
     queryClient.invalidateQueries({ queryKey });
   }
 
@@ -250,7 +250,7 @@ export default function MyRequisitionsTable() {
                       <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
                       <TableCell className="text-right space-x-2">
                        {req.status === 'Em Revisão' && (
-                        <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(req)}>
+                        <Button variant="secondary" size="sm" onClick={() => setRequisitionToEdit(req)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Revisar
                         </Button>
@@ -269,22 +269,22 @@ export default function MyRequisitionsTable() {
         </Card>
       </TooltipProvider>
 
-      <PurchaseRequisitionDetailsDialog
-        requisition={selectedRequisition}
-        isOpen={!!selectedRequisition}
-        onClose={() => setSelectedRequisition(null)}
-      />
-
-      {requisitionToReview && (
-          <ReviewRequisitionDialog
-            requisition={requisitionToReview}
-            isOpen={!!requisitionToReview}
-            onClose={() => setRequisitionToReview(null)}
-            onSuccess={handleReviewSuccess}
+      {selectedRequisition && (
+          <PurchaseRequisitionDetailsDialog
+            requisition={selectedRequisition}
+            isOpen={!!selectedRequisition}
+            onClose={() => setSelectedRequisition(null)}
           />
+      )}
+      
+      {requisitionToEdit && (
+        <EditRequisitionDialog
+            requisition={requisitionToEdit}
+            isOpen={!!requisitionToEdit}
+            onClose={() => setRequisitionToEdit(null)}
+            onSuccess={handleEditSuccess}
+        />
       )}
     </>
   );
 };
-
-    
