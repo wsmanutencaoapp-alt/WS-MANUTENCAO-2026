@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, documentId } from 'firebase/firestore';
+import { collection, query, where, documentId, doc, getDoc } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -37,12 +37,18 @@ export type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
   details: Partial<WithDocId<Supply> | WithDocId<Tool>>;
 };
 
-export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, onClose, onActionSuccess }: PurchaseRequisitionDetailsDialogProps) {
+export default function PurchaseRequisitionDetailsDialog({ requisition: initialRequisition, isOpen, onClose, onActionSuccess }: PurchaseRequisitionDetailsDialogProps) {
   const firestore = useFirestore();
   const queryClient = useQueryClient();
 
+  const [requisition, setRequisition] = useState(initialRequisition);
   const [selectedItemsForQuotation, setSelectedItemsForQuotation] = useState<RequisitionItemWithDetails[]>([]);
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState(false);
+  
+  useEffect(() => {
+    setRequisition(initialRequisition);
+  }, [initialRequisition]);
+
 
   // Fetch requisition items
   const itemsQuery = useMemoFirebase(() => {
@@ -108,14 +114,21 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
       }
   };
 
-  const handleQuotationSuccess = (updatedRequisition?: WithDocId<PurchaseRequisition>) => {
+  const handleQuotationSuccess = async (updatedRequisition?: WithDocId<PurchaseRequisition>) => {
     setIsQuotationDialogOpen(false);
     setSelectedItemsForQuotation([]);
+    
+    // Force a refetch of the requisition details to update the quotation count
+    if (firestore && requisition) {
+        const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+        const freshReq = await getDoc(reqRef);
+        if (freshReq.exists()) {
+            setRequisition({ ...freshReq.data() as PurchaseRequisition, docId: freshReq.id });
+        }
+    }
+    
     queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
     onActionSuccess?.(updatedRequisition);
-    if (!updatedRequisition) {
-      onClose();
-    }
   }
 
   const getPriorityVariant = (priority?: PurchaseRequisition['priority']) => {
