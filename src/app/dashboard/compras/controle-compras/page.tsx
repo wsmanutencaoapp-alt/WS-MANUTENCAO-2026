@@ -123,7 +123,10 @@ const ControleComprasPage = () => {
   });
   
   useEffect(() => {
-    if (!scRequisitions || !firestore) return;
+    if (!scRequisitions || !firestore) {
+      setRequisitionsWithProgress([]);
+      return;
+    }
 
     const fetchProgress = async () => {
       const enrichedReqs: RequisitionWithProgress[] = [];
@@ -184,12 +187,15 @@ const ControleComprasPage = () => {
     );
   }, [ocRequisitions, searchTermOC]);
 
-  const handleSuccess = () => {
+  const handleSuccess = (updatedRequisition?: WithDocId<PurchaseRequisition>) => {
     setSelectedRequisition(null);
     setRequisitionToEdit(null);
     queryClient.invalidateQueries({ queryKey: [scQueryKey] });
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
+    if (updatedRequisition) {
+        setSelectedRequisition(updatedRequisition);
+    }
   };
   
   const handleDeleteRequisition = async (requisitionId: string, type: 'SC' | 'OC') => {

@@ -10,7 +10,8 @@ import {
   getDocs,
   updateDoc,
   addDoc,
-  runTransaction
+  runTransaction,
+  getDoc
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -44,7 +45,7 @@ import { Alert, AlertTitle, AlertDescription } from './ui/alert';
 interface QuotationDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (updatedRequisition?: WithDocId<PurchaseRequisition>) => void;
   requisition: WithDocId<PurchaseRequisition>;
   items: RequisitionItemWithDetails[];
 }
@@ -95,10 +96,26 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   useEffect(() => {
     if (isOpen) {
-        setQuotations([
-            {...emptyQuotation}, {...emptyQuotation}, {...emptyQuotation}
-        ]);
-        setSelectedQuotationIndex(null);
+        // Find existing quotations for the items being quoted
+        const existingQuotes = requisition.quotations || [];
+        const initialQuotes: QuotationFormState[] = Array(3).fill(null).map((_, index) => {
+            if (existingQuotes[index]) {
+                const eq = existingQuotes[index];
+                return {
+                    supplierId: eq.supplierId,
+                    supplierName: eq.supplierName,
+                    totalValue: eq.totalValue,
+                    deliveryTime: eq.deliveryTime,
+                    paymentTerms: eq.paymentTerms,
+                    attachmentUrl: eq.attachmentUrl,
+                    attachmentFile: null,
+                };
+            }
+            return {...emptyQuotation};
+        });
+
+        setQuotations(initialQuotes);
+        setSelectedQuotationIndex(requisition.selectedQuotationIndex ?? null);
         setJustification('');
         setPurchaseOrderNotes('');
         setIsSaving(false);
@@ -106,7 +123,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         setIsItemsDialogOpen(false);
         setIsJustificationDialogOpen(false);
     }
-  }, [isOpen]);
+  }, [isOpen, requisition]);
 
   const handleQuotationChange = (index: number, field: keyof QuotationFormState, value: any) => {
     const updatedQuotations = [...quotations];
@@ -180,6 +197,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
     setIsSaving(true);
     
+    let generatedOC: WithDocId<PurchaseRequisition> | null = null;
+
     try {
       const counterRef = doc(firestore, 'counters', 'purchaseOrders');
       const newId = await runTransaction(firestore, async (transaction) => {
@@ -242,15 +261,23 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       const scUpdateBatch = writeBatch(firestore);
       for (const item of items) {
           const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.docId);
-          scUpdateBatch.update(originalItemRef, { status: 'Em Cotação' });
+          scUpdateBatch.update(originalItemRef, { status: 'Cotado' });
       }
+      // Also update the main SC document's quotations
+      const scRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+      scUpdateBatch.update(scRef, { quotations: finalQuotations, status: 'Em Cotação' });
+      
       await scUpdateBatch.commit();
+      
+      const ocDocSnapshot = await getDoc(ocRef);
+      generatedOC = { ...ocDocSnapshot.data() as PurchaseRequisition, docId: ocDocSnapshot.id };
       
     } catch (err) {
       console.error("Erro ao gerar OC:", err);
       throw err;
     } finally {
       setIsSaving(false);
+      return generatedOC;
     }
   }
 
@@ -281,9 +308,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
       setIsJustificationDialogOpen(false);
       try {
-          await handleGenerateOC(quotations, justification);
+          const newOC = await handleGenerateOC(quotations, justification);
           toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
-          onSuccess();
+          onSuccess(newOC || undefined);
       } catch (err: any) {
           toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível enviar para aprovação.' });
       }
