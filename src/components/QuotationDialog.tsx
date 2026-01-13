@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useFirestore, useCollection, useMemoFirebase, useStorage } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useStorage, useUser } from '@/firebase';
 import {
   collection,
   query,
@@ -72,6 +72,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const storage = useStorage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useUser();
 
   const [quotations, setQuotations] = useState<QuotationFormState[]>([
     {...emptyQuotation}, {...emptyQuotation}, {...emptyQuotation}
@@ -95,9 +96,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   useEffect(() => {
     if (isOpen) {
-        setQuotations([
+        // Deep clone to avoid issues with state updates
+        setQuotations(JSON.parse(JSON.stringify([
             {...emptyQuotation}, {...emptyQuotation}, {...emptyQuotation}
-        ]);
+        ])));
         setSelectedQuotationIndex(null);
         setJustification('');
         setPurchaseOrderNotes('');
@@ -159,90 +161,86 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   };
 
 
-  const proceedToGenerateOC = async (justificationText: string) => {
-     if (!firestore || !storage || !requisition || !items || items.length === 0) return Promise.reject("Dados inválidos.");
-     if (selectedQuotationIndex === null) return Promise.reject("Nenhum orçamento vencedor selecionado.");
-     
-     setIsSaving(true);
-     try {
-        const batch = writeBatch(firestore);
+  const handleGenerateOC = async (justificationText: string) => {
+    if (!firestore || !storage || !user || !requisition || !items.length || selectedQuotationIndex === null) {
+      throw new Error("Dados insuficientes para gerar a Ordem de Compra.");
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      // 1. Generate OC Protocol
+      const counterRef = doc(firestore, 'counters', 'purchaseOrders');
+      const newId = await runTransaction(firestore, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        let lastId = 0;
+        if (counterDoc.exists()) {
+          lastId = counterDoc.data()?.lastId || 0;
+        }
+        const newId = lastId + 1;
+        transaction.set(counterRef, { lastId: newId }, { merge: true });
+        return newId;
+      });
+      const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
 
-        const itemIdsBeingProcessed = new Set(items.map(item => item.docId));
-        itemIdsBeingProcessed.forEach(itemId => {
-            const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', itemId);
-            batch.update(originalItemRef, { status: 'Em Cotação' });
+      // 2. Prepare OC Data
+      const ocRef = doc(collection(firestore, 'purchase_requisitions'));
+      
+      const finalQuotations: Quotation[] = [];
+      for (const q of quotations) {
+        if (!q.supplierId) continue;
+        let attachmentUrl = q.attachmentUrl || '';
+        if (q.attachmentFile) {
+          const fileRef = storageRef(storage, `quotations/${ocRef.id}/${q.supplierId}-${q.attachmentFile.name}`);
+          await uploadBytes(fileRef, q.attachmentFile);
+          attachmentUrl = await getDownloadURL(fileRef);
+        }
+        finalQuotations.push({
+          supplierId: q.supplierId, supplierName: q.supplierName, totalValue: Number(q.totalValue),
+          deliveryTime: Number(q.deliveryTime), paymentTerms: q.paymentTerms, attachmentUrl: attachmentUrl
         });
-        
-        const counterRef = doc(firestore, 'counters', 'purchaseOrders');
-        let newId;
+      }
+      
+      const chosenQuotation = finalQuotations[selectedQuotationIndex];
+      
+      const ocData: Omit<PurchaseRequisition, 'id'> = {
+        protocol: ocProtocol, originalRequisitionId: requisition.docId,
+        requesterId: requisition.requesterId, requesterName: requisition.requesterName,
+        costCenterId: requisition.costCenterId, neededByDate: requisition.neededByDate,
+        type: 'Ordem de Compra', status: 'Em Aprovação', createdAt: new Date().toISOString(),
+        priority: requisition.priority, purchaseReason: requisition.purchaseReason,
+        quotations: finalQuotations, selectedQuotationIndex: selectedQuotationIndex,
+        expensiveChoiceJustification: justificationText, purchaseOrderNotes: purchaseOrderNotes,
+        supplierId: chosenQuotation?.supplierId, totalValue: chosenQuotation?.totalValue,
+        paymentTerms: chosenQuotation?.paymentTerms,
+      };
 
-        await runTransaction(firestore, async (transaction) => {
-            const counterDoc = await transaction.get(counterRef);
-            let lastId = 0;
-            if (counterDoc.exists()) {
-                lastId = counterDoc.data()?.lastId || 0;
-            }
-            newId = lastId + 1;
-            transaction.set(counterRef, { lastId: newId }, { merge: true });
-        });
+      // 3. Create OC and its items in a batch
+      const ocBatch = writeBatch(firestore);
+      ocBatch.set(ocRef, ocData);
+      for (const item of items) {
+        const ocItemRef = doc(collection(ocRef, 'items'));
+        const { details, ...baseItem } = item;
+        ocBatch.set(ocItemRef, { ...baseItem, status: 'Pendente' });
+      }
+      await ocBatch.commit();
 
-        if (newId === undefined) {
-          throw new Error("Não foi possível gerar um novo número de protocolo para a OC.");
-        }
-
-        const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
-        
-        const ocRef = doc(collection(firestore, 'purchase_requisitions'));
-
-        const finalQuotations: Quotation[] = [];
-        for (const q of quotations) {
-            if (!q.supplierId) continue;
-            let attachmentUrl = q.attachmentUrl || '';
-            if (q.attachmentFile) {
-                const fileRef = storageRef(storage, `quotations/${ocRef.id}/${q.supplierId}-${q.attachmentFile.name}`);
-                await uploadBytes(fileRef, q.attachmentFile);
-                attachmentUrl = await getDownloadURL(fileRef);
-            }
-            finalQuotations.push({
-                supplierId: q.supplierId, supplierName: q.supplierName, totalValue: Number(q.totalValue),
-                deliveryTime: Number(q.deliveryTime), paymentTerms: q.paymentTerms, attachmentUrl: attachmentUrl
-            });
-        }
-        
-        const chosenQuotation = finalQuotations.find((q, i) => i === selectedQuotationIndex);
-
-        const ocData: Omit<PurchaseRequisition, 'id'> = {
-            protocol: ocProtocol, originalRequisitionId: requisition.docId,
-            requesterId: requisition.requesterId, requesterName: requisition.requesterName,
-            costCenterId: requisition.costCenterId, neededByDate: requisition.neededByDate,
-            type: 'Ordem de Compra', status: 'Em Aprovação', createdAt: new Date().toISOString(),
-            priority: requisition.priority, purchaseReason: requisition.purchaseReason,
-            quotations: finalQuotations, selectedQuotationIndex: selectedQuotationIndex,
-            expensiveChoiceJustification: justificationText, purchaseOrderNotes: purchaseOrderNotes,
-            supplierId: chosenQuotation?.supplierId, totalValue: chosenQuotation?.totalValue,
-            paymentTerms: chosenQuotation?.paymentTerms,
-        };
-        batch.set(ocRef, ocData);
-        
-        for (const item of items) {
-            const ocItemRef = doc(collection(ocRef, 'items'));
-            const { details, ...baseItem } = item;
-            batch.set(ocItemRef, { ...baseItem, status: 'Pendente' });
-        }
-
-        await batch.commit();
-
-     } catch(err) {
-        throw err;
-     } finally {
-        setIsSaving(false);
-     }
+      // 4. AFTER OC creation, update original SC items status
+      const scUpdateBatch = writeBatch(firestore);
+      for (const item of items) {
+          const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.docId);
+          scUpdateBatch.update(originalItemRef, { status: 'Em Cotação' });
+      }
+      await scUpdateBatch.commit();
+      
+    } catch (err) {
+      console.error("Erro ao gerar OC:", err);
+      throw err; // Re-throw to be caught by the calling function
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  const handleSaveDraft = async () => {
-    // This function logic would be different, it would save the current state without full validation or OC creation
-    toast({ title: "Funcionalidade pendente", description: "Salvar como rascunho ainda não foi implementado." });
-  };
   
   const handleSendForApproval = async () => {
     if (selectedQuotationIndex === null) {
@@ -255,12 +253,11 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
     
     try {
-        await proceedToGenerateOC(''); // Pass empty justification if not required
+        await handleGenerateOC(''); // Pass empty justification if not required
         toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
         onSuccess();
     } catch (err: any) {
-        console.error("Erro ao enviar para aprovação:", err);
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível enviar para aprovação.' });
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível enviar para aprovação.' });
     }
   }
   
@@ -271,12 +268,11 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
       setIsJustificationDialogOpen(false);
       try {
-          await proceedToGenerateOC(justification);
+          await handleGenerateOC(justification);
           toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
           onSuccess();
       } catch (err: any) {
-          console.error("Erro ao enviar para aprovação com justificativa:", err);
-          toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível enviar para aprovação.' });
+          toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message || 'Não foi possível enviar para aprovação.' });
       }
   }
 
@@ -364,10 +360,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
           <DialogFooter>
             <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-            <Button variant="secondary" onClick={handleSaveDraft} disabled={isSaving || filledQuotations.length === 0}>
-               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-               Salvar Rascunho
-            </Button>
             <Button onClick={handleSendForApproval} disabled={isSaving || selectedQuotationIndex === null}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar e Enviar para Aprovação
