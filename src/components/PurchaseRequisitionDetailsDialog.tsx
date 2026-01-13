@@ -141,9 +141,28 @@ export default function PurchaseRequisitionDetailsDialog({ requisition, isOpen, 
 
         <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-4">
           <div className="space-y-3 rounded-lg border p-3">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  {/* Header Info */}
-              </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div>
+                  <p className="font-semibold text-muted-foreground">Solicitante</p>
+                  <p className="flex items-center gap-2"><User className="h-4 w-4"/> {requisition?.requesterName}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-muted-foreground">Centro de Custo</p>
+                  <p className="flex items-center gap-2"><Briefcase className="h-4 w-4"/> {costCenter?.description || 'Carregando...'}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-muted-foreground">Data de Necessidade</p>
+                  <p className="flex items-center gap-2"><Calendar className="h-4 w-4"/> {requisition ? format(new Date(requisition.neededByDate), 'dd/MM/yyyy') : 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-muted-foreground">Prioridade</p>
+                  <p><Badge variant={getPriorityVariant(requisition?.priority)}>{requisition?.priority}</Badge></p>
+                </div>
+                <div className="col-span-2">
+                  <p className="font-semibold text-muted-foreground">Motivo da Compra</p>
+                  <p className="flex items-start gap-2"><Info className="h-4 w-4 mt-0.5 shrink-0"/> {requisition?.purchaseReason}</p>
+                </div>
+            </div>
           </div>
 
            {isPurchaseOrder && requisition?.quotations && (
