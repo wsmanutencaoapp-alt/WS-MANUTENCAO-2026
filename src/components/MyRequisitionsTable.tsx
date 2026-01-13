@@ -120,6 +120,7 @@ export default function MyRequisitionsTable() {
         
         itemsSnapshot.forEach(doc => {
           const item = doc.data() as PurchaseRequisitionItem;
+          // An item is considered "attended" if it has been quoted or processed beyond the pending state.
           if (item.status !== 'Pendente') {
             attendedItems++;
           }
