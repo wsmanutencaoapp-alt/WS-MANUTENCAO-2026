@@ -35,6 +35,7 @@ import { Separator } from './ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import SupplierSelectorDialog from './SupplierSelectorDialog';
+import { cn } from '@/lib/utils';
 
 
 interface QuotationDialogProps {
@@ -83,7 +84,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   useEffect(() => {
     if (isOpen && currentItem) {
         const itemQuotes = currentItem.quotations || [];
-        const initialQuotes = itemQuotes.filter(q => q.supplierId).map(q => ({
+        const initialQuotes = itemQuotes.filter(q => q && q.supplierId).map(q => ({
             supplierId: q.supplierId, supplierName: q.supplierName,
             totalValue: q.totalValue, deliveryTime: q.deliveryTime,
             paymentTerms: q.paymentTerms, attachmentUrl: q.attachmentUrl,
