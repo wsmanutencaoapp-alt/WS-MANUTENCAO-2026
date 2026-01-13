@@ -107,7 +107,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         setIsJustificationDialogOpen(false);
 
         // Load initial data from the FIRST selected item.
-        // The assumption is that all items in a single quotation process will share the same set of quotes.
         const firstItem = items[0];
         const initialQuotesData = firstItem?.quotations?.length > 0 ? firstItem.quotations : [null, null, null];
 
@@ -126,7 +125,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             return {...emptyQuotation};
         });
         
-        // Ensure there are always 3 quote forms
         while (initialQuotes.length < 3) {
             initialQuotes.push({...emptyQuotation});
         }
@@ -198,7 +196,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       const finalQuotations: Quotation[] = [];
       for (const q of quotes) {
           if (!q.supplierId) {
-            finalQuotations.push({} as Quotation); // Push empty object to maintain index
+            finalQuotations.push({} as Quotation);
             continue;
           };
           let attachmentUrl = q.attachmentUrl || '';
@@ -224,7 +222,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
       
       const scRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-      batch.update(scRef, { status: filledQuotations.length > 0 ? 'Em Cotação' : 'Aprovada' });
+      // **THE FIX**: Update the main requisition's status to trigger UI updates.
+      if (filledQuotations.length > 0 && requisition.status !== 'Em Cotação') {
+        batch.update(scRef, { status: 'Em Cotação' });
+      }
 
       await batch.commit();
       return finalQuotations;
@@ -236,7 +237,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           await saveQuotationsToItems(quotations);
           toast({ title: "Progresso Salvo!", description: "As cotações foram salvas nos itens." });
           onSuccess();
-          onClose(); // Close dialog after saving progress
+          onClose();
       } catch (err: any) {
           console.error("Erro ao salvar progresso:", err);
           toast({ variant: 'destructive', title: 'Erro ao Salvar', description: err.message });
