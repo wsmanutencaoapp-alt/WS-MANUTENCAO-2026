@@ -95,14 +95,23 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     enabled: isOpen,
   });
 
-  useEffect(() => {
+ useEffect(() => {
     if (isOpen) {
-        const firstItem = items[0];
-        const initialQuotesData = firstItem?.quotations && firstItem.quotations.length > 0
-          ? firstItem.quotations
-          : Array(3).fill(null);
+        // Reset state
+        setJustification('');
+        setPurchaseOrderNotes('');
+        setIsSaving(false);
+        setIsSavingProgress(false);
+        setActiveQuotationIndex(null);
+        setIsItemsDialogOpen(false);
+        setIsJustificationDialogOpen(false);
 
-        const initialQuotes: QuotationFormState[] = initialQuotesData.map(q => {
+        // Load initial data from the FIRST selected item.
+        // The assumption is that all items in a single quotation process will share the same set of quotes.
+        const firstItem = items[0];
+        const initialQuotesData = firstItem?.quotations?.length > 0 ? firstItem.quotations : [null, null, null];
+
+        const initialQuotes = initialQuotesData.slice(0, 3).map(q => {
             if (q && q.supplierId) {
                 return {
                     supplierId: q.supplierId,
@@ -116,16 +125,15 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             }
             return {...emptyQuotation};
         });
-
+        
+        // Ensure there are always 3 quote forms
+        while (initialQuotes.length < 3) {
+            initialQuotes.push({...emptyQuotation});
+        }
+        
         setQuotations(initialQuotes);
         setSelectedQuotationIndex(firstItem?.selectedQuotationIndex ?? null);
-        setJustification('');
-        setPurchaseOrderNotes('');
-        setIsSaving(false);
-        setIsSavingProgress(false);
-        setActiveQuotationIndex(null);
-        setIsItemsDialogOpen(false);
-        setIsJustificationDialogOpen(false);
+
     }
 }, [isOpen, items]);
 
