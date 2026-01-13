@@ -84,6 +84,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const [supplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
   const [activeQuotationIndex, setActiveQuotationIndex] = useState<number | null>(null);
   const [isItemsDialogOpen, setIsItemsDialogOpen] = useState(false);
+  const [isJustificationDialogOpen, setIsJustificationDialogOpen] = useState(false);
 
 
   const suppliersQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'suppliers')) : null), [firestore]);
@@ -141,13 +142,27 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   }, [quotations]);
 
   const isJustificationRequired = useMemo(() => {
-      const choseMoreExpensive = selectedQuotationIndex !== null && cheapestIndex !== -1 && selectedQuotationIndex !== cheapestIndex;
+      if (selectedQuotationIndex === null) return false;
+      const choseMoreExpensive = selectedQuotationIndex !== cheapestIndex;
       const lessThanThreeQuotes = filledQuotations.length > 0 && filledQuotations.length < 3;
       return choseMoreExpensive || lessThanThreeQuotes;
   }, [selectedQuotationIndex, cheapestIndex, filledQuotations.length]);
   
-  const generateOC = async (finalStatus: 'Em Cotação' | 'Em Aprovação'): Promise<void> => {
+  const getJustificationReason = () => {
+    if (selectedQuotationIndex !== null && selectedQuotationIndex !== cheapestIndex) {
+      return "Sua escolha não é o orçamento mais barato. Por favor, justifique.";
+    }
+    if (filledQuotations.length > 0 && filledQuotations.length < 3) {
+      return "Você preencheu menos de 3 orçamentos. Por favor, justifique.";
+    }
+    return "É necessário fornecer uma justificativa.";
+  };
+
+
+  const proceedToGenerateOC = async (justificationText: string) => {
      if (!firestore || !storage || !requisition || !items || items.length === 0) return Promise.reject("Dados inválidos.");
+     if (selectedQuotationIndex === null) return Promise.reject("Nenhum orçamento vencedor selecionado.");
+     
      setIsSaving(true);
      try {
         const batch = writeBatch(firestore);
@@ -194,16 +209,16 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             });
         }
         
-        const chosenQuotation = selectedQuotationIndex !== null ? finalQuotations.find((q, i) => i === selectedQuotationIndex) : null;
+        const chosenQuotation = finalQuotations.find((q, i) => i === selectedQuotationIndex);
 
         const ocData: Omit<PurchaseRequisition, 'id'> = {
             protocol: ocProtocol, originalRequisitionId: requisition.docId,
             requesterId: requisition.requesterId, requesterName: requisition.requesterName,
             costCenterId: requisition.costCenterId, neededByDate: requisition.neededByDate,
-            type: 'Ordem de Compra', status: finalStatus, createdAt: new Date().toISOString(),
+            type: 'Ordem de Compra', status: 'Em Aprovação', createdAt: new Date().toISOString(),
             priority: requisition.priority, purchaseReason: requisition.purchaseReason,
-            quotations: finalQuotations, selectedQuotationIndex: selectedQuotationIndex ?? undefined,
-            expensiveChoiceJustification: justification, purchaseOrderNotes: purchaseOrderNotes,
+            quotations: finalQuotations, selectedQuotationIndex: selectedQuotationIndex,
+            expensiveChoiceJustification: justificationText, purchaseOrderNotes: purchaseOrderNotes,
             supplierId: chosenQuotation?.supplierId, totalValue: chosenQuotation?.totalValue,
             paymentTerms: chosenQuotation?.paymentTerms,
         };
@@ -225,14 +240,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   }
 
   const handleSaveDraft = async () => {
-    try {
-        await generateOC('Em Cotação');
-        toast({ title: "Rascunho Salvo!", description: "A Ordem de Compra foi salva como rascunho." });
-        onSuccess();
-    } catch(err: any) {
-        console.error("Erro ao salvar rascunho:", err);
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar a Ordem de Compra.' });
-    }
+    // This function logic would be different, it would save the current state without full validation or OC creation
+    toast({ title: "Funcionalidade pendente", description: "Salvar como rascunho ainda não foi implementado." });
   };
   
   const handleSendForApproval = async () => {
@@ -240,14 +249,13 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         toast({ variant: 'destructive', title: 'Erro', description: 'Selecione um orçamento vencedor.' });
         return;
     }
-     if (isJustificationRequired && !justification) {
-        let reason = selectedQuotationIndex !== cheapestIndex ? "Justifique a escolha pelo orçamento que não é o mais barato." : "Justifique por que há menos de 3 orçamentos.";
-        toast({ variant: 'destructive', title: 'Erro', description: reason });
+     if (isJustificationRequired) {
+        setIsJustificationDialogOpen(true);
         return;
     }
     
     try {
-        await generateOC('Em Aprovação');
+        await proceedToGenerateOC(''); // Pass empty justification if not required
         toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
         onSuccess();
     } catch (err: any) {
@@ -255,11 +263,27 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível enviar para aprovação.' });
     }
   }
+  
+  const handleJustificationSubmit = async () => {
+      if (!justification) {
+          toast({ variant: 'destructive', title: 'Erro', description: 'A justificativa é obrigatória.' });
+          return;
+      }
+      setIsJustificationDialogOpen(false);
+      try {
+          await proceedToGenerateOC(justification);
+          toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
+          onSuccess();
+      } catch (err: any) {
+          console.error("Erro ao enviar para aprovação com justificativa:", err);
+          toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível enviar para aprovação.' });
+      }
+  }
 
 
   return (
     <>
-      <Dialog open={isOpen && !isItemsDialogOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen && !isItemsDialogOpen && !isJustificationDialogOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
@@ -329,15 +353,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                   </div>
               </RadioGroup>
               
-              <div className="space-y-2 mt-4">
-                  {isJustificationRequired && (
-                      <div className="space-y-1.5 animate-in fade-in-50 border border-orange-500 bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
-                          <Label htmlFor="justification" className="text-orange-800 dark:text-orange-300 flex items-center gap-1">
-                              <Info className="h-4 w-4" /> Justificativa <span className="text-destructive">*</span>
-                          </Label>
-                          <Textarea id="justification" value={justification} onChange={(e) => setJustification(e.target.value)} placeholder={selectedQuotationIndex !== null && selectedQuotationIndex !== cheapestIndex ? "Justifique a escolha pelo orçamento que não é o mais barato." : "Justifique por que há menos de 3 orçamentos."} />
-                      </div>
-                  )}
+               <div className="space-y-2 mt-4">
                   <div className="space-y-1.5">
                       <Label htmlFor="purchaseOrderNotes">Observações da Ordem de Compra</Label>
                       <Textarea id="purchaseOrderNotes" value={purchaseOrderNotes} onChange={(e) => setPurchaseOrderNotes(e.target.value)} placeholder="Informações adicionais para a OC, como dados de entrega, contato, etc." />
@@ -378,6 +394,29 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           </ScrollArea>
           <DialogFooter>
             <Button onClick={() => setIsItemsDialogOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+       <Dialog open={isJustificationDialogOpen} onOpenChange={setIsJustificationDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Justificativa Necessária</DialogTitle>
+            <DialogDescription>{getJustificationReason()}</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="justification-dialog">Justificativa <span className="text-destructive">*</span></Label>
+            <Textarea
+              id="justification-dialog"
+              value={justification}
+              onChange={(e) => setJustification(e.target.value)}
+              className="mt-1"
+              placeholder="Forneça uma justificativa clara para sua escolha."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsJustificationDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleJustificationSubmit} disabled={!justification}>Confirmar e Enviar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

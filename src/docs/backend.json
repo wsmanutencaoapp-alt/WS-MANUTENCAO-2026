@@ -1,5 +1,4 @@
 
-
 {
   "entities": {
     "Address": {
@@ -382,6 +381,10 @@
           "type": "string",
           "description": "Phone number of the supplier's contact person."
         },
+        "segmento": {
+          "type": "string",
+          "description": "Business segment of the supplier (e.g., 'Usinagem', 'Matéria-Prima')."
+        },
         "rating": {
           "type": "number",
           "description": "Supplier performance rating (e.g., 1-5)."
@@ -437,7 +440,7 @@
         "type": { "type": "string", "enum": ["Solicitação de Compra", "Ordem de Compra"], "description": "Distinguishes between a requisition and an order." },
         "status": {
           "type": "string",
-          "enum": ["Aberta", "Parcialmente Atendida", "Totalmente Atendida", "Em Cotação", "Em Aprovação", "Aprovada", "Recusada", "Concluída", "Cancelada"],
+          "enum": ["Aberta", "Parcialmente Atendida", "Totalmente Atendida", "Cancelada", "Em Cotação", "Em Aprovação", "Aprovada", "Recusada", "Concluída", "Em Revisão"],
           "description": "Current status of the document."
         },
         "rejectionReason": { "type": "string" },
@@ -468,7 +471,7 @@
         "itemType": { "type": "string", "enum": ["supply", "tool"] },
         "quantity": { "type": "number" },
         "estimatedPrice": { "type": "number" },
-        "status": { "type": "string", "enum": ["Pendente", "Cotado", "Recebido"], "description": "Tracks the status of an individual item within the original SC." },
+        "status": { "type": "string", "enum": ["Pendente", "Em Cotação", "Cotado", "Recebido", "Cancelado"], "description": "Tracks the status of an individual item within the original SC." },
         "notes": { "type": "string" },
         "attachmentUrl": { "type": "string", "format": "uri" }
       },
@@ -882,6 +885,4 @@
     ]
   }
 }
-
-
       
