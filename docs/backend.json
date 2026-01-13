@@ -440,7 +440,7 @@
         "type": { "type": "string", "enum": ["Solicitação de Compra", "Ordem de Compra"], "description": "Distinguishes between a requisition and an order." },
         "status": {
           "type": "string",
-          "enum": ["Aberta", "Parcialmente Atendida", "Totalmente Atendida", "Cancelada", "Em Cotação", "Em Aprovação", "Aprovada", "Recusada", "Concluída", "Em Revisão"],
+          "enum": ["Aberta", "Parcialmente Atendida", "Totalmente Atendida", "Cancelada", "Em Cotação", "Em Aprovação", "Aprovada", "Recusada", "Concluída", "Em Revisão", "Aguardando Entrega"],
           "description": "Current status of the document."
         },
         "rejectionReason": { "type": "string" },
@@ -887,4 +887,3 @@
 }
       
 
-    

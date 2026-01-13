@@ -30,6 +30,8 @@ import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDe
 import { useQueryClient } from '@tanstack/react-query';
 import QuotationDialog from '@/components/QuotationDialog';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
     progress: number;
@@ -42,6 +44,7 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Em Cotação': 'default',
     'Em Aprovação': 'default',
     'Aprovada': 'success',
+    'Aguardando Entrega': 'default',
     'Recusada': 'destructive',
     'Concluída': 'secondary',
     'Em Revisão': 'warning',
@@ -72,27 +75,38 @@ const ControleComprasPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTermSC, setSearchTermSC] = useState('');
+  const [searchTermOC, setSearchTermOC] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
 
 
-  const queryKey = 'allPurchaseRequisitionsForControl';
-  const requisitionsQuery = useMemoFirebase(() => {
+  // Query for SCs
+  const scQueryKey = 'allPurchaseRequisitionsForControl';
+  const scQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Solicitação de Compra'));
   }, [firestore]);
-  
-  const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
-      queryKey: [queryKey]
+  const { data: scRequisitions, isLoading: isLoadingSCs, error: scError } = useCollection<WithDocId<PurchaseRequisition>>(scQuery, {
+      queryKey: [scQueryKey]
+  });
+
+  // Query for OCs
+  const ocQueryKey = 'allPurchaseOrdersForControl';
+  const ocQuery = useMemoFirebase(() => {
+    if(!firestore) return null;
+    return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Ordem de Compra'), where('status', '==', 'Aprovada'));
+  }, [firestore]);
+  const { data: ocRequisitions, isLoading: isLoadingOCs, error: ocError } = useCollection<WithDocId<PurchaseRequisition>>(ocQuery, {
+      queryKey: [ocQueryKey]
   });
   
   useEffect(() => {
-    if (!requisitions || !firestore) return;
+    if (!scRequisitions || !firestore) return;
 
     const fetchProgress = async () => {
       const enrichedReqs: RequisitionWithProgress[] = [];
-      for (const req of requisitions) {
+      for (const req of scRequisitions) {
         const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
         const itemsSnapshot = await getDocs(itemsRef);
         const totalItems = itemsSnapshot.size;
@@ -112,40 +126,19 @@ const ControleComprasPage = () => {
     };
 
     fetchProgress();
-  }, [requisitions, firestore]);
-
-  const costCenterIds = useMemo(() => {
-    if (!requisitions || requisitions.length === 0) return [];
-    return [...new Set(requisitions.map(r => r.costCenterId))];
-  }, [requisitions]);
-
-  const costCentersQuery = useMemoFirebase(() => {
-      if (!firestore || costCenterIds.length === 0) return null;
-      return query(collection(firestore, 'cost_centers'), where(documentId(), 'in', costCenterIds));
-  }, [firestore, costCenterIds.join(',')]);
-
-  const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery, {
-      queryKey: ['costCentersForControl', costCenterIds.join(',')],
-      enabled: costCenterIds.length > 0,
-  });
+  }, [scRequisitions, firestore]);
   
-  const costCenterMap = useMemo(() => {
-      if (!costCenters) return new Map<string, string>();
-      return new Map(costCenters.map(cc => [cc.docId, `${cc.code} - ${cc.description}`]));
-  }, [costCenters]);
 
-  const sortedAndFilteredRequisitions = useMemo(() => {
+  const sortedAndFilteredSCs = useMemo(() => {
     if (!requisitionsWithProgress) return [];
 
-    // Filter client-side
     let relevantRequisitions = requisitionsWithProgress.filter(req => ['Aprovada', 'Parcialmente Atendida', 'Em Cotação'].includes(req.status));
 
-    if (searchTerm) {
-        const lowercasedTerm = searchTerm.toLowerCase();
+    if (searchTermSC) {
+        const lowercasedTerm = searchTermSC.toLowerCase();
         relevantRequisitions = relevantRequisitions.filter(req => 
             (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
-            req.requesterName.toLowerCase().includes(lowercasedTerm) ||
-            (costCenterMap.get(req.costCenterId) || '').toLowerCase().includes(lowercasedTerm)
+            req.requesterName.toLowerCase().includes(lowercasedTerm)
         );
     }
     
@@ -158,87 +151,164 @@ const ControleComprasPage = () => {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 
-  }, [requisitionsWithProgress, searchTerm, costCenterMap]);
+  }, [requisitionsWithProgress, searchTermSC]);
   
+  const filteredOCs = useMemo(() => {
+    if(!ocRequisitions) return [];
+    if(!searchTermOC) return ocRequisitions;
+    const lowercasedTerm = searchTermOC.toLowerCase();
+    return ocRequisitions.filter(oc => 
+      (oc.protocol && oc.protocol.toLowerCase().includes(lowercasedTerm)) ||
+      (oc.supplierName && oc.supplierName.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [ocRequisitions, searchTermOC]);
+
   const handleSuccess = () => {
     setSelectedRequisition(null);
-    queryClient.invalidateQueries({ queryKey });
-    queryClient.invalidateQueries({ queryKey: 'pendingPurchaseRequisitions' });
+    queryClient.invalidateQueries({ queryKey: [scQueryKey] });
+    queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
+    queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
   };
 
 
-  const isLoading = isLoadingRequisitions || isLoadingCostCenters;
+  const isLoading = isLoadingSCs || isLoadingOCs;
 
   return (
     <>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Controle de Compras</h1>
-        <Card>
-          <CardHeader>
-            <CardTitle>Requisições Aprovadas e Em Cotação</CardTitle>
-            <CardDescription>
-              Gerencie as requisições de compra aprovadas e inicie o processo de cotação e compra.
-            </CardDescription>
-            <div className="relative pt-4">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Pesquisar por protocolo, solicitante..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Protocolo</TableHead>
-                  <TableHead>Prioridade</TableHead>
-                  <TableHead>Solicitante</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[20%]">Atendimento</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
-                )}
-                {requisitionsError && (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
-                )}
-                {!isLoading && sortedAndFilteredRequisitions.length === 0 && (
-                   <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição aprovada ou em cotação encontrada.</TableCell></TableRow>
-                )}
-                {!isLoading && sortedAndFilteredRequisitions.map(req => (
-                  <TableRow key={req.docId}>
-                    <TableCell className="font-mono">{req.protocol}</TableCell>
-                    <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
-                    <TableCell>{req.requesterName}</TableCell>
-                     <TableCell>
-                        <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                        {req.totalItems > 0 ? (
-                           <div className="flex flex-col">
-                             <Progress value={req.progress} className="h-2" />
-                             <span className="text-xs text-muted-foreground text-right">{Math.round(req.progress)}%</span>
-                           </div>
-                        ) : <span className="text-xs text-muted-foreground">N/A</span> }
-                      </TableCell>
-                    <TableCell className="text-right space-x-2">
-                       <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
-                           <Eye className="mr-2 h-4 w-4"/>
-                           Ver e Atender Itens
-                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        
+        <Tabs defaultValue="requisicoes">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="requisicoes">Requisições para Cotação</TabsTrigger>
+                <TabsTrigger value="ordens">Ordens de Compra Aprovadas</TabsTrigger>
+            </TabsList>
+            <TabsContent value="requisicoes">
+                <Card>
+                <CardHeader>
+                    <CardTitle>Requisições Aprovadas e Em Cotação</CardTitle>
+                    <CardDescription>
+                    Gerencie as requisições de compra aprovadas e inicie o processo de cotação e compra.
+                    </CardDescription>
+                    <div className="relative pt-4">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Pesquisar por protocolo, solicitante..."
+                        value={searchTermSC}
+                        onChange={(e) => setSearchTermSC(e.target.value)}
+                        className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                    />
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead>Protocolo</TableHead>
+                        <TableHead>Prioridade</TableHead>
+                        <TableHead>Solicitante</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-[20%]">Atendimento</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading && (
+                        <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                        )}
+                        {scError && (
+                        <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{scError.message}</TableCell></TableRow>
+                        )}
+                        {!isLoading && sortedAndFilteredSCs.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição aprovada ou em cotação encontrada.</TableCell></TableRow>
+                        )}
+                        {!isLoading && sortedAndFilteredSCs.map(req => (
+                        <TableRow key={req.docId}>
+                            <TableCell className="font-mono">{req.protocol}</TableCell>
+                            <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
+                            <TableCell>{req.requesterName}</TableCell>
+                            <TableCell>
+                                <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
+                            </TableCell>
+                            <TableCell>
+                                {req.totalItems > 0 ? (
+                                <div className="flex flex-col">
+                                    <Progress value={req.progress} className="h-2" />
+                                    <span className="text-xs text-muted-foreground text-right">{Math.round(req.progress)}%</span>
+                                </div>
+                                ) : <span className="text-xs text-muted-foreground">N/A</span> }
+                            </TableCell>
+                            <TableCell className="text-right space-x-2">
+                            <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
+                                <Eye className="mr-2 h-4 w-4"/>
+                                Ver e Atender Itens
+                            </Button>
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="ordens">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Ordens de Compra Aprovadas</CardTitle>
+                        <CardDescription>Gerencie as OCs aprovadas, acompanhe entregas e finalize o processo.</CardDescription>
+                         <div className="relative pt-4">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Pesquisar por OC ou fornecedor..."
+                                value={searchTermOC}
+                                onChange={(e) => setSearchTermOC(e.target.value)}
+                                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                            />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                       <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Protocolo OC</TableHead>
+                                    <TableHead>Fornecedor</TableHead>
+                                    <TableHead>Valor Total</TableHead>
+                                    <TableHead>Data Aprovação</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Ações</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                             <TableBody>
+                                {isLoading && (
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                                )}
+                                {ocError && (
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{ocError.message}</TableCell></TableRow>
+                                )}
+                                {!isLoading && filteredOCs.length === 0 && (
+                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma Ordem de Compra aprovada encontrada.</TableCell></TableRow>
+                                )}
+                                 {!isLoading && filteredOCs.map(oc => (
+                                    <TableRow key={oc.docId}>
+                                        <TableCell className="font-mono">{oc.protocol}</TableCell>
+                                        <TableCell>{oc.quotations?.[oc.selectedQuotationIndex!]?.supplierName || 'N/A'}</TableCell>
+                                        <TableCell className="font-medium">{oc.totalValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                                        <TableCell>{format(new Date(oc.createdAt), 'dd/MM/yyyy')}</TableCell>
+                                        <TableCell><Badge variant={getStatusVariant(oc.status)}>{oc.status}</Badge></TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(oc)}>
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                Detalhes
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                 ))}
+                            </TableBody>
+                       </Table>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
       </div>
 
       {selectedRequisition && (
