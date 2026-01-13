@@ -66,6 +66,7 @@ service cloud.firestore {
     
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
+      // Allow user to create their own record on signup
       allow create: if isOwner(employeeId);
       
       allow update: if isAdmin() || 
@@ -103,12 +104,16 @@ service cloud.firestore {
     }
 
     match /purchase_requisitions/{requisitionId} {
+        // A user can create/update their own SC, or if they have compras permission
+        // A user can create an OC if they have 'compras' permission OR if they are the requester of the original SC
         allow read: if isAuthenticated();
-        allow write: if hasPermission('compras');
+        allow write: if hasPermission('compras') || 
+                      (request.resource.data.type == 'Ordem de Compra' && request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(request.resource.data.originalRequisitionId)).data.requesterId) ||
+                      (request.resource.data.type == 'Solicitação de Compra' && request.auth.uid == request.resource.data.requesterId);
         
         match /items/{itemId} {
             allow read: if isAuthenticated();
-            allow write: if hasPermission('compras');
+            allow write: if hasPermission('compras') || request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId;
         }
     }
 
