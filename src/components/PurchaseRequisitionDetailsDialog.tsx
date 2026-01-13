@@ -41,20 +41,17 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   const firestore = useFirestore();
   const queryClient = useQueryClient();
 
-  // This state will hold the real-time version of the requisition
-  const [requisition, setRequisition] = useState(initialRequisition);
+  const [requisition, setRequisition] = useState<WithDocId<PurchaseRequisition> | null>(initialRequisition);
 
   const [selectedItemsForQuotation, setSelectedItemsForQuotation] = useState<RequisitionItemWithDetails[]>([]);
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState(false);
   
   useEffect(() => {
     if (!firestore || !initialRequisition?.docId) {
-        setRequisition(null);
+        setRequisition(initialRequisition);
         return;
     };
     
-    setRequisition(initialRequisition); // Set initial data immediately
-
     const unsub = onSnapshot(doc(firestore, 'purchase_requisitions', initialRequisition.docId), (doc) => {
         if (doc.exists()) {
             setRequisition({ docId: doc.id, ...doc.data() as PurchaseRequisition });
@@ -152,7 +149,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
 
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
   const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
-  const quotationCount = (requisition?.quotations || []).filter(q => q?.totalValue > 0).length;
+  
 
 
   return (
@@ -194,9 +191,6 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
 
           <div className="flex justify-between items-center mt-4">
             <h3 className="font-semibold text-base">Itens Solicitados</h3>
-             {!isPurchaseOrder && (
-                <Badge variant="outline">Cotações: {quotationCount}/3</Badge>
-              )}
           </div>
           {isLoading && (
             <div className="flex justify-center items-center h-24">
@@ -207,7 +201,9 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
           {!isLoading && enrichedItems.length === 0 && <p className="text-muted-foreground text-center text-sm">Nenhum item nesta requisição.</p>}
           
           <div className="space-y-3">
-              {enrichedItems.map(item => (
+              {enrichedItems.map(item => {
+                  const quotationCount = (item.quotations || []).filter(q => q?.totalValue > 0).length;
+                  return (
                       <div key={item.docId} className="flex items-start gap-4 rounded-lg border p-3">
                           {!isPurchaseOrder && (
                               <Checkbox 
@@ -228,17 +224,17 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
                           <div className="flex-1 text-sm">
                               <p className="font-bold">{item.details.descricao}</p>
                               <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
-                              <Badge variant={item.status === 'Pendente' ? 'default' : 'success'}>
-                                {item.status === 'Pendente' ? 'Pendente Cotação' : item.status}
+                              <Badge variant={item.status === 'Pendente' ? 'default' : item.status === 'Em Cotação' ? 'warning' : 'success'}>
+                                {item.status}
                               </Badge>
                           </div>
                           <div className="text-right">
                               <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
-                              {item.estimatedPrice && <p className="text-xs text-muted-foreground">Est: {(item.estimatedPrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / un.</p>}
+                              <Badge variant="outline">Cotações: {quotationCount}/3</Badge>
                           </div>
                       </div>
                   )
-              )}
+                })}
           </div>
         </div>
 

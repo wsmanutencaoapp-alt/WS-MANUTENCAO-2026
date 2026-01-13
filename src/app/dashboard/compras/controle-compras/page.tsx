@@ -53,7 +53,7 @@ type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
     'Aberta': 'secondary',
-    'Em Cotação': 'default',
+    'Em Cotação': 'warning',
     'Em Aprovação': 'default',
     'Aprovada': 'success',
     'Aguardando Entrega': 'default',
@@ -131,8 +131,8 @@ const ControleComprasPage = () => {
     const fetchProgress = async () => {
       const enrichedReqs: RequisitionWithProgress[] = [];
       for (const req of scRequisitions) {
-        if (req.status === 'Totalmente Atendida') {
-            enrichedReqs.push({ ...req, progress: 100, totalItems: 1 }); // Assume 1 to avoid division by zero
+        if (req.status === 'Totalmente Atendida' || req.status === 'Concluída' || req.status === 'Cancelada' || req.status === 'Recusada') {
+            enrichedReqs.push({ ...req, progress: 100, totalItems: 1 });
             continue;
         }
 
@@ -141,9 +141,12 @@ const ControleComprasPage = () => {
         const totalItems = itemsSnapshot.size;
         
         let attendedItems = 0;
-        if (req.quotations && req.quotations.length > 0) {
-            attendedItems = totalItems;
-        }
+        itemsSnapshot.forEach(itemDoc => {
+            const item = itemDoc.data() as PurchaseRequisitionItem;
+            if (item.status === 'Cotado') {
+                attendedItems++;
+            }
+        });
         
         const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
         enrichedReqs.push({ ...req, progress, totalItems });
@@ -189,9 +192,14 @@ const ControleComprasPage = () => {
     );
   }, [ocRequisitions, searchTermOC]);
 
-  const handleSuccess = () => {
+  const handleSuccess = (updatedRequisition?: WithDocId<PurchaseRequisition>) => {
     setRequisitionToEdit(null);
-    setSelectedRequisition(null);
+    if (updatedRequisition) {
+      // If we get an updated requisition, force update the selected one for dialog refresh
+      setSelectedRequisition(updatedRequisition);
+    } else {
+      setSelectedRequisition(null);
+    }
     queryClient.invalidateQueries({ queryKey: [scQueryKey] });
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
@@ -427,12 +435,7 @@ const ControleComprasPage = () => {
           requisition={selectedRequisition}
           isOpen={!!selectedRequisition}
           onClose={() => setSelectedRequisition(null)}
-          onActionSuccess={() => {
-              handleSuccess();
-              if (selectedRequisition) {
-                  queryClient.invalidateQueries({ queryKey: ['requisitionItems', selectedRequisition.docId] });
-              }
-          }}
+          onActionSuccess={() => handleSuccess(selectedRequisition)}
         />
       )}
 
@@ -449,3 +452,5 @@ const ControleComprasPage = () => {
 };
 
 export default ControleComprasPage;
+
+    

@@ -96,8 +96,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   });
 
  useEffect(() => {
-    if (isOpen) {
-        // Reset state
+    if (isOpen && items.length > 0) {
         setJustification('');
         setPurchaseOrderNotes('');
         setIsSaving(false);
@@ -106,8 +105,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         setIsItemsDialogOpen(false);
         setIsJustificationDialogOpen(false);
 
-        // Use the initial requisition data passed in props
-        const initialQuotesData = requisition.quotations?.length > 0 ? requisition.quotations : [null, null, null];
+        const firstItem = items[0];
+        const initialQuotesData = firstItem?.quotations?.length > 0 ? firstItem.quotations : [null, null, null];
 
         const initialQuotes = initialQuotesData.slice(0, 3).map(q => {
             if (q && q.supplierId) {
@@ -129,9 +128,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         }
         
         setQuotations(initialQuotes);
-        setSelectedQuotationIndex(requisition.selectedQuotationIndex ?? null);
+        setSelectedQuotationIndex(firstItem?.selectedQuotationIndex ?? null);
     }
-}, [isOpen, requisition]);
+}, [isOpen, items]);
 
   const handleQuotationChange = (index: number, field: keyof QuotationFormState, value: any) => {
     const updatedQuotations = [...quotations];
@@ -187,11 +186,13 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
     return "É necessário fornecer uma justificativa.";
   };
-  
-  const saveQuotationsToRequisition = async (quotes: QuotationFormState[], status: PurchaseRequisition['status']): Promise<Quotation[]> => {
+
+  const saveQuotationsToItems = async (quotes: QuotationFormState[], newStatus: PurchaseRequisitionItem['status']): Promise<Quotation[]> => {
       if (!firestore || !storage || !requisition) throw new Error("Serviços ou requisição indisponíveis.");
 
+      const batch = writeBatch(firestore);
       const finalQuotations: Quotation[] = [];
+
       for (const q of quotes) {
           if (!q.supplierId) {
             finalQuotations.push({} as Quotation);
@@ -208,25 +209,29 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             deliveryTime: Number(q.deliveryTime), paymentTerms: q.paymentTerms, attachmentUrl: attachmentUrl
           });
       }
-
-      const requisitionRef = doc(firestore, 'purchase_requisitions', requisition.docId);
       
-      const updateData: Partial<PurchaseRequisition> = {
-          quotations: finalQuotations,
-          selectedQuotationIndex: selectedQuotationIndex ?? undefined,
-          status: status,
-      };
+      for (const item of items) {
+          const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.docId);
+          batch.update(itemRef, {
+              quotations: finalQuotations,
+              selectedQuotationIndex: selectedQuotationIndex,
+              status: newStatus
+          });
+      }
 
-      await updateDoc(requisitionRef, updateData);
-      
+      await batch.commit();
       return finalQuotations;
-  }
-
+  };
+  
   const handleSaveProgress = async () => {
       setIsSavingProgress(true);
       try {
-          await saveQuotationsToRequisition(quotations, 'Em Cotação');
-          toast({ title: "Progresso Salvo!", description: "As cotações foram salvas na requisição." });
+          // Update status to 'Em Cotação'
+          await saveQuotationsToItems(quotations, 'Em Cotação');
+          const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+          await updateDoc(reqRef, { status: 'Em Cotação' });
+          
+          toast({ title: "Progresso Salvo!", description: "As cotações foram salvas nos itens." });
           onSuccess();
           onClose();
       } catch (err: any) {
@@ -273,8 +278,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         supplierId: chosenQuotation.supplierId,
         totalValue: Number(chosenQuotation.totalValue),
         paymentTerms: chosenQuotation.paymentTerms,
-        quotations: quotes,
-        selectedQuotationIndex: selectedQuotationIndex,
       };
 
       const ocBatch = writeBatch(firestore);
@@ -320,7 +323,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
     
     try {
-        const finalQuotes = await saveQuotationsToRequisition(quotations, 'Totalmente Atendida');
+        const finalQuotes = await saveQuotationsToItems(quotations, 'Cotado');
         await handleGenerateOC(finalQuotes, '');
         toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
         onSuccess();
@@ -336,7 +339,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
       setIsJustificationDialogOpen(false);
       try {
-          const finalQuotes = await saveQuotationsToRequisition(quotations, 'Totalmente Atendida');
+          const finalQuotes = await saveQuotationsToItems(quotations, 'Cotado');
           await handleGenerateOC(finalQuotes, justification);
           toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
           onSuccess();
@@ -501,3 +504,5 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     </>
   );
 }
+
+    
