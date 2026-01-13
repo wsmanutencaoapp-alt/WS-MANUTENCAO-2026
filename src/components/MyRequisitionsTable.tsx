@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, orderBy, where, doc } from 'firebase/firestore';
-import type { PurchaseRequisition, CostCenter, Employee } from '@/lib/types';
+import { collection, query, orderBy, where, doc, getDocs } from 'firebase/firestore';
+import type { PurchaseRequisition, CostCenter, Employee, PurchaseRequisitionItem } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -34,7 +34,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Progress } from '@/components/ui/progress';
 
+type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
+    progress: number;
+    totalItems: number;
+};
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
@@ -44,6 +49,10 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Aprovada': 'success',
     'Recusada': 'destructive',
     'Concluída': 'secondary',
+    'Parcialmente Atendida': 'warning',
+    'Totalmente Atendida': 'success',
+    'Cancelada': 'destructive',
+    'Em Cotação': 'default',
   };
   return variants[status] || 'secondary';
 };
@@ -64,6 +73,7 @@ export default function MyRequisitionsTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -96,6 +106,33 @@ export default function MyRequisitionsTable() {
       queryKey,
       enabled: !isEmployeeLoading && !!user,
   });
+  
+  useEffect(() => {
+    if (!requisitions || !firestore) return;
+    
+    const fetchProgress = async () => {
+      const enrichedReqs: RequisitionWithProgress[] = [];
+      for (const req of requisitions) {
+        const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
+        const itemsSnapshot = await getDocs(itemsRef);
+        const totalItems = itemsSnapshot.size;
+        let attendedItems = 0;
+        
+        itemsSnapshot.forEach(doc => {
+          const item = doc.data() as PurchaseRequisitionItem;
+          if (item.status !== 'Pendente') {
+            attendedItems++;
+          }
+        });
+        
+        const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
+        enrichedReqs.push({ ...req, progress, totalItems });
+      }
+      setRequisitionsWithProgress(enrichedReqs);
+    };
+
+    fetchProgress();
+  }, [requisitions, firestore]);
 
   const costCenterIds = useMemo(() => {
     if (!requisitions) return [];
@@ -118,15 +155,15 @@ export default function MyRequisitionsTable() {
 
 
   const filteredRequisitions = useMemo(() => {
-    if (!requisitions) return [];
-    if (!searchTerm) return requisitions;
+    if (!requisitionsWithProgress) return [];
+    if (!searchTerm) return requisitionsWithProgress;
     const lowercasedTerm = searchTerm.toLowerCase();
-    return requisitions.filter(req => 
+    return requisitionsWithProgress.filter(req => 
         (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
         req.status.toLowerCase().includes(lowercasedTerm) ||
         (costCenterMap.get(req.costCenterId) || '').toLowerCase().includes(lowercasedTerm)
     );
-  }, [requisitions, searchTerm, costCenterMap]);
+  }, [requisitionsWithProgress, searchTerm, costCenterMap]);
 
   const handleReviewSuccess = () => {
     setRequisitionToReview(null);
@@ -158,12 +195,12 @@ export default function MyRequisitionsTable() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Status</TableHead>
                   <TableHead>Protocolo</TableHead>
-                  <TableHead>Data da Requisição</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[20%]">Atendimento</TableHead>
                   <TableHead>Centro de Custo</TableHead>
                   <TableHead>Prioridade</TableHead>
-                  <TableHead>Observação</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -181,30 +218,35 @@ export default function MyRequisitionsTable() {
                   const showReason = (req.status === 'Recusada' || req.status === 'Em Revisão') && req.rejectionReason;
                   return (
                     <TableRow key={req.docId}>
-                      <TableCell>
-                          <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
-                      </TableCell>
                       <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
                       <TableCell>{format(new Date(req.createdAt), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell>
+                         <div className="flex items-center gap-2">
+                           <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
+                           {showReason && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-help">
+                                    <AlertCircle className="h-4 w-4 text-orange-500" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{req.rejectionReason}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {req.type === 'Solicitação de Compra' && req.totalItems > 0 ? (
+                           <div className="flex flex-col">
+                             <Progress value={req.progress} className="h-2" />
+                             <span className="text-xs text-muted-foreground text-right">{Math.round(req.progress)}%</span>
+                           </div>
+                        ) : <span className="text-xs text-muted-foreground">N/A</span> }
+                      </TableCell>
                       <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
                       <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                         {showReason ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="flex items-center gap-1 cursor-help">
-                                <AlertCircle className="h-4 w-4 text-orange-500" />
-                                <span className="truncate">{req.rejectionReason}</span>
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{req.rejectionReason}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
                       <TableCell className="text-right space-x-2">
                        {req.status === 'Em Revisão' && (
                         <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(req)}>
