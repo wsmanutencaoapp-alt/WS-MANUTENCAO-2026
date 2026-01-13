@@ -116,7 +116,7 @@ const ControleComprasPage = () => {
   const ocQueryKey = 'allPurchaseOrdersForControl';
   const ocQuery = useMemoFirebase(() => {
     if(!firestore) return null;
-    return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Ordem de Compra'), where('status', '==', 'Aprovada'));
+    return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Ordem de Compra'));
   }, [firestore]);
   const { data: ocRequisitions, isLoading: isLoadingOCs, error: ocError } = useCollection<WithDocId<PurchaseRequisition>>(ocQuery, {
       queryKey: [ocQueryKey]
@@ -192,29 +192,34 @@ const ControleComprasPage = () => {
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
   };
   
-  const handleDeleteRequisition = async (requisitionId: string) => {
+  const handleDeleteRequisition = async (requisitionId: string, type: 'SC' | 'OC') => {
       if (!firestore) return;
       setIsProcessing(requisitionId);
       try {
           const batch = writeBatch(firestore);
           const reqRef = doc(firestore, 'purchase_requisitions', requisitionId);
           
-          // Delete items in subcollection
           const itemsRef = collection(reqRef, 'items');
           const itemsSnapshot = await getDocs(itemsRef);
           itemsSnapshot.forEach(itemDoc => {
               batch.delete(itemDoc.ref);
           });
           
-          // Delete main document
           batch.delete(reqRef);
           
           await batch.commit();
-          toast({ title: 'Sucesso', description: 'Requisição e seus itens foram excluídos.' });
-          queryClient.invalidateQueries({ queryKey: [scQueryKey] });
+          const docType = type === 'SC' ? 'Requisição' : 'Ordem de Compra';
+          toast({ title: 'Sucesso', description: `${docType} e seus itens foram excluídos.` });
+          
+          if(type === 'SC') {
+            queryClient.invalidateQueries({ queryKey: [scQueryKey] });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
+          }
+
       } catch (err) {
           console.error("Erro ao excluir requisição:", err);
-          toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir a requisição.' });
+          toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir o documento.' });
       } finally {
           setIsProcessing(null);
       }
@@ -313,7 +318,7 @@ const ControleComprasPage = () => {
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
                                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDeleteRequisition(req.docId)}>
+                                                    <AlertDialogAction onClick={() => handleDeleteRequisition(req.docId, 'SC')}>
                                                         Sim, Excluir
                                                     </AlertDialogAction>
                                                 </AlertDialogFooter>
@@ -369,15 +374,38 @@ const ControleComprasPage = () => {
                                  {!isLoading && filteredOCs.map(oc => (
                                     <TableRow key={oc.docId}>
                                         <TableCell className="font-mono">{oc.protocol}</TableCell>
-                                        <TableCell>{oc.quotations?.[oc.selectedQuotationIndex!]?.supplierName || 'N/A'}</TableCell>
+                                        <TableCell>{oc.supplierName || 'N/A'}</TableCell>
                                         <TableCell className="font-medium">{oc.totalValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                         <TableCell>{format(new Date(oc.createdAt), 'dd/MM/yyyy')}</TableCell>
                                         <TableCell><Badge variant={getStatusVariant(oc.status)}>{oc.status}</Badge></TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right space-x-2">
                                             <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(oc)}>
                                                 <Eye className="mr-2 h-4 w-4" />
                                                 Detalhes
                                             </Button>
+                                            {isAdmin && (
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="destructive" size="icon" disabled={isProcessing === oc.docId} title="Excluir Ordem de Compra">
+                                                            {isProcessing === oc.docId ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                Tem certeza que deseja excluir permanentemente a Ordem de Compra <span className="font-bold">{oc.protocol}</span>? Esta ação não pode ser desfeita.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDeleteRequisition(oc.docId, 'OC')}>
+                                                                Sim, Excluir
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                  ))}
