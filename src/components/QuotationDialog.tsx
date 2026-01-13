@@ -94,7 +94,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
   useEffect(() => {
     if (isOpen) {
-        // Correctly reset the state when the dialog is opened
         setQuotations([
             {...emptyQuotation}, {...emptyQuotation}, {...emptyQuotation}
         ]);
@@ -163,12 +162,12 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     return "É necessário fornecer uma justificativa.";
   };
   
-  const handleGenerateOC = async (justificationText: string) => {
+  const handleGenerateOC = async (quotes: QuotationFormState[], justificationText: string) => {
     if (!firestore || !storage || !user || !requisition || !items.length || selectedQuotationIndex === null) {
       throw new Error("Dados insuficientes para gerar a Ordem de Compra.");
     }
     
-    const chosenQuotation = quotations[selectedQuotationIndex];
+    const chosenQuotation = quotes[selectedQuotationIndex];
     if (!chosenQuotation || !chosenQuotation.supplierId) {
       throw new Error("A cotação escolhida é inválida ou não possui um fornecedor.");
     }
@@ -189,7 +188,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       const ocRef = doc(collection(firestore, 'purchase_requisitions'));
       
       const finalQuotations: Quotation[] = [];
-      for (const q of quotations) {
+      for (const q of quotes) {
         if (!q.supplierId) continue;
         let attachmentUrl = q.attachmentUrl || '';
         if (q.attachmentFile) {
@@ -261,7 +260,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
     
     try {
-        await handleGenerateOC('');
+        await handleGenerateOC(quotations, '');
         toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
         onSuccess();
     } catch (err: any) {
@@ -276,7 +275,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
       setIsJustificationDialogOpen(false);
       try {
-          await handleGenerateOC(justification);
+          await handleGenerateOC(quotations, justification);
           toast({ title: "Sucesso!", description: "Ordem de Compra enviada para aprovação." });
           onSuccess();
       } catch (err: any) {
