@@ -131,17 +131,19 @@ const ControleComprasPage = () => {
     const fetchProgress = async () => {
       const enrichedReqs: RequisitionWithProgress[] = [];
       for (const req of scRequisitions) {
+        if (req.status === 'Totalmente Atendida') {
+            enrichedReqs.push({ ...req, progress: 100, totalItems: 1 }); // Assume 1 to avoid division by zero
+            continue;
+        }
+
         const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
         const itemsSnapshot = await getDocs(itemsRef);
         const totalItems = itemsSnapshot.size;
-        let attendedItems = 0;
         
-        itemsSnapshot.forEach(doc => {
-          const item = doc.data() as PurchaseRequisitionItem;
-          if (['Cotado', 'Recebido', 'Cancelado'].includes(item.status)) {
-            attendedItems++;
-          }
-        });
+        let attendedItems = 0;
+        if (req.quotations && req.quotations.length > 0) {
+            attendedItems = totalItems;
+        }
         
         const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
         enrichedReqs.push({ ...req, progress, totalItems });
@@ -425,7 +427,12 @@ const ControleComprasPage = () => {
           requisition={selectedRequisition}
           isOpen={!!selectedRequisition}
           onClose={() => setSelectedRequisition(null)}
-          onActionSuccess={handleSuccess}
+          onActionSuccess={() => {
+              handleSuccess();
+              if (selectedRequisition) {
+                  queryClient.invalidateQueries({ queryKey: ['requisitionItems', selectedRequisition.docId] });
+              }
+          }}
         />
       )}
 
@@ -442,5 +449,3 @@ const ControleComprasPage = () => {
 };
 
 export default ControleComprasPage;
-
-    

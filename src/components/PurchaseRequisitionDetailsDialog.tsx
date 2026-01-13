@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, documentId, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, documentId, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -41,17 +41,37 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   const firestore = useFirestore();
   const queryClient = useQueryClient();
 
+  // This state will hold the real-time version of the requisition
+  const [requisition, setRequisition] = useState(initialRequisition);
+
   const [selectedItemsForQuotation, setSelectedItemsForQuotation] = useState<RequisitionItemWithDetails[]>([]);
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState(false);
   
+  useEffect(() => {
+    if (!firestore || !initialRequisition?.docId) {
+        setRequisition(null);
+        return;
+    };
+    
+    setRequisition(initialRequisition); // Set initial data immediately
+
+    const unsub = onSnapshot(doc(firestore, 'purchase_requisitions', initialRequisition.docId), (doc) => {
+        if (doc.exists()) {
+            setRequisition({ docId: doc.id, ...doc.data() as PurchaseRequisition });
+        }
+    });
+
+    return () => unsub(); // Unsubscribe on cleanup
+  }, [initialRequisition, firestore]);
+  
   const itemsQuery = useMemoFirebase(() => {
-    if (!firestore || !initialRequisition?.docId) return null;
-    return query(collection(firestore, 'purchase_requisitions', initialRequisition.docId, 'items'));
-  }, [firestore, initialRequisition?.docId]);
+    if (!firestore || !requisition?.docId) return null;
+    return query(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
+  }, [firestore, requisition?.docId]);
   
   const { data: items, isLoading: isLoadingItems, error: itemsError } = useCollection<WithDocId<PurchaseRequisitionItem>>(itemsQuery, {
-      queryKey: ['requisitionItems', initialRequisition?.docId],
-      enabled: !!initialRequisition && isOpen,
+      queryKey: ['requisitionItems', requisition?.docId],
+      enabled: !!requisition && isOpen,
   });
 
   const supplyIds = useMemo(() => items?.filter(i => i.itemType === 'supply').map(i => i.itemId) || [], [items]);
@@ -70,10 +90,10 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   const { data: toolMasterData, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery, { enabled: toolIds.length > 0 && isOpen });
 
   const costCenterQuery = useMemoFirebase(() => {
-    if (!firestore || !initialRequisition) return null;
-    return query(collection(firestore, 'cost_centers'), where(documentId(), '==', initialRequisition.costCenterId));
-  }, [firestore, initialRequisition]);
-  const { data: costCenterData, isLoading: isLoadingCostCenter } = useCollection<WithDocId<CostCenter>>(costCenterQuery, { queryKey: ['costCenterForReq', initialRequisition?.costCenterId], enabled: !!initialRequisition && isOpen });
+    if (!firestore || !requisition) return null;
+    return query(collection(firestore, 'cost_centers'), where(documentId(), '==', requisition.costCenterId));
+  }, [firestore, requisition]);
+  const { data: costCenterData, isLoading: isLoadingCostCenter } = useCollection<WithDocId<CostCenter>>(costCenterQuery, { queryKey: ['costCenterForReq', requisition?.costCenterId], enabled: !!requisition && isOpen });
   const costCenter = useMemo(() => costCenterData?.[0], [costCenterData]);
 
   const enrichedItems = useMemo((): RequisitionItemWithDetails[] => {
@@ -110,7 +130,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   const handleQuotationSuccess = async () => {
     setIsQuotationDialogOpen(false);
     setSelectedItemsForQuotation([]);
-    queryClient.invalidateQueries({ queryKey: ['requisitionItems', initialRequisition?.docId] });
+    queryClient.invalidateQueries({ queryKey: ['requisitionItems', requisition?.docId] });
     queryClient.invalidateQueries({ queryKey: ['allPurchaseRequisitionsForControl'] });
     if(onActionSuccess) onActionSuccess();
   }
@@ -131,8 +151,8 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   }
 
   const isLoading = isLoadingItems || isLoadingSupplies || isLoadingTools || isLoadingCostCenter;
-  const isPurchaseOrder = initialRequisition?.type === 'Ordem de Compra';
-  const quotationCount = (initialRequisition?.quotations || []).filter(q => q?.totalValue > 0).length;
+  const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
+  const quotationCount = (requisition?.quotations || []).filter(q => q?.totalValue > 0).length;
 
 
   return (
@@ -142,7 +162,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
         <DialogHeader>
           <DialogTitle>Detalhes da Requisição</DialogTitle>
           <DialogDescription>
-            Protocolo: <span className="font-mono font-bold">{initialRequisition?.protocol || initialRequisition?.docId.substring(0, 8)}</span>
+            Protocolo: <span className="font-mono font-bold">{requisition?.protocol || requisition?.docId.substring(0, 8)}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -151,7 +171,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <div>
                   <p className="font-semibold text-muted-foreground">Solicitante</p>
-                  <p className="flex items-center gap-2"><User className="h-4 w-4"/> {initialRequisition?.requesterName}</p>
+                  <p className="flex items-center gap-2"><User className="h-4 w-4"/> {requisition?.requesterName}</p>
                 </div>
                 <div>
                   <p className="font-semibold text-muted-foreground">Centro de Custo</p>
@@ -159,15 +179,15 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
                 </div>
                 <div>
                   <p className="font-semibold text-muted-foreground">Data de Necessidade</p>
-                  <p className="flex items-center gap-2"><Calendar className="h-4 w-4"/> {initialRequisition ? format(new Date(initialRequisition.neededByDate), 'dd/MM/yyyy') : 'N/A'}</p>
+                  <p className="flex items-center gap-2"><Calendar className="h-4 w-4"/> {requisition ? format(new Date(requisition.neededByDate), 'dd/MM/yyyy') : 'N/A'}</p>
                 </div>
                 <div>
                   <p className="font-semibold text-muted-foreground">Prioridade</p>
-                  <p><Badge variant={getPriorityVariant(initialRequisition?.priority)}>{initialRequisition?.priority}</Badge></p>
+                  <p><Badge variant={getPriorityVariant(requisition?.priority)}>{requisition?.priority}</Badge></p>
                 </div>
                 <div className="col-span-2">
                   <p className="font-semibold text-muted-foreground">Motivo da Compra</p>
-                  <p className="flex items-start gap-2"><Info className="h-4 w-4 mt-0.5 shrink-0"/> {initialRequisition?.purchaseReason}</p>
+                  <p className="flex items-start gap-2"><Info className="h-4 w-4 mt-0.5 shrink-0"/> {requisition?.purchaseReason}</p>
                 </div>
             </div>
           </div>
@@ -234,11 +254,11 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
       </DialogContent>
     </Dialog>
 
-    {initialRequisition && isQuotationDialogOpen && (
+    {requisition && isQuotationDialogOpen && (
       <QuotationDialog
         isOpen={isQuotationDialogOpen}
         onClose={() => setIsQuotationDialogOpen(false)}
-        requisition={initialRequisition}
+        requisition={requisition}
         items={selectedItemsForQuotation}
         onSuccess={handleQuotationSuccess}
       />

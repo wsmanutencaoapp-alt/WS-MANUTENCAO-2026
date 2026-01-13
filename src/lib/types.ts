@@ -262,6 +262,8 @@ export type PurchaseRequisition = {
   supplierId?: string;
   totalValue?: number;
   paymentTerms?: string;
+  quotations?: Quotation[];
+  selectedQuotationIndex?: number;
 };
 
 
@@ -274,8 +276,6 @@ export type PurchaseRequisitionItem = {
     status: 'Pendente' | 'Em Cotação' | 'Cotado' | 'Recebido' | 'Cancelado';
     notes?: string;
     attachmentUrl?: string;
-    quotations?: Quotation[];
-    selectedQuotationIndex?: number;
 };
 
 export type Notification = {
