@@ -169,11 +169,12 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
       const updateData: any = {
         quotations: finalQuotations,
-        selectedQuotationIndex: selectedQuotationIndex
+        selectedQuotationIndex: selectedQuotationIndex,
+        status: finalQuotations.length > 0 ? 'Em Cotação' : 'Pendente' // This is the change
       };
       
-      if(finalQuotations.length > 0 && currentItem.status === 'Pendente') {
-        updateData.status = 'Em Cotação';
+      if (selectedQuotationIndex !== null) {
+          updateData.status = 'Cotado';
       }
       
       await updateDoc(itemRef, updateData);
@@ -202,9 +203,14 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   }
   
   const handleSendForApproval = async () => {
-    // This check needs to be against ALL items, not just the current one.
-    // Let's assume for now the user clicks this when they are "done" with all items.
-    const allItemsAreQuoted = items.every(item => item.quotations?.length > 0 && item.selectedQuotationIndex !== undefined && item.selectedQuotationIndex !== null);
+    const allItems = (await getDocs(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'))).docs.map(d => d.data() as PurchaseRequisitionItem);
+
+    const allItemsAreQuoted = allItems.every(item => 
+        (item.quotations?.length ?? 0) > 0 && 
+        item.selectedQuotationIndex !== undefined && 
+        item.selectedQuotationIndex !== null
+    );
+
     if (!allItemsAreQuoted) {
         toast({
             variant: 'destructive',
@@ -214,7 +220,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         return;
     }
 
-    const winningQuotes = items.map(item => item.quotations[item.selectedQuotationIndex!]);
+    const winningQuotes = allItems.map(item => item.quotations![item.selectedQuotationIndex!]);
     const uniqueSupplierIds = new Set(winningQuotes.map(q => q.supplierId));
 
     if (uniqueSupplierIds.size > 1) {
@@ -226,13 +232,14 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         return;
     }
 
-    const expensiveChoiceJustification = requisition.expensiveChoiceJustification || '';
+    const expensiveChoiceJustification = justification || requisition.expensiveChoiceJustification || '';
     
-    // Check if any selected quote is the most expensive
-    const requiresJustification = items.some(item => {
+    const requiresJustification = allItems.some(item => {
         if (!item.quotations || item.quotations.length <= 1 || item.selectedQuotationIndex === null) return false;
         const selectedQuoteValue = item.quotations[item.selectedQuotationIndex!].totalValue;
-        return item.quotations.every(q => q.totalValue <= selectedQuoteValue);
+        const prices = item.quotations.map(q => q.totalValue);
+        const maxPrice = Math.max(...prices);
+        return selectedQuoteValue >= maxPrice;
     });
 
     if (requiresJustification && !expensiveChoiceJustification) {
@@ -251,7 +258,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     try {
         const batch = writeBatch(firestore);
 
-        // 1. Generate new OC Protocol
         const counterRef = doc(firestore, 'counters', 'purchaseOrders');
         const counterSnapshot = await getDoc(counterRef);
         let lastId = 0;
@@ -261,9 +267,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         const newId = lastId + 1;
         const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
         
-        // 2. Prepare new OC document
         const newOcRef = doc(collection(firestore, 'purchase_requisitions'));
-        const winningQuotes = items.map(item => item.quotations[item.selectedQuotationIndex!]);
+        const allItems = (await getDocs(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'))).docs.map(d => d.data() as PurchaseRequisitionItem);
+        const winningQuotes = allItems.map(item => item.quotations![item.selectedQuotationIndex!]);
         const firstWinner = winningQuotes[0];
 
         const ocData: Omit<PurchaseRequisition, 'id'> = {
@@ -286,28 +292,25 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         };
         batch.set(newOcRef, ocData);
 
-        // 3. Add winning items to the new OC's subcollection
         items.forEach(item => {
+            if (item.selectedQuotationIndex === null || item.selectedQuotationIndex === undefined) return;
+
             const newItemRef = doc(collection(newOcRef, 'items'));
-            const winningQuote = item.quotations[item.selectedQuotationIndex!];
+            const winningQuote = item.quotations![item.selectedQuotationIndex!];
             const newItemData: Omit<PurchaseRequisitionItem, 'id'> = {
                 itemId: item.itemId,
                 itemType: item.itemType,
                 quantity: item.quantity,
-                status: 'Pendente', // Status for item within OC
+                status: 'Pendente', 
                 notes: item.notes,
-                // The price is now the final one from the quotation
                 estimatedPrice: winningQuote.totalValue,
-                // We don't need to copy quotations to the OC
             };
             batch.set(newItemRef, newItemData);
         });
 
-        // 4. Update the original SC
         const originalReqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
         batch.update(originalReqRef, { status: 'Totalmente Atendida' });
         
-        // 5. Update the OC counter
         if (counterSnapshot.exists()) {
             batch.update(counterRef, { lastId: newId });
         } else {
