@@ -98,8 +98,8 @@ export default function ReviewPurchaseOrderDialog({ isOpen, onClose, onSuccess, 
 
             // Fetch master data for the item
             const masterCollectionName = itemData.itemType === 'supply' ? 'supplies' : 'tools';
-            const masterDataRef = doc(firestore, masterCollectionName, itemData.itemId);
-            const masterDataSnapshot = await getDocs(query(collection(firestore, masterCollectionName), where(documentId(), '==', itemData.itemId)));
+            const masterDataQuery = query(collection(firestore, masterCollectionName), where(documentId(), '==', itemData.itemId));
+            const masterDataSnapshot = await getDocs(masterDataQuery);
             
             if (masterDataSnapshot.empty) {
                  toast({ variant: 'destructive', title: 'Erro', description: 'Dados mestre do item não encontrados.' });
@@ -252,7 +252,7 @@ export default function ReviewPurchaseOrderDialog({ isOpen, onClose, onSuccess, 
              <Card>
                 <CardHeader>
                     <CardTitle className="text-base font-medium">
-                        Item: {item?.details.descricao || (isLoading ? 'Carregando...' : 'Não encontrado')}
+                         Item: {item?.details.descricao || (isLoading ? 'Carregando...' : 'Não encontrado')}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
