@@ -1,306 +1,500 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, getDocs, doc, writeBatch, where, updateDoc } from 'firebase/firestore';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Trash2 } from 'lucide-react';
-import Image from 'next/image';
-import type { Supply, Tool, PurchaseRequisition, PurchaseRequisitionItem } from '@/lib/types';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import type { PurchaseRequisition, CostCenter, Tool, Supply, PurchaseRequisitionItem, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Textarea } from './ui/textarea';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
+import { useQueryClient } from '@tanstack/react-query';
+import QuotationDialog from '@/components/QuotationDialog';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ReviewPurchaseOrderDialog from '@/components/ReviewPurchaseOrderDialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
-type RequisitionableItem = (WithDocId<Supply> | WithDocId<Tool>) & { itemType: 'supply' | 'tool' };
-type CartItem = RequisitionableItem & {
-    requisitionQuantity: number;
-    estimatedPrice?: number;
-    notes?: string;
-    attachmentUrl?: string;
-    existingItemId?: string; // ID of the item in the subcollection
+
+type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
+    progress: number;
+    totalItems: number;
 };
 
-interface EditRequisitionDialogProps {
-  requisition: WithDocId<PurchaseRequisition> | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
+const getStatusVariant = (status: PurchaseRequisition['status']) => {
+  const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
+    'Aberta': 'secondary',
+    'Em Cotação': 'warning',
+    'Em Aprovação': 'default',
+    'Aprovada': 'success',
+    'Aguardando Entrega': 'default',
+    'Recusada': 'destructive',
+    'Concluída': 'secondary',
+    'Em Revisão': 'warning',
+    'Em Revisão Comprador': 'warning',
+    'Parcialmente Atendida': 'warning',
+    'Totalmente Atendida': 'success',
+    'Cancelada': 'destructive',
+    'Pronta para OC': 'success',
+  };
+  return variants[status] || 'secondary';
+};
+
+const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
+    switch(priority) {
+        case 'Normal': return 'secondary';
+        case 'Urgente': return 'warning';
+        case 'Muito Urgente': return 'destructive';
+        default: return 'secondary';
+    }
 }
 
-export default function EditRequisitionDialog({ requisition, isOpen, onClose, onSuccess }: EditRequisitionDialogProps) {
-  const { user } = useUser();
+const ControleComprasPage = () => {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editableFields, setEditableFields] = useState({
-      paymentTerms: '',
-      purchaseOrderNotes: ''
+  const [searchTermSC, setSearchTermSC] = useState('');
+  const [searchTermOC, setSearchTermOC] = useState('');
+  const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
+
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData, isLoading: isEmployeeLoading } = useDoc<Employee>(userDocRef);
+  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
+
+  // Query for SCs
+  const scQueryKey = 'allPurchaseRequisitionsForControl';
+  const scQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Solicitação de Compra'));
+  }, [firestore]);
+  const { data: scRequisitions, isLoading: isLoadingSCs, error: scError } = useCollection<WithDocId<PurchaseRequisition>>(scQuery, {
+      queryKey: [scQueryKey]
   });
 
-  const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
-
-
-  // Fetch all master data to map item details
-  const suppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
-  const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery, {queryKey: ['allSuppliesForReview']});
-  const toolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools')) : null, [firestore]);
-  const { data: allTools, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery, {queryKey: ['allToolModelsForReview']});
-  
-  const masterDataMap = useMemo(() => {
-    if (isLoadingSupplies || isLoadingTools) return new Map();
-    const items = [
-      ...(allSupplies?.map(s => ({...s, itemType: 'supply' as const })) || []),
-      ...(allTools?.map(t => ({...t, itemType: 'tool' as const })) || [])
-    ];
-    return new Map(items.map(item => [item.docId, item]));
-  }, [allSupplies, allTools, isLoadingSupplies, isLoadingTools]);
+  // Query for OCs
+  const ocQueryKey = 'allPurchaseOrdersForControl';
+  const ocQuery = useMemoFirebase(() => {
+    if(!firestore) return null;
+    return query(collection(firestore, 'purchase_requisitions'), where('type', '==', 'Ordem de Compra'));
+  }, [firestore]);
+  const { data: ocRequisitions, isLoading: isLoadingOCs, error: ocError } = useCollection<WithDocId<PurchaseRequisition>>(ocQuery, {
+      queryKey: [ocQueryKey]
+  });
   
   useEffect(() => {
-    const fetchRequisitionItems = async () => {
-        if (!requisition || !firestore || !masterDataMap.size) return;
+    if (!scRequisitions || !firestore) {
+      setRequisitionsWithProgress([]);
+      return;
+    }
 
-        setIsLoading(true);
-        try {
-             if (isPurchaseOrder) {
-                setEditableFields({
-                    paymentTerms: requisition.paymentTerms || '',
-                    purchaseOrderNotes: requisition.purchaseOrderNotes || ''
-                });
-            }
-
-            const itemsRef = collection(firestore, 'purchase_requisitions', requisition.docId, 'items');
-            const itemsSnapshot = await getDocs(itemsRef);
-            
-            const fetchedItems: CartItem[] = [];
+    const unsubscribers = scRequisitions.map(req => {
+        const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
+        return onSnapshot(itemsRef, (itemsSnapshot) => {
+            const totalItems = itemsSnapshot.size;
+            let attendedItems = 0;
             itemsSnapshot.forEach(itemDoc => {
-                const itemData = itemDoc.data() as PurchaseRequisitionItem;
-                const masterDataItem = masterDataMap.get(itemData.itemId);
-                
-                if (masterDataItem) {
-                    fetchedItems.push({
-                        ...masterDataItem,
-                        requisitionQuantity: itemData.quantity,
-                        estimatedPrice: itemData.estimatedPrice,
-                        notes: itemData.notes,
-                        attachmentUrl: itemData.attachmentUrl,
-                        existingItemId: itemDoc.id,
-                    });
+                const item = itemDoc.data() as PurchaseRequisitionItem;
+                // Item is considered "attended" if it's no longer pending.
+                if (item.status === 'Em Cotação' || item.status === 'Cotado' || item.status === 'Recebido' || item.status === 'Cancelado') {
+                    attendedItems++;
                 }
             });
-            setCart(fetchedItems);
-            setDeletedItemIds([]); // Reset deleted items on new load
-        } catch (error) {
-            console.error("Erro ao buscar itens da requisição:", error);
-            toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar os itens da requisição.' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
+            const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
+
+            setRequisitionsWithProgress(prev => {
+                const index = prev.findIndex(r => r.docId === req.docId);
+                const updatedReq = { ...req, progress, totalItems };
+                if (index > -1) {
+                    const newProgress = [...prev];
+                    newProgress[index] = updatedReq;
+                    return newProgress;
+                } else {
+                    return [...prev, updatedReq];
+                }
+            });
+        });
+    });
+
+    return () => unsubscribers.forEach(unsub => unsub());
+
+  }, [scRequisitions, firestore]);
+  
+  const priorityOrder = {
+      'Muito Urgente': 1,
+      'Urgente': 2,
+      'Normal': 3,
+  };
+
+  const sortedAndFilteredSCs = useMemo(() => {
+    if (!requisitionsWithProgress) return [];
+
+    let relevantRequisitions = requisitionsWithProgress.filter(req => ['Aprovada', 'Parcialmente Atendida', 'Em Cotação', 'Em Revisão'].includes(req.status));
+
+    if (searchTermSC) {
+        const lowercasedTerm = searchTermSC.toLowerCase();
+        relevantRequisitions = relevantRequisitions.filter(req => 
+            (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
+            req.requesterName.toLowerCase().includes(lowercasedTerm)
+        );
+    }
     
-    if (isOpen && masterDataMap.size > 0) {
-        fetchRequisitionItems();
-    }
-  }, [requisition, isOpen, firestore, toast, masterDataMap, isPurchaseOrder]);
+    return relevantRequisitions.sort((a, b) => {
+        const priorityA = priorityOrder[a.priority] || 3;
+        const priorityB = priorityOrder[b.priority] || 3;
+        if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+        }
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
 
+  }, [requisitionsWithProgress, searchTermSC]);
+  
+  const filteredOCs = useMemo(() => {
+    if(!ocRequisitions) return [];
+    if(!searchTermOC) return ocRequisitions;
+    const lowercasedTerm = searchTermOC.toLowerCase();
+    return ocRequisitions.filter(oc => 
+      (oc.protocol && oc.protocol.toLowerCase().includes(lowercasedTerm)) ||
+      (oc.supplierName && oc.supplierName.toLowerCase().includes(lowercasedTerm)) ||
+      (oc.originalRequisitionProtocol && oc.originalRequisitionProtocol.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [ocRequisitions, searchTermOC]);
 
-  const removeFromCart = (docId: string, existingItemId?: string) => {
-    setCart(prev => prev.filter(item => item.docId !== docId));
-    if (existingItemId) {
-      setDeletedItemIds(prev => [...prev, existingItemId]);
-    }
-  };
-
-  const updateCartItem = (docId: string, field: keyof CartItem, value: any) => {
-    setCart(prev => prev.map(item => item.docId === docId ? { ...item, [field]: value } : item));
-  };
-
-   const handleFieldChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
-    setEditableFields(prev => ({ ...prev, [id]: value }));
+  const handleSuccess = () => {
+    setRequisitionToReview(null);
+    setSelectedRequisition(null);
+    queryClient.invalidateQueries({ queryKey: [scQueryKey] });
+    queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
+    queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
+    queryClient.invalidateQueries({ queryKey: ['myPurchaseRequisitions'] });
   };
   
-  const handleSubmitUpdate = async () => {
-    if (!firestore || !user || !requisition) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Dados da sessão inválidos.' });
-        return;
-    }
-    if (cart.length === 0 && !isPurchaseOrder) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'A requisição não pode ficar sem itens.' });
-        return;
-    }
+  const handleDeleteRequisition = async (requisitionId: string, type: 'SC' | 'OC') => {
+      if (!firestore) return;
+      setIsProcessing(requisitionId);
+      try {
+          const batch = writeBatch(firestore);
+          const reqRef = doc(firestore, 'purchase_requisitions', requisitionId);
+          
+          const itemsRef = collection(reqRef, 'items');
+          const itemsSnapshot = await getDocs(itemsRef);
+          itemsSnapshot.forEach(itemDoc => {
+              batch.delete(itemDoc.ref);
+          });
+          
+          batch.delete(reqRef);
+          
+          await batch.commit();
+          const docType = type === 'SC' ? 'Requisição' : 'Ordem de Compra';
+          toast({ title: 'Sucesso', description: `${docType} e seus itens foram excluídos.` });
+          
+          if(type === 'SC') {
+            queryClient.invalidateQueries({ queryKey: [scQueryKey] });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
+          }
 
-    setIsSubmitting(true);
-    try {
-        const batch = writeBatch(firestore);
-        const requisitionRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+      } catch (err) {
+          console.error("Erro ao excluir requisição:", err);
+          toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir o documento.' });
+      } finally {
+          setIsProcessing(null);
+      }
+  }
 
-        // Update requisition status back to 'Em Aprovação' to re-enter the approval flow
-        let updateData: any = { status: 'Em Aprovação', rejectionReason: '' };
-        
-        if (isPurchaseOrder) {
-            updateData.paymentTerms = editableFields.paymentTerms;
-            updateData.purchaseOrderNotes = editableFields.purchaseOrderNotes;
-        }
 
-        batch.update(requisitionRef, updateData);
-
-        if (!isPurchaseOrder) {
-            // Process updated and new items for SC
-            for (const item of cart) {
-                const itemRef = item.existingItemId
-                    ? doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.existingItemId)
-                    : doc(collection(firestore, 'purchase_requisitions', requisition.docId, 'items')); // For items added during edit
-                
-                const itemData: Omit<PurchaseRequisitionItem, 'id'> = {
-                    itemId: item.docId,
-                    itemType: item.itemType,
-                    quantity: item.requisitionQuantity,
-                    estimatedPrice: item.estimatedPrice || 0,
-                    status: 'Pendente',
-                    notes: item.notes,
-                    attachmentUrl: item.attachmentUrl,
-                };
-                batch.set(itemRef, itemData, { merge: true });
-            }
-
-            // Delete items that were removed for SC
-            for (const itemIdToDelete of deletedItemIds) {
-                const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', itemIdToDelete);
-                batch.delete(itemRef);
-            }
-        }
-
-        await batch.commit();
-
-        toast({ title: 'Sucesso!', description: 'Sua requisição foi atualizada e reenviada para aprovação.' });
-        onSuccess();
-    } catch(err) {
-        console.error("Erro ao atualizar requisição:", err);
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar as alterações.' });
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
-
+  const isLoading = isLoadingSCs || isLoadingOCs || isEmployeeLoading;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl">
-            <DialogHeader>
-            <DialogTitle>Revisar {isPurchaseOrder ? 'Ordem de Compra' : 'Requisição'}</DialogTitle>
-            <DialogDescription>
-                Ajuste os dados de <span className='font-bold'>{requisition?.protocol}</span> e reenvie para aprovação.
-                 <br />
-                <span className="text-orange-600 dark:text-orange-400">Motivo da devolução: {requisition?.rejectionReason || 'Não especificado.'}</span>
-            </DialogDescription>
-            </DialogHeader>
-            <Card className="w-full border-none shadow-none">
-                <CardContent className="p-0">
-                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4">
-                        
-                        {isPurchaseOrder && (
-                            <div className="space-y-4 p-1">
-                                <div className="space-y-1">
-                                    <Label htmlFor="paymentTerms">Condições de Pagamento</Label>
-                                    <Input id="paymentTerms" value={editableFields.paymentTerms} onChange={handleFieldChange} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="purchaseOrderNotes">Notas para OC</Label>
-                                    <Textarea id="purchaseOrderNotes" value={editableFields.purchaseOrderNotes} onChange={handleFieldChange} />
-                                </div>
-                            </div>
+    <>
+    <TooltipProvider>
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Controle de Compras</h1>
+        
+        <Tabs defaultValue="requisicoes">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="requisicoes">Requisições para Cotação</TabsTrigger>
+                <TabsTrigger value="ordens">Ordens de Compra Aprovadas</TabsTrigger>
+            </TabsList>
+            <TabsContent value="requisicoes">
+                <Card>
+                <CardHeader>
+                    <CardTitle>Requisições Aprovadas e Em Cotação</CardTitle>
+                    <CardDescription>
+                    Gerencie as requisições de compra aprovadas e inicie o processo de cotação e compra.
+                    </CardDescription>
+                    <div className="relative pt-4">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Pesquisar por protocolo, solicitante..."
+                        value={searchTermSC}
+                        onChange={(e) => setSearchTermSC(e.target.value)}
+                        className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                    />
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead>Protocolo</TableHead>
+                        <TableHead>Prioridade</TableHead>
+                        <TableHead>Solicitante</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-[20%]">Atendimento</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading && (
+                        <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                         )}
-
-                        <h3 className="font-semibold text-lg pt-2">Itens ({cart.length})</h3>
-                        {isLoading ? (
-                            <div className="flex justify-center items-center h-48">
-                                <Loader2 className="h-8 w-8 animate-spin" />
-                            </div>
-                        ) : cart.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
-                                <p>Nenhum item na requisição.</p>
-                            </div>
-                        ) : (
-                            <ScrollArea className="h-96 border rounded-md">
-                                <div className="space-y-3 p-3">
-                                {cart.map(item => (
-                                    <Card key={item.docId} className="p-3 shadow-sm">
-                                        <div className="flex items-start gap-4">
-                                            <Image
-                                                src={item.imageUrl || 'https://picsum.photos/seed/item/64/64'}
-                                                alt={item.descricao || 'Item sem descrição'}
-                                                width={48}
-                                                height={48}
-                                                className="rounded-md aspect-square object-cover"
-                                            />
-                                            <div className="flex-1 text-sm space-y-2">
-                                                <p className="font-bold">{item.descricao}</p>
-                                                <p className="font-mono text-xs text-muted-foreground">{item.codigo}</p>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                    <Input 
-                                                        type="number" 
-                                                        placeholder="Qtd."
-                                                        value={item.requisitionQuantity}
-                                                        onChange={(e) => updateCartItem(item.docId, 'requisitionQuantity', Math.max(1, parseInt(e.target.value) || 1))}
-                                                        className="h-8 text-center"
-                                                        min="1"
-                                                        disabled={isPurchaseOrder}
-                                                    />
-                                                    <Input
-                                                        type="number"
-                                                        placeholder="Preço Est. (R$)"
-                                                        value={item.estimatedPrice || ''}
-                                                        onChange={(e) => updateCartItem(item.docId, 'estimatedPrice', parseFloat(e.target.value) || undefined)}
-                                                        className="h-8 text-center"
-                                                        disabled={isPurchaseOrder}
-                                                    />
-                                                </div>
-                                                <Textarea
-                                                    placeholder="Observação (opcional)"
-                                                    value={item.notes || ''}
-                                                    onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
-                                                    className="h-16 text-sm"
-                                                     disabled={isPurchaseOrder}
-                                                />
+                        {scError && (
+                        <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{scError.message}</TableCell></TableRow>
+                        )}
+                        {!isLoading && sortedAndFilteredSCs.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição aprovada ou em cotação encontrada.</TableCell></TableRow>
+                        )}
+                        {!isLoading && sortedAndFilteredSCs.map(req => (
+                        <TableRow key={req.docId} className={cn(req.status === 'Em Revisão' && 'bg-yellow-50 dark:bg-yellow-900/20')}>
+                            <TableCell className="font-mono">{req.protocol}</TableCell>
+                            <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
+                            <TableCell>{req.requesterName}</TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
+                                  {req.status === 'Em Revisão' && req.rejectionReason && (
+                                     <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="cursor-help">
+                                              <AlertCircle className="h-4 w-4 text-orange-500" />
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="max-w-xs">Motivo da Devolução: {req.rejectionReason}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                {req.totalItems > 0 ? (
+                                <div className="flex flex-col">
+                                    <Progress value={req.progress} className="h-2" />
+                                    <span className="text-xs text-muted-foreground text-right">{Math.round(req.progress)}%</span>
+                                </div>
+                                ) : <span className="text-xs text-muted-foreground">N/A</span> }
+                            </TableCell>
+                            <TableCell className="text-right space-x-2">
+                               <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
+                                  <Eye className="mr-2 h-4 w-4"/>
+                                  Ver e Atender Itens
+                                </Button>
+                                {isAdmin && (
+                                    <>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="destructive" size="icon" disabled={isProcessing === req.docId} title="Excluir Requisição">
+                                                    {isProcessing === req.docId ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Tem certeza que deseja excluir permanentemente a requisição <span className="font-bold">{req.protocol}</span>? Esta ação não pode ser desfeita.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteRequisition(req.docId, 'SC')}>
+                                                        Sim, Excluir
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </>
+                                )}
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="ordens">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Ordens de Compra</CardTitle>
+                        <CardDescription>Gerencie as OCs, acompanhe entregas, revise e finalize o processo.</CardDescription>
+                         <div className="relative pt-4">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Pesquisar por OC, fornecedor ou SC de origem..."
+                                value={searchTermOC}
+                                onChange={(e) => setSearchTermOC(e.target.value)}
+                                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                            />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                       <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Protocolo OC</TableHead>
+                                    <TableHead>Fornecedor</TableHead>
+                                    <TableHead>Valor Total</TableHead>
+                                    <TableHead>Data Aprovação</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Ações</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                             <TableBody>
+                                {isLoading && (
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                                )}
+                                {ocError && (
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{ocError.message}</TableCell></TableRow>
+                                )}
+                                {!isLoading && filteredOCs.length === 0 && (
+                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma Ordem de Compra encontrada.</TableCell></TableRow>
+                                )}
+                                 {!isLoading && filteredOCs.map(oc => {
+                                  const showReason = (oc.status === 'Em Revisão Comprador') && oc.rejectionReason;
+                                  return (
+                                    <TableRow key={oc.docId}>
+                                        <TableCell className="font-mono">
+                                            <p>{oc.protocol}</p>
+                                            {oc.originalRequisitionProtocol && <p className="text-xs text-muted-foreground">Origem: {oc.originalRequisitionProtocol}</p>}
+                                        </TableCell>
+                                        <TableCell>{oc.supplierName || 'N/A'}</TableCell>
+                                        <TableCell className="font-medium">{oc.totalValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                                        <TableCell>{format(new Date(oc.createdAt), 'dd/MM/yyyy')}</TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant={getStatusVariant(oc.status)}>{oc.status}</Badge>
+                                                {showReason && (
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                        <span className="cursor-help">
+                                                            <AlertCircle className="h-4 w-4 text-orange-500" />
+                                                        </span>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                        <p className="max-w-xs">Motivo da Devolução: {oc.rejectionReason}</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                )}
                                             </div>
-                                            {!isPurchaseOrder && (
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.docId, item.existingItemId)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                        </TableCell>
+                                        <TableCell className="text-right space-x-2">
+                                            {oc.status === 'Em Revisão Comprador' ? (
+                                                <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(oc)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    Revisar e Reenviar
+                                                </Button>
+                                            ) : (
+                                                <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(oc)}>
+                                                    <Eye className="mr-2 h-4 w-4" />
+                                                    Detalhes
                                                 </Button>
                                             )}
-                                        </div>
-                                    </Card>
-                                ))}
-                                </div>
-                            </ScrollArea>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-            <DialogFooter>
-                <Button variant="outline" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
-                <Button onClick={handleSubmitUpdate} disabled={isSubmitting || isLoading}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Salvar e Reenviar para Aprovação
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
+
+                                            {isAdmin && (
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="destructive" size="icon" disabled={isProcessing === oc.docId} title="Excluir Ordem de Compra">
+                                                            {isProcessing === oc.docId ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                Tem certeza que deseja excluir permanentemente a Ordem de Compra <span className="font-bold">{oc.protocol}</span>? Esta ação não pode ser desfeita.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDeleteRequisition(oc.docId, 'OC')}>
+                                                                Sim, Excluir
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                  )
+                                })}
+                            </TableBody>
+                       </Table>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
+      </div>
+      </TooltipProvider>
+
+      {selectedRequisition && (
+          <PurchaseRequisitionDetailsDialog
+            requisition={selectedRequisition}
+            isOpen={!!selectedRequisition}
+            onClose={() => setSelectedRequisition(null)}
+            onActionSuccess={handleSuccess}
+          />
+      )}
+
+      {requisitionToReview && requisitionToReview.type === 'Ordem de Compra' && (
+        <ReviewPurchaseOrderDialog
+            purchaseOrder={requisitionToReview}
+            isOpen={!!requisitionToReview}
+            onClose={() => setRequisitionToReview(null)}
+            onSuccess={handleSuccess}
+        />
+      )}
+    </>
   );
 };
+
+export default ControleComprasPage;

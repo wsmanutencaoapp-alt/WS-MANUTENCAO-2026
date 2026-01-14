@@ -42,7 +42,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import QuotationDialog from '@/components/QuotationDialog';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import EditRequisitionDialog from '@/components/EditRequisitionDialog';
+import ReviewPurchaseOrderDialog from '@/components/ReviewPurchaseOrderDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -89,7 +89,7 @@ const ControleComprasPage = () => {
   const [searchTermSC, setSearchTermSC] = useState('');
   const [searchTermOC, setSearchTermOC] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
-  const [requisitionToEdit, setRequisitionToEdit] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
@@ -200,7 +200,7 @@ const ControleComprasPage = () => {
   }, [ocRequisitions, searchTermOC]);
 
   const handleSuccess = () => {
-    setRequisitionToEdit(null);
+    setRequisitionToReview(null);
     setSelectedRequisition(null);
     queryClient.invalidateQueries({ queryKey: [scQueryKey] });
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
@@ -325,22 +325,12 @@ const ControleComprasPage = () => {
                                 ) : <span className="text-xs text-muted-foreground">N/A</span> }
                             </TableCell>
                             <TableCell className="text-right space-x-2">
-                               {req.status === 'Em Revisão' ? (
-                                  <Button variant="secondary" size="sm" onClick={() => setRequisitionToEdit(req)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Revisar
-                                  </Button>
-                                ) : (
-                                  <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
-                                      <Eye className="mr-2 h-4 w-4"/>
-                                      Ver e Atender Itens
-                                  </Button>
-                                )}
+                               <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
+                                  <Eye className="mr-2 h-4 w-4"/>
+                                  Ver e Atender Itens
+                                </Button>
                                 {isAdmin && (
                                     <>
-                                        <Button variant="outline" size="icon" onClick={() => setRequisitionToEdit(req)} title="Editar Requisição">
-                                            <Edit className="h-4 w-4" />
-                                        </Button>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                 <Button variant="destructive" size="icon" disabled={isProcessing === req.docId} title="Excluir Requisição">
@@ -439,7 +429,7 @@ const ControleComprasPage = () => {
                                         </TableCell>
                                         <TableCell className="text-right space-x-2">
                                             {oc.status === 'Em Revisão Comprador' ? (
-                                                <Button variant="secondary" size="sm" onClick={() => setRequisitionToEdit(oc)}>
+                                                <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(oc)}>
                                                     <Edit className="mr-2 h-4 w-4" />
                                                     Revisar e Reenviar
                                                 </Button>
@@ -495,11 +485,11 @@ const ControleComprasPage = () => {
           />
       )}
 
-      {requisitionToEdit && (
-        <EditRequisitionDialog
-            requisition={requisitionToEdit}
-            isOpen={!!requisitionToEdit}
-            onClose={() => setRequisitionToEdit(null)}
+      {requisitionToReview && requisitionToReview.type === 'Ordem de Compra' && (
+        <ReviewPurchaseOrderDialog
+            purchaseOrder={requisitionToReview}
+            isOpen={!!requisitionToReview}
+            onClose={() => setRequisitionToReview(null)}
             onSuccess={handleSuccess}
         />
       )}
