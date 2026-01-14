@@ -28,13 +28,14 @@ interface PurchaseRequisitionDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onActionSuccess?: () => void; 
+  isRequesterView?: boolean;
 }
 
 export type RequisitionItemWithDetails = WithDocId<PurchaseRequisitionItem> & {
   details: Partial<WithDocId<Supply> | WithDocId<Tool>>;
 };
 
-export default function PurchaseRequisitionDetailsDialog({ requisition: initialRequisition, isOpen, onClose, onActionSuccess }: PurchaseRequisitionDetailsDialogProps) {
+export default function PurchaseRequisitionDetailsDialog({ requisition: initialRequisition, isOpen, onClose, onActionSuccess, isRequesterView = false }: PurchaseRequisitionDetailsDialogProps) {
   const firestore = useFirestore();
   const queryClient = useQueryClient();
 
@@ -85,6 +86,12 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     // Subscribe to real-time updates on the items subcollection
     const unsubscribe = onSnapshot(itemsQuery, async (itemsSnapshot) => {
         const items = itemsSnapshot.docs.map(d => ({ ...d.data() as PurchaseRequisitionItem, docId: d.id }));
+
+        if(items.length === 0) {
+            setEnrichedItems([]);
+            setIsLoading(false);
+            return;
+        }
 
         // Fetch master data
         const supplyIds = items.filter(i => i.itemType === 'supply').map(i => i.itemId);
@@ -141,8 +148,6 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
   const handleQuotationSuccess = () => {
     setIsQuotationDialogOpen(false);
     setSelectedItemsForQuotation([]);
-    // Invalidation might still be useful as a fallback or for related data,
-    // but the onSnapshot listener is now the primary source of truth for the dialog.
     queryClient.invalidateQueries({ queryKey: ['allPurchaseRequisitionsForControl'] });
     if (onActionSuccess) onActionSuccess();
   }
@@ -216,7 +221,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
                   const quotationCount = (item.quotations || []).filter(q => q?.totalValue > 0).length;
                   return (
                       <div key={item.docId} className="flex items-start gap-4 rounded-lg border p-3">
-                          {!isPurchaseOrder && (
+                          {!isPurchaseOrder && !isRequesterView && (
                               <Checkbox 
                                 id={`select-item-${item.docId}`}
                                 checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
@@ -241,7 +246,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
                           </div>
                           <div className="text-right">
                               <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
-                              <Badge variant="outline">Cotações: {quotationCount}/3</Badge>
+                              {!isRequesterView && <Badge variant="outline">Cotações: {quotationCount}/3</Badge>}
                           </div>
                       </div>
                   )
@@ -251,7 +256,7 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
 
         <DialogFooter className="sm:justify-between">
           <Button variant="outline" onClick={handleDialogClose}>Fechar</Button>
-          {!isPurchaseOrder && (
+          {!isPurchaseOrder && !isRequesterView && (
             <Button onClick={handleStartQuotation} disabled={selectedItemsForQuotation.length === 0}>
                 <ShoppingBag className="mr-2 h-4 w-4"/>
                 Realizar Cotação para Itens Selecionados ({selectedItemsForQuotation.length})

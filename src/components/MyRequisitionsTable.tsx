@@ -37,7 +37,6 @@ import { Loader2, Search, Eye, Edit, AlertCircle, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
-import EditRequisitionDialog from '@/components/EditRequisitionDialog'; 
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Tooltip,
@@ -47,6 +46,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import ReviewRequisitionDialog from './ReviewRequisitionDialog';
 
 
 type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
@@ -67,7 +67,7 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Cancelada': 'destructive',
     'Aguardando Entrega': 'default',
     'Em Revisão': 'warning',
-    'Pronta para OC': 'success', // Novo status
+    'Pronta para OC': 'success', 
   };
   return variants[status] || 'secondary';
 };
@@ -88,7 +88,7 @@ export default function MyRequisitionsTable() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
-  const [requisitionToEdit, setRequisitionToEdit] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
   const [isProcessingDelete, setIsProcessingDelete] = useState<string | null>(null);
 
@@ -184,8 +184,8 @@ export default function MyRequisitionsTable() {
     );
   }, [requisitionsWithProgress, searchTerm, costCenterMap]);
 
-  const handleEditSuccess = () => {
-    setRequisitionToEdit(null);
+  const handleReviewSuccess = () => {
+    setRequisitionToReview(null);
     queryClient.invalidateQueries({ queryKey });
   }
 
@@ -296,7 +296,7 @@ export default function MyRequisitionsTable() {
                       <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
                       <TableCell className="text-right space-x-2">
                        {req.status === 'Em Revisão' && (
-                        <Button variant="secondary" size="sm" onClick={() => setRequisitionToEdit(req)}>
+                        <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(req)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Revisar
                         </Button>
@@ -343,15 +343,16 @@ export default function MyRequisitionsTable() {
             requisition={selectedRequisition}
             isOpen={!!selectedRequisition}
             onClose={() => setSelectedRequisition(null)}
+            isRequesterView={true}
           />
       )}
       
-      {requisitionToEdit && (
-        <EditRequisitionDialog
-            requisition={requisitionToEdit}
-            isOpen={!!requisitionToEdit}
-            onClose={() => setRequisitionToEdit(null)}
-            onSuccess={handleEditSuccess}
+      {requisitionToReview && (
+        <ReviewRequisitionDialog
+            requisition={requisitionToReview}
+            isOpen={!!requisitionToReview}
+            onClose={() => setRequisitionToReview(null)}
+            onSuccess={handleReviewSuccess}
         />
       )}
     </>
