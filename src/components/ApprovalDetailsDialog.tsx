@@ -11,6 +11,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Card,
+  CardContent,
+} from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
