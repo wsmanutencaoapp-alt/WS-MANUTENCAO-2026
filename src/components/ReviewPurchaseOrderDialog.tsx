@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useFirestore, useCollection, useMemoFirebase, useStorage } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useStorage, useUser } from '@/firebase';
 import {
   collection,
   query,
@@ -23,7 +23,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, FileText, ChevronsUpDown, Check, ShoppingBag, Save, Trash2, Crown, Edit, ExternalLink } from 'lucide-react';
+import { Loader2, Upload, FileText, ChevronsUpDown, Check, ShoppingBag, Save, Trash2, Crown, Edit, ExternalLink, PlusCircle } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
