@@ -97,16 +97,17 @@ export default function ReviewPurchaseOrderDialog({ isOpen, onClose, onSuccess, 
             const itemData = { ...itemDoc.data(), docId: itemDoc.id } as WithDocId<PurchaseRequisitionItem>;
 
             // Fetch master data for the item
-            const masterDataRef = doc(firestore, itemData.itemType === 'supply' ? 'supplies' : 'tools', itemData.itemId);
-            const masterDataSnap = await getDocs(query(collection(firestore, itemData.itemType === 'supply' ? 'supplies' : 'tools'), where(documentId(), '==', itemData.itemId)));
-
-            if (masterDataSnap.empty) {
+            const masterCollectionName = itemData.itemType === 'supply' ? 'supplies' : 'tools';
+            const masterDataRef = doc(firestore, masterCollectionName, itemData.itemId);
+            const masterDataSnapshot = await getDocs(query(collection(firestore, masterCollectionName), where(documentId(), '==', itemData.itemId)));
+            
+            if (masterDataSnapshot.empty) {
                  toast({ variant: 'destructive', title: 'Erro', description: 'Dados mestre do item não encontrados.' });
                  setIsLoading(false);
                  return;
             }
             
-            const masterData = {...masterDataSnap.docs[0].data() as (Supply | Tool), docId: masterDataSnap.docs[0].id};
+            const masterData = {...masterDataSnapshot.docs[0].data() as (Supply | Tool), docId: masterDataSnapshot.docs[0].id};
 
             const enrichedItem: RequisitionItemWithDetails = {
                 ...itemData,
