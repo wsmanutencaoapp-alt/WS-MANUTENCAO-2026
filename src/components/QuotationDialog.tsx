@@ -170,8 +170,13 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       const updateData: any = {
         quotations: finalQuotations,
         selectedQuotationIndex: selectedQuotationIndex,
-        status: finalQuotations.length > 0 ? 'Em Cotação' : 'Pendente' // This is the change
       };
+      
+      if (finalQuotations.length > 0) {
+        updateData.status = 'Em Cotação';
+      } else {
+        updateData.status = 'Pendente';
+      }
       
       if (selectedQuotationIndex !== null) {
           updateData.status = 'Cotado';
@@ -268,7 +273,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
         
         const newOcRef = doc(collection(firestore, 'purchase_requisitions'));
-        const allItems = (await getDocs(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'))).docs.map(d => d.data() as PurchaseRequisitionItem);
+        const allItems = (await getDocs(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'))).docs.map(d => ({ ...d.data() as PurchaseRequisitionItem, docId: d.id }));
         const winningQuotes = allItems.map(item => item.quotations![item.selectedQuotationIndex!]);
         const firstWinner = winningQuotes[0];
 
@@ -292,8 +297,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         };
         batch.set(newOcRef, ocData);
 
-        items.forEach(item => {
-            if (item.selectedQuotationIndex === null || item.selectedQuotationIndex === undefined) return;
+        for (const item of allItems) {
+            if (item.selectedQuotationIndex === null || item.selectedQuotationIndex === undefined) continue;
 
             const newItemRef = doc(collection(newOcRef, 'items'));
             const winningQuote = item.quotations![item.selectedQuotationIndex!];
@@ -306,7 +311,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                 estimatedPrice: winningQuote.totalValue,
             };
             batch.set(newItemRef, newItemData);
-        });
+        };
 
         const originalReqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
         batch.update(originalReqRef, { status: 'Totalmente Atendida' });
