@@ -125,7 +125,7 @@ const AprovacoesComprasPage = () => {
   }, [costCenters]);
 
 
-  const handleDecision = async (req: WithDocId<PurchaseRequisition>, newStatus: 'Aprovada' | 'Recusada' | 'Em Revisão', reason?: string) => {
+  const handleDecision = async (req: WithDocId<PurchaseRequisition>, newStatus: 'Aprovada' | 'Recusada' | 'Em Revisão' | 'Em Revisão Comprador', reason?: string) => {
       if (!firestore) return;
       setIsProcessing(req.docId);
       
@@ -139,9 +139,6 @@ const AprovacoesComprasPage = () => {
       
       if (newStatus === 'Aprovada' && req.type === 'Ordem de Compra') {
         updateData.status = 'Aguardando Entrega';
-      } else if (newStatus === 'Em Revisão' && req.type === 'Ordem de Compra') {
-          // OC revision goes back to the buyer
-          updateData.status = 'Em Revisão Comprador';
       }
 
       batch.update(reqRef, updateData);
@@ -195,6 +192,7 @@ const AprovacoesComprasPage = () => {
         'Aberta': 'secondary',
         'Em Aprovação': 'default',
         'Em Revisão': 'warning',
+        'Em Revisão Comprador': 'warning',
         'Aprovada': 'success',
         'Recusada': 'destructive',
         'Concluída': 'secondary',
@@ -203,6 +201,7 @@ const AprovacoesComprasPage = () => {
         'Cancelada': 'destructive',
         'Em Cotação': 'default',
         'Aguardando Entrega': 'default',
+        'Pronta para OC': 'success',
     };
     return variants[status] || 'secondary';
   }
@@ -250,6 +249,7 @@ const AprovacoesComprasPage = () => {
                   <TableRow key={req.docId} className={cn(req.type === 'Ordem de Compra' && 'bg-blue-50 dark:bg-blue-900/20')}>
                     <TableCell>
                       <Badge variant={req.type === 'Ordem de Compra' ? 'default' : 'secondary'}>{req.type}</Badge>
+                       {req.originalRequisitionProtocol && <p className="text-xs text-muted-foreground mt-1">Origem: {req.originalRequisitionProtocol}</p>}
                     </TableCell>
                     <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
                     <TableCell>{req.requesterName}</TableCell>
@@ -313,7 +313,14 @@ const AprovacoesComprasPage = () => {
               <DialogFooter>
                   <Button variant="ghost" onClick={() => setDecisionState(prev => ({...prev, isOpen: false}))}>Cancelar</Button>
                   <Button
-                      onClick={() => handleDecision(decisionState.requisition!, decisionState.type === 'reject' ? 'Recusada' : 'Em Revisão', decisionState.reason)}
+                      onClick={() => {
+                        const newStatus = decisionState.requisition?.type === 'Ordem de Compra' && decisionState.type === 'review'
+                          ? 'Em Revisão Comprador'
+                          : decisionState.type === 'reject'
+                          ? 'Recusada'
+                          : 'Em Revisão';
+                        handleDecision(decisionState.requisition!, newStatus, decisionState.reason);
+                      }}
                       disabled={!decisionState.reason || isProcessing === decisionState.requisition?.docId}
                       variant={decisionState.type === 'reject' ? 'destructive' : 'default'}
                   >

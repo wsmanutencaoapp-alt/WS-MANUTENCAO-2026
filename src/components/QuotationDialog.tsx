@@ -250,6 +250,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             const ocData: Omit<PurchaseRequisition, 'id'> = {
                 protocol: ocProtocol,
                 originalRequisitionId: requisition.docId,
+                originalRequisitionProtocol: requisition.protocol,
                 requesterId: requisition.requesterId,
                 requesterName: requisition.requesterName,
                 costCenterId: requisition.costCenterId,

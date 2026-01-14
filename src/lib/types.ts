@@ -30,6 +30,7 @@ export type Supply = {
   // Anexos
   imageUrl?: string;
   documentoUrl?: string;
+  valor_estimado?: number;
 };
 
 export type SupplyStock = {
@@ -178,6 +179,8 @@ export type Permissions = {
   manutencao?: boolean;
   contabilidade_classificacao?: boolean;
   suprimentos_controle_almoxarifado?: boolean;
+  ferramentaria_kits?: boolean;
+  ferramentaria_historico?: boolean;
   [key: string]: boolean | undefined;
 };
 
@@ -247,12 +250,13 @@ export type PurchaseRequisition = {
   id?: string;
   protocol: string;
   originalRequisitionId?: string; // Links an OC back to its original SC
+  originalRequisitionProtocol?: string;
   requesterId: string;
   requesterName: string;
   costCenterId: string;
   neededByDate: string; // ISO date string
   type: 'Solicitação de Compra' | 'Ordem de Compra';
-  status: 'Aberta' | 'Parcialmente Atendida' | 'Totalmente Atendida' | 'Cancelada' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída' | 'Em Revisão' | 'Aguardando Entrega';
+  status: 'Aberta' | 'Parcialmente Atendida' | 'Totalmente Atendida' | 'Cancelada' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída' | 'Em Revisão' | 'Aguardando Entrega' | 'Pronta para OC' | 'Em Revisão Comprador';
   rejectionReason?: string;
   createdAt: string; // ISO date string
   priority: 'Normal' | 'Urgente' | 'Muito Urgente';
@@ -262,8 +266,6 @@ export type PurchaseRequisition = {
   supplierId?: string;
   totalValue?: number;
   paymentTerms?: string;
-  quotations?: Quotation[];
-  selectedQuotationIndex?: number;
 };
 
 
@@ -276,6 +278,8 @@ export type PurchaseRequisitionItem = {
     status: 'Pendente' | 'Em Cotação' | 'Cotado' | 'Recebido' | 'Cancelado';
     notes?: string;
     attachmentUrl?: string;
+    quotations?: Quotation[];
+    selectedQuotationIndex?: number;
 };
 
 export type Notification = {

@@ -67,7 +67,8 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Cancelada': 'destructive',
     'Aguardando Entrega': 'default',
     'Em Revisão': 'warning',
-    'Pronta para OC': 'success', 
+    'Pronta para OC': 'success',
+    'Em Revisão Comprador': 'warning',
   };
   return variants[status] || 'secondary';
 };
@@ -132,6 +133,10 @@ export default function MyRequisitionsTable() {
     const fetchProgress = async () => {
       const enrichedReqs: RequisitionWithProgress[] = [];
       for (const req of requisitions) {
+        if (req.type === 'Ordem de Compra') {
+            enrichedReqs.push({ ...req, progress: 0, totalItems: 0 });
+            continue;
+        }
         const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
         const itemsSnapshot = await getDocs(itemsRef);
         const totalItems = itemsSnapshot.size;
@@ -139,7 +144,7 @@ export default function MyRequisitionsTable() {
         
         itemsSnapshot.forEach(doc => {
           const item = doc.data() as PurchaseRequisitionItem;
-          if (['Cotado', 'Recebido', 'Cancelado'].includes(item.status)) {
+          if (['Recebido', 'Cancelado'].includes(item.status)) {
             attendedItems++;
           }
         });
@@ -265,7 +270,10 @@ export default function MyRequisitionsTable() {
                   const showReason = (req.status === 'Recusada' || req.status === 'Em Revisão') && req.rejectionReason;
                   return (
                     <TableRow key={req.docId}>
-                      <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
+                      <TableCell className="font-mono">
+                        <p>{req.protocol || req.docId.substring(0, 8)}</p>
+                        {req.originalRequisitionProtocol && <p className="text-xs text-muted-foreground">Origem: {req.originalRequisitionProtocol}</p>}
+                      </TableCell>
                       <TableCell>{format(new Date(req.createdAt), 'dd/MM/yyyy')}</TableCell>
                       <TableCell>
                          <div className="flex items-center gap-2">
@@ -305,7 +313,7 @@ export default function MyRequisitionsTable() {
                          <Eye className="mr-2 h-4 w-4" />
                          Ver Itens
                       </Button>
-                       {isAdmin && (
+                       {isAdmin && req.type === 'Solicitação de Compra' && (
                           <AlertDialog>
                               <AlertDialogTrigger asChild>
                                   <Button variant="destructive" size="icon" disabled={isProcessingDelete === req.docId} title="Excluir Requisição">

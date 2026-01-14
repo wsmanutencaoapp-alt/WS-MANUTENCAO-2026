@@ -115,6 +115,7 @@ export default function ApprovalDetailsDialog({ requisition, isOpen, onClose }: 
           <DialogTitle>Detalhes para Aprovação</DialogTitle>
           <DialogDescription>
             Protocolo: <span className="font-mono font-bold">{requisition?.protocol || 'N/A'}</span>
+            {requisition?.originalRequisitionProtocol && <span className="text-sm"> (Origem: {requisition.originalRequisitionProtocol})</span>}
           </DialogDescription>
         </DialogHeader>
 

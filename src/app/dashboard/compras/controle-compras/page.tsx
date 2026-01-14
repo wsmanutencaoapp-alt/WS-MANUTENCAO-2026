@@ -60,9 +60,11 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Recusada': 'destructive',
     'Concluída': 'secondary',
     'Em Revisão': 'warning',
+    'Em Revisão Comprador': 'warning',
     'Parcialmente Atendida': 'warning',
     'Totalmente Atendida': 'success',
-    'Cancelada': 'destructive'
+    'Cancelada': 'destructive',
+    'Pronta para OC': 'success',
   };
   return variants[status] || 'secondary';
 };
@@ -191,7 +193,8 @@ const ControleComprasPage = () => {
     const lowercasedTerm = searchTermOC.toLowerCase();
     return ocRequisitions.filter(oc => 
       (oc.protocol && oc.protocol.toLowerCase().includes(lowercasedTerm)) ||
-      (oc.supplierName && oc.supplierName.toLowerCase().includes(lowercasedTerm))
+      (oc.supplierName && oc.supplierName.toLowerCase().includes(lowercasedTerm)) ||
+      (oc.originalRequisitionProtocol && oc.originalRequisitionProtocol.toLowerCase().includes(lowercasedTerm))
     );
   }, [ocRequisitions, searchTermOC]);
 
@@ -354,7 +357,7 @@ const ControleComprasPage = () => {
                          <div className="relative pt-4">
                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Pesquisar por OC ou fornecedor..."
+                                placeholder="Pesquisar por OC, fornecedor ou SC de origem..."
                                 value={searchTermOC}
                                 onChange={(e) => setSearchTermOC(e.target.value)}
                                 className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -385,7 +388,10 @@ const ControleComprasPage = () => {
                                 )}
                                  {!isLoading && filteredOCs.map(oc => (
                                     <TableRow key={oc.docId}>
-                                        <TableCell className="font-mono">{oc.protocol}</TableCell>
+                                        <TableCell className="font-mono">
+                                            <p>{oc.protocol}</p>
+                                            {oc.originalRequisitionProtocol && <p className="text-xs text-muted-foreground">Origem: {oc.originalRequisitionProtocol}</p>}
+                                        </TableCell>
                                         <TableCell>{oc.supplierName || 'N/A'}</TableCell>
                                         <TableCell className="font-medium">{oc.totalValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                         <TableCell>{format(new Date(oc.createdAt), 'dd/MM/yyyy')}</TableCell>
