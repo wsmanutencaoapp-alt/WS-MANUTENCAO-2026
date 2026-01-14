@@ -9,6 +9,7 @@ import {
   writeBatch,
   getDocs,
   updateDoc,
+  documentId,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -24,7 +25,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload, FileText, ChevronsUpDown, Check, ShoppingBag, Save, Trash2, Crown, Edit, ExternalLink, PlusCircle } from 'lucide-react';
-import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
+import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation, Supply, Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from './ui/card';
@@ -32,6 +33,8 @@ import SupplierSelectorDialog from './SupplierSelectorDialog';
 import { cn } from '@/lib/utils';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
+import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
+
 
 interface ReviewPurchaseOrderDialogProps {
   isOpen: boolean;
@@ -66,7 +69,7 @@ export default function ReviewPurchaseOrderDialog({ isOpen, onClose, onSuccess, 
   const queryClient = useQueryClient();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [item, setItem] = useState<WithDocId<PurchaseRequisitionItem> | null>(null);
+  const [item, setItem] = useState<RequisitionItemWithDetails | null>(null);
   const [savedQuotations, setSavedQuotations] = useState<QuotationFormState[]>([]);
   const [newQuotation, setNewQuotation] = useState<QuotationFormState>(emptyQuotation);
   const [selectedQuotationIndex, setSelectedQuotationIndex] = useState<number | null>(null);
@@ -74,19 +77,43 @@ export default function ReviewPurchaseOrderDialog({ isOpen, onClose, onSuccess, 
   const [isSaving, setIsSaving] = useState(false);
   const [isSupplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
 
-  // Fetch the single item from the Purchase Order
+  // Fetch the single item from the Purchase Order and its master data
   useEffect(() => {
-    if (!firestore || !purchaseOrder) return;
+    if (!firestore || !purchaseOrder || !isOpen) return;
     
-    const fetchItem = async () => {
+    const fetchItemAndDetails = async () => {
         setIsLoading(true);
-        const itemsRef = collection(firestore, 'purchase_requisitions', purchaseOrder.docId, 'items');
-        const itemsSnapshot = await getDocs(itemsRef);
-        
-        if (!itemsSnapshot.empty) {
-            const doc = itemsSnapshot.docs[0];
-            const itemData = { ...doc.data(), docId: doc.id } as WithDocId<PurchaseRequisitionItem>;
-            setItem(itemData);
+        try {
+            const itemsRef = collection(firestore, 'purchase_requisitions', purchaseOrder.docId, 'items');
+            const itemsSnapshot = await getDocs(itemsRef);
+            
+            if (itemsSnapshot.empty) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'Nenhum item encontrado nesta Ordem de Compra.' });
+                setIsLoading(false);
+                return;
+            }
+
+            const itemDoc = itemsSnapshot.docs[0];
+            const itemData = { ...itemDoc.data(), docId: itemDoc.id } as WithDocId<PurchaseRequisitionItem>;
+
+            // Fetch master data for the item
+            const masterDataRef = doc(firestore, itemData.itemType === 'supply' ? 'supplies' : 'tools', itemData.itemId);
+            const masterDataSnap = await getDocs(query(collection(firestore, itemData.itemType === 'supply' ? 'supplies' : 'tools'), where(documentId(), '==', itemData.itemId)));
+
+            if (masterDataSnap.empty) {
+                 toast({ variant: 'destructive', title: 'Erro', description: 'Dados mestre do item não encontrados.' });
+                 setIsLoading(false);
+                 return;
+            }
+            
+            const masterData = {...masterDataSnap.docs[0].data() as (Supply | Tool), docId: masterDataSnap.docs[0].id};
+
+            const enrichedItem: RequisitionItemWithDetails = {
+                ...itemData,
+                details: masterData
+            };
+            
+            setItem(enrichedItem);
             
             const itemQuotes = itemData.quotations || [];
             const initialQuotes = itemQuotes.map(q => ({
@@ -97,13 +124,18 @@ export default function ReviewPurchaseOrderDialog({ isOpen, onClose, onSuccess, 
             }));
             setSavedQuotations(initialQuotes);
             setSelectedQuotationIndex(itemData.selectedQuotationIndex ?? null);
+
+        } catch (error) {
+            console.error("Error fetching item details:", error);
+            toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar os detalhes do item.' });
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
-    fetchItem();
+    fetchItemAndDetails();
 
-  }, [firestore, purchaseOrder, isOpen]);
+  }, [firestore, purchaseOrder, isOpen, toast]);
 
   const handleNewQuotationChange = (field: keyof QuotationFormState, value: any) => {
     setNewQuotation(prev => ({ ...prev, [field]: value }));
