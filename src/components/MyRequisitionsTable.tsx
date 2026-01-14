@@ -54,6 +54,7 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Cancelada': 'destructive',
     'Aguardando Entrega': 'default',
     'Em Revisão': 'warning',
+    'Pronta para OC': 'success', // Novo status
   };
   return variants[status] || 'secondary';
 };

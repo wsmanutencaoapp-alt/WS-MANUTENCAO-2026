@@ -115,11 +115,11 @@ const RequisicaoCompraPage = () => {
             requesterName: user.displayName || user.email || 'Desconhecido',
             costCenterId: costCenterId,
             neededByDate: neededByDate.toISOString(),
-            status: 'Aberta',
+            status: 'Em Aprovação',
             createdAt: new Date().toISOString(),
             priority: priority,
             purchaseReason: purchaseReason,
-            type: 'Solicitação de Compra', // Always starts as SC
+            type: 'Solicitação de Compra',
         };
         batch.set(requisitionRef, requisitionData);
 
