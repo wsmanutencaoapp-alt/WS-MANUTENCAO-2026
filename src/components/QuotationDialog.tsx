@@ -90,6 +90,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   const [isSupplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
   const [isJustificationDialogOpen, setIsJustificationDialogOpen] = useState(false);
   const [justification, setJustification] = useState('');
+  const [justificationReason, setJustificationReason] = useState('');
+
 
   const currentItem = useMemo(() => items[currentItemIndex], [items, currentItemIndex]);
 
@@ -216,10 +218,19 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
     const expensiveChoiceJustification = justification || requisition.expensiveChoiceJustification || '';
     
-    const requiresJustification = (savedQuotations || []).length > 1 &&
+    const isExpensiveChoice = (savedQuotations || []).length > 1 &&
         savedQuotations[selectedQuotationIndex].totalValue >= Math.max(...savedQuotations.map(q => Number(q.totalValue)));
+    
+    const notEnoughQuotes = (savedQuotations || []).length < 3;
 
-    if (requiresJustification && !expensiveChoiceJustification) {
+    if ((isExpensiveChoice || notEnoughQuotes) && !expensiveChoiceJustification) {
+        let reason = '';
+        if (notEnoughQuotes) {
+            reason = 'É necessário justificar a geração de Ordem de Compra com menos de 3 cotações.';
+        } else if (isExpensiveChoice) {
+            reason = 'Você selecionou a cotação de maior valor. Por favor, forneça uma justificativa.';
+        }
+        setJustificationReason(reason);
         setIsJustificationDialogOpen(true);
         return;
     }
@@ -476,10 +487,10 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
        <Dialog open={isJustificationDialogOpen} onOpenChange={setIsJustificationDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Justificar Escolha Mais Cara</DialogTitle>
+            <DialogTitle>Justificar Geração de OC</DialogTitle>
             <DialogDescription className="flex items-start gap-2 pt-2">
               <AlertTriangle className="h-6 w-6 text-orange-500 shrink-0" />
-              Você selecionou a cotação de maior valor para um ou mais itens. Por favor, forneça uma justificativa geral para esta escolha.
+              <span>{justificationReason}</span>
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -488,7 +499,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
               id="justification"
               value={justification}
               onChange={(e) => setJustification(e.target.value)}
-              placeholder="Ex: Menor prazo de entrega, melhor condição de pagamento, única opção disponível, etc."
+              placeholder="Ex: Menor prazo de entrega, fornecedor exclusivo, etc."
             />
           </div>
           <DialogFooter>
