@@ -22,20 +22,30 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, FileText, ChevronsUpDown, Check, ShoppingBag, Save, ArrowLeft, ArrowRight, PlusCircle, Trash2, Crown } from 'lucide-react';
+import { Loader2, Upload, FileText, ChevronsUpDown, Check, ShoppingBag, Save, ArrowLeft, ArrowRight, PlusCircle, Trash2, Crown, AlertTriangle } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from './ui/card';
-import { Separator } from './ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import SupplierSelectorDialog from './SupplierSelectorDialog';
 import { cn } from '@/lib/utils';
+import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
+import { Textarea } from './ui/textarea';
 
 
 interface QuotationDialogProps {
@@ -78,7 +88,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   
   const [isSaving, setIsSaving] = useState(false);
   const [isSupplierSelectorOpen, setSupplierSelectorOpen] = useState(false);
-  
+  const [isJustificationDialogOpen, setIsJustificationDialogOpen] = useState(false);
+  const [justification, setJustification] = useState('');
+
   const currentItem = useMemo(() => items[currentItemIndex], [items, currentItemIndex]);
 
   useEffect(() => {
@@ -182,29 +194,50 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           setIsSaving(false);
       }
   }
-
-  const handleMarkAsFinished = async () => {
+  
+  const handleSendForApproval = async () => {
     if (selectedQuotationIndex === null && savedQuotations.length > 0) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Selecione a cotação vencedora para este item.' });
       return;
     }
     
+    // Check if the selected quotation is the most expensive one
+    const selectedQuote = savedQuotations[selectedQuotationIndex!];
+    const isMostExpensive = savedQuotations.every(q => Number(q.totalValue) <= Number(selectedQuote.totalValue));
+
+    if (isMostExpensive && savedQuotations.length > 1) {
+        setIsJustificationDialogOpen(true);
+        return; // Stop here and wait for justification
+    }
+
+    // Proceed without justification
+    await finishApprovalProcess();
+  }
+
+  const finishApprovalProcess = async (providedJustification?: string) => {
     setIsSaving(true);
+    setIsJustificationDialogOpen(false); // Close justification dialog if it was open
+    
     try {
+        // Save current item's quotations one last time
         await saveCurrentItemQuotations();
 
+        // Update item status to 'Cotado'
         const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
         await updateDoc(itemRef, { status: 'Cotado' });
+        
+        // Update main requisition status to 'Em Aprovação' and add justification
+        const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+        const reqUpdateData: any = { status: 'Em Aprovação' };
+        if (providedJustification) {
+            reqUpdateData.expensiveChoiceJustification = providedJustification;
+        }
+        await updateDoc(reqRef, reqUpdateData);
 
-        toast({ title: "Item Finalizado!", description: `O item ${currentItem.details.codigo} foi cotado.` });
+        toast({ title: "Enviado para Aprovação!", description: `A requisição ${requisition.protocol} aguarda aprovação.` });
         
         onSuccess();
-        
-        if (currentItemIndex < items.length - 1) {
-            handleNext();
-        } else {
-            onClose();
-        }
+        onClose(); // Close the main quotation dialog
         
     } catch (err: any) {
         toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
@@ -329,9 +362,9 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
              </div>
              <div className="flex gap-2">
                 <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-                <Button onClick={handleMarkAsFinished} disabled={isSaving || (savedQuotations.length > 0 && selectedQuotationIndex === null)}>
+                <Button onClick={handleSendForApproval} disabled={isSaving || (savedQuotations.length > 0 && selectedQuotationIndex === null)}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Marcar Item como Cotado
+                    Enviar para Aprovação
                 </Button>
             </div>
           </DialogFooter>
@@ -343,6 +376,34 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         onClose={() => setSupplierSelectorOpen(false)}
         onSelect={handleSupplierSelect}
       />
+
+       <Dialog open={isJustificationDialogOpen} onOpenChange={setIsJustificationDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Justificar Escolha Mais Cara</DialogTitle>
+            <DialogDescription className="flex items-start gap-2 pt-2">
+              <AlertTriangle className="h-6 w-6 text-orange-500 shrink-0" />
+              Você selecionou a cotação de maior valor. Por favor, forneça uma justificativa para esta escolha antes de prosseguir.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="justification">Justificativa <span className="text-destructive">*</span></Label>
+            <Textarea
+              id="justification"
+              value={justification}
+              onChange={(e) => setJustification(e.target.value)}
+              placeholder="Ex: Menor prazo de entrega, melhor condição de pagamento, única opção disponível, etc."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsJustificationDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => finishApprovalProcess(justification)} disabled={!justification || isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirmar e Enviar para Aprovação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
