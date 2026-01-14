@@ -158,6 +158,11 @@ const ControleComprasPage = () => {
 
   }, [scRequisitions, firestore]);
   
+  const priorityOrder = {
+      'Muito Urgente': 1,
+      'Urgente': 2,
+      'Normal': 3,
+  };
 
   const sortedAndFilteredSCs = useMemo(() => {
     if (!requisitionsWithProgress) return [];
