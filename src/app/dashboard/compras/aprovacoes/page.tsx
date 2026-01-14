@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where, doc, updateDoc, getDocs, documentId, writeBatch, addDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, getDocs, documentId, writeBatch, addDoc, onSnapshot } from 'firebase/firestore';
 import type { PurchaseRequisition, PurchaseRequisitionItem, CostCenter, Supply, Tool, Notification, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -35,10 +35,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
-import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
+import ApprovalDetailsDialog from '@/components/ApprovalDetailsDialog';
 
 
 type RequisitionWithTotal = WithDocId<PurchaseRequisition> & {
@@ -52,7 +52,7 @@ const AprovacoesComprasPage = () => {
   const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [selectedRequisition, setSelectedRequisition] = useState<RequisitionWithTotal | null>(null);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [decisionState, setDecisionState] = useState<{
       isOpen: boolean;
@@ -60,23 +60,65 @@ const AprovacoesComprasPage = () => {
       type: 'reject' | 'review';
       reason: string;
   }>({ isOpen: false, requisition: null, type: 'reject', reason: '' });
+  
+  const [requisitionsWithTotals, setRequisitionsWithTotals] = useState<RequisitionWithTotal[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const queryKey = 'pendingPurchaseRequisitions';
-  // Query for requisitions that need some form of approval/action by a manager.
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'purchase_requisitions'), where('status', '==', 'Em Aprovação'));
   }, [firestore]);
-  
-  const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
-      queryKey: [queryKey]
-  });
 
-  const costCentersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'cost_centers')) : null, [firestore]);
-  const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery, {
-      queryKey: ['allCostCentersForApprovals']
-  });
+  // Main listener for requisitions
+  useEffect(() => {
+    if (!requisitionsQuery) {
+        setIsLoading(false);
+        return;
+    };
+    setIsLoading(true);
+
+    const unsubscribe = onSnapshot(requisitionsQuery, async (querySnapshot) => {
+      const reqs = querySnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() } as WithDocId<PurchaseRequisition>));
+      
+      const reqsWithTotals: RequisitionWithTotal[] = await Promise.all(
+          reqs.map(async (req) => {
+              if (req.type === 'Ordem de Compra') {
+                  return { ...req, totalValue: req.totalValue || 0 };
+              }
+              // For SC, calculate total from items
+              const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
+              const itemsSnapshot = await getDocs(itemsRef);
+              const total = itemsSnapshot.docs.reduce((sum, doc) => {
+                  const item = doc.data() as PurchaseRequisitionItem;
+                  return sum + (item.estimatedPrice || 0) * item.quantity;
+              }, 0);
+              return { ...req, totalValue: total };
+          })
+      );
+      
+      setRequisitionsWithTotals(reqsWithTotals);
+      setIsLoading(false);
+    }, (error) => {
+        console.error("Error fetching requisitions:", error);
+        toast({ variant: 'destructive', title: 'Erro de Conexão', description: 'Não foi possível carregar as requisições.' });
+        setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [requisitionsQuery, firestore, toast]);
+
+  const costCenterIds = useMemo(() => {
+    if (!requisitionsWithTotals) return [];
+    return [...new Set(requisitionsWithTotals.map(r => r.costCenterId))];
+  }, [requisitionsWithTotals]);
   
+  const costCentersQuery = useMemoFirebase(() => {
+      if (!firestore || costCenterIds.length === 0) return null;
+      return query(collection(firestore, 'cost_centers'), where(documentId(), 'in', costCenterIds));
+  }, [firestore, costCenterIds]);
+  const { data: costCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery);
+
   const costCenterMap = useMemo(() => {
       if (!costCenters) return new Map<string, string>();
       return new Map(costCenters.map(cc => [cc.docId, `${cc.code} - ${cc.description}`]));
@@ -90,18 +132,20 @@ const AprovacoesComprasPage = () => {
       const batch = writeBatch(firestore);
       const reqRef = doc(firestore, 'purchase_requisitions', req.docId);
 
-      const updateData: { status: string; rejectionReason?: string } = { status: newStatus };
+      let updateData: { status: string; rejectionReason?: string } = { status: newStatus };
       if (reason) {
           updateData.rejectionReason = reason;
       }
-      // For approved OCs, they are now ready to be delivered.
+      
       if (newStatus === 'Aprovada' && req.type === 'Ordem de Compra') {
         updateData.status = 'Aguardando Entrega';
+      } else if (newStatus === 'Em Revisão' && req.type === 'Ordem de Compra') {
+          // OC revision goes back to the buyer
+          updateData.status = 'Em Revisão Comprador';
       }
 
       batch.update(reqRef, updateData);
       
-      // Create notification
       const notificationRef = doc(collection(firestore, `employees/${req.requesterId}/notifications`));
       const notification: Omit<Notification, 'id'> = {
           userId: req.requesterId,
@@ -117,11 +161,11 @@ const AprovacoesComprasPage = () => {
           await batch.commit();
           toast({
               title: `Requisição ${newStatus}`,
-              description: `A requisição foi atualizada e o solicitante notificado.`,
+              description: `A requisição foi atualizada e as partes notificadas.`,
               variant: newStatus === 'Recusada' ? 'destructive' : 'default',
           });
-          queryClient.invalidateQueries({ queryKey: [queryKey] });
-          queryClient.invalidateQueries({ queryKey: ['allPurchaseRequisitions'] });
+          // Invalidation is implicitly handled by onSnapshot, but we can do it for safety
+          queryClient.invalidateQueries({ queryKey: [queryKey] }); 
       } catch (err) {
           console.error("Erro ao atualizar requisição:", err);
           toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível processar a sua decisão.' });
@@ -136,17 +180,15 @@ const AprovacoesComprasPage = () => {
   }
 
   const filteredRequisitions = useMemo(() => {
-    if (!requisitions) return [];
-    if (!searchTerm) return requisitions;
+    if (!requisitionsWithTotals) return [];
+    if (!searchTerm) return requisitionsWithTotals;
     const lowercasedTerm = searchTerm.toLowerCase();
-    return requisitions.filter(req => 
+    return requisitionsWithTotals.filter(req => 
         (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
         req.requesterName.toLowerCase().includes(lowercasedTerm) ||
         (costCenterMap.get(req.costCenterId) || '').toLowerCase().includes(lowercasedTerm)
     );
-  }, [requisitions, searchTerm, costCenterMap]);
-
-  const isLoading = isLoadingRequisitions || isLoadingCostCenters;
+  }, [requisitionsWithTotals, searchTerm, costCenterMap]);
 
   const getStatusVariant = (status: PurchaseRequisition['status']) => {
     const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
@@ -201,9 +243,6 @@ const AprovacoesComprasPage = () => {
                 {isLoading && (
                   <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                 )}
-                {requisitionsError && (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
-                )}
                 {!isLoading && filteredRequisitions.length === 0 && (
                    <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição pendente de aprovação.</TableCell></TableRow>
                 )}
@@ -244,11 +283,13 @@ const AprovacoesComprasPage = () => {
         </Card>
       </div>
 
-      <PurchaseRequisitionDetailsDialog
-        requisition={selectedRequisition}
-        isOpen={!!selectedRequisition}
-        onClose={() => setSelectedRequisition(null)}
-      />
+      {selectedRequisition && (
+        <ApprovalDetailsDialog
+            requisition={selectedRequisition}
+            isOpen={!!selectedRequisition}
+            onClose={() => setSelectedRequisition(null)}
+        />
+      )}
 
        <Dialog open={decisionState.isOpen} onOpenChange={() => setDecisionState(prev => ({...prev, isOpen: false}))}>
           <DialogContent>
