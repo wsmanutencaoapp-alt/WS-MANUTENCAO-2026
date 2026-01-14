@@ -184,7 +184,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       
       await updateDoc(itemRef, updateData);
 
-      if (requisition.status === 'Aprovada' || requisition.status === 'Aberta') {
+      if (requisition.status === 'Aprovada' || requisition.status === 'Aberta' || requisition.status === 'Em Revisão') {
           if (finalQuotations.length > 0) {
             const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
             await updateDoc(reqRef, { status: 'Em Cotação' });
@@ -207,40 +207,56 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   }
   
   const handleGenerateOC = async () => {
-    if (selectedQuotationIndex === null) {
-        toast({
-            variant: 'destructive',
-            title: 'Ação Incompleta',
-            description: 'Você precisa selecionar uma cotação vencedora para este item antes de gerar a Ordem de Compra.',
-        });
-        return;
+    setIsSaving(true);
+    try {
+      // Step 1: Save the current state of quotations for the item.
+      await saveCurrentItemQuotations();
+      
+      // Step 2: Proceed with validation and OC generation.
+      if (selectedQuotationIndex === null) {
+          toast({
+              variant: 'destructive',
+              title: 'Ação Incompleta',
+              description: 'Você precisa selecionar uma cotação vencedora para este item antes de gerar a Ordem de Compra.',
+          });
+          setIsSaving(false);
+          return;
+      }
+  
+      const expensiveChoiceJustification = justification || requisition.expensiveChoiceJustification || '';
+      
+      // Check if the winning quote is the most expensive among the saved ones.
+      const isExpensiveChoice = (savedQuotations || []).length > 1 &&
+          savedQuotations[selectedQuotationIndex].totalValue >= Math.max(...savedQuotations.map(q => Number(q.totalValue)));
+      
+      const notEnoughQuotes = (savedQuotations || []).length < 3;
+  
+      if ((isExpensiveChoice || notEnoughQuotes) && !expensiveChoiceJustification) {
+          let reason = '';
+          if (notEnoughQuotes) {
+              reason = 'É necessário justificar a geração de Ordem de Compra com menos de 3 cotações.';
+          } else if (isExpensiveChoice) {
+              reason = 'Você selecionou a cotação de maior valor. Por favor, forneça uma justificativa.';
+          }
+          setJustificationReason(reason);
+          setIsJustificationDialogOpen(true);
+          setIsSaving(false); // Stop saving process to wait for user input
+          return;
+      }
+  
+      await finishApprovalProcess(expensiveChoiceJustification);
+
+    } catch (err: any) {
+        console.error("Erro no processo de geração de OC:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
+        setIsSaving(false);
     }
-
-    const expensiveChoiceJustification = justification || requisition.expensiveChoiceJustification || '';
-    
-    const isExpensiveChoice = (savedQuotations || []).length > 1 &&
-        savedQuotations[selectedQuotationIndex].totalValue >= Math.max(...savedQuotations.map(q => Number(q.totalValue)));
-    
-    const notEnoughQuotes = (savedQuotations || []).length < 3;
-
-    if ((isExpensiveChoice || notEnoughQuotes) && !expensiveChoiceJustification) {
-        let reason = '';
-        if (notEnoughQuotes) {
-            reason = 'É necessário justificar a geração de Ordem de Compra com menos de 3 cotações.';
-        } else if (isExpensiveChoice) {
-            reason = 'Você selecionou a cotação de maior valor. Por favor, forneça uma justificativa.';
-        }
-        setJustificationReason(reason);
-        setIsJustificationDialogOpen(true);
-        return;
-    }
-
-    await finishApprovalProcess(expensiveChoiceJustification);
   }
 
   const finishApprovalProcess = async (finalJustification?: string) => {
     if (!firestore || !currentItem || selectedQuotationIndex === null) return;
-    setIsSaving(true);
+    // No need to set isSaving again as it's already true from handleGenerateOC
+    
     setIsJustificationDialogOpen(false); 
     
     try {
