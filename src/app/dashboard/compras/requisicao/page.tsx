@@ -118,7 +118,8 @@ const RequisicaoCompraPage = () => {
             lastId = counterSnapshot.data().lastId || 0;
         }
         const newId = lastId + 1;
-        const protocol = `SC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
+        const year = new Date().getFullYear().toString().slice(-2);
+        const protocol = `SC${year}${String(newId).padStart(5, '0')}`;
 
         
         const requisitionRef = doc(collection(firestore, 'purchase_requisitions'));

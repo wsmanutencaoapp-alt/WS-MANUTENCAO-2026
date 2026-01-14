@@ -244,7 +244,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                 lastId = counterDoc.data().lastId || 0;
             }
             const newId = lastId + 1;
-            const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
+            const year = new Date().getFullYear().toString().slice(-2);
+            const ocProtocol = `OC${year}${String(newId).padStart(5, '0')}`;
             
             const newOcRef = doc(collection(firestore, 'purchase_requisitions'));
             const ocData: Omit<PurchaseRequisition, 'id'> = {
