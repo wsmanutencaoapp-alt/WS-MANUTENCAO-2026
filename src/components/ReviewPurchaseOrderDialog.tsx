@@ -10,6 +10,7 @@ import {
   getDocs,
   updateDoc,
   documentId,
+  getDoc,
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -31,9 +32,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from './ui/card';
 import SupplierSelectorDialog from './SupplierSelectorDialog';
 import { cn } from '@/lib/utils';
+import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
-import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 
 
 interface ReviewPurchaseOrderDialogProps {
