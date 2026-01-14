@@ -31,7 +31,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -41,7 +40,7 @@ import { Loader2, Upload, FileText, ChevronsUpDown, Check, ShoppingBag, Save, Ar
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from './ui/card';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from './ui/card';
 import SupplierSelectorDialog from './SupplierSelectorDialog';
 import { cn } from '@/lib/utils';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
@@ -203,41 +202,121 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   }
   
   const handleSendForApproval = async () => {
-    if (selectedQuotationIndex === null && savedQuotations.length > 0) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Selecione a cotação vencedora para este item.' });
-      return;
+    // This check needs to be against ALL items, not just the current one.
+    // Let's assume for now the user clicks this when they are "done" with all items.
+    const allItemsAreQuoted = items.every(item => item.quotations?.length > 0 && item.selectedQuotationIndex !== undefined && item.selectedQuotationIndex !== null);
+    if (!allItemsAreQuoted) {
+        toast({
+            variant: 'destructive',
+            title: 'Ação Incompleta',
+            description: 'Todos os itens da requisição devem ter uma cotação vencedora selecionada antes de gerar a Ordem de Compra.',
+        });
+        return;
     }
+
+    const winningQuotes = items.map(item => item.quotations[item.selectedQuotationIndex!]);
+    const uniqueSupplierIds = new Set(winningQuotes.map(q => q.supplierId));
+
+    if (uniqueSupplierIds.size > 1) {
+        toast({
+            variant: 'destructive',
+            title: 'Fornecedores Múltiplos',
+            description: 'A geração de Ordem de Compra automática só suporta um único fornecedor. Por favor, selecione cotações do mesmo fornecedor para todos os itens.',
+        });
+        return;
+    }
+
+    const expensiveChoiceJustification = requisition.expensiveChoiceJustification || '';
     
-    const selectedQuote = savedQuotations[selectedQuotationIndex!];
-    const isMostExpensive = savedQuotations.every(q => Number(q.totalValue) <= Number(selectedQuote.totalValue));
+    // Check if any selected quote is the most expensive
+    const requiresJustification = items.some(item => {
+        if (!item.quotations || item.quotations.length <= 1 || item.selectedQuotationIndex === null) return false;
+        const selectedQuoteValue = item.quotations[item.selectedQuotationIndex!].totalValue;
+        return item.quotations.every(q => q.totalValue <= selectedQuoteValue);
+    });
 
-    if (isMostExpensive && savedQuotations.length > 1) {
+    if (requiresJustification && !expensiveChoiceJustification) {
         setIsJustificationDialogOpen(true);
-        return; 
+        return;
     }
 
-    await finishApprovalProcess();
+    await finishApprovalProcess(expensiveChoiceJustification);
   }
 
-  const finishApprovalProcess = async (providedJustification?: string) => {
+  const finishApprovalProcess = async (finalJustification?: string) => {
+    if (!firestore) return;
     setIsSaving(true);
     setIsJustificationDialogOpen(false); 
     
     try {
-        await saveCurrentItemQuotations();
+        const batch = writeBatch(firestore);
 
-        const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
-        await updateDoc(itemRef, { status: 'Cotado' });
-        
-        const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-        const reqUpdateData: any = { status: 'Em Aprovação' };
-        if (providedJustification) {
-            const currentJustification = requisition.expensiveChoiceJustification || '';
-            reqUpdateData.expensiveChoiceJustification = `${currentJustification}\nItem ${currentItem.details.codigo}: ${providedJustification}`.trim();
+        // 1. Generate new OC Protocol
+        const counterRef = doc(firestore, 'counters', 'purchaseOrders');
+        const counterSnapshot = await getDoc(counterRef);
+        let lastId = 0;
+        if (counterSnapshot.exists()) {
+            lastId = counterSnapshot.data().lastId || 0;
         }
-        await updateDoc(reqRef, reqUpdateData);
+        const newId = lastId + 1;
+        const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
+        
+        // 2. Prepare new OC document
+        const newOcRef = doc(collection(firestore, 'purchase_requisitions'));
+        const winningQuotes = items.map(item => item.quotations[item.selectedQuotationIndex!]);
+        const firstWinner = winningQuotes[0];
 
-        toast({ title: "Enviado para Aprovação!", description: `A requisição ${requisition.protocol} aguarda aprovação.` });
+        const ocData: Omit<PurchaseRequisition, 'id'> = {
+            protocol: ocProtocol,
+            originalRequisitionId: requisition.docId,
+            requesterId: requisition.requesterId,
+            requesterName: requisition.requesterName,
+            costCenterId: requisition.costCenterId,
+            neededByDate: requisition.neededByDate,
+            type: 'Ordem de Compra',
+            status: 'Em Aprovação',
+            createdAt: new Date().toISOString(),
+            priority: requisition.priority,
+            purchaseReason: requisition.purchaseReason,
+            expensiveChoiceJustification: finalJustification,
+            supplierId: firstWinner.supplierId,
+            supplierName: firstWinner.supplierName,
+            totalValue: winningQuotes.reduce((acc, q) => acc + q.totalValue, 0),
+            paymentTerms: firstWinner.paymentTerms,
+        };
+        batch.set(newOcRef, ocData);
+
+        // 3. Add winning items to the new OC's subcollection
+        items.forEach(item => {
+            const newItemRef = doc(collection(newOcRef, 'items'));
+            const winningQuote = item.quotations[item.selectedQuotationIndex!];
+            const newItemData: Omit<PurchaseRequisitionItem, 'id'> = {
+                itemId: item.itemId,
+                itemType: item.itemType,
+                quantity: item.quantity,
+                status: 'Pendente', // Status for item within OC
+                notes: item.notes,
+                // The price is now the final one from the quotation
+                estimatedPrice: winningQuote.totalValue,
+                // We don't need to copy quotations to the OC
+            };
+            batch.set(newItemRef, newItemData);
+        });
+
+        // 4. Update the original SC
+        const originalReqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+        batch.update(originalReqRef, { status: 'Totalmente Atendida' });
+        
+        // 5. Update the OC counter
+        if (counterSnapshot.exists()) {
+            batch.update(counterRef, { lastId: newId });
+        } else {
+            batch.set(counterRef, { lastId: newId });
+        }
+
+        await batch.commit();
+
+        toast({ title: "Ordem de Compra Gerada!", description: `A OC ${ocProtocol} foi enviada para aprovação.` });
         
         onSuccess();
         onClose(); 
@@ -249,13 +328,15 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
   }
   
-  const handleNext = () => {
+  const handleNext = async () => {
+    await handleSaveProgress();
     if (currentItemIndex < items.length - 1) {
       setCurrentItemIndex(currentItemIndex + 1);
     }
   };
 
-  const handlePrev = () => {
+  const handlePrev = async () => {
+    await handleSaveProgress();
     if (currentItemIndex > 0) {
       setCurrentItemIndex(currentItemIndex - 1);
     }
@@ -283,11 +364,11 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                         <CardDescription>Código: {currentItem?.details.codigo} | Qtd: {currentItem?.quantity}</CardDescription>
                     </div>
                      <div className="flex gap-2">
-                        <Button variant="outline" size="icon" onClick={handlePrev} disabled={currentItemIndex === 0}>
-                            <ArrowLeft className="h-4 w-4" />
+                        <Button variant="outline" size="icon" onClick={handlePrev} disabled={currentItemIndex === 0 || isSaving}>
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowLeft className="h-4 w-4" />}
                         </Button>
-                        <Button variant="outline" size="icon" onClick={handleNext} disabled={currentItemIndex === items.length - 1}>
-                            <ArrowRight className="h-4 w-4" />
+                        <Button variant="outline" size="icon" onClick={handleNext} disabled={currentItemIndex === items.length - 1 || isSaving}>
+                           {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowRight className="h-4 w-4" />}
                         </Button>
                     </div>
                 </CardHeader>
@@ -377,10 +458,11 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                 </Button>
              </div>
              <div className="flex gap-2">
-                <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-                <Button onClick={handleSendForApproval} disabled={isSaving || (savedQuotations.length > 0 && selectedQuotationIndex === null)}>
+                <Button variant="outline" onClick={onClose} disabled={isSaving}>Fechar</Button>
+                <Button onClick={handleSendForApproval} disabled={isSaving}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Enviar para Aprovação
+                    <ShoppingBag className="mr-2 h-4 w-4"/>
+                    Gerar Ordem de Compra
                 </Button>
             </div>
           </DialogFooter>
@@ -399,7 +481,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             <DialogTitle>Justificar Escolha Mais Cara</DialogTitle>
             <DialogDescription className="flex items-start gap-2 pt-2">
               <AlertTriangle className="h-6 w-6 text-orange-500 shrink-0" />
-              Você selecionou a cotação de maior valor. Por favor, forneça uma justificativa para esta escolha antes de prosseguir.
+              Você selecionou a cotação de maior valor para um ou mais itens. Por favor, forneça uma justificativa geral para esta escolha.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -415,7 +497,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             <Button variant="outline" onClick={() => setIsJustificationDialogOpen(false)}>Cancelar</Button>
             <Button onClick={() => finishApprovalProcess(justification)} disabled={!justification || isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Confirmar e Enviar para Aprovação
+              Confirmar e Gerar OC
             </Button>
           </DialogFooter>
         </DialogContent>

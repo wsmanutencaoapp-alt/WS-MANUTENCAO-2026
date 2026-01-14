@@ -53,7 +53,6 @@ const AprovacoesComprasPage = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
-  const [requisitionsWithTotals, setRequisitionsWithTotals] = useState<RequisitionWithTotal[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [decisionState, setDecisionState] = useState<{
       isOpen: boolean;
@@ -66,7 +65,7 @@ const AprovacoesComprasPage = () => {
   // Query for requisitions that need some form of approval/action by a manager.
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'purchase_requisitions'), where('status', 'in', ['Em Aprovação', 'Aberta']));
+    return query(collection(firestore, 'purchase_requisitions'), where('status', '==', 'Em Aprovação'));
   }, [firestore]);
   
   const { data: requisitions, isLoading: isLoadingRequisitions, error: requisitionsError } = useCollection<WithDocId<PurchaseRequisition>>(requisitionsQuery, {
@@ -83,31 +82,6 @@ const AprovacoesComprasPage = () => {
       return new Map(costCenters.map(cc => [cc.docId, `${cc.code} - ${cc.description}`]));
   }, [costCenters]);
 
-  useMemo(() => {
-    if (!requisitions || !firestore) return;
-
-    const calculateTotals = async () => {
-        const enrichedReqs: RequisitionWithTotal[] = [];
-        for (const req of requisitions) {
-            // For OCs, the total is already on the document. For SCs, we calculate it.
-            if (req.type === 'Ordem de Compra') {
-                enrichedReqs.push({ ...req, totalValue: req.totalValue || 0 });
-            } else {
-                const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
-                const itemsSnapshot = await getDocs(itemsRef);
-                let totalValue = 0;
-                itemsSnapshot.forEach(doc => {
-                    const item = doc.data() as PurchaseRequisitionItem;
-                    totalValue += (item.estimatedPrice || 0) * item.quantity;
-                });
-                enrichedReqs.push({ ...req, totalValue });
-            }
-        }
-        setRequisitionsWithTotals(enrichedReqs);
-    };
-
-    calculateTotals();
-  }, [requisitions, firestore]);
 
   const handleDecision = async (req: WithDocId<PurchaseRequisition>, newStatus: 'Aprovada' | 'Recusada' | 'Em Revisão', reason?: string) => {
       if (!firestore) return;
@@ -120,6 +94,11 @@ const AprovacoesComprasPage = () => {
       if (reason) {
           updateData.rejectionReason = reason;
       }
+      // For approved OCs, they are now ready to be delivered.
+      if (newStatus === 'Aprovada' && req.type === 'Ordem de Compra') {
+        updateData.status = 'Aguardando Entrega';
+      }
+
       batch.update(reqRef, updateData);
       
       // Create notification
@@ -157,15 +136,15 @@ const AprovacoesComprasPage = () => {
   }
 
   const filteredRequisitions = useMemo(() => {
-    if (!requisitionsWithTotals) return [];
-    if (!searchTerm) return requisitionsWithTotals;
+    if (!requisitions) return [];
+    if (!searchTerm) return requisitions;
     const lowercasedTerm = searchTerm.toLowerCase();
-    return requisitionsWithTotals.filter(req => 
+    return requisitions.filter(req => 
         (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
         req.requesterName.toLowerCase().includes(lowercasedTerm) ||
         (costCenterMap.get(req.costCenterId) || '').toLowerCase().includes(lowercasedTerm)
     );
-  }, [requisitionsWithTotals, searchTerm, costCenterMap]);
+  }, [requisitions, searchTerm, costCenterMap]);
 
   const isLoading = isLoadingRequisitions || isLoadingCostCenters;
 
@@ -181,6 +160,7 @@ const AprovacoesComprasPage = () => {
         'Totalmente Atendida': 'success',
         'Cancelada': 'destructive',
         'Em Cotação': 'default',
+        'Aguardando Entrega': 'default',
     };
     return variants[status] || 'secondary';
   }
@@ -234,7 +214,7 @@ const AprovacoesComprasPage = () => {
                     </TableCell>
                     <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
                     <TableCell>{req.requesterName}</TableCell>
-                    <TableCell className="font-medium">{req.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                    <TableCell className="font-medium">{(req.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                      <TableCell>
                         <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
                     </TableCell>
