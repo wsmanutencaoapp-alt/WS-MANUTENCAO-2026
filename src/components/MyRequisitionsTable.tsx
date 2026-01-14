@@ -304,7 +304,7 @@ export default function MyRequisitionsTable() {
                       <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
                       <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
                       <TableCell className="text-right space-x-2">
-                       {req.status === 'Em Revisão' && (
+                       {req.status === 'Em Revisão' && user?.uid === req.requesterId && (
                         <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(req)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Revisar
@@ -314,7 +314,7 @@ export default function MyRequisitionsTable() {
                          <Eye className="mr-2 h-4 w-4" />
                          Ver Itens
                       </Button>
-                       {isAdmin && req.type === 'Solicitação de Compra' && (
+                       {isAdmin && req.type === 'Solicitação de Compra' && ['Pendente', 'Em Revisão', 'Recusada', 'Cancelada'].includes(req.status) && (
                           <AlertDialog>
                               <AlertDialogTrigger asChild>
                                   <Button variant="destructive" size="icon" disabled={isProcessingDelete === req.docId} title="Excluir Requisição">

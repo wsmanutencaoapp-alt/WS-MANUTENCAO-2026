@@ -44,6 +44,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EditRequisitionDialog from '@/components/EditRequisitionDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 
 type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
@@ -78,12 +79,6 @@ const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
         default: return 'secondary';
     }
 }
-
-const priorityOrder: Record<PurchaseRequisition['priority'], number> = {
-    'Muito Urgente': 1,
-    'Urgente': 2,
-    'Normal': 3,
-};
 
 const ControleComprasPage = () => {
   const firestore = useFirestore();
@@ -167,7 +162,7 @@ const ControleComprasPage = () => {
   const sortedAndFilteredSCs = useMemo(() => {
     if (!requisitionsWithProgress) return [];
 
-    let relevantRequisitions = requisitionsWithProgress.filter(req => ['Aprovada', 'Parcialmente Atendida', 'Em Cotação'].includes(req.status));
+    let relevantRequisitions = requisitionsWithProgress.filter(req => ['Aprovada', 'Parcialmente Atendida', 'Em Cotação', 'Em Revisão'].includes(req.status));
 
     if (searchTermSC) {
         const lowercasedTerm = searchTermSC.toLowerCase();
@@ -295,12 +290,26 @@ const ControleComprasPage = () => {
                         <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição aprovada ou em cotação encontrada.</TableCell></TableRow>
                         )}
                         {!isLoading && sortedAndFilteredSCs.map(req => (
-                        <TableRow key={req.docId}>
+                        <TableRow key={req.docId} className={cn(req.status === 'Em Revisão' && 'bg-yellow-50 dark:bg-yellow-900/20')}>
                             <TableCell className="font-mono">{req.protocol}</TableCell>
                             <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
                             <TableCell>{req.requesterName}</TableCell>
                             <TableCell>
-                                <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
+                                  {req.status === 'Em Revisão' && req.rejectionReason && (
+                                     <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="cursor-help">
+                                              <AlertCircle className="h-4 w-4 text-orange-500" />
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="max-w-xs">Motivo da Devolução: {req.rejectionReason}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
                             </TableCell>
                             <TableCell>
                                 {req.totalItems > 0 ? (
@@ -311,10 +320,17 @@ const ControleComprasPage = () => {
                                 ) : <span className="text-xs text-muted-foreground">N/A</span> }
                             </TableCell>
                             <TableCell className="text-right space-x-2">
-                                <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
-                                    <Eye className="mr-2 h-4 w-4"/>
-                                    Ver e Atender Itens
-                                </Button>
+                               {req.status === 'Em Revisão' ? (
+                                  <Button variant="secondary" size="sm" onClick={() => setRequisitionToEdit(req)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Revisar
+                                  </Button>
+                                ) : (
+                                  <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
+                                      <Eye className="mr-2 h-4 w-4"/>
+                                      Ver e Atender Itens
+                                  </Button>
+                                )}
                                 {isAdmin && (
                                     <>
                                         <Button variant="outline" size="icon" onClick={() => setRequisitionToEdit(req)} title="Editar Requisição">
