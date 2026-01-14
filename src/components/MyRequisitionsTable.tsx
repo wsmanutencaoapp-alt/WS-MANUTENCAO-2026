@@ -47,6 +47,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import ReviewRequisitionDialog from './ReviewRequisitionDialog';
+import { cn } from '@/lib/utils';
 
 
 type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
@@ -269,7 +270,7 @@ export default function MyRequisitionsTable() {
                 {!isLoading && filteredRequisitions.map(req => {
                   const showReason = (req.status === 'Recusada' || req.status === 'Em Revisão') && req.rejectionReason;
                   return (
-                    <TableRow key={req.docId}>
+                    <TableRow key={req.docId} className={cn(req.status === 'Em Revisão' && 'bg-yellow-50 dark:bg-yellow-900/20')}>
                       <TableCell className="font-mono">
                         <p>{req.protocol || req.docId.substring(0, 8)}</p>
                         {req.originalRequisitionProtocol && <p className="text-xs text-muted-foreground">Origem: {req.originalRequisitionProtocol}</p>}
