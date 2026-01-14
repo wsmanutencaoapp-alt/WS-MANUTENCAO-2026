@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, getDocs, doc, writeBatch, updateDoc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, Upload, FileText, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import type { Supply, Tool, PurchaseRequisition, PurchaseRequisitionItem } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
@@ -21,6 +21,9 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Textarea } from './ui/textarea';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useStorage } from '@/firebase/provider';
+
 
 type RequisitionableItem = (WithDocId<Supply> | WithDocId<Tool>) & { itemType: 'supply' | 'tool' };
 type CartItem = RequisitionableItem & {
@@ -29,6 +32,7 @@ type CartItem = RequisitionableItem & {
     notes?: string;
     attachmentUrl?: string;
     existingItemId?: string; // ID of the item in the subcollection
+    attachmentFile?: File | null;
 };
 
 interface ReviewRequisitionDialogProps {
@@ -41,6 +45,7 @@ interface ReviewRequisitionDialogProps {
 export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, onSuccess }: ReviewRequisitionDialogProps) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -85,6 +90,7 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
                         notes: itemData.notes,
                         attachmentUrl: itemData.attachmentUrl,
                         existingItemId: itemDoc.id,
+                        attachmentFile: null,
                     });
                 }
             });
@@ -114,9 +120,13 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
   const updateCartItem = (docId: string, field: keyof CartItem, value: any) => {
     setCart(prev => prev.map(item => item.docId === docId ? { ...item, [field]: value } : item));
   };
+   const handleFileChange = (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    updateCartItem(docId, 'attachmentFile', file);
+  }
   
   const handleSubmitUpdate = async () => {
-    if (!firestore || !user || !requisition) {
+    if (!firestore || !user || !requisition || !storage) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Dados da sessão inválidos.' });
         return;
     }
@@ -135,6 +145,13 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
 
         // Process updated and new items
         for (const item of cart) {
+            let attachmentUrl = item.attachmentUrl;
+            if(item.attachmentFile) {
+                const fileRef = storageRef(storage, `requisition_attachments/${requisition.docId}/${item.docId}-${item.attachmentFile.name}`);
+                await uploadBytes(fileRef, item.attachmentFile);
+                attachmentUrl = await getDownloadURL(fileRef);
+            }
+
             const itemRef = item.existingItemId
                 ? doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.existingItemId)
                 : doc(collection(firestore, 'purchase_requisitions', requisition.docId, 'items')); // For items added during edit
@@ -146,7 +163,7 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
                 estimatedPrice: item.estimatedPrice || 0,
                 status: 'Pendente',
                 notes: item.notes,
-                attachmentUrl: item.attachmentUrl,
+                attachmentUrl: attachmentUrl,
             };
             batch.set(itemRef, itemData, { merge: true }); // Use merge to be safe
         }
@@ -232,6 +249,22 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
                                                     onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
                                                     className="h-16 text-sm"
                                                 />
+                                                <div className='flex gap-2 items-center'>
+                                                    <Button asChild variant="outline" size="sm" className="flex-1 h-8 text-sm">
+                                                        <label htmlFor={`file-review-${item.docId}`} className="cursor-pointer">
+                                                            {item.attachmentFile ? <FileText className="mr-2 h-4 w-4 text-green-600"/> : <Upload className="mr-2 h-4 w-4"/>}
+                                                            <span className="truncate">{item.attachmentFile ? item.attachmentFile.name : 'Anexar/Trocar'}</span>
+                                                            <Input id={`file-review-${item.docId}`} type="file" className="sr-only" onChange={(e) => handleFileChange(item.docId, e)} />
+                                                        </label>
+                                                    </Button>
+                                                    {item.attachmentUrl && !item.attachmentFile && (
+                                                         <Button asChild variant="link" size="sm" className="p-0 h-auto text-xs">
+                                                            <a href={item.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                                                                <ExternalLink className="mr-1 h-3 w-3" /> Ver Anexo Atual
+                                                            </a>
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
                                             <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.docId, item.existingItemId)}>
                                                 <Trash2 className="h-4 w-4 text-destructive" />
