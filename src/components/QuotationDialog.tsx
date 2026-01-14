@@ -46,6 +46,7 @@ import SupplierSelectorDialog from './SupplierSelectorDialog';
 import { cn } from '@/lib/utils';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import { Textarea } from './ui/textarea';
+import { Badge } from './ui/badge';
 
 
 interface QuotationDialogProps {
