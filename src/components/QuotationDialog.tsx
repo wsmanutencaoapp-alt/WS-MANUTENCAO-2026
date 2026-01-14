@@ -303,18 +303,20 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             transaction.set(newItemRef, newItemData);
 
             const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
-            transaction.update(originalItemRef, { status: 'Recebido' });
+            transaction.update(originalItemRef, { status: 'Cotado' });
             
             const allItemsSnapshot = await getDocs(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
             const allItems = allItemsSnapshot.docs.map(d => ({...d.data() as PurchaseRequisitionItem, docId: d.id}));
             
             const otherItems = allItems.filter(i => i.docId !== currentItem.docId);
-            const allOthersDone = otherItems.every(i => ['Recebido', 'Cancelado'].includes(i.status));
+            const allOthersDone = otherItems.every(i => ['Recebido', 'Cancelado', 'Cotado'].includes(i.status));
 
             const originalReqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-            if (allOthersDone) {
+            if (allOthersDone && allItems.every(i => i.status === 'Cotado' || i.status === 'Recebido' || i.status === 'Cancelado')) {
+                // If this was the last item to be quoted and all others are also done
                 transaction.update(originalReqRef, { status: 'Totalmente Atendida' });
             } else {
+                // If there are still pending items
                 transaction.update(originalReqRef, { status: 'Parcialmente Atendida' });
             }
 
