@@ -37,7 +37,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, FileText, ChevronsUpDown, Check, ShoppingBag, Save, ArrowLeft, ArrowRight, PlusCircle, Trash2, Crown, AlertTriangle } from 'lucide-react';
+import { Loader2, Upload, FileText, ChevronsUpDown, Check, ShoppingBag, Save, ArrowLeft, ArrowRight, PlusCircle, Trash2, Crown, AlertTriangle, Edit, ExternalLink } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supplier, Quotation } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
@@ -143,6 +143,12 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     }
   }
 
+  const handleEditQuotation = (index: number) => {
+    const quoteToEdit = savedQuotations[index];
+    setNewQuotation(quoteToEdit);
+    removeQuotation(index);
+  };
+
 
   const saveCurrentItemQuotations = async () => {
       if (!firestore || !storage || !requisition || !currentItem) throw new Error("Dados da sessão inválidos.");
@@ -202,43 +208,39 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       return;
     }
     
-    // Check if the selected quotation is the most expensive one
     const selectedQuote = savedQuotations[selectedQuotationIndex!];
     const isMostExpensive = savedQuotations.every(q => Number(q.totalValue) <= Number(selectedQuote.totalValue));
 
     if (isMostExpensive && savedQuotations.length > 1) {
         setIsJustificationDialogOpen(true);
-        return; // Stop here and wait for justification
+        return; 
     }
 
-    // Proceed without justification
     await finishApprovalProcess();
   }
 
   const finishApprovalProcess = async (providedJustification?: string) => {
     setIsSaving(true);
-    setIsJustificationDialogOpen(false); // Close justification dialog if it was open
+    setIsJustificationDialogOpen(false); 
     
     try {
-        // Save current item's quotations one last time
         await saveCurrentItemQuotations();
 
-        // Update item status to 'Cotado'
         const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
         await updateDoc(itemRef, { status: 'Cotado' });
         
-        // Update main requisition status to 'Em Aprovação' and add justification
         const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
         const reqUpdateData: any = { status: 'Em Aprovação' };
         if (providedJustification) {
-            reqUpdateData.expensiveChoiceJustification = providedJustification;
+            const currentJustification = requisition.expensiveChoiceJustification || '';
+            reqUpdateData.expensiveChoiceJustification = `${currentJustification}\nItem ${currentItem.details.codigo}: ${providedJustification}`.trim();
         }
         await updateDoc(reqRef, reqUpdateData);
 
         toast({ title: "Enviado para Aprovação!", description: `A requisição ${requisition.protocol} aguarda aprovação.` });
         
         onSuccess();
-        onClose(); // Close the main quotation dialog
+        onClose(); 
         
     } catch (err: any) {
         toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
@@ -290,7 +292,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                     </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
-                    {/* Coluna de Adicionar Cotação */}
                     <Card className="p-4 space-y-3 bg-muted/50 border-dashed">
                         <h3 className="font-semibold">Adicionar Novo Orçamento</h3>
                          <div className="space-y-1.5">
@@ -320,7 +321,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                           </Button>
                     </Card>
 
-                    {/* Coluna de Cotações Salvas */}
                     <div className="space-y-4">
                         <h3 className="font-semibold">Orçamentos Criados ({savedQuotations.length})</h3>
                         {savedQuotations.length === 0 && (
@@ -328,23 +328,38 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                         )}
                         {savedQuotations.map((q, index) => (
                            <Card key={index} className={cn("p-3 relative", selectedQuotationIndex === index && "border-primary ring-2 ring-primary")}>
-                                <div className="flex justify-between items-start">
-                                    <div className="space-y-1">
-                                      <p className="font-bold">{q.supplierName}</p>
-                                      <p className="text-sm text-muted-foreground">{Number(q.totalValue).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} - {q.deliveryTime} dias</p>
-                                      <p className="text-xs text-muted-foreground">{q.paymentTerms}</p>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-2">
-                                       <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1" onClick={() => removeQuotation(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                       {selectedQuotationIndex !== index ? (
-                                           <Button size="sm" variant="outline" className="mt-8" onClick={() => setSelectedQuotationIndex(index)}>
-                                               <Check className="mr-2 h-4 w-4"/>
-                                               Selecionar
-                                           </Button>
-                                       ) : (
-                                            <Badge variant="success" className="mt-8 gap-1"><Crown className="h-3 w-3"/>Vencedor</Badge>
-                                       )}
-                                    </div>
+                                <div className="space-y-2">
+                                  <div className="flex justify-between items-start">
+                                    <p className="font-bold pr-10">{q.supplierName}</p>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1" onClick={() => removeQuotation(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                      <div><Label className="text-muted-foreground">Valor:</Label> <p>{Number(q.totalValue).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</p></div>
+                                      <div><Label className="text-muted-foreground">Prazo:</Label> <p>{q.deliveryTime} dias</p></div>
+                                      <div className="col-span-2"><Label className="text-muted-foreground">Pagamento:</Label> <p>{q.paymentTerms}</p></div>
+                                  </div>
+                                   <div className="flex justify-between items-center pt-2">
+                                       <div>
+                                        {(q.attachmentUrl || q.attachmentFile) && (
+                                            <Button asChild variant="link" size="sm" className="p-0 h-auto">
+                                                <a href={q.attachmentUrl || (q.attachmentFile ? URL.createObjectURL(q.attachmentFile) : '#')} target="_blank" rel="noopener noreferrer">
+                                                    <ExternalLink className="mr-1 h-3 w-3"/> Ver Anexo
+                                                </a>
+                                            </Button>
+                                        )}
+                                       </div>
+                                       <div className="flex gap-2">
+                                            <Button size="sm" variant="ghost" onClick={() => handleEditQuotation(index)}><Edit className="mr-2 h-4 w-4"/>Editar</Button>
+                                            {selectedQuotationIndex !== index ? (
+                                                <Button size="sm" variant="outline" onClick={() => setSelectedQuotationIndex(index)}>
+                                                    <Check className="mr-2 h-4 w-4"/>
+                                                    Selecionar
+                                                </Button>
+                                            ) : (
+                                                    <Badge variant="success" className="gap-1"><Crown className="h-3 w-3"/>Vencedor</Badge>
+                                            )}
+                                       </div>
+                                   </div>
                                 </div>
                            </Card>
                         ))}
