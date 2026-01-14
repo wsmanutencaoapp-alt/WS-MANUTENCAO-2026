@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, orderBy, where, doc, getDocs, documentId } from 'firebase/firestore';
+import { collection, query, orderBy, where, doc, getDocs, documentId, deleteDoc, writeBatch } from 'firebase/firestore';
 import type { PurchaseRequisition, CostCenter, Employee, PurchaseRequisitionItem } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -20,9 +20,20 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, Eye, Edit, AlertCircle } from 'lucide-react';
+import { Loader2, Search, Eye, Edit, AlertCircle, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import PurchaseRequisitionDetailsDialog from '@/components/PurchaseRequisitionDetailsDialog';
@@ -35,6 +46,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
+
 
 type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
     progress: number;
@@ -72,10 +85,12 @@ export default function MyRequisitionsTable() {
   const firestore = useFirestore();
   const { user } = useUser();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionToEdit, setRequisitionToEdit] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
+  const [isProcessingDelete, setIsProcessingDelete] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -87,6 +102,8 @@ export default function MyRequisitionsTable() {
     if (!employeeData) return false;
     return employeeData.accessLevel === 'Admin' || (employeeData.permissions?.compras ?? false);
   }, [employeeData]);
+
+  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
 
   const queryKey = ['myPurchaseRequisitions', canViewAll, user?.uid];
 
@@ -170,6 +187,34 @@ export default function MyRequisitionsTable() {
   const handleEditSuccess = () => {
     setRequisitionToEdit(null);
     queryClient.invalidateQueries({ queryKey });
+  }
+
+  const handleDeleteRequisition = async (requisitionId: string) => {
+      if (!firestore) return;
+      setIsProcessingDelete(requisitionId);
+      try {
+          const batch = writeBatch(firestore);
+          const reqRef = doc(firestore, 'purchase_requisitions', requisitionId);
+          
+          const itemsRef = collection(reqRef, 'items');
+          const itemsSnapshot = await getDocs(itemsRef);
+          itemsSnapshot.forEach(itemDoc => {
+              batch.delete(itemDoc.ref);
+          });
+          
+          batch.delete(reqRef);
+          
+          await batch.commit();
+          toast({ title: 'Sucesso', description: `Requisição e seus itens foram excluídos.` });
+          
+          queryClient.invalidateQueries({ queryKey });
+
+      } catch (err) {
+          console.error("Erro ao excluir requisição:", err);
+          toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir o documento.' });
+      } finally {
+          setIsProcessingDelete(null);
+      }
   }
 
   const isLoading = isLoadingRequisitions || isLoadingCostCenters || isEmployeeLoading;
@@ -260,6 +305,29 @@ export default function MyRequisitionsTable() {
                          <Eye className="mr-2 h-4 w-4" />
                          Ver Itens
                       </Button>
+                       {isAdmin && (
+                          <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                  <Button variant="destructive" size="icon" disabled={isProcessingDelete === req.docId} title="Excluir Requisição">
+                                      {isProcessingDelete === req.docId ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                                  </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                      <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                          Tem certeza que deseja excluir permanentemente a requisição <span className="font-bold">{req.protocol}</span>? Esta ação não pode ser desfeita.
+                                      </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteRequisition(req.docId)}>
+                                          Sim, Excluir
+                                      </AlertDialogAction>
+                                  </AlertDialogFooter>
+                              </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </TableCell>
                     </TableRow>
                   )
