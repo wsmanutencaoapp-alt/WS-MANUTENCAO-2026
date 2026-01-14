@@ -184,6 +184,13 @@ export default function ApprovalDetailsDialog({ requisition, isOpen, onClose }: 
                                 <p className="font-bold">{item.details.descricao}</p>
                                 <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
                                 <p className="text-xs text-muted-foreground">Qtd: {item.quantity} {item.details.unidadeMedida}</p>
+                                {item.attachmentUrl && (
+                                    <Button asChild variant="link" size="sm" className="p-0 h-auto text-xs">
+                                        <a href={item.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                                            <FileText className="mr-1 h-3 w-3" /> Ver Anexo do Item
+                                        </a>
+                                    </Button>
+                                )}
                             </div>
                         </CardHeader>
                         <CardContent className="p-4">
