@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ShoppingCart, PlusCircle, Trash2, CalendarIcon, PackageSearch, ListChecks } from 'lucide-react';
+import { Loader2, ShoppingCart, PlusCircle, Trash2, CalendarIcon, PackageSearch, ListChecks, Upload, FileText } from 'lucide-react';
 import Image from 'next/image';
 import {
   Select,
@@ -28,6 +28,8 @@ import { Textarea } from '@/components/ui/textarea';
 import ItemSelectorDialog from '@/components/ItemSelectorDialog';
 import MyRequisitionsTable from '@/components/MyRequisitionsTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useStorage } from '@/firebase/provider';
 
 
 type RequisitionableItem = (WithDocId<Supply> | WithDocId<Tool>) & { itemType: 'supply' | 'tool' };
@@ -35,12 +37,13 @@ type CartItem = RequisitionableItem & {
     requisitionQuantity: number;
     estimatedPrice?: number;
     notes?: string;
-    attachmentUrl?: string;
+    attachmentFile?: File | null;
 };
 
 const RequisicaoCompraPage = () => {
   const { user } = useUser();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -56,7 +59,7 @@ const RequisicaoCompraPage = () => {
   const suppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
   const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery, {queryKey: ['allSuppliesForReq']});
   
-  const toolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools'), where('sequencial', '==', 0)) : null, [firestore]);
+  const toolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools'), where('enderecamento', '==', 'LOGICA')) : null, [firestore]);
   const { data: allTools, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery, {queryKey: ['allToolModelsForReq']});
 
   const costCentersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'cost_centers')) : null, [firestore]);
@@ -71,7 +74,13 @@ const RequisicaoCompraPage = () => {
   }, [allSupplies, allTools, cart, isLoadingSupplies, isLoadingTools]);
   
   const addToCart = (item: RequisitionableItem) => {
-    setCart(prev => [...prev, { ...item, requisitionQuantity: 1, estimatedPrice: 0, notes: '', attachmentUrl: '' }]);
+    setCart(prev => [...prev, { 
+        ...item, 
+        requisitionQuantity: 1, 
+        estimatedPrice: item.valor_estimado || 0, 
+        notes: '', 
+        attachmentFile: null 
+    }]);
   };
 
   const removeFromCart = (docId: string) => {
@@ -81,9 +90,14 @@ const RequisicaoCompraPage = () => {
   const updateCartItem = (docId: string, field: keyof CartItem, value: any) => {
     setCart(prev => prev.map(item => item.docId === docId ? { ...item, [field]: value } : item));
   };
+  
+  const handleFileChange = (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    updateCartItem(docId, 'attachmentFile', file);
+  }
 
   const handleSubmitRequisition = async () => {
-    if (!firestore || !user) {
+    if (!firestore || !user || !storage) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado.' });
         return;
     }
@@ -122,8 +136,15 @@ const RequisicaoCompraPage = () => {
             type: 'Solicitação de Compra',
         };
         batch.set(requisitionRef, requisitionData);
-
+        
         for (const item of cart) {
+            let attachmentUrl = '';
+            if(item.attachmentFile) {
+                const fileRef = storageRef(storage, `requisition_attachments/${requisitionRef.id}/${item.docId}-${item.attachmentFile.name}`);
+                await uploadBytes(fileRef, item.attachmentFile);
+                attachmentUrl = await getDownloadURL(fileRef);
+            }
+
             const itemRef = doc(collection(firestore, 'purchase_requisitions', requisitionRef.id, 'items'));
             const itemData: Omit<PurchaseRequisitionItem, 'id'> = {
                 itemId: item.docId,
@@ -132,7 +153,7 @@ const RequisicaoCompraPage = () => {
                 estimatedPrice: item.estimatedPrice || 0,
                 status: 'Pendente',
                 notes: item.notes,
-                attachmentUrl: item.attachmentUrl,
+                attachmentUrl: attachmentUrl,
             };
             batch.set(itemRef, itemData);
         }
@@ -299,12 +320,13 @@ const RequisicaoCompraPage = () => {
                                                 onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
                                                 className="h-8 text-sm"
                                             />
-                                            <Input
-                                                placeholder="Link de referência (opcional)"
-                                                value={item.attachmentUrl || ''}
-                                                onChange={(e) => updateCartItem(item.docId, 'attachmentUrl', e.target.value)}
-                                                className="h-8 text-sm"
-                                            />
+                                            <Button asChild variant="outline" size="sm" className="w-full h-8 text-sm">
+                                                <label htmlFor={`file-${item.docId}`} className="cursor-pointer">
+                                                    {item.attachmentFile ? <FileText className="mr-2 h-4 w-4 text-green-600"/> : <Upload className="mr-2 h-4 w-4"/>}
+                                                    <span className="truncate">{item.attachmentFile ? item.attachmentFile.name : 'Anexar Referência'}</span>
+                                                    <Input id={`file-${item.docId}`} type="file" className="sr-only" onChange={(e) => handleFileChange(item.docId, e)} />
+                                                </label>
+                                            </Button>
                                         </div>
                                         <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.docId)}>
                                             <Trash2 className="h-4 w-4 text-destructive" />
