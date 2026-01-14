@@ -135,7 +135,8 @@ const ControleComprasPage = () => {
             let attendedItems = 0;
             itemsSnapshot.forEach(itemDoc => {
                 const item = itemDoc.data() as PurchaseRequisitionItem;
-                if (item.status === 'Cotado' || item.status === 'Recebido' || item.status === 'Cancelado') {
+                // Item is considered "attended" if it's no longer pending.
+                if (item.status === 'Em Cotação' || item.status === 'Cotado' || item.status === 'Recebido' || item.status === 'Cancelado') {
                     attendedItems++;
                 }
             });
