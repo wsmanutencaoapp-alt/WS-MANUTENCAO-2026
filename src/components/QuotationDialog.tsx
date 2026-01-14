@@ -207,45 +207,20 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
   }
   
-  const handleSendForApproval = async () => {
-    const allItems = (await getDocs(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'))).docs.map(d => d.data() as PurchaseRequisitionItem);
-
-    const allItemsAreQuoted = allItems.every(item => 
-        (item.quotations?.length ?? 0) > 0 && 
-        item.selectedQuotationIndex !== undefined && 
-        item.selectedQuotationIndex !== null
-    );
-
-    if (!allItemsAreQuoted) {
+  const handleGenerateOC = async () => {
+    if (selectedQuotationIndex === null) {
         toast({
             variant: 'destructive',
             title: 'Ação Incompleta',
-            description: 'Todos os itens da requisição devem ter uma cotação vencedora selecionada antes de gerar a Ordem de Compra.',
-        });
-        return;
-    }
-
-    const winningQuotes = allItems.map(item => item.quotations![item.selectedQuotationIndex!]);
-    const uniqueSupplierIds = new Set(winningQuotes.map(q => q.supplierId));
-
-    if (uniqueSupplierIds.size > 1) {
-        toast({
-            variant: 'destructive',
-            title: 'Fornecedores Múltiplos',
-            description: 'A geração de Ordem de Compra automática só suporta um único fornecedor. Por favor, selecione cotações do mesmo fornecedor para todos os itens.',
+            description: 'Você precisa selecionar uma cotação vencedora para este item antes de gerar a Ordem de Compra.',
         });
         return;
     }
 
     const expensiveChoiceJustification = justification || requisition.expensiveChoiceJustification || '';
     
-    const requiresJustification = allItems.some(item => {
-        if (!item.quotations || item.quotations.length <= 1 || item.selectedQuotationIndex === null) return false;
-        const selectedQuoteValue = item.quotations[item.selectedQuotationIndex!].totalValue;
-        const prices = item.quotations.map(q => q.totalValue);
-        const maxPrice = Math.max(...prices);
-        return selectedQuoteValue >= maxPrice;
-    });
+    const requiresJustification = (savedQuotations || []).length > 1 &&
+        savedQuotations[selectedQuotationIndex].totalValue >= Math.max(...savedQuotations.map(q => Number(q.totalValue)));
 
     if (requiresJustification && !expensiveChoiceJustification) {
         setIsJustificationDialogOpen(true);
@@ -256,75 +231,83 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
   }
 
   const finishApprovalProcess = async (finalJustification?: string) => {
-    if (!firestore) return;
+    if (!firestore || !currentItem || selectedQuotationIndex === null) return;
     setIsSaving(true);
     setIsJustificationDialogOpen(false); 
     
     try {
-        const batch = writeBatch(firestore);
-
-        const counterRef = doc(firestore, 'counters', 'purchaseOrders');
-        const counterSnapshot = await getDoc(counterRef);
-        let lastId = 0;
-        if (counterSnapshot.exists()) {
-            lastId = counterSnapshot.data().lastId || 0;
-        }
-        const newId = lastId + 1;
-        const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
+        const winningQuote = savedQuotations[selectedQuotationIndex];
         
-        const newOcRef = doc(collection(firestore, 'purchase_requisitions'));
-        const allItems = (await getDocs(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'))).docs.map(d => ({ ...d.data() as PurchaseRequisitionItem, docId: d.id }));
-        const winningQuotes = allItems.map(item => item.quotations![item.selectedQuotationIndex!]);
-        const firstWinner = winningQuotes[0];
+        await runTransaction(firestore, async (transaction) => {
+            const counterRef = doc(firestore, 'counters', 'purchaseOrders');
+            const counterDoc = await transaction.get(counterRef);
 
-        const ocData: Omit<PurchaseRequisition, 'id'> = {
-            protocol: ocProtocol,
-            originalRequisitionId: requisition.docId,
-            requesterId: requisition.requesterId,
-            requesterName: requisition.requesterName,
-            costCenterId: requisition.costCenterId,
-            neededByDate: requisition.neededByDate,
-            type: 'Ordem de Compra',
-            status: 'Em Aprovação',
-            createdAt: new Date().toISOString(),
-            priority: requisition.priority,
-            purchaseReason: requisition.purchaseReason,
-            expensiveChoiceJustification: finalJustification,
-            supplierId: firstWinner.supplierId,
-            supplierName: firstWinner.supplierName,
-            totalValue: winningQuotes.reduce((acc, q) => acc + q.totalValue, 0),
-            paymentTerms: firstWinner.paymentTerms,
-        };
-        batch.set(newOcRef, ocData);
-
-        for (const item of allItems) {
-            if (item.selectedQuotationIndex === null || item.selectedQuotationIndex === undefined) continue;
+            let lastId = 0;
+            if(counterDoc.exists()){
+                lastId = counterDoc.data().lastId || 0;
+            }
+            const newId = lastId + 1;
+            const ocProtocol = `OC-${new Date().getFullYear()}-${String(newId).padStart(5, '0')}`;
+            
+            const newOcRef = doc(collection(firestore, 'purchase_requisitions'));
+            const ocData: Omit<PurchaseRequisition, 'id'> = {
+                protocol: ocProtocol,
+                originalRequisitionId: requisition.docId,
+                requesterId: requisition.requesterId,
+                requesterName: requisition.requesterName,
+                costCenterId: requisition.costCenterId,
+                neededByDate: requisition.neededByDate,
+                type: 'Ordem de Compra',
+                status: 'Em Aprovação',
+                createdAt: new Date().toISOString(),
+                priority: requisition.priority,
+                purchaseReason: `Item: ${currentItem.details.descricao} (da SC ${requisition.protocol})`,
+                expensiveChoiceJustification: finalJustification,
+                supplierId: winningQuote.supplierId,
+                supplierName: winningQuote.supplierName,
+                totalValue: Number(winningQuote.totalValue),
+                paymentTerms: winningQuote.paymentTerms,
+            };
+            transaction.set(newOcRef, ocData);
 
             const newItemRef = doc(collection(newOcRef, 'items'));
-            const winningQuote = item.quotations![item.selectedQuotationIndex!];
             const newItemData: Omit<PurchaseRequisitionItem, 'id'> = {
-                itemId: item.itemId,
-                itemType: item.itemType,
-                quantity: item.quantity,
+                itemId: currentItem.itemId,
+                itemType: currentItem.itemType,
+                quantity: currentItem.quantity,
                 status: 'Pendente', 
-                notes: item.notes,
-                estimatedPrice: winningQuote.totalValue,
+                notes: currentItem.notes,
+                estimatedPrice: Number(winningQuote.totalValue),
             };
-            batch.set(newItemRef, newItemData);
-        };
+            transaction.set(newItemRef, newItemData);
 
-        const originalReqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
-        batch.update(originalReqRef, { status: 'Totalmente Atendida' });
-        
-        if (counterSnapshot.exists()) {
-            batch.update(counterRef, { lastId: newId });
-        } else {
-            batch.set(counterRef, { lastId: newId });
-        }
+            // Update original item
+            const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
+            transaction.update(originalItemRef, { status: 'Recebido' }); // Or another final status
+            
+            // Check if all items in original SC are now done
+            const allItemsSnapshot = await getDocs(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
+            const allItems = allItemsSnapshot.docs.map(d => ({...d.data() as PurchaseRequisitionItem, docId: d.id}));
+            
+            // Exclude the current item from the check, as it's being updated in this transaction
+            const otherItems = allItems.filter(i => i.docId !== currentItem.docId);
+            const allOthersDone = otherItems.every(i => i.status === 'Recebido' || i.status === 'Cancelado');
 
-        await batch.commit();
+            const originalReqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
+            if (allOthersDone) {
+                transaction.update(originalReqRef, { status: 'Totalmente Atendida' });
+            } else {
+                transaction.update(originalReqRef, { status: 'Parcialmente Atendida' });
+            }
 
-        toast({ title: "Ordem de Compra Gerada!", description: `A OC ${ocProtocol} foi enviada para aprovação.` });
+            if (counterDoc.exists()) {
+                transaction.update(counterRef, { lastId: newId });
+            } else {
+                transaction.set(counterRef, { lastId: newId });
+            }
+        });
+
+        toast({ title: "Ordem de Compra Gerada!", description: `Uma OC para o item foi enviada para aprovação.` });
         
         onSuccess();
         onClose(); 
@@ -358,7 +341,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           <DialogHeader>
             <DialogTitle>Gerenciar Cotação - {requisition.protocol}</DialogTitle>
             <DialogDescription>
-              Adicione orçamentos para os itens e, ao final, escolha o vencedor.
+              Adicione orçamentos para os itens e, ao final, escolha o vencedor para gerar a Ordem de Compra.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-4 py-4">
@@ -467,7 +450,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
              </div>
              <div className="flex gap-2">
                 <Button variant="outline" onClick={onClose} disabled={isSaving}>Fechar</Button>
-                <Button onClick={handleSendForApproval} disabled={isSaving}>
+                <Button onClick={handleGenerateOC} disabled={isSaving || selectedQuotationIndex === null}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     <ShoppingBag className="mr-2 h-4 w-4"/>
                     Gerar Ordem de Compra
