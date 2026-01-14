@@ -172,10 +172,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
         selectedQuotationIndex: selectedQuotationIndex,
       };
       
-      if (finalQuotations.length > 0) {
+      if (finalQuotations.length > 0 && currentItem.status === 'Pendente') {
         updateData.status = 'Em Cotação';
-      } else {
-        updateData.status = 'Pendente';
       }
       
       if (selectedQuotationIndex !== null) {
@@ -184,7 +182,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       
       await updateDoc(itemRef, updateData);
 
-      // Update the main requisition status if needed
       if (requisition.status === 'Aprovada' || requisition.status === 'Aberta') {
           if (finalQuotations.length > 0) {
             const reqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
@@ -198,7 +195,7 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       try {
           await saveCurrentItemQuotations();
           toast({ title: "Progresso Salvo!", description: "As cotações para este item foram salvas." });
-          onSuccess(); // Triggers a refetch
+          onSuccess(); 
       } catch (err: any) {
           console.error("Erro ao salvar progresso:", err);
           toast({ variant: 'destructive', title: 'Erro ao Salvar', description: err.message });
@@ -271,27 +268,35 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             transaction.set(newOcRef, ocData);
 
             const newItemRef = doc(collection(newOcRef, 'items'));
-            const newItemData: Omit<PurchaseRequisitionItem, 'id'> = {
+            // Include quotations in the new OC item
+            const newItemData: Omit<PurchaseRequisitionItem, 'id' | 'quotations'> & { quotations: Quotation[]; selectedQuotationIndex: number } = {
                 itemId: currentItem.itemId,
                 itemType: currentItem.itemType,
                 quantity: currentItem.quantity,
                 status: 'Pendente', 
                 notes: currentItem.notes,
                 estimatedPrice: Number(winningQuote.totalValue),
+                attachmentUrl: currentItem.attachmentUrl,
+                quotations: savedQuotations.map(q => ({
+                  supplierId: q.supplierId,
+                  supplierName: q.supplierName,
+                  totalValue: Number(q.totalValue),
+                  deliveryTime: Number(q.deliveryTime),
+                  paymentTerms: q.paymentTerms,
+                  attachmentUrl: q.attachmentUrl || ''
+                })),
+                selectedQuotationIndex: selectedQuotationIndex
             };
             transaction.set(newItemRef, newItemData);
 
-            // Update original item
             const originalItemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', currentItem.docId);
-            transaction.update(originalItemRef, { status: 'Recebido' }); // Or another final status
+            transaction.update(originalItemRef, { status: 'Recebido' });
             
-            // Check if all items in original SC are now done
             const allItemsSnapshot = await getDocs(collection(firestore, 'purchase_requisitions', requisition.docId, 'items'));
             const allItems = allItemsSnapshot.docs.map(d => ({...d.data() as PurchaseRequisitionItem, docId: d.id}));
             
-            // Exclude the current item from the check, as it's being updated in this transaction
             const otherItems = allItems.filter(i => i.docId !== currentItem.docId);
-            const allOthersDone = otherItems.every(i => i.status === 'Recebido' || i.status === 'Cancelado');
+            const allOthersDone = otherItems.every(i => ['Recebido', 'Cancelado'].includes(i.status));
 
             const originalReqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
             if (allOthersDone) {
