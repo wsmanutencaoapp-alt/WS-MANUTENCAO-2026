@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit } from 'lucide-react';
+import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +43,7 @@ import QuotationDialog from '@/components/QuotationDialog';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EditRequisitionDialog from '@/components/EditRequisitionDialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
@@ -245,6 +246,7 @@ const ControleComprasPage = () => {
 
   return (
     <>
+    <TooltipProvider>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Controle de Compras</h1>
         
@@ -352,8 +354,8 @@ const ControleComprasPage = () => {
             <TabsContent value="ordens">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Ordens de Compra Aprovadas</CardTitle>
-                        <CardDescription>Gerencie as OCs aprovadas, acompanhe entregas e finalize o processo.</CardDescription>
+                        <CardTitle>Ordens de Compra</CardTitle>
+                        <CardDescription>Gerencie as OCs, acompanhe entregas, revise e finalize o processo.</CardDescription>
                          <div className="relative pt-4">
                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -384,9 +386,11 @@ const ControleComprasPage = () => {
                                 <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{ocError.message}</TableCell></TableRow>
                                 )}
                                 {!isLoading && filteredOCs.length === 0 && (
-                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma Ordem de Compra aprovada encontrada.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma Ordem de Compra encontrada.</TableCell></TableRow>
                                 )}
-                                 {!isLoading && filteredOCs.map(oc => (
+                                 {!isLoading && filteredOCs.map(oc => {
+                                  const showReason = (oc.status === 'Em Revisão Comprador') && oc.rejectionReason;
+                                  return (
                                     <TableRow key={oc.docId}>
                                         <TableCell className="font-mono">
                                             <p>{oc.protocol}</p>
@@ -395,12 +399,36 @@ const ControleComprasPage = () => {
                                         <TableCell>{oc.supplierName || 'N/A'}</TableCell>
                                         <TableCell className="font-medium">{oc.totalValue?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                         <TableCell>{format(new Date(oc.createdAt), 'dd/MM/yyyy')}</TableCell>
-                                        <TableCell><Badge variant={getStatusVariant(oc.status)}>{oc.status}</Badge></TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant={getStatusVariant(oc.status)}>{oc.status}</Badge>
+                                                {showReason && (
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                        <span className="cursor-help">
+                                                            <AlertCircle className="h-4 w-4 text-orange-500" />
+                                                        </span>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                        <p className="max-w-xs">Motivo da Devolução: {oc.rejectionReason}</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-right space-x-2">
-                                            <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(oc)}>
-                                                <Eye className="mr-2 h-4 w-4" />
-                                                Detalhes
-                                            </Button>
+                                            {oc.status === 'Em Revisão Comprador' ? (
+                                                <Button variant="secondary" size="sm" onClick={() => setRequisitionToEdit(oc)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    Revisar e Reenviar
+                                                </Button>
+                                            ) : (
+                                                <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(oc)}>
+                                                    <Eye className="mr-2 h-4 w-4" />
+                                                    Detalhes
+                                                </Button>
+                                            )}
+
                                             {isAdmin && (
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
@@ -426,7 +454,8 @@ const ControleComprasPage = () => {
                                             )}
                                         </TableCell>
                                     </TableRow>
-                                 ))}
+                                  )
+                                })}
                             </TableBody>
                        </Table>
                     </CardContent>
@@ -434,6 +463,7 @@ const ControleComprasPage = () => {
             </TabsContent>
         </Tabs>
       </div>
+      </TooltipProvider>
 
       {selectedRequisition && (
           <PurchaseRequisitionDetailsDialog

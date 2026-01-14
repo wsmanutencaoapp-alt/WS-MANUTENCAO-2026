@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, getDocs, doc, writeBatch, where } from 'firebase/firestore';
+import { collection, query, getDocs, doc, writeBatch, where, updateDoc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,25 +48,18 @@ export default function EditRequisitionDialog({ requisition, isOpen, onClose, on
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [initialData, setInitialData] = useState<{
-    costCenterId: string,
-    neededByDate: Date | undefined,
-    priority: PurchaseRequisition['priority'],
-    purchaseReason: string,
-    type: PurchaseRequisition['type']
-  }>({
-      costCenterId: '',
-      neededByDate: undefined,
-      priority: 'Normal',
-      purchaseReason: '',
-      type: 'Solicitação de Compra'
+  const [editableFields, setEditableFields] = useState({
+      paymentTerms: '',
+      purchaseOrderNotes: ''
   });
+
+  const isPurchaseOrder = requisition?.type === 'Ordem de Compra';
 
 
   // Fetch all master data to map item details
   const suppliesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'supplies')) : null, [firestore]);
   const { data: allSupplies, isLoading: isLoadingSupplies } = useCollection<WithDocId<Supply>>(suppliesQuery, {queryKey: ['allSuppliesForReview']});
-  const toolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools'), where('sequencial', '==', 0)) : null, [firestore]);
+  const toolsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'tools')) : null, [firestore]);
   const { data: allTools, isLoading: isLoadingTools } = useCollection<WithDocId<Tool>>(toolsQuery, {queryKey: ['allToolModelsForReview']});
   
   const masterDataMap = useMemo(() => {
@@ -84,13 +77,12 @@ export default function EditRequisitionDialog({ requisition, isOpen, onClose, on
 
         setIsLoading(true);
         try {
-            setInitialData({
-                costCenterId: requisition.costCenterId,
-                neededByDate: new Date(requisition.neededByDate),
-                priority: requisition.priority,
-                purchaseReason: requisition.purchaseReason,
-                type: requisition.type
-            });
+             if (isPurchaseOrder) {
+                setEditableFields({
+                    paymentTerms: requisition.paymentTerms || '',
+                    purchaseOrderNotes: requisition.purchaseOrderNotes || ''
+                });
+            }
 
             const itemsRef = collection(firestore, 'purchase_requisitions', requisition.docId, 'items');
             const itemsSnapshot = await getDocs(itemsRef);
@@ -124,7 +116,7 @@ export default function EditRequisitionDialog({ requisition, isOpen, onClose, on
     if (isOpen && masterDataMap.size > 0) {
         fetchRequisitionItems();
     }
-  }, [requisition, isOpen, firestore, toast, masterDataMap]);
+  }, [requisition, isOpen, firestore, toast, masterDataMap, isPurchaseOrder]);
 
 
   const removeFromCart = (docId: string, existingItemId?: string) => {
@@ -137,13 +129,18 @@ export default function EditRequisitionDialog({ requisition, isOpen, onClose, on
   const updateCartItem = (docId: string, field: keyof CartItem, value: any) => {
     setCart(prev => prev.map(item => item.docId === docId ? { ...item, [field]: value } : item));
   };
+
+   const handleFieldChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setEditableFields(prev => ({ ...prev, [id]: value }));
+  };
   
   const handleSubmitUpdate = async () => {
     if (!firestore || !user || !requisition) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Dados da sessão inválidos.' });
         return;
     }
-    if (cart.length === 0) {
+    if (cart.length === 0 && !isPurchaseOrder) {
         toast({ variant: 'destructive', title: 'Erro', description: 'A requisição não pode ficar sem itens.' });
         return;
     }
@@ -153,30 +150,40 @@ export default function EditRequisitionDialog({ requisition, isOpen, onClose, on
         const batch = writeBatch(firestore);
         const requisitionRef = doc(firestore, 'purchase_requisitions', requisition.docId);
 
-        // Update requisition status back to 'Aberta' to re-enter the approval flow
-        batch.update(requisitionRef, { status: 'Aberta' });
-
-        // Process updated and new items
-        for (const item of cart) {
-            const itemRef = item.existingItemId
-                ? doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.existingItemId)
-                : doc(collection(firestore, 'purchase_requisitions', requisition.docId, 'items')); // For items added during edit
-            
-            const itemData: Omit<PurchaseRequisitionItem, 'id'> = {
-                itemId: item.docId,
-                itemType: item.itemType,
-                quantity: item.requisitionQuantity,
-                estimatedPrice: item.estimatedPrice || 0,
-                notes: item.notes,
-                attachmentUrl: item.attachmentUrl,
-            };
-            batch.set(itemRef, itemData, { merge: true }); // Use merge to be safe
+        // Update requisition status back to 'Em Aprovação' to re-enter the approval flow
+        let updateData: any = { status: 'Em Aprovação', rejectionReason: '' };
+        
+        if (isPurchaseOrder) {
+            updateData.paymentTerms = editableFields.paymentTerms;
+            updateData.purchaseOrderNotes = editableFields.purchaseOrderNotes;
         }
 
-        // Delete items that were removed
-        for (const itemIdToDelete of deletedItemIds) {
-            const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', itemIdToDelete);
-            batch.delete(itemRef);
+        batch.update(requisitionRef, updateData);
+
+        if (!isPurchaseOrder) {
+            // Process updated and new items for SC
+            for (const item of cart) {
+                const itemRef = item.existingItemId
+                    ? doc(firestore, 'purchase_requisitions', requisition.docId, 'items', item.existingItemId)
+                    : doc(collection(firestore, 'purchase_requisitions', requisition.docId, 'items')); // For items added during edit
+                
+                const itemData: Omit<PurchaseRequisitionItem, 'id'> = {
+                    itemId: item.docId,
+                    itemType: item.itemType,
+                    quantity: item.requisitionQuantity,
+                    estimatedPrice: item.estimatedPrice || 0,
+                    status: 'Pendente',
+                    notes: item.notes,
+                    attachmentUrl: item.attachmentUrl,
+                };
+                batch.set(itemRef, itemData, { merge: true });
+            }
+
+            // Delete items that were removed for SC
+            for (const itemIdToDelete of deletedItemIds) {
+                const itemRef = doc(firestore, 'purchase_requisitions', requisition.docId, 'items', itemIdToDelete);
+                batch.delete(itemRef);
+            }
         }
 
         await batch.commit();
@@ -196,17 +203,31 @@ export default function EditRequisitionDialog({ requisition, isOpen, onClose, on
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl">
             <DialogHeader>
-            <DialogTitle>Revisar Requisição de Compra</DialogTitle>
+            <DialogTitle>Revisar {isPurchaseOrder ? 'Ordem de Compra' : 'Requisição'}</DialogTitle>
             <DialogDescription>
-                Ajuste os itens da requisição <span className='font-bold'>{requisition?.protocol}</span> e reenvie para aprovação.
+                Ajuste os dados de <span className='font-bold'>{requisition?.protocol}</span> e reenvie para aprovação.
                  <br />
-                <span className="text-orange-600 dark:text-orange-400">Motivo da revisão: {requisition?.rejectionReason || 'Não especificado.'}</span>
+                <span className="text-orange-600 dark:text-orange-400">Motivo da devolução: {requisition?.rejectionReason || 'Não especificado.'}</span>
             </DialogDescription>
             </DialogHeader>
             <Card className="w-full border-none shadow-none">
                 <CardContent className="p-0">
                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4">
-                        <h3 className="font-semibold text-lg">Itens da Requisição ({cart.length})</h3>
+                        
+                        {isPurchaseOrder && (
+                            <div className="space-y-4 p-1">
+                                <div className="space-y-1">
+                                    <Label htmlFor="paymentTerms">Condições de Pagamento</Label>
+                                    <Input id="paymentTerms" value={editableFields.paymentTerms} onChange={handleFieldChange} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="purchaseOrderNotes">Notas para OC</Label>
+                                    <Textarea id="purchaseOrderNotes" value={editableFields.purchaseOrderNotes} onChange={handleFieldChange} />
+                                </div>
+                            </div>
+                        )}
+
+                        <h3 className="font-semibold text-lg pt-2">Itens ({cart.length})</h3>
                         {isLoading ? (
                             <div className="flex justify-center items-center h-48">
                                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -239,6 +260,7 @@ export default function EditRequisitionDialog({ requisition, isOpen, onClose, on
                                                         onChange={(e) => updateCartItem(item.docId, 'requisitionQuantity', Math.max(1, parseInt(e.target.value) || 1))}
                                                         className="h-8 text-center"
                                                         min="1"
+                                                        disabled={isPurchaseOrder}
                                                     />
                                                     <Input
                                                         type="number"
@@ -246,6 +268,7 @@ export default function EditRequisitionDialog({ requisition, isOpen, onClose, on
                                                         value={item.estimatedPrice || ''}
                                                         onChange={(e) => updateCartItem(item.docId, 'estimatedPrice', parseFloat(e.target.value) || undefined)}
                                                         className="h-8 text-center"
+                                                        disabled={isPurchaseOrder}
                                                     />
                                                 </div>
                                                 <Textarea
@@ -253,11 +276,14 @@ export default function EditRequisitionDialog({ requisition, isOpen, onClose, on
                                                     value={item.notes || ''}
                                                     onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
                                                     className="h-16 text-sm"
+                                                     disabled={isPurchaseOrder}
                                                 />
                                             </div>
-                                            <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.docId, item.existingItemId)}>
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
+                                            {!isPurchaseOrder && (
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.docId, item.existingItemId)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </Card>
                                 ))}
