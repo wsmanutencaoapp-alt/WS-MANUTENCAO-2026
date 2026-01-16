@@ -60,13 +60,13 @@ function EmailConfigCard({ configId }: { configId: string }) {
 
   const addRecipient = () => {
     if (newRecipient && !recipients.includes(newRecipient)) {
-      setRecipients([...recipients, newRecipient]);
+      setRecipients(prev => [...prev, newRecipient]);
       setNewRecipient('');
     }
   };
 
   const removeRecipient = (emailToRemove: string) => {
-    setRecipients(recipients.filter(email => email !== emailToRemove));
+    setRecipients(prev => prev.filter(email => email !== emailToRemove));
   };
   
   const handleSave = async () => {
