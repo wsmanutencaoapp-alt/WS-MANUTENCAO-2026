@@ -22,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { Supply, CostCenter, PurchaseRequisition, PurchaseRequisitionItem, Tool, Employee } from '@/lib/types';
+import type { Supply, CostCenter, PurchaseRequisition, PurchaseRequisitionItem, Tool, Employee, Notification } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Textarea } from '@/components/ui/textarea';
 import ItemSelectorDialog from '@/components/ItemSelectorDialog';
@@ -163,6 +163,26 @@ const RequisicaoCompraPage = () => {
             batch.update(counterRef, { lastId: newId });
         } else {
             batch.set(counterRef, { lastId: newId });
+        }
+
+        // Create notifications for approvers
+        const approversQuery = query(collection(firestore, 'employees'), where('permissions.compras', '==', true));
+        const approversSnapshot = await getDocs(approversQuery);
+
+        if (!approversSnapshot.empty) {
+            approversSnapshot.forEach(approverDoc => {
+                const approverId = approverDoc.id;
+                const notificationRef = doc(collection(firestore, `employees/${approverId}/notifications`));
+                const notificationData: Omit<Notification, 'id'> = {
+                    userId: approverId,
+                    title: 'Nova Requisição para Aprovação',
+                    message: `A solicitação ${protocol} de ${user.displayName || user.email} aguarda sua aprovação.`,
+                    link: '/dashboard/compras/aprovacoes',
+                    read: false,
+                    createdAt: new Date().toISOString(),
+                };
+                batch.set(notificationRef, notificationData);
+            });
         }
         
         await batch.commit();
