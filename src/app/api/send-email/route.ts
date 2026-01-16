@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'APP WS <onboarding@resend.dev>', // You must verify this domain on Resend
+      from: 'onboarding@resend.dev', // Using the default unverified sending address
       to: [to],
       subject: subject,
       html: html,
