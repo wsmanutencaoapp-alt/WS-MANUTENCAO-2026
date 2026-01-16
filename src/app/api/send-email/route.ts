@@ -15,15 +15,15 @@ export async function POST(request: Request) {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'onboarding@resend.dev', // Using the default unverified sending address
+      from: 'onboarding@resend.dev',
       to: [to],
       subject: subject,
       html: html,
     });
 
     if (error) {
-      console.error('Resend API Error:', error);
-      return NextResponse.json({ error }, { status: 500 });
+      console.error('Resend API Error:', JSON.stringify(error, null, 2));
+      return NextResponse.json({ message: 'Failed to send email', error: error.message }, { status: 500 });
     }
 
     return NextResponse.json(data);
