@@ -79,7 +79,8 @@ function EmailConfigCard({ configId }: { configId: string }) {
               enabled,
               recipients,
           };
-          await setDoc(configRef, dataToSave, { merge: true });
+          // Using a full overwrite instead of merge to ensure the recipients array is always correct.
+          await setDoc(configRef, dataToSave);
           toast({ title: 'Sucesso!', description: 'Configurações de e-mail salvas.' });
       } catch (error) {
           toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível salvar as configurações.' });
