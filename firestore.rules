@@ -74,7 +74,8 @@ service cloud.firestore {
                       !('status' in request.resource.data));
       
       match /notifications/{notificationId} {
-        allow read, write: if isOwner(employeeId);
+        allow create: if isAuthenticated();
+        allow read, update, delete: if isOwner(employeeId);
       }
     }
     
@@ -124,7 +125,8 @@ service cloud.firestore {
     }
 
     match /email_configurations/{configId} {
-      allow read, write: if isAdmin();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 }
