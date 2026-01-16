@@ -95,6 +95,47 @@ const RequisicaoCompraPage = () => {
     const file = e.target.files?.[0] || null;
     updateCartItem(docId, 'attachmentFile', file);
   }
+  
+  const sendEmailNotification = async (approverEmail: string, requisitionData: any) => {
+    const subject = `Nova Requisição de Compra para Aprovação: ${requisitionData.protocol}`;
+    const htmlBody = `
+      <div style="font-family: sans-serif; padding: 20px; color: #333;">
+        <h2 style="color: #1a202c;">Nova Requisição de Compra</h2>
+        <p>Uma nova solicitação de compra foi criada e aguarda sua aprovação.</p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p><strong>Protocolo:</strong> ${requisitionData.protocol}</p>
+        <p><strong>Solicitante:</strong> ${requisitionData.requesterName}</p>
+        <p><strong>Motivo da Compra:</strong> ${requisitionData.purchaseReason}</p>
+        <p><strong>Itens:</strong> ${cart.length}</p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="text-align: center;">
+          <a href="${window.location.origin}/dashboard/compras/aprovacoes" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+            Ver Requisição
+          </a>
+        </p>
+        <p style="font-size: 12px; color: #718096; text-align: center; margin-top: 20px;">
+          Esta é uma notificação automática. Por favor, não responda a este e-mail.
+        </p>
+      </div>
+    `;
+
+    try {
+      await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: approverEmail,
+          subject,
+          html: htmlBody,
+        }),
+      });
+    } catch (error) {
+      console.error(`Failed to send email to ${approverEmail}:`, error);
+      // Don't block the UI for email failures
+    }
+  };
 
   const handleSubmitRequisition = async () => {
     if (!firestore || !user || !storage) {
@@ -171,6 +212,7 @@ const RequisicaoCompraPage = () => {
 
         if (!approversSnapshot.empty) {
             approversSnapshot.forEach(approverDoc => {
+                const approver = approverDoc.data() as Employee;
                 const approverId = approverDoc.id;
                 const notificationRef = doc(collection(firestore, `employees/${approverId}/notifications`));
                 const notificationData: Omit<Notification, 'id'> = {
@@ -182,6 +224,11 @@ const RequisicaoCompraPage = () => {
                     createdAt: new Date().toISOString(),
                 };
                 batch.set(notificationRef, notificationData);
+
+                // Send email notification
+                if (approver.email) {
+                    sendEmailNotification(approver.email, requisitionData);
+                }
             });
         }
         
