@@ -38,6 +38,7 @@ export const availableModules: { id: string; label: string, isModule?: boolean }
     { id: 'userManagement', label: 'Gerenciar Usuários', isModule: true },
     { id: 'configurador', label: 'Configurador (Módulo)', isModule: true },
     { id: 'configurador_alcada', label: '-> Alçada de Aprovação', isModule: false },
+    { id: 'configurador_disparo_email', label: '-> Disparo de E-mail', isModule: false },
 ];
 
 export const getRequiredPermissionForPath = (path: string): string | null => {

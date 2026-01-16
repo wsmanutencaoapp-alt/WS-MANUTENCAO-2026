@@ -46,6 +46,7 @@ import { cn } from '@/lib/utils';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
+import { sendPurchaseOrderEmail } from '@/lib/email';
 
 
 interface QuotationDialogProps {
@@ -206,63 +207,15 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
       }
   }
   
-  const handleGenerateOC = async () => {
-    setIsSaving(true);
-    try {
-      // Step 1: Save the current state of quotations for the item.
-      await saveCurrentItemQuotations();
-      
-      // Step 2: Proceed with validation and OC generation.
-      if (selectedQuotationIndex === null) {
-          toast({
-              variant: 'destructive',
-              title: 'Ação Incompleta',
-              description: 'Você precisa selecionar uma cotação vencedora para este item antes de gerar a Ordem de Compra.',
-          });
-          setIsSaving(false);
-          return;
-      }
-  
-      const expensiveChoiceJustification = justification || requisition.expensiveChoiceJustification || '';
-      
-      // Check if the winning quote is the most expensive among the saved ones.
-      const isExpensiveChoice = (savedQuotations || []).length > 1 &&
-          savedQuotations[selectedQuotationIndex].totalValue >= Math.max(...savedQuotations.map(q => Number(q.totalValue)));
-      
-      const notEnoughQuotes = (savedQuotations || []).length < 3;
-  
-      if ((isExpensiveChoice || notEnoughQuotes) && !expensiveChoiceJustification) {
-          let reason = '';
-          if (notEnoughQuotes) {
-              reason = 'É necessário justificar a geração de Ordem de Compra com menos de 3 cotações.';
-          } else if (isExpensiveChoice) {
-              reason = 'Você selecionou a cotação de maior valor. Por favor, forneça uma justificativa.';
-          }
-          setJustificationReason(reason);
-          setIsJustificationDialogOpen(true);
-          setIsSaving(false); // Stop saving process to wait for user input
-          return;
-      }
-  
-      await finishApprovalProcess(expensiveChoiceJustification);
-
-    } catch (err: any) {
-        console.error("Erro no processo de geração de OC:", err);
-        toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
-        setIsSaving(false);
-    }
-  }
-
   const finishApprovalProcess = async (finalJustification?: string) => {
     if (!firestore || !currentItem || selectedQuotationIndex === null) return;
-    // No need to set isSaving again as it's already true from handleGenerateOC
     
     setIsJustificationDialogOpen(false); 
     
     try {
         const winningQuote = savedQuotations[selectedQuotationIndex];
         
-        await runTransaction(firestore, async (transaction) => {
+        const newOcData = await runTransaction(firestore, async (transaction) => {
             const counterRef = doc(firestore, 'counters', 'purchaseOrders');
             const counterDoc = await transaction.get(counterRef);
 
@@ -297,7 +250,6 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             transaction.set(newOcRef, ocData);
 
             const newItemRef = doc(collection(newOcRef, 'items'));
-            // Include quotations in the new OC item
             const newItemData: Omit<PurchaseRequisitionItem, 'id' | 'quotations'> & { quotations: Quotation[]; selectedQuotationIndex: number } = {
                 itemId: currentItem.itemId,
                 itemType: currentItem.itemType,
@@ -329,10 +281,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
 
             const originalReqRef = doc(firestore, 'purchase_requisitions', requisition.docId);
             if (allOthersDone && allItems.every(i => i.status === 'Cotado' || i.status === 'Recebido' || i.status === 'Cancelado')) {
-                // If this was the last item to be quoted and all others are also done
                 transaction.update(originalReqRef, { status: 'Totalmente Atendida' });
             } else {
-                // If there are still pending items
                 transaction.update(originalReqRef, { status: 'Parcialmente Atendida' });
             }
 
@@ -341,7 +291,19 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             } else {
                 transaction.set(counterRef, { lastId: newId });
             }
+            return ocData;
         });
+
+        if (newOcData) {
+            const emailConfigRef = doc(firestore, 'email_configurations', 'purchase_order');
+            const emailConfigSnap = await getDoc(emailConfigRef);
+            if (emailConfigSnap.exists() && emailConfigSnap.data().enabled) {
+                const recipients = emailConfigSnap.data().recipients || [];
+                if (recipients.length > 0) {
+                    await sendPurchaseOrderEmail(recipients, newOcData);
+                }
+            }
+        }
 
         toast({ title: "Ordem de Compra Gerada!", description: `Uma OC para o item foi enviada para aprovação.` });
         
@@ -351,6 +313,50 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
     } catch (err: any) {
         toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
     } finally {
+        setIsSaving(false);
+    }
+  }
+
+  const handleGenerateOC = async () => {
+    setIsSaving(true);
+    try {
+      await saveCurrentItemQuotations();
+      
+      if (selectedQuotationIndex === null) {
+          toast({
+              variant: 'destructive',
+              title: 'Ação Incompleta',
+              description: 'Você precisa selecionar uma cotação vencedora para este item antes de gerar a Ordem de Compra.',
+          });
+          setIsSaving(false);
+          return;
+      }
+  
+      const expensiveChoiceJustification = justification || requisition.expensiveChoiceJustification || '';
+      
+      const isExpensiveChoice = (savedQuotations || []).length > 1 &&
+          savedQuotations[selectedQuotationIndex].totalValue >= Math.max(...savedQuotations.map(q => Number(q.totalValue)));
+      
+      const notEnoughQuotes = (savedQuotations || []).length < 3;
+  
+      if ((isExpensiveChoice || notEnoughQuotes) && !expensiveChoiceJustification) {
+          let reason = '';
+          if (notEnoughQuotes) {
+              reason = 'É necessário justificar a geração de Ordem de Compra com menos de 3 cotações.';
+          } else if (isExpensiveChoice) {
+              reason = 'Você selecionou a cotação de maior valor. Por favor, forneça uma justificativa.';
+          }
+          setJustificationReason(reason);
+          setIsJustificationDialogOpen(true);
+          setIsSaving(false);
+          return;
+      }
+  
+      await finishApprovalProcess(expensiveChoiceJustification);
+
+    } catch (err: any) {
+        console.error("Erro no processo de geração de OC:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
         setIsSaving(false);
     }
   }

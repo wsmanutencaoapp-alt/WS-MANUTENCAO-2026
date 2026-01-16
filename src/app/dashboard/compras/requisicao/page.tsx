@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ShoppingCart, PlusCircle, Trash2, CalendarIcon, PackageSearch, ListChecks, Upload, FileText } from 'lucide-react';
+import { Loader2, ShoppingCart, PlusCircle, Trash2, CalendarIcon, PackageSearch, ListChecks, Upload, FileText, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import {
   Select,
@@ -30,6 +30,7 @@ import MyRequisitionsTable from '@/components/MyRequisitionsTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useStorage } from '@/firebase/provider';
+import { sendPurchaseRequisitionEmail } from '@/lib/email';
 
 
 type RequisitionableItem = (WithDocId<Supply> | WithDocId<Tool>) & { itemType: 'supply' | 'tool' };
@@ -96,47 +97,6 @@ const RequisicaoCompraPage = () => {
     updateCartItem(docId, 'attachmentFile', file);
   }
   
-  const sendEmailNotification = async (approverEmail: string, requisitionData: any) => {
-    const subject = `Nova Requisição de Compra para Aprovação: ${requisitionData.protocol}`;
-    const htmlBody = `
-      <div style="font-family: sans-serif; padding: 20px; color: #333;">
-        <h2 style="color: #1a202c;">Nova Requisição de Compra</h2>
-        <p>Uma nova solicitação de compra foi criada e aguarda sua aprovação.</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p><strong>Protocolo:</strong> ${requisitionData.protocol}</p>
-        <p><strong>Solicitante:</strong> ${requisitionData.requesterName}</p>
-        <p><strong>Motivo da Compra:</strong> ${requisitionData.purchaseReason}</p>
-        <p><strong>Itens:</strong> ${cart.length}</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="text-align: center;">
-          <a href="${window.location.origin}/dashboard/compras/aprovacoes" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-            Ver Requisição
-          </a>
-        </p>
-        <p style="font-size: 12px; color: #718096; text-align: center; margin-top: 20px;">
-          Esta é uma notificação automática. Por favor, não responda a este e-mail.
-        </p>
-      </div>
-    `;
-
-    try {
-      await fetch('/api/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: approverEmail,
-          subject,
-          html: htmlBody,
-        }),
-      });
-    } catch (error) {
-      console.error(`Failed to send email to ${approverEmail}:`, error);
-      // Don't block the UI for email failures
-    }
-  };
-
   const handleSubmitRequisition = async () => {
     if (!firestore || !user || !storage) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado.' });
@@ -148,6 +108,19 @@ const RequisicaoCompraPage = () => {
     if (!purchaseReason) { toast({ variant: 'destructive', title: 'Erro', description: 'O motivo da compra é obrigatório.' }); return; }
 
     setIsSubmitting(true);
+    
+    const requisitionData: Omit<PurchaseRequisition, 'id' | 'protocol'> & { protocol?: string } = {
+        requesterId: user.uid,
+        requesterName: user.displayName || user.email || 'Desconhecido',
+        costCenterId: costCenterId,
+        neededByDate: neededByDate.toISOString(),
+        status: 'Em Aprovação',
+        createdAt: new Date().toISOString(),
+        priority: priority,
+        purchaseReason: purchaseReason,
+        type: 'Solicitação de Compra',
+    };
+
     try {
         const batch = writeBatch(firestore);
         
@@ -162,21 +135,8 @@ const RequisicaoCompraPage = () => {
         const year = new Date().getFullYear().toString().slice(-2);
         const protocol = `SC${year}${String(newId).padStart(5, '0')}`;
 
-        
+        requisitionData.protocol = protocol;
         const requisitionRef = doc(collection(firestore, 'purchase_requisitions'));
-
-        const requisitionData: Omit<PurchaseRequisition, 'id'> = {
-            protocol: protocol,
-            requesterId: user.uid,
-            requesterName: user.displayName || user.email || 'Desconhecido',
-            costCenterId: costCenterId,
-            neededByDate: neededByDate.toISOString(),
-            status: 'Em Aprovação',
-            createdAt: new Date().toISOString(),
-            priority: priority,
-            purchaseReason: purchaseReason,
-            type: 'Solicitação de Compra',
-        };
         batch.set(requisitionRef, requisitionData);
         
         for (const item of cart) {
@@ -206,7 +166,7 @@ const RequisicaoCompraPage = () => {
             batch.set(counterRef, { lastId: newId });
         }
 
-        // Create notifications for approvers
+        // Create in-app notifications for approvers
         const approversQuery = query(collection(firestore, 'employees'), where('permissions.compras', '==', true));
         const approversSnapshot = await getDocs(approversQuery);
 
@@ -224,15 +184,25 @@ const RequisicaoCompraPage = () => {
                     createdAt: new Date().toISOString(),
                 };
                 batch.set(notificationRef, notificationData);
-
-                // Send email notification
-                if (approver.email) {
-                    sendEmailNotification(approver.email, requisitionData);
-                }
             });
         }
         
         await batch.commit();
+
+        // Send email notifications based on configuration (after commit)
+        const emailConfigRef = doc(firestore, 'email_configurations', 'purchase_requisition');
+        try {
+            const emailConfigSnap = await getDoc(emailConfigRef);
+            if (emailConfigSnap.exists() && emailConfigSnap.data().enabled) {
+                const recipients = emailConfigSnap.data().recipients || [];
+                if (recipients.length > 0) {
+                    await sendPurchaseRequisitionEmail(recipients, requisitionData);
+                }
+            }
+        } catch (emailError) {
+            console.error("Failed to check or send email notifications:", emailError);
+            // Do not block the user for email errors, just log it.
+        }
 
         toast({ title: 'Sucesso!', description: 'Sua requisição de compra foi enviada para aprovação.' });
         setCart([]);

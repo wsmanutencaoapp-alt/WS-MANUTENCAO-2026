@@ -122,5 +122,9 @@ service cloud.firestore {
     match /counters/{counterId} {
         allow read, write: if isAuthenticated();
     }
+
+    match /email_configurations/{configId} {
+      allow read, write: if isAdmin();
+    }
   }
 }

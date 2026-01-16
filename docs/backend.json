@@ -813,6 +813,37 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "title", "message", "link", "read", "createdAt"]
+    },
+    "EmailConfiguration": {
+      "title": "Email Configuration",
+      "type": "object",
+      "description": "Configuration for automated email notifications.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the configuration (e.g., 'purchase_requisition')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A human-readable description of the notification event."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this email notification is active."
+        },
+        "recipients": {
+          "type": "array",
+          "description": "A list of email addresses to notify.",
+          "items": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "enabled"
+      ]
     }
   },
   "auth": {
@@ -885,10 +916,12 @@
       {
         "path": "/purchase_requisitions/{requisitionId}/items/{itemId}",
         "definition": { "schema": { "$ref": "#/backend/entities/PurchaseRequisitionItem" }, "description": "Stores the items within a specific purchase requisition or order." }
+      },
+      {
+        "path": "/email_configurations/{configId}",
+        "definition": { "schema": { "$ref": "#/backend/entities/EmailConfiguration" }, "description": "Stores configurations for various email notifications." }
       }
     ]
   }
 }
       
-
-    

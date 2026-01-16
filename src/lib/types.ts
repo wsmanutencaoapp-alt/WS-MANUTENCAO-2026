@@ -181,6 +181,7 @@ export type Permissions = {
   suprimentos_controle_almoxarifado?: boolean;
   ferramentaria_kits?: boolean;
   ferramentaria_historico?: boolean;
+  configurador_disparo_email?: boolean;
   [key: string]: boolean | undefined;
 };
 
@@ -302,5 +303,11 @@ export type Supplier = {
     rating?: number;
 };
 
+export type EmailConfiguration = {
+    id: string; // e.g. 'purchase_requisition'
+    description: string;
+    enabled: boolean;
+    recipients: string[];
+};
     
     

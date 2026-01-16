@@ -185,7 +185,8 @@ const allNavItems: NavItem[] = [
     label: 'Configurador',
     permission: 'configurador',
     subItems: [
-        { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação', permission: 'configurador_alcada' }
+        { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação', permission: 'configurador_alcada' },
+        { href: '/dashboard/configurador/disparo-email', label: 'Disparo de E-mail', permission: 'configurador_disparo_email' }
     ]
   },
   { 
