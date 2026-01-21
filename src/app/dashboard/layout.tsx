@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Header } from '@/components/header';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth } from '@/firebase';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { doc } from 'firebase/firestore';
@@ -22,6 +22,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const { toast } = useToast();
 
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
     [firestore, user]
@@ -31,14 +33,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const isLoading = isUserLoading || isEmployeeLoading;
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (isLoading) {
+      return; // Wait until user and employee data are loaded
+    }
+
+    if (!user) {
       router.push('/login');
       return;
     }
 
-    if (!isLoading && user && employeeData) {
+    if (user && employeeData) {
       if (employeeData.status !== 'Ativo') {
-        toast({
+         toast({
           variant: 'destructive',
           title: 'Acesso Negado',
           description: `Sua conta está com o status "${employeeData.status}". Contate um administrador.`
@@ -50,32 +56,26 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       const requiredPermission = getRequiredPermissionForPath(pathname);
       const isAdmin = employeeData.accessLevel === 'Admin';
       
-      if (isAdmin) return; // Admin can access everything
-      if (!requiredPermission) return; // No specific permission needed
-
-      // The most fundamental permission is to view. If user can't view, redirect.
-      if (!employeeData.permissions || !employeeData.permissions[requiredPermission]) {
+      if (isAdmin || !requiredPermission || (employeeData.permissions && employeeData.permissions[requiredPermission])) {
+        setIsAuthorized(true);
+      } else {
+        setIsAuthorized(false);
         router.push('/dashboard');
       }
+    } else if (user && !employeeData) {
+        // This case can happen if the employee doc is not yet created or fails to load
+        router.push('/login');
     }
 
-  }, [user, employeeData, isLoading, isUserLoading, router, pathname, toast, auth]);
+  }, [user, employeeData, isLoading, router, pathname, toast, auth]);
 
-  if (isLoading || !user || !employeeData) {
+
+  if (isLoading || !isAuthorized) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center bg-muted/40">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Verificando credenciais...</p>
+        <p className="mt-4 text-muted-foreground">Verificando permissões...</p>
       </div>
-    );
-  }
-  
-   if (employeeData.status !== 'Ativo') {
-    return (
-        <div className="flex h-screen w-full flex-col items-center justify-center bg-muted/40">
-            <Loader2 className="h-10 w-10 animate-spin text-destructive" />
-            <p className="mt-4 text-destructive">Sua conta não está ativa. Redirecionando...</p>
-        </div>
     );
   }
 
