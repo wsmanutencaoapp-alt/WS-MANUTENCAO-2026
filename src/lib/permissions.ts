@@ -1,83 +1,138 @@
-export const availableModules: { id: string; label: string, isModule?: boolean }[] = [
-    { id: 'dashboard', label: 'Dashboard', isModule: true },
-    { id: 'suprimentos', label: 'Suprimentos (Módulo)', isModule: true },
-    { id: 'suprimentos_lista', label: '-> Lista de Itens', isModule: false },
-    { id: 'suprimentos_movimentacao', label: '-> Movimentação', isModule: false },
-    { id: 'ferramentaria', label: 'Ferramentaria (Módulo)', isModule: true },
-    { id: 'ferramentaria_lista', label: '-> Lista de Ferramentas', isModule: false },
-    { id: 'ferramentaria_movimentacao', label: '-> Entrada e Saída', isModule: false },
-    { id: 'ferramentaria_kits', label: '-> Gerenciar Kits', isModule: false },
-    { id: 'ferramentaria_historico', label: '-> Histórico Não Conformes', isModule: false },
-    { id: 'calibracao', label: 'Controle/Calibração', isModule: true }, // Standalone but related
-    { id: 'cadastros', label: 'Cadastros (Módulo)', isModule: true },
-    { id: 'cadastros_ferramentas', label: '-> Ferramentas', isModule: false },
-    { id: 'cadastros_suprimentos', label: '-> Suprimentos', isModule: false },
-    { id: 'cadastros_fornecedores', label: '-> Fornecedores', isModule: false },
-    { id: 'cadastros_enderecos', label: '-> Endereços', isModule: false },
-    { id: 'cadastros_centro_custo', label: '-> Centro de Custo', isModule: false },
-    { id: 'compras', label: 'Compras (Módulo)', isModule: true },
-    { id: 'compras_requisicao', label: '-> Requisição de Compra', isModule: false },
-    { id: 'compras_aprovacoes', label: '-> Aprovações', isModule: false },
-    { id: 'compras_controle', label: '-> Controle de Compras', isModule: false },
-    { id: 'engenharia', label: 'Engenharia (Módulo)', isModule: true },
-    { id: 'engenharia_aprovacoes', label: '-> Aprovações', isModule: false },
-    { id: 'engenharia_projetos', label: '-> Projetos', isModule: false },
-    { id: 'comercial', label: 'Comercial', isModule: true },
-    { id: 'financeiro', label: 'Financeiro (Módulo)', isModule: true },
-    { id: 'financeiro_visao_geral', label: '-> Visão Geral', isModule: false },
-    { id: 'financeiro_budget', label: '-> Budget', isModule: false },
-    { id: 'financeiro_despesas', label: '-> Despesas', isModule: false },
-    { id: 'contabilidade', label: 'Fiscal/Contábil (Módulo)', isModule: true },
-    { id: 'contabilidade_balancete', label: '-> Balancete', isModule: false },
-    { id: 'contabilidade_relatorios', label: '-> Relatórios', isModule: false },
-    { id: 'contabilidade_classificacao', label: '-> Classificação Contábil', isModule: false },
-    { id: 'qualidade', label: 'Qualidade', isModule: true },
-    { id: 'gso', label: 'GSO', isModule: true },
-    { id: 'planejamento', label: 'Planejamento', isModule: true },
-    { id: 'manutencao', label: 'Manutenção', isModule: true },
-    { id: 'userManagement', label: 'Gerenciar Usuários', isModule: true },
-    { id: 'configurador', label: 'Configurador (Módulo)', isModule: true },
-    { id: 'configurador_alcada', label: '-> Alçada de Aprovação', isModule: false },
-    { id: 'configurador_disparo_email', label: '-> Disparo de E-mail', isModule: false },
+export const permissionActions = ['view', 'create', 'update', 'delete'] as const;
+export type PermissionAction = typeof permissionActions[number];
+
+export const actionLabels: Record<PermissionAction, string> = {
+    view: 'Visualizar',
+    create: 'Criar',
+    update: 'Editar',
+    delete: 'Excluir',
+};
+
+// This new structure drives the permission dialog UI and navigation.
+export const permissionStructure = [
+    {
+        id: 'dashboard',
+        label: 'Dashboard',
+        path: '/dashboard',
+        isModule: true,
+        actions: ['view'],
+    },
+    {
+        id: 'suprimentos',
+        label: 'Suprimentos',
+        path: '/dashboard/suprimentos',
+        isModule: true,
+        submodules: [
+            { id: 'suprimentos_lista', label: 'Lista de Itens (Estoque)', path: '/dashboard/suprimentos/lista-itens', actions: ['view', 'update', 'delete'] },
+            { id: 'suprimentos_movimentacao', label: 'Histórico de Movimentação', path: '/dashboard/suprimentos/movimentacao', actions: ['view', 'create'] },
+        ],
+    },
+    {
+        id: 'ferramentaria',
+        label: 'Ferramentaria',
+        path: '/dashboard/ferramentaria',
+        isModule: true,
+        submodules: [
+            { id: 'ferramentaria_lista', label: 'Lista de Ferramentas', path: '/dashboard/ferramentaria/lista-ferramentas', actions: ['view', 'update', 'delete'] },
+            { id: 'ferramentaria_movimentacao', label: 'Entrada e Saída', path: '/dashboard/ferramentaria/movimentacao', actions: ['view', 'create'] },
+            { id: 'ferramentaria_kits', label: 'Gerenciar Kits', path: '/dashboard/ferramentaria/kits', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'calibracao', label: 'Controle/Calibração', path: '/dashboard/calibracao', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'ferramentaria_historico', label: 'Histórico Não Conformes', path: '/dashboard/ferramentaria/historico-nao-conformes', actions: ['view'] },
+        ],
+    },
+    {
+        id: 'cadastros',
+        label: 'Cadastros',
+        path: '/dashboard/cadastros',
+        isModule: true,
+        submodules: [
+            { id: 'cadastros_ferramentas', label: 'Ferramentas', path: '/dashboard/cadastros/ferramentas', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'cadastros_suprimentos', label: 'Suprimentos', path: '/dashboard/cadastros/suprimentos', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'cadastros_fornecedores', label: 'Fornecedores', path: '/dashboard/cadastros/fornecedores', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'cadastros_enderecos', label: 'Endereços', path: '/dashboard/cadastros/enderecos', actions: ['view', 'create', 'delete'] },
+            { id: 'cadastros_centro_custo', label: 'Centro de Custo', path: '/dashboard/cadastros/centro-de-custo', actions: ['view', 'create', 'update', 'delete'] },
+        ]
+    },
+    {
+        id: 'compras',
+        label: 'Compras',
+        path: '/dashboard/compras',
+        isModule: true,
+        submodules: [
+            { id: 'compras_requisicao', label: 'Requisição de Compra', path: '/dashboard/compras/requisicao', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'compras_aprovacoes', label: 'Aprovações', path: '/dashboard/compras/aprovacoes', actions: ['view', 'update'] },
+            { id: 'compras_controle', label: 'Controle de Compras', path: '/dashboard/compras/controle-compras', actions: ['view', 'create', 'update', 'delete'] },
+        ],
+    },
+    {
+        id: 'engenharia',
+        label: 'Engenharia',
+        path: '/dashboard/engenharia',
+        isModule: true,
+        submodules: [
+          { id: 'engenharia_aprovacoes', label: 'Aprovações', path: '/dashboard/engenharia/aprovacoes', actions: ['view', 'update', 'delete'] },
+          { id: 'engenharia_projetos', label: 'Projetos', path: '/dashboard/engenharia/projetos', actions: ['view', 'create', 'update', 'delete'] },
+        ]
+    },
+    {
+        id: 'financeiro',
+        label: 'Financeiro',
+        path: '/dashboard/financeiro',
+        isModule: true,
+        submodules: [
+            { id: 'financeiro_budget', label: 'Budget', path: '/dashboard/financeiro/budget', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'financeiro_despesas', label: 'Despesas', path: '/dashboard/financeiro/despesas', actions: ['view', 'create'] },
+        ]
+    },
+    {
+        id: 'userManagement',
+        label: 'Gerenciar Usuários',
+        path: '/dashboard/user-management',
+        isModule: true,
+        actions: ['view', 'update'],
+    },
+    {
+        id: 'configurador',
+        label: 'Configurador',
+        path: '/dashboard/configurador',
+        isModule: true,
+        submodules: [
+            { id: 'configurador_disparo_email', label: 'Disparo de E-mail', path: '/dashboard/configurador/disparo-email', actions: ['view', 'update'] },
+        ],
+    },
 ];
 
+// Generates a flat list of all possible permission IDs
+export const allPermissionIDs = permissionStructure.flatMap(module => {
+    const mainPermissions = module.actions ? module.actions.map(action => `${module.id}_${action}`) : [];
+    const subPermissions = module.submodules ? module.submodules.flatMap(sub => 
+        sub.actions.map(action => `${sub.id}_${action}`)
+    ) : [];
+    return [...mainPermissions, ...subPermissions];
+});
+
+
 export const getRequiredPermissionForPath = (path: string): string | null => {
-    // Find the most specific match first by sorting paths by length descending
-    const sortedPermissions = [...availableModules].sort((a, b) => {
-        const pathA = a.id.replace(/_/g, '/');
-        const pathB = b.id.replace(/_/g, '/');
-        return pathB.length - pathA.length;
-    });
+    if (path === '/dashboard') return 'dashboard_view';
+    if (path === '/dashboard/settings') return null; // All users can see their own settings
 
-    const pathSegments = path.split('/').filter(Boolean);
-    
-    // Example path: /dashboard/ferramentaria/lista-ferramentas
-    // We want to match `ferramentaria_lista`
-    
-    // Find the permission that is the best match for the current path
-    for (const p of sortedPermissions) {
-        let permissionPath = p.id.replace(/_/g, '/');
-        if (p.id === 'compras_controle') {
-            permissionPath = 'compras/controle-compras';
-        }
-        
-        const fullPermissionPath = `/dashboard/${permissionPath}`;
-
-        if (path.startsWith(fullPermissionPath)) {
-            return p.id;
+    // Find the most specific submodule path match first
+    for (const module of permissionStructure) {
+        if (module.submodules) {
+            for (const sub of module.submodules) {
+                if (path.startsWith(sub.path)) {
+                    return `${sub.id}_view`;
+                }
+            }
         }
     }
     
-    // Fallback for top-level modules if no specific sub-module matches
-    if (pathSegments.length >= 2 && pathSegments[0] === 'dashboard') {
-        const moduleName = pathSegments[1];
-        const modulePermission = availableModules.find(p => p.id === moduleName && p.isModule);
-        if (modulePermission) {
-            return modulePermission.id;
+    // Then check top-level modules
+    for (const module of permissionStructure) {
+        if (path.startsWith(module.path)) {
+            return `${module.id}_view`;
         }
     }
-
-    if (path === '/dashboard') return 'dashboard';
 
     return null;
 };

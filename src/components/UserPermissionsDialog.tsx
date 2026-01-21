@@ -14,9 +14,7 @@ import type { Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Separator } from './ui/separator';
 import { Loader2 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
-import { availableModules } from '@/lib/permissions';
-import { cn } from "@/lib/utils";
+import { permissionStructure, actionLabels } from '@/lib/permissions';
 
 interface UserPermissionsDialogProps {
     isOpen: boolean;
@@ -65,10 +63,10 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
         }
     };
     
-    const handlePermissionChange = (moduleId: string, checked: boolean) => {
+    const handlePermissionChange = (permissionId: string, checked: boolean) => {
         setCurrentPermissions(prev => ({
             ...prev,
-            [moduleId]: checked
+            [permissionId]: checked
         }));
     };
     
@@ -82,7 +80,7 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Gerenciar Permissões de Acesso</DialogTitle>
                     <DialogDescription>
@@ -96,21 +94,45 @@ export default function UserPermissionsDialog({ isOpen, onClose, employee, onPer
                             Administradores têm acesso irrestrito a todos os módulos por padrão.
                         </p>
                     ) : (
-                        <div className="space-y-3">
-                            {availableModules.map((module) => (
-                                <div key={module.id} className={cn("flex items-center space-x-3", !module.isModule && "pl-6")}>
-                                    <Checkbox
-                                        id={`${employee.docId}-${module.id}`}
-                                        checked={currentPermissions?.[module.id] || false}
-                                        onCheckedChange={(checked) => handlePermissionChange(module.id, !!checked)}
-                                        aria-label={`Permissão para ${module.label}`}
-                                    />
-                                    <Label
-                                        htmlFor={`${employee.docId}-${module.id}`}
-                                        className={cn("text-sm leading-none", module.isModule ? "font-semibold" : "font-normal")}
-                                    >
-                                        {module.label}
-                                    </Label>
+                        <div className="space-y-4">
+                            {permissionStructure.map((module) => (
+                                <div key={module.id} className="space-y-3 rounded-lg border p-4">
+                                    <h4 className="font-semibold">{module.label}</h4>
+                                    {module.actions && (
+                                         <div className="flex items-center space-x-4 pl-2">
+                                            {module.actions.map(action => (
+                                                <div key={`${module.id}_${action}`} className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`${module.id}_${action}`}
+                                                        checked={currentPermissions[`${module.id}_${action}`] || false}
+                                                        onCheckedChange={(checked) => handlePermissionChange(`${module.id}_${action}`, !!checked)}
+                                                    />
+                                                    <Label htmlFor={`${module.id}_${action}`} className="font-normal">{actionLabels[action as keyof typeof actionLabels]}</Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {module.submodules && module.submodules.length > 0 && (
+                                        <div className="space-y-3 pt-2">
+                                            {module.submodules.map(sub => (
+                                                <div key={sub.id} className="pl-4">
+                                                    <p className="font-medium text-sm">{sub.label}</p>
+                                                    <div className="flex items-center space-x-4 pt-1 pl-2">
+                                                        {sub.actions.map(action => (
+                                                            <div key={`${sub.id}_${action}`} className="flex items-center space-x-2">
+                                                                <Checkbox
+                                                                    id={`${sub.id}_${action}`}
+                                                                    checked={currentPermissions[`${sub.id}_${action}`] || false}
+                                                                    onCheckedChange={(checked) => handlePermissionChange(`${sub.id}_${action}`, !!checked)}
+                                                                />
+                                                                <Label htmlFor={`${sub.id}_${action}`} className="font-normal">{actionLabels[action as keyof typeof actionLabels]}</Label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

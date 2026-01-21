@@ -18,10 +18,9 @@ service cloud.firestore {
              getUserData().accessLevel == 'Admin';
     }
     
-    function hasPermission(module) {
+    function hasPermission(permission) {
       let userData = getUserData();
-      // An admin has all permissions.
-      return isAuthenticated() && (isAdmin() || (userData.permissions[module] == true));
+      return isAuthenticated() && (isAdmin() || (userData.permissions[permission] == true));
     }
     
     function isOwner(userId) {
@@ -30,132 +29,138 @@ service cloud.firestore {
 
     // --- CADASTROS ---
     match /addresses/{addressId} {
-      allow get, list: if isAuthenticated();
-      allow create, update: if hasPermission('cadastros_enderecos');
-      allow delete: if isAdmin();
+      allow get, list: if hasPermission('cadastros_enderecos_view');
+      allow create: if hasPermission('cadastros_enderecos_create');
+      allow delete: if hasPermission('cadastros_enderecos_delete');
+      // No update for addresses
     }
     
     match /cost_centers/{costCenterId} {
-      allow get, list: if isAuthenticated();
-      allow create, update: if hasPermission('cadastros_centro_custo');
-      allow delete: if isAdmin();
+      allow get, list: if hasPermission('cadastros_centro_custo_view');
+      allow create: if hasPermission('cadastros_centro_custo_create');
+      allow update: if hasPermission('cadastros_centro_custo_update');
+      allow delete: if hasPermission('cadastros_centro_custo_delete');
     }
     
     match /suppliers/{supplierId} {
-      allow get, list: if isAuthenticated();
-      allow create, update: if hasPermission('cadastros_fornecedores');
-      allow delete: if isAdmin();
+      allow get, list: if hasPermission('cadastros_fornecedores_view');
+      allow create: if hasPermission('cadastros_fornecedores_create');
+      allow update: if hasPermission('cadastros_fornecedores_update');
+      allow delete: if hasPermission('cadastros_fornecedores_delete');
     }
     
     // --- SUPRIMENTOS ---
     match /supplies/{supplyId} {
-      allow get, list: if isAuthenticated();
-      allow create, update: if hasPermission('cadastros_suprimentos');
-      allow delete: if isAdmin();
+      allow get, list: if hasPermission('cadastros_suprimentos_view');
+      allow create: if hasPermission('cadastros_suprimentos_create');
+      allow update: if hasPermission('cadastros_suprimentos_update');
+      allow delete: if hasPermission('cadastros_suprimentos_delete');
       
       match /stock/{stockId} {
-        allow get, list: if isAuthenticated();
-        // Movements create/update stock lots
-        allow create, update: if hasPermission('suprimentos'); 
-        allow delete: if isAdmin();
+        allow get, list: if hasPermission('suprimentos_lista_view');
+        allow create: if hasPermission('suprimentos_movimentacao_create');
+        allow update: if hasPermission('suprimentos_lista_update');
+        allow delete: if hasPermission('suprimentos_lista_delete');
       }
     }
     
     match /supply_movements/{movementId} {
-      allow list: if hasPermission('suprimentos');
-      allow get: if hasPermission('suprimentos');
-      allow create: if hasPermission('suprimentos');
-      allow update, delete: if isAdmin(); // Log should be immutable
+      allow get, list: if hasPermission('suprimentos_movimentacao_view');
+      allow create: if hasPermission('suprimentos_movimentacao_create');
+      allow update, delete: if false; // Log should be immutable
     }
 
     // --- FERRAMENTARIA ---
     match /tools/{toolId} {
-      allow get, list: if isAuthenticated();
-      allow create, update: if hasPermission('cadastros_ferramentas') || hasPermission('ferramentaria') || hasPermission('calibracao');
-      allow delete: if isAdmin();
+      allow get, list: if hasPermission('ferramentaria_lista_view') || hasPermission('cadastros_ferramentas_view');
+      allow create: if hasPermission('cadastros_ferramentas_create');
+      allow update: if hasPermission('cadastros_ferramentas_update') || hasPermission('ferramentaria_lista_update') || hasPermission('calibracao_update');
+      allow delete: if hasPermission('cadastros_ferramentas_delete');
       
       match /calibration_history/{calibrationId} {
-        allow get, list: if hasPermission('calibracao') || hasPermission('ferramentaria');
-        allow create: if hasPermission('calibracao');
-        allow update, delete: if isAdmin();
+        allow get, list: if hasPermission('calibracao_view');
+        allow create: if hasPermission('calibracao_create');
+        allow update: if hasPermission('calibracao_update');
+        allow delete: if hasPermission('calibracao_delete');
       }
     }
     
     match /kits/{kitId} {
-      allow get, list: if isAuthenticated();
-      allow create, update: if hasPermission('ferramentaria_kits');
-      allow delete: if hasPermission('ferramentaria_kits');
+      allow get, list: if hasPermission('ferramentaria_kits_view');
+      allow create: if hasPermission('ferramentaria_kits_create');
+      allow update: if hasPermission('ferramentaria_kits_update');
+      allow delete: if hasPermission('ferramentaria_kits_delete');
     }
     
     match /tool_requests/{requestId} {
-      allow get: if isAuthenticated();
-      allow list: if hasPermission('ferramentaria');
-      allow create: if isOwner(request.resource.data.requesterId);
-      allow update: if hasPermission('ferramentaria') || isOwner(resource.data.requesterId);
-      allow delete: if isAdmin();
+      allow get, list: if hasPermission('ferramentaria_movimentacao_view');
+      allow create: if hasPermission('ferramentaria_movimentacao_create');
+      allow update: if hasPermission('ferramentaria_movimentacao_update') || (isOwner(resource.data.requesterId) && resource.data.status == 'Pendente');
+      allow delete: if false; // Use update to set status to 'Cancelada'
     }
 
     // --- FINANCEIRO ---
     match /budgets/{budgetId} {
-      allow get, list: if isAuthenticated();
-      allow create, update: if hasPermission('financeiro_budget');
-      allow delete: if isAdmin();
+      allow get, list: if hasPermission('financeiro_budget_view');
+      allow create: if hasPermission('financeiro_budget_create');
+      allow update: if hasPermission('financeiro_budget_update');
+      allow delete: if hasPermission('financeiro_budget_delete');
     }
     
     match /expenses/{expenseId} {
-      allow get, list: if hasPermission('financeiro');
-      allow create: if hasPermission('financeiro_despesas');
-      allow update, delete: if isAdmin();
+      allow get, list: if hasPermission('financeiro_despesas_view');
+      allow create: if hasPermission('financeiro_despesas_create');
+      allow update, delete: if false; // Log should be immutable
     }
 
     // --- COMPRAS ---
     match /purchase_requisitions/{requisitionId} {
-        allow get: if isAuthenticated();
-        allow list: if hasPermission('compras');
+        allow get, list: if hasPermission('compras_requisicao_view') || hasPermission('compras_aprovacoes_view') || hasPermission('compras_controle_view');
 
-        allow create: if isOwner(request.resource.data.requesterId);
+        allow create: if hasPermission('compras_requisicao_create') || hasPermission('compras_controle_create');
 
-        // Requester can cancel/update if it's in revision
-        // Buyer can update for quotation
-        // Approver can update status
-        allow update: if (isOwner(resource.data.requesterId) && resource.data.status == 'Em Revisão') ||
-                         hasPermission('compras') || hasPermission('compras_aprovacoes');
+        allow update: if hasPermission('compras_requisicao_update') || hasPermission('compras_aprovacoes_update') || hasPermission('compras_controle_update');
 
-        allow delete: if isAdmin();
+        allow delete: if hasPermission('compras_requisicao_delete');
         
         match /items/{itemId} {
-            allow get, list: if isAuthenticated();
-            allow create, update: if hasPermission('compras') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
-            allow delete: if hasPermission('compras') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
+            allow get, list: if hasPermission('compras_requisicao_view') || hasPermission('compras_controle_view');
+            allow create: if hasPermission('compras_requisicao_create');
+            allow update: if hasPermission('compras_controle_update') || hasPermission('compras_requisicao_update');
+            allow delete: if hasPermission('compras_requisicao_delete');
         }
     }
 
     // --- SISTEMA / ADMIN ---
     match /employees/{employeeId} {
-      allow get, list: if hasPermission('userManagement');
+      allow get, list: if hasPermission('userManagement_view');
       // On sign up
       allow create: if isOwner(employeeId);
       
-      // A user can update their own non-sensitive info
-      // An admin can update anything
-      allow update: if isAdmin() || (isOwner(employeeId) && !('accessLevel' in request.resource.data) && !('permissions' in request.resource.data) && !('status' in request.resource.data));
+      // Admin can update everything. User can update their own non-sensitive info.
+      allow update: if hasPermission('userManagement_update') || (isOwner(employeeId) && !('accessLevel' in request.resource.data) && !('permissions' in request.resource.data) && !('status' in request.resource.data));
 
-      allow delete: if isAdmin();
+      allow delete: if false; // Never delete employee records
       
       match /notifications/{notificationId} {
-        allow read, update, delete: if isOwner(employeeId);
         // Any authenticated user can create a notification for another user
         allow create: if isAuthenticated(); 
+        allow read, update, delete: if isOwner(employeeId);
       }
     }
     
     match /counters/{counterId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if isAuthenticated(); // Internal counters
     }
 
     match /email_configurations/{configId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read: if hasPermission('configurador_disparo_email_view');
+      allow write: if hasPermission('configurador_disparo_email_update');
+    }
+    
+    // --- Engenharia ---
+    match /engenharia/projetos/{projectId} {
+       allow read, write: if hasPermission('engenharia_projetos_view');
     }
   }
 }

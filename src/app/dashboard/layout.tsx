@@ -6,7 +6,7 @@ import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth } from '@/fireb
 import { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import type { Employee } from '@/lib/types';
 import { getRequiredPermissionForPath } from '@/lib/permissions';
@@ -50,10 +50,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       const requiredPermission = getRequiredPermissionForPath(pathname);
       const isAdmin = employeeData.accessLevel === 'Admin';
       
-      if (isAdmin) return;
-      if (pathname === '/dashboard' || pathname === '/dashboard/') return;
-      if (!requiredPermission) return;
+      if (isAdmin) return; // Admin can access everything
+      if (!requiredPermission) return; // No specific permission needed
 
+      // The most fundamental permission is to view. If user can't view, redirect.
       if (!employeeData.permissions || !employeeData.permissions[requiredPermission]) {
         router.push('/dashboard');
       }
