@@ -80,12 +80,12 @@ export default function SignUpPage() {
 
       const userDocRef = doc(firestore, 'employees', user.uid);
       
-      const isMasterAdmin = values.email === 'grupodallax@gmail.com';
+      const isFirstUser = newEmployeeId === 1001;
       
-      // Master admin is always created as 'Admin' and 'Ativo'.
+      // First user (ID 1001) is always 'Admin' and 'Ativo'.
       // Other users start as 'Técnico' and 'Pendente'.
-      const accessLevel = isMasterAdmin ? 'Admin' : 'Técnico';
-      const status = isMasterAdmin ? 'Ativo' : 'Pendente';
+      const accessLevel = isFirstUser ? 'Admin' : 'Técnico';
+      const status = isFirstUser ? 'Ativo' : 'Pendente';
 
       const userData = {
         id: newEmployeeId,
@@ -102,7 +102,7 @@ export default function SignUpPage() {
 
       toast({
         title: 'Sucesso!',
-        description: isMasterAdmin
+        description: isFirstUser
             ? 'Sua conta de Administrador foi criada. Redirecionando para o login...'
             : 'Sua conta foi criada e aguarda aprovação de um administrador.',
       });
