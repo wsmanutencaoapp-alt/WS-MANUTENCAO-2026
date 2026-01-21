@@ -133,8 +133,14 @@ service cloud.firestore {
 
     // --- SISTEMA / ADMIN ---
     match /employees/{employeeId} {
-      allow get, list: if hasPermission('userManagement_view');
-      // On sign up
+      // Any authenticated user can read their own document.
+      // Users with 'userManagement_view' can read any employee document.
+      allow get: if isOwner(employeeId) || hasPermission('userManagement_view');
+      
+      // Only users with 'userManagement_view' can list all employees.
+      allow list: if hasPermission('userManagement_view');
+
+      // On sign up, a user can create their own document.
       allow create: if isOwner(employeeId);
       
       // Admin can update everything. User can update their own non-sensitive info.
@@ -154,7 +160,7 @@ service cloud.firestore {
     }
 
     match /email_configurations/{configId} {
-      allow read: if hasPermission('configurador_disparo_email_view');
+      allow read: if isAuthenticated();
       allow write: if hasPermission('configurador_disparo_email_update');
     }
     
