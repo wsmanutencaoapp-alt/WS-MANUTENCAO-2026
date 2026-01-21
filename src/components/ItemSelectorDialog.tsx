@@ -39,7 +39,11 @@ export default function ItemSelectorDialog<T>({
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredItems = useMemo(() => {
-    return filterFunction(items || [], searchTerm);
+    // Defensive check to ensure `items` is an array before filtering.
+    if (!Array.isArray(items)) {
+      return [];
+    }
+    return filterFunction(items, searchTerm);
   }, [items, searchTerm, filterFunction]);
 
   const handleSelect = (item: T) => {
