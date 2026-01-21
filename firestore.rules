@@ -32,35 +32,35 @@ service cloud.firestore {
 
     match /supplies/{supplyId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('suprimentos');
+      allow write: if isAuthenticated();
       
       match /stock/{stockId} {
         allow read: if isAuthenticated();
-        allow write: if hasPermission('suprimentos');
+        allow write: if isAuthenticated();
       }
     }
     
     match /supply_movements/{movementId} {
-      allow read, write: if hasPermission('suprimentos');
+      allow read, write: if isAuthenticated();
     }
 
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if hasPermission('ferramentaria');
+      allow create, update, delete: if isAuthenticated();
       
       match /calibration_history/{calibrationId} {
-        allow read: if hasPermission('ferramentaria');
-        allow create, write: if hasPermission('ferramentaria');
+        allow read: if isAuthenticated();
+        allow create, write: if isAuthenticated();
       }
     }
     
     match /kits/{kitId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('ferramentaria');
+      allow write: if isAuthenticated();
     }
     
     match /suppliers/{supplierId} {
-      allow read, write: if hasPermission('compras');
+      allow read, write: if isAuthenticated();
     }
     
     match /employees/{employeeId} {
@@ -80,8 +80,8 @@ service cloud.firestore {
     }
     
     match /expenses/{expenseId} {
-      allow create: if hasPermission('financeiro');
-      allow read, update, delete: if hasPermission('financeiro');
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAuthenticated();
     }
 
     match /tool_requests/{requestId} {
@@ -90,16 +90,16 @@ service cloud.firestore {
     
     match /budgets/{budgetId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('financeiro');
+      allow write: if isAuthenticated();
     }
     
     match /addresses/{addressId} {
-        allow read, write: if hasPermission('cadastros');
+        allow read, write: if isAuthenticated();
     }
 
     match /cost_centers/{costCenterId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros');
+      allow write: if isAuthenticated();
     }
 
     match /purchase_requisitions/{requisitionId} {
