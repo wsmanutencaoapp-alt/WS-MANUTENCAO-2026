@@ -51,28 +51,20 @@ service cloud.firestore {
     
     // --- SUPRIMENTOS ---
     match /supplies/{supplyId} {
-      allow get, list: if hasPermission('cadastros_suprimentos_view');
-      allow create: if hasPermission('cadastros_suprimentos_create');
-      allow update: if hasPermission('cadastros_suprimentos_update');
-      allow delete: if hasPermission('cadastros_suprimentos_delete');
+      allow read, write: if isAuthenticated();
       
       match /stock/{stockId} {
-        allow get, list: if hasPermission('suprimentos_lista_view');
-        allow create: if hasPermission('suprimentos_movimentacao_create');
-        allow update: if hasPermission('suprimentos_lista_update');
-        allow delete: if hasPermission('suprimentos_lista_delete');
+        allow read, write: if isAuthenticated();
       }
     }
     
     match /supply_movements/{movementId} {
-      allow get, list: if hasPermission('suprimentos_movimentacao_view');
-      allow create: if hasPermission('suprimentos_movimentacao_create');
-      allow update, delete: if false; // Log should be immutable
+      allow read, write: if isAuthenticated();
     }
 
     // --- FERRAMENTARIA ---
     match /tools/{toolId} {
-      allow get, list: if hasPermission('ferramentaria_lista_view') || hasPermission('cadastros_ferramentas_view');
+      allow get, list: if isAuthenticated();
       allow create: if hasPermission('cadastros_ferramentas_create');
       allow update: if hasPermission('cadastros_ferramentas_update') || hasPermission('ferramentaria_lista_update') || hasPermission('calibracao_update');
       allow delete: if hasPermission('cadastros_ferramentas_delete');
@@ -134,7 +126,6 @@ service cloud.firestore {
     // --- SISTEMA / ADMIN ---
     match /employees/{employeeId} {
       // Any authenticated user can read their own document.
-      // Users with 'userManagement_view' can read any employee document.
       allow get: if isOwner(employeeId) || hasPermission('userManagement_view');
       
       // Only users with 'userManagement_view' can list all employees.
