@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
@@ -248,7 +247,17 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
         finalDocumentoUrl = await getDownloadURL(docRef);
       }
       
-      const dataToSave = { ...values, imageUrl: finalImageUrl, documentoUrl: finalDocumentoUrl };
+      const rawData = { ...values, imageUrl: finalImageUrl, documentoUrl: finalDocumentoUrl };
+      
+      // Clean the object to remove undefined fields
+      const dataToSave: { [key: string]: any } = {};
+      Object.keys(rawData).forEach(key => {
+        const value = (rawData as any)[key];
+        if (value !== undefined) {
+          dataToSave[key] = value;
+        }
+      });
+
 
       if (supply) {
         // Edit mode
