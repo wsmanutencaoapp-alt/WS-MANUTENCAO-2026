@@ -51,20 +51,30 @@ service cloud.firestore {
     
     // --- SUPRIMENTOS ---
     match /supplies/{supplyId} {
-      allow read, write: if isAuthenticated();
+      allow get, list: if hasPermission('cadastros_suprimentos_view') || hasPermission('suprimentos_lista_view');
+      allow create: if hasPermission('cadastros_suprimentos_create');
+      allow update: if hasPermission('cadastros_suprimentos_update') || hasPermission('suprimentos_lista_update');
+      allow delete: if hasPermission('cadastros_suprimentos_delete');
       
       match /stock/{stockId} {
-        allow read, write: if isAuthenticated();
+        allow get, list: if hasPermission('suprimentos_lista_view');
+        allow create: if hasPermission('suprimentos_movimentacao_create');
+        allow update: if hasPermission('suprimentos_lista_update');
+        allow delete: if hasPermission('suprimentos_lista_delete');
       }
     }
     
     match /supply_movements/{movementId} {
-      allow read, write: if isAuthenticated();
+      allow get, list: if hasPermission('suprimentos_movimentacao_view');
+      allow create: if hasPermission('suprimentos_movimentacao_create');
+      // Immutable log
+      allow update, delete: if false; 
     }
 
     // --- FERRAMENTARIA ---
     match /tools/{toolId} {
-      allow get, list: if isAuthenticated();
+      allow get: if isAuthenticated();
+      allow list: if hasPermission('cadastros_ferramentas_view') || hasPermission('ferramentaria_lista_view') || hasPermission('calibracao_view');
       allow create: if hasPermission('cadastros_ferramentas_create');
       allow update: if hasPermission('cadastros_ferramentas_update') || hasPermission('ferramentaria_lista_update') || hasPermission('calibracao_update');
       allow delete: if hasPermission('cadastros_ferramentas_delete');
@@ -126,7 +136,7 @@ service cloud.firestore {
     // --- SISTEMA / ADMIN ---
     match /employees/{employeeId} {
       // Any authenticated user can read their own document.
-      allow get: if isOwner(employeeId) || hasPermission('userManagement_view');
+      allow get: if isOwner(employeeId);
       
       // Only users with 'userManagement_view' can list all employees.
       allow list: if hasPermission('userManagement_view');

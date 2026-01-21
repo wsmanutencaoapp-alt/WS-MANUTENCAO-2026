@@ -15,13 +15,26 @@ export default function DashboardPage() {
     () => (firestore ? query(collection(firestore, 'tools'), where('sequencial', '>', 0)) : null),
     [firestore]
   );
-  const { data: tools, isLoading: isLoadingTools } = useCollection<Tool>(toolsQuery);
+  const { data: tools, isLoading: isLoadingTools, error: toolsError } = useCollection<Tool>(toolsQuery);
 
   const suppliesQuery = useMemoFirebase(
     () => (firestore ? collection(firestore, 'supplies') : null),
     [firestore]
   );
-  const { data: supplies, isLoading: isLoadingSupplies } = useCollection<Supply>(suppliesQuery);
+  const { data: supplies, isLoading: isLoadingSupplies, error: suppliesError } = useCollection<Supply>(suppliesQuery);
+
+  const activeLoansQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Em Empréstimo')) : null),
+    [firestore]
+  );
+  const { data: loanedTools, isLoading: isLoadingLoans, error: loansError } = useCollection<Tool>(activeLoansQuery);
+
+  const overdueToolsQuery = useMemoFirebase(
+      () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Vencido')) : null),
+      [firestore]
+  );
+  const { data: overdueTools, isLoading: isLoadingOverdue, error: overdueError } = useCollection<Tool>(overdueToolsQuery);
+
 
   return (
     <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
@@ -35,6 +48,8 @@ export default function DashboardPage() {
         <CardContent>
           {isLoadingTools ? (
             <Skeleton className="h-8 w-1/2" />
+          ) : toolsError ? (
+            <div className="text-sm font-bold text-muted-foreground">N/A</div>
           ) : (
             <div className="text-2xl font-bold">{tools?.length || 0}</div>
           )}
@@ -53,9 +68,11 @@ export default function DashboardPage() {
         <CardContent>
            {isLoadingSupplies ? (
             <Skeleton className="h-8 w-1/2" />
+          ) : suppliesError ? (
+            <div className="text-sm font-bold text-muted-foreground">N/A</div>
           ) : (
-          <div className="text-2xl font-bold">{supplies?.length || 0}</div>
-           )}
+             <div className="text-2xl font-bold">{supplies?.length || 0}</div>
+          )}
           <p className="text-xs text-muted-foreground">
             Tipos de suprimentos cadastrados
           </p>
@@ -67,7 +84,13 @@ export default function DashboardPage() {
           <Activity className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">0</div>
+           {isLoadingLoans ? (
+            <Skeleton className="h-8 w-1/2" />
+          ) : loansError ? (
+            <div className="text-sm font-bold text-muted-foreground">N/A</div>
+          ) : (
+            <div className="text-2xl font-bold">{loanedTools?.length || 0}</div>
+          )}
           <p className="text-xs text-muted-foreground">
             Ferramentas emprestadas no momento
           </p>
@@ -79,7 +102,13 @@ export default function DashboardPage() {
           <Activity className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">0</div>
+           {isLoadingOverdue ? (
+            <Skeleton className="h-8 w-1/2" />
+          ) : overdueError ? (
+             <div className="text-sm font-bold text-muted-foreground">N/A</div>
+          ) : (
+             <div className="text-2xl font-bold text-destructive">{overdueTools?.length || 0}</div>
+          )}
           <p className="text-xs text-muted-foreground">
             Ferramentas com calibração vencida
           </p>
