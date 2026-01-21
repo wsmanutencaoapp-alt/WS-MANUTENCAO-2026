@@ -14,7 +14,6 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // An admin is a user with Admin level.
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
              getUserData().accessLevel == 'Admin';
     }
@@ -22,104 +21,134 @@ service cloud.firestore {
     function hasPermission(module) {
       let userData = getUserData();
       // An admin has all permissions.
-      // A regular user must be authenticated. The active status is now checked in the layout, not globally here for all operations.
-      return isAuthenticated() && (isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true));
+      return isAuthenticated() && (isAdmin() || (userData.permissions[module] == true));
     }
     
     function isOwner(userId) {
         return request.auth.uid == userId;
     }
 
+    // --- CADASTROS ---
+    match /addresses/{addressId} {
+      allow get, list: if isAuthenticated();
+      allow create, update: if hasPermission('cadastros_enderecos');
+      allow delete: if isAdmin();
+    }
+    
+    match /cost_centers/{costCenterId} {
+      allow get, list: if isAuthenticated();
+      allow create, update: if hasPermission('cadastros_centro_custo');
+      allow delete: if isAdmin();
+    }
+    
+    match /suppliers/{supplierId} {
+      allow get, list: if isAuthenticated();
+      allow create, update: if hasPermission('cadastros_fornecedores');
+      allow delete: if isAdmin();
+    }
+    
+    // --- SUPRIMENTOS ---
     match /supplies/{supplyId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('suprimentos');
+      allow get, list: if isAuthenticated();
+      allow create, update: if hasPermission('cadastros_suprimentos');
+      allow delete: if isAdmin();
       
       match /stock/{stockId} {
-        allow read: if isAuthenticated();
-        allow write: if hasPermission('suprimentos');
+        allow get, list: if isAuthenticated();
+        // Movements create/update stock lots
+        allow create, update: if hasPermission('suprimentos'); 
+        allow delete: if isAdmin();
       }
     }
     
     match /supply_movements/{movementId} {
-      allow read, write: if hasPermission('suprimentos');
+      allow list: if hasPermission('suprimentos');
+      allow get: if hasPermission('suprimentos');
+      allow create: if hasPermission('suprimentos');
+      allow update, delete: if isAdmin(); // Log should be immutable
     }
 
+    // --- FERRAMENTARIA ---
     match /tools/{toolId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if hasPermission('ferramentaria');
+      allow get, list: if isAuthenticated();
+      allow create, update: if hasPermission('cadastros_ferramentas') || hasPermission('ferramentaria') || hasPermission('calibracao');
+      allow delete: if isAdmin();
       
       match /calibration_history/{calibrationId} {
-        allow read: if hasPermission('ferramentaria');
-        allow create, write: if hasPermission('ferramentaria');
+        allow get, list: if hasPermission('calibracao') || hasPermission('ferramentaria');
+        allow create: if hasPermission('calibracao');
+        allow update, delete: if isAdmin();
       }
     }
     
     match /kits/{kitId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('ferramentaria');
+      allow get, list: if isAuthenticated();
+      allow create, update: if hasPermission('ferramentaria_kits');
+      allow delete: if hasPermission('ferramentaria_kits');
     }
     
-    match /suppliers/{supplierId} {
-      allow read, write: if hasPermission('compras');
+    match /tool_requests/{requestId} {
+      allow get: if isAuthenticated();
+      allow list: if hasPermission('ferramentaria');
+      allow create: if isOwner(request.resource.data.requesterId);
+      allow update: if hasPermission('ferramentaria') || isOwner(resource.data.requesterId);
+      allow delete: if isAdmin();
     }
-    
-    match /employees/{employeeId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(employeeId);
-      
-      allow update: if isAdmin() || 
-                     (isOwner(employeeId) && 
-                      !('accessLevel' in request.resource.data) &&
-                      !('permissions' in request.resource.data) &&
-                      !('status' in request.resource.data));
-      
-      match /notifications/{notificationId} {
-        allow create: if isAuthenticated();
-        allow read, update, delete: if isOwner(employeeId);
-      }
+
+    // --- FINANCEIRO ---
+    match /budgets/{budgetId} {
+      allow get, list: if isAuthenticated();
+      allow create, update: if hasPermission('financeiro_budget');
+      allow delete: if isAdmin();
     }
     
     match /expenses/{expenseId} {
-      allow create: if hasPermission('financeiro');
-      allow read, update, delete: if hasPermission('financeiro');
+      allow get, list: if hasPermission('financeiro');
+      allow create: if hasPermission('financeiro_despesas');
+      allow update, delete: if isAdmin();
     }
 
-    match /tool_requests/{requestId} {
-      allow read, write: if (isAuthenticated() && (isOwner(resource.data.requesterId) || isOwner(resource.data.handledBy))) || hasPermission('ferramentaria');
-    }
-    
-    match /budgets/{budgetId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('financeiro');
-    }
-    
-    match /addresses/{addressId} {
-        allow read, write: if hasPermission('cadastros');
-    }
-
-    match /cost_centers/{costCenterId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros');
-    }
-
+    // --- COMPRAS ---
     match /purchase_requisitions/{requisitionId} {
-        allow read: if isAuthenticated();
+        allow get: if isAuthenticated();
+        allow list: if hasPermission('compras');
 
-        allow create: if hasPermission('compras') ||
-                       (request.resource.data.type == 'Solicitação de Compra' && request.auth.uid == request.resource.data.requesterId) ||
-                       (request.resource.data.type == 'Ordem de Compra' && request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(request.resource.data.originalRequisitionId)).data.requesterId);
+        allow create: if isOwner(request.resource.data.requesterId);
 
-        allow update: if hasPermission('compras') ||
-                       (request.auth.uid == resource.data.requesterId);
+        // Requester can cancel/update if it's in revision
+        // Buyer can update for quotation
+        // Approver can update status
+        allow update: if (isOwner(resource.data.requesterId) && resource.data.status == 'Em Revisão') ||
+                         hasPermission('compras') || hasPermission('compras_aprovacoes');
 
-        allow delete: if hasPermission('compras') || isOwner(resource.data.requesterId);
+        allow delete: if isAdmin();
         
         match /items/{itemId} {
-            allow read: if isAuthenticated();
-            allow write: if hasPermission('compras') || request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId;
+            allow get, list: if isAuthenticated();
+            allow create, update: if hasPermission('compras') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
+            allow delete: if hasPermission('compras') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
         }
     }
 
+    // --- SISTEMA / ADMIN ---
+    match /employees/{employeeId} {
+      allow get, list: if hasPermission('userManagement');
+      // On sign up
+      allow create: if isOwner(employeeId);
+      
+      // A user can update their own non-sensitive info
+      // An admin can update anything
+      allow update: if isAdmin() || (isOwner(employeeId) && !('accessLevel' in request.resource.data) && !('permissions' in request.resource.data) && !('status' in request.resource.data));
+
+      allow delete: if isAdmin();
+      
+      match /notifications/{notificationId} {
+        allow read, update, delete: if isOwner(employeeId);
+        // Any authenticated user can create a notification for another user
+        allow create: if isAuthenticated(); 
+      }
+    }
+    
     match /counters/{counterId} {
         allow read, write: if isAuthenticated();
     }
