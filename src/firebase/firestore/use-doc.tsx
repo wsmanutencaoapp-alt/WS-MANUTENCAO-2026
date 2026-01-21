@@ -40,7 +40,6 @@ async function fetchDoc<T>(docRef: DocumentReference<DocumentData>): Promise<T |
                 operation: 'get',
                 path: docRef.path,
             });
-            errorEmitter.emit('permission-error', contextualError);
             throw contextualError;
         }
         throw error;
@@ -98,7 +97,6 @@ export function useDoc<T = any>(
           operation: 'get',
           path: memoizedDocRef.path,
         });
-        errorEmitter.emit('permission-error', contextualError);
         queryClient.setQueryData(queryKey, (oldData: any) => ({ ...oldData, error: contextualError }));
       }
     );

@@ -51,7 +51,6 @@ async function fetchCollection<T>(query: CollectionReference<DocumentData> | Que
         operation: 'list',
         path,
       });
-      errorEmitter.emit('permission-error', contextualError);
       throw contextualError; // Re-throw the rich error for react-query
     }
     throw error; // Re-throw other errors
@@ -97,7 +96,6 @@ export function useCollection<T = any>(
             ? (memoizedTargetRefOrQuery as CollectionReference).path
             : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
         const contextualError = new FirestorePermissionError({ operation: 'list', path });
-        errorEmitter.emit('permission-error', contextualError);
         // Optionally, you can also update the query's error state in react-query
         queryClient.setQueryData(queryKey, (oldData: any) => ({ ...oldData, error: contextualError }));
       }
