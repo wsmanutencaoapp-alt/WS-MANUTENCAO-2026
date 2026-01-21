@@ -81,8 +81,14 @@ const formSchema = z.object({
   
   // Aba 4: Conversão
   unidadeSecundaria: z.enum(['G', 'ML', 'CM', 'MM']).optional(),
-  fatorConversao: z.coerce.number().optional(),
-  pesoBruto: z.coerce.number().optional(),
+  fatorConversao: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.coerce.number().optional()
+  ),
+  pesoBruto: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.coerce.number().optional()
+  ),
 
 }).refine(data => {
     if (data.familia !== 'CG') {
@@ -141,8 +147,6 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       localizacaoPadrao: '',
       imageUrl: '',
       documentoUrl: '',
-      fatorConversao: 0,
-      pesoBruto: 0,
     },
   });
 
@@ -166,7 +170,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
         descricao: '', partNumber: '', unidadeMedida: 'UN', familia: 'CT',
         exigeLote: false, exigeSerialNumber: false, exigeValidade: false,
         estoqueMinimo: 0, estoqueMaximo: 0, localizacaoPadrao: '',
-        imageUrl: '', documentoUrl: '', fatorConversao: 0, pesoBruto: 0
+        imageUrl: '', documentoUrl: '',
       });
       setPreviewImage(null);
     }
