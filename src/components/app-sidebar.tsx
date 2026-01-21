@@ -175,22 +175,18 @@ const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permi
   if (!permissions && !isAdmin) return [];
 
   return items.reduce((acc, item) => {
-    // Admins see everything. For others, check the main item permission.
-    const hasParentPermission = isAdmin || (item.permission && permissions?.[item.permission]);
+    const hasViewPermission = isAdmin || !item.permission || (permissions?.[`${item.permission}_view`]);
 
-    if (hasParentPermission) {
-      // If the item has sub-items, filter them based on their specific permissions
+    if (hasViewPermission) {
       if (item.subItems) {
         const permittedSubItems = item.subItems.filter(subItem => 
-          isAdmin || (subItem.permission && permissions?.[subItem.permission])
+          isAdmin || !subItem.permission || (permissions?.[`${subItem.permission}_view`])
         );
         
-        // Only include the parent item if it has at least one permitted sub-item
         if (permittedSubItems.length > 0) {
           acc.push({ ...item, subItems: permittedSubItems });
         }
       } else {
-        // If no sub-items, just include the parent item
         acc.push(item);
       }
     }
