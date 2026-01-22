@@ -2,8 +2,8 @@
 
 import { toast } from '@/hooks/use-toast';
 
-// A generic email sending function
-async function sendEmail(to: string, subject: string, html: string) {
+// A generic email sending function that accepts single or multiple recipients
+async function sendEmail(to: string | string[], subject: string, html: string) {
     try {
         const response = await fetch('/api/send-email', {
             method: 'POST',
@@ -16,16 +16,12 @@ async function sendEmail(to: string, subject: string, html: string) {
         if (!response.ok) {
             let errorDescription = `Falha no envio do e-mail. Status: ${response.status}`;
             try {
-                // Try to parse the error response as JSON
                 const errorData = await response.json();
-                // Prioritize the 'message' field for a more detailed error.
                 errorDescription = errorData.message || errorData.error || errorDescription;
             } catch (e) {
-                // If the response isn't JSON, use the status text as a fallback
                 errorDescription = response.statusText || errorDescription;
             }
             console.error('Email API Error:', errorDescription);
-            // Show a toast to the user to make the error visible.
             toast({
                 variant: 'destructive',
                 title: 'Erro ao Enviar Notificação por E-mail',
@@ -34,7 +30,7 @@ async function sendEmail(to: string, subject: string, html: string) {
         }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Erro de conexão ao tentar enviar e-mail.';
-        console.error(`Failed to send email to ${to}:`, error);
+        console.error(`Failed to send email:`, error);
         toast({
             variant: 'destructive',
             title: 'Erro de Rede ao Enviar E-mail',
@@ -78,9 +74,8 @@ export const sendPurchaseRequisitionEmail = async (recipients: string[], requisi
       </body>
     `;
 
-    for (const email of recipients) {
-        await sendEmail(email, subject, htmlBody);
-    }
+    // Send one email to all recipients at once
+    await sendEmail(recipients, subject, htmlBody);
 };
 
 // Specific function for Purchase Order notifications
@@ -118,7 +113,6 @@ export const sendPurchaseOrderEmail = async (recipients: string[], orderData: an
       </body>
     `;
 
-    for (const email of recipients) {
-        await sendEmail(email, subject, htmlBody);
-    }
+    // Send one email to all recipients at once
+    await sendEmail(recipients, subject, htmlBody);
 };
