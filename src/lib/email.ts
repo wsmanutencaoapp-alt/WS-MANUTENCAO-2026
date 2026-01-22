@@ -1,5 +1,7 @@
 'use client';
 
+import { toast } from '@/hooks/use-toast';
+
 // A generic email sending function
 async function sendEmail(to: string, subject: string, html: string) {
     try {
@@ -13,11 +15,23 @@ async function sendEmail(to: string, subject: string, html: string) {
 
         if (!response.ok) {
             const errorData = await response.json();
-            console.error(`Failed to send email. Status: ${response.status}`, errorData);
+            const errorMessage = errorData.error || `Falha no envio do e-mail. Status: ${response.status}`;
+            console.error('Email API Error:', errorMessage, errorData);
+            // Show a toast to the user to make the error visible.
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao Enviar Notificação por E-mail',
+                description: errorMessage,
+            });
         }
     } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Erro de conexão ao tentar enviar e-mail.';
         console.error(`Failed to send email to ${to}:`, error);
-        // We don't throw an error to not block the UI flow.
+        toast({
+            variant: 'destructive',
+            title: 'Erro de Rede ao Enviar E-mail',
+            description: errorMessage,
+        });
     }
 };
 
