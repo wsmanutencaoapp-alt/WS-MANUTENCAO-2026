@@ -5,3 +5,8 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+  env:
+    - variable: RESEND_FROM_EMAIL
+      value: "noreply@manutencaows.com"
+    - variable: RESEND_API_KEY
+      secret: RESEND_API_KEY

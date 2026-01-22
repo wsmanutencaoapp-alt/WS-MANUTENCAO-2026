@@ -3,13 +3,18 @@
 // A generic email sending function
 async function sendEmail(to: string, subject: string, html: string) {
     try {
-        await fetch('/api/send-email', {
+        const response = await fetch('/api/send-email', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ to, subject, html }),
         });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error(`Failed to send email. Status: ${response.status}`, errorData);
+        }
     } catch (error) {
         console.error(`Failed to send email to ${to}:`, error);
         // We don't throw an error to not block the UI flow.
