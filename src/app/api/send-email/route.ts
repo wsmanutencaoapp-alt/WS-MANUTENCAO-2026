@@ -8,14 +8,14 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export async function POST(request: Request) {
   const { to, subject, html } = await request.json();
 
-  if (!process.env.RESEND_API_KEY) {
-      console.error('RESEND_API_KEY is not set.');
-      return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
+  if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
+      console.error('RESEND_API_KEY or RESEND_FROM_EMAIL is not set.');
+      return NextResponse.json({ error: 'Server configuration error: Email settings are incomplete.' }, { status: 500 });
   }
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+      from: process.env.RESEND_FROM_EMAIL,
       to: [to],
       subject: subject,
       html: html,
