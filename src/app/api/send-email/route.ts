@@ -3,20 +3,17 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// REMOVED: const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(request: Request) {
   const { to, subject, html } = await request.json();
 
-  if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
+  try {
+    if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
       console.error('RESEND_API_KEY or RESEND_FROM_EMAIL is not set in the environment.');
       return NextResponse.json({ error: 'Server configuration error: Email settings are incomplete.' }, { status: 500 });
-  }
+    }
 
-  // MOVED INSTANTIATION HERE:
-  const resend = new Resend(process.env.RESEND_API_KEY);
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
-  try {
     const { data, error } = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL,
       to: [to],
