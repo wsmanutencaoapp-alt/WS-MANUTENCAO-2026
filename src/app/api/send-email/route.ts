@@ -3,15 +3,18 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// REMOVED: const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   const { to, subject, html } = await request.json();
 
   if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
-      console.error('RESEND_API_KEY or RESEND_FROM_EMAIL is not set.');
+      console.error('RESEND_API_KEY or RESEND_FROM_EMAIL is not set in the environment.');
       return NextResponse.json({ error: 'Server configuration error: Email settings are incomplete.' }, { status: 500 });
   }
+
+  // MOVED INSTANTIATION HERE:
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
   try {
     const { data, error } = await resend.emails.send({
@@ -29,6 +32,9 @@ export async function POST(request: Request) {
     return NextResponse.json(data);
   } catch (error) {
     console.error('Failed to send email:', error);
-    return NextResponse.json({ error }, { status: 500 });
+    if (error instanceof Error) {
+        return NextResponse.json({ error: 'Internal server error during email sending.', message: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: 'An unknown error occurred during email sending.' }, { status: 500 });
   }
 }
