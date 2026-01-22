@@ -4,23 +4,27 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
+// ATENÇÃO: Medida temporária e insegura para testes de funcionalidade.
+// Substitua 'SUA_CHAVE_API_AQUI' pela sua chave de API real do Resend.
+// Recomenda-se fortemente voltar a usar o Secret Manager em produção.
+const apiKey = 'SUA_CHAVE_API_AQUI'; 
+
 export async function POST(request: Request) {
   const { to, subject, html } = await request.json();
 
-  const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.RESEND_FROM_EMAIL;
   
-  if (!apiKey) {
+  if (apiKey === 'SUA_CHAVE_API_AQUI') {
     return NextResponse.json({ 
         error: 'Server Configuration Error', 
-        message: 'The RESEND_API_KEY is missing. Please check your Secret Manager and apphosting.yaml configuration.'
+        message: 'A chave da API do Resend não foi inserida no código. Substitua o placeholder em src/app/api/send-email/route.ts.'
     }, { status: 500 });
   }
 
   if (!fromEmail) {
     return NextResponse.json({ 
         error: 'Server Configuration Error', 
-        message: 'The RESEND_FROM_EMAIL environment variable is missing. Check your apphosting.yaml file.'
+        message: 'A variável de ambiente RESEND_FROM_EMAIL está faltando. Verifique seu arquivo apphosting.yaml.'
     }, { status: 500 });
   }
 
@@ -35,14 +39,12 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-        // This handles errors returned from the Resend API (e.g., validation errors)
         return NextResponse.json({ 
             error: 'Resend API Error', 
             message: `[${error.name}] ${error.message}` 
         }, { status: 422 });
     }
 
-    // Success
     return NextResponse.json(data);
   } catch (exception) {
       let errorMessage = 'An unknown exception occurred during the email sending process.';
