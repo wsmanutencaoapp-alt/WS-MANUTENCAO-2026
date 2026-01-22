@@ -18,7 +18,8 @@ async function sendEmail(to: string, subject: string, html: string) {
             try {
                 // Try to parse the error response as JSON
                 const errorData = await response.json();
-                errorDescription = errorData.error || errorData.message || errorDescription;
+                // Prioritize the 'message' field for a more detailed error.
+                errorDescription = errorData.message || errorData.error || errorDescription;
             } catch (e) {
                 // If the response isn't JSON, use the status text as a fallback
                 errorDescription = response.statusText || errorDescription;
