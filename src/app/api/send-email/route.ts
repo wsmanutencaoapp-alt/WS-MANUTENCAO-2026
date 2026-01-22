@@ -6,21 +6,25 @@ import { Resend } from 'resend';
 export async function POST(request: Request) {
   const { to, subject, html } = await request.json();
 
-  try {
-    // Let the Resend constructor automatically pick up the API key from the environment.
-    // This is a more robust pattern in serverless environments.
-    const resend = new Resend();
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL;
 
-    const fromEmail = process.env.RESEND_FROM_EMAIL;
-
-    // Check for the FROM email address.
-    if (!fromEmail) {
-      console.error('Server configuration error: RESEND_FROM_EMAIL is not set.');
-      return NextResponse.json({ error: 'Server configuration error: The sender email is not configured.' }, { status: 500 });
-    }
+  // Explicitly check for both variables
+  if (!apiKey || !fromEmail) {
+    const missing = [];
+    if (!apiKey) missing.push('RESEND_API_KEY');
+    if (!fromEmail) missing.push('RESEND_FROM_EMAIL');
     
-    // The resend.emails.send call will throw an error if the API key is missing,
-    // which will be caught by the catch block.
+    console.error(`Server configuration error: The following environment variables are not set: ${missing.join(', ')}`);
+    return NextResponse.json({ 
+        error: 'Email Service Error', 
+        message: `Server configuration is incomplete. Missing: ${missing.join(', ')}.` 
+    }, { status: 500 });
+  }
+
+  try {
+    const resend = new Resend(apiKey); // Explicitly pass the key
+
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: [to],
@@ -29,17 +33,17 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      // This block handles errors returned by the Resend API (e.g., invalid 'to' address)
       console.error('Resend API returned an error:', JSON.stringify(error, null, 2));
-      return NextResponse.json({ message: 'Failed to send email', details: error.message }, { status: 422 }); // Unprocessable Entity
+      return NextResponse.json({ message: 'Failed to send email', details: error.message }, { status: 422 });
     }
 
     return NextResponse.json(data);
   } catch (error) {
-    // This block catches errors from the Resend constructor (e.g., missing API key) or network issues.
+    // This block catches network issues or other unexpected errors during the send call.
     console.error('Caught an exception during email sending:', error);
     if (error instanceof Error) {
-        return NextResponse.json({ error: 'Email Service Error', message: error.message }, { status: 500 });
+        // Provide a more detailed error message
+        return NextResponse.json({ error: 'Email Service Error', message: `An unexpected exception occurred: ${error.message}` }, { status: 500 });
     }
     return NextResponse.json({ error: 'An unknown error occurred.' }, { status: 500 });
   }
