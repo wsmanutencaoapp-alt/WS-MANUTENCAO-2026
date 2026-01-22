@@ -4,22 +4,14 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
 // ATENÇÃO: Medida temporária e insegura para testes de funcionalidade.
-// Substitua 'SUA_CHAVE_API_AQUI' pela sua chave de API real do Resend.
 // Recomenda-se fortemente voltar a usar o Secret Manager em produção.
-const apiKey = 'SUA_CHAVE_API_AQUI'; 
+const apiKey = 're_UsnkMP6W_8nH5PhoDA8jvVyoxsiBkz9DN'; 
 
 export async function POST(request: Request) {
   const { to, subject, html } = await request.json();
 
   const fromEmail = process.env.RESEND_FROM_EMAIL;
   
-  if (apiKey === 'SUA_CHAVE_API_AQUI') {
-    return NextResponse.json({ 
-        error: 'Server Configuration Error', 
-        message: 'A chave da API do Resend não foi inserida no código. Substitua o placeholder em src/app/api/send-email/route.ts.'
-    }, { status: 500 });
-  }
-
   if (!fromEmail) {
     return NextResponse.json({ 
         error: 'Server Configuration Error', 
