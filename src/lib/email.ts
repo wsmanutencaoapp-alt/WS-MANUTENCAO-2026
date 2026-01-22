@@ -22,20 +22,33 @@ export const sendPurchaseRequisitionEmail = async (recipients: string[], requisi
 
     const subject = `Nova Requisição de Compra para Aprovação: ${requisitionData.protocol}`;
     const htmlBody = `
-      <div style="font-family: sans-serif; padding: 20px; color: #333;">
-        <h2 style="color: #1a202c;">Nova Requisição de Compra</h2>
-        <p>Uma nova solicitação de compra foi criada e aguarda sua aprovação.</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p><strong>Protocolo:</strong> ${requisitionData.protocol}</p>
-        <p><strong>Solicitante:</strong> ${requisitionData.requesterName}</p>
-        <p><strong>Motivo da Compra:</strong> ${requisitionData.purchaseReason}</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="text-align: center;">
-          <a href="${window.location.origin}/dashboard/compras/aprovacoes" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-            Ver Requisição
-          </a>
-        </p>
-      </div>
+      <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden;">
+          <div style="background-color: #4A5568; color: #ffffff; padding: 20px; text-align: center;">
+            <h1>Nova Requisição de Compra</h1>
+          </div>
+          <div style="padding: 20px 30px; color: #333;">
+            <p style="font-size: 16px;">Olá,</p>
+            <p style="font-size: 16px;">Uma nova Solicitação de Compra (SC) foi enviada e requer sua atenção para aprovação.</p>
+            <div style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-top: 20px;">
+              <h3 style="margin-top: 0; color: #2d3748;">Detalhes da Requisição</h3>
+              <p style="margin: 5px 0;"><strong>Protocolo:</strong> ${requisitionData.protocol}</p>
+              <p style="margin: 5px 0;"><strong>Solicitante:</strong> ${requisitionData.requesterName}</p>
+              <p style="margin: 5px 0;"><strong>Data da Necessidade:</strong> ${new Date(requisitionData.neededByDate).toLocaleDateString('pt-BR')}</p>
+              <p style="margin: 5px 0;"><strong>Prioridade:</strong> ${requisitionData.priority}</p>
+              <p style="margin: 5px 0;"><strong>Motivo:</strong> ${requisitionData.purchaseReason}</p>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="${window.location.origin}/dashboard/compras/aprovacoes" style="background-color: #3b82f6; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; display: inline-block;">
+                Analisar Requisição
+              </a>
+            </div>
+          </div>
+          <div style="background-color: #edf2f7; text-align: center; padding: 15px; font-size: 12px; color: #718096;">
+            <p>Este é um e-mail automático do sistema APP WS.</p>
+          </div>
+        </div>
+      </body>
     `;
 
     for (const email of recipients) {
@@ -49,20 +62,33 @@ export const sendPurchaseOrderEmail = async (recipients: string[], orderData: an
     
     const subject = `Nova Ordem de Compra para Aprovação: ${orderData.protocol}`;
     const htmlBody = `
-      <div style="font-family: sans-serif; padding: 20px; color: #333;">
-        <h2 style="color: #1a202c;">Nova Ordem de Compra</h2>
-        <p>Uma nova ordem de compra foi gerada a partir da SC ${orderData.originalRequisitionProtocol || ''} e aguarda sua aprovação.</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p><strong>Protocolo OC:</strong> ${orderData.protocol}</p>
-        <p><strong>Fornecedor:</strong> ${orderData.supplierName}</p>
-        <p><strong>Valor Total:</strong> ${(orderData.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="text-align: center;">
-          <a href="${window.location.origin}/dashboard/compras/aprovacoes" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-            Ver Ordem de Compra
-          </a>
-        </p>
-      </div>
+      <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden;">
+          <div style="background-color: #4A5568; color: #ffffff; padding: 20px; text-align: center;">
+            <h1>Nova Ordem de Compra para Aprovação</h1>
+          </div>
+          <div style="padding: 20px 30px; color: #333;">
+            <p style="font-size: 16px;">Olá,</p>
+            <p style="font-size: 16px;">Uma nova Ordem de Compra (OC) foi gerada a partir da SC ${orderData.originalRequisitionProtocol || ''} e aguarda sua aprovação.</p>
+            <div style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-top: 20px;">
+              <h3 style="margin-top: 0; color: #2d3748;">Detalhes da Ordem de Compra</h3>
+              <p style="margin: 5px 0;"><strong>Protocolo OC:</strong> ${orderData.protocol}</p>
+              <p style="margin: 5px 0;"><strong>Requisição Original:</strong> ${orderData.originalRequisitionProtocol || 'N/A'}</p>
+              <p style="margin: 5px 0;"><strong>Fornecedor:</strong> ${orderData.supplierName}</p>
+              <p style="margin: 5px 0;"><strong>Valor Total:</strong> <strong>${(orderData.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></p>
+              <p style="margin: 5px 0;"><strong>Cond. Pagamento:</strong> ${orderData.paymentTerms}</p>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="${window.location.origin}/dashboard/compras/aprovacoes" style="background-color: #3b82f6; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; display: inline-block;">
+                Analisar Ordem de Compra
+              </a>
+            </div>
+          </div>
+          <div style="background-color: #edf2f7; text-align: center; padding: 15px; font-size: 12px; color: #718096;">
+            <p>Este é um e-mail automático do sistema APP WS.</p>
+          </div>
+        </div>
+      </body>
     `;
 
     for (const email of recipients) {
