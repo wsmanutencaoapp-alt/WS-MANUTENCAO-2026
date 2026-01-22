@@ -1,3 +1,4 @@
+
 'use server';
 
 import { NextResponse } from 'next/server';
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
   if (!apiKey) {
     return NextResponse.json({ 
         error: 'Server Configuration Error', 
-        message: 'The RESEND_API_KEY is missing. Please ensure it is set correctly in your Google Cloud Secret Manager and referenced in the apphosting.yaml file.'
+        message: 'The RESEND_API_KEY is missing. Please check your Secret Manager and apphosting.yaml configuration.'
     }, { status: 500 });
   }
 
