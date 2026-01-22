@@ -14,14 +14,21 @@ async function sendEmail(to: string, subject: string, html: string) {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            const errorMessage = errorData.error || `Falha no envio do e-mail. Status: ${response.status}`;
-            console.error('Email API Error:', errorMessage, errorData);
+            let errorDescription = `Falha no envio do e-mail. Status: ${response.status}`;
+            try {
+                // Try to parse the error response as JSON
+                const errorData = await response.json();
+                errorDescription = errorData.error || errorData.message || errorDescription;
+            } catch (e) {
+                // If the response isn't JSON, use the status text as a fallback
+                errorDescription = response.statusText || errorDescription;
+            }
+            console.error('Email API Error:', errorDescription);
             // Show a toast to the user to make the error visible.
             toast({
                 variant: 'destructive',
                 title: 'Erro ao Enviar Notificação por E-mail',
-                description: errorMessage,
+                description: errorDescription,
             });
         }
     } catch (error) {
