@@ -8,19 +8,27 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    function getUserData() {
-      // Use get() which doesn't count as a read operation in most cases within rules
-      return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data;
-    }
-
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
-             getUserData().accessLevel == 'Admin';
-    }
-    
     function hasPermission(permission) {
-      let userData = getUserData();
-      return isAuthenticated() && (isAdmin() || (userData.permissions[permission] == true));
+      // User must be authenticated to have any permission.
+      if (!isAuthenticated()) {
+        return false;
+      }
+      
+      // The employee document must exist. If not, deny permission.
+      if (!exists(/databases/$(database)/documents/employees/$(request.auth.uid))) {
+        return false;
+      }
+      
+      // Now it's safe to get user data.
+      let userData = get(/databases/$(database)/documents/employees/$(request.auth.uid)).data;
+      
+      // Admins have all permissions.
+      if (userData.accessLevel == 'Admin') {
+        return true;
+      }
+      
+      // For non-admins, check if the permissions map exists and has the required permission.
+      return userData.permissions != null && userData.permissions[permission] == true;
     }
     
     function isOwner(userId) {
