@@ -36,6 +36,7 @@ import { Alert, AlertTitle, AlertDescription } from './ui/alert';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { cn } from '@/lib/utils';
+import { Switch } from './ui/switch';
 
 type DialogTool = Tool & Partial<WithDocId<Tool>>;
 
@@ -58,6 +59,7 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
   const [availableAddresses, setAvailableAddresses] = useState<{value: string, label: string}[]>([]);
   const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
 
   const firestore = useFirestore();
   const storage = useStorage();
@@ -78,14 +80,17 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
       setIsLoadingAddresses(true);
       try {
         const addressesRef = collection(firestore, 'addresses');
-        const qAddresses = query(addressesRef, where('setor', '==', '01'));
+        const qAddresses = showAllAddresses
+          ? query(addressesRef)
+          : query(addressesRef, where('setor', '==', '01'));
+        
         const addressesSnapshot = await getDocs(qAddresses);
         
-        const allFerramentariaAddresses = addressesSnapshot.docs
+        const allAddresses = addressesSnapshot.docs
             .map(doc => doc.data() as Address)
             .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
             
-        setAvailableAddresses(allFerramentariaAddresses);
+        setAvailableAddresses(allAddresses);
       } catch (error) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar endereços.' });
       } finally {
@@ -94,7 +99,7 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
     };
 
     fetchAddresses();
-  }, [isEditing, firestore, toast]);
+  }, [isEditing, showAllAddresses, firestore, toast]);
 
 
   if (!tool) {
@@ -258,7 +263,13 @@ export default function ToolDetailsDialog({ tool, isOpen, onClose, onToolUpdated
                     <Input id="descricao" value={editableTool.descricao || ''} onChange={handleInputChange} />
                 </div>
                 <div className="space-y-1">
-                    <Label htmlFor="enderecamento">Endereçamento</Label>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="enderecamento">Endereçamento</Label>
+                        <div className="flex items-center space-x-2">
+                            <Switch id="show-all-addresses-details" checked={showAllAddresses} onCheckedChange={setShowAllAddresses} />
+                            <Label htmlFor="show-all-addresses-details" className="text-xs font-normal">Ver todos</Label>
+                        </div>
+                    </div>
                     <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
                         <PopoverTrigger asChild>
                         <Button
