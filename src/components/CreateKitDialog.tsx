@@ -34,6 +34,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { cn } from '@/lib/utils';
+import { Switch } from './ui/switch';
 
 interface CreateKitDialogProps {
   isOpen: boolean;
@@ -57,6 +58,7 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
   const [availableAddresses, setAvailableAddresses] = useState<{value: string, label: string}[]>([]);
   const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
   const [isPrerequisitesLoading, setIsPrerequisitesLoading] = useState(false);
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
 
   // This query correctly gets all tools that could POTENTIALLY be in a kit.
   const availableToolsQuery = useMemoFirebase(
@@ -77,14 +79,16 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
       setIsPrerequisitesLoading(true);
       try {
         const addressesRef = collection(firestore, 'addresses');
-        const qAddresses = query(addressesRef, where('setor', '==', '01'));
+        const qAddresses = showAllAddresses
+          ? query(addressesRef)
+          : query(addressesRef, where('setor', '==', '01'));
         const addressesSnapshot = await getDocs(qAddresses);
         
-        const allFerramentariaAddresses = addressesSnapshot.docs
+        const fetchedAddresses = addressesSnapshot.docs
             .map(doc => doc.data() as Address)
             .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
             
-        setAvailableAddresses(allFerramentariaAddresses);
+        setAvailableAddresses(fetchedAddresses);
       } catch (error) {
         console.error("Erro ao buscar endereços disponíveis:", error);
         toast({ variant: "destructive", title: "Erro de Busca", description: "Não foi possível carregar os endereços." });
@@ -96,7 +100,7 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
     if (isOpen) {
       fetchPrerequisites();
     }
-  }, [isOpen, firestore, toast]);
+  }, [isOpen, firestore, toast, showAllAddresses]);
 
 
   const filteredTools = useMemo(() => {
@@ -250,7 +254,13 @@ export default function CreateKitDialog({ isOpen, onClose, onSuccess }: CreateKi
                 />
             </div>
             <div className="space-y-1.5">
-                <Label htmlFor="kitEnderecamento">Endereçamento do Kit <span className="text-destructive">*</span></Label>
+                 <div className="flex justify-between items-center mb-1">
+                    <Label htmlFor="kitEnderecamento">Endereçamento do Kit <span className="text-destructive">*</span></Label>
+                    <div className="flex items-center space-x-2">
+                        <Switch id="show-all-addresses-kit" checked={showAllAddresses} onCheckedChange={setShowAllAddresses} />
+                        <Label htmlFor="show-all-addresses-kit" className="text-xs font-normal">Ver todos</Label>
+                    </div>
+                </div>
                  <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button

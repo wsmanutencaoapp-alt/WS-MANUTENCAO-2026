@@ -39,6 +39,7 @@ import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { cn } from '@/lib/utils';
+import { Switch } from './ui/switch';
 
 interface QuickAddDialogProps {
   isOpen: boolean;
@@ -78,6 +79,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
   
   const [availableAddresses, setAvailableAddresses] = useState<{value: string, label: string}[]>([]);
   const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -110,14 +112,16 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
 
             // Fetch addresses
             const addressesRef = collection(firestore, 'addresses');
-            const qAddresses = query(addressesRef, where('setor', '==', '01'));
+            const qAddresses = showAllAddresses
+              ? query(addressesRef)
+              : query(addressesRef, where('setor', '==', '01'));
             const addressesSnapshot = await getDocs(qAddresses);
             
-            const allFerramentariaAddresses = addressesSnapshot.docs
+            const fetchedAddresses = addressesSnapshot.docs
                 .map(doc => doc.data() as Address)
                 .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
             
-            setAvailableAddresses(allFerramentariaAddresses);
+            setAvailableAddresses(fetchedAddresses);
 
         } catch (error) {
             console.error('Erro ao buscar dados:', error);
@@ -130,7 +134,7 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
     if (isOpen) {
       fetchPrerequisites();
     }
-  }, [isOpen, firestore, toast]);
+  }, [isOpen, firestore, toast, showAllAddresses]);
 
   useEffect(() => {
     if (searchTerm.length < 1) {
@@ -417,7 +421,13 @@ export default function QuickAddDialog({ isOpen, onClose, onSuccess }: QuickAddD
                 </div>
                  <div className="grid grid-cols-2 gap-4">
                      <div className="space-y-1.5">
-                        <Label htmlFor="enderecamento">Endereçamento <span className="text-destructive">*</span></Label>
+                        <div className="flex justify-between items-center mb-1">
+                            <Label htmlFor="enderecamento">Endereçamento <span className="text-destructive">*</span></Label>
+                            <div className="flex items-center space-x-2">
+                                <Switch id="show-all-addresses-quickadd" checked={showAllAddresses} onCheckedChange={setShowAllAddresses} />
+                                <Label htmlFor="show-all-addresses-quickadd" className="text-xs font-normal">Ver todos</Label>
+                            </div>
+                        </div>
                          <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
                           <PopoverTrigger asChild>
                             <Button

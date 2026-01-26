@@ -59,6 +59,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 
 
 const familiaSuggestions: { [key in Tool['familia']]?: Tool['classificacao'] } = {
@@ -98,6 +99,7 @@ const CadastroFerramentasPage = () => {
   const [availableAddresses, setAvailableAddresses] = useState<{value: string, label: string}[]>([]);
   const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -142,14 +144,16 @@ const CadastroFerramentasPage = () => {
       setIsLoadingAddresses(true);
       try {
         const addressesRef = collection(firestore, 'addresses');
-        const qAddresses = query(addressesRef, where('setor', '==', '01')); // Ferramentaria
+        const qAddresses = showAllAddresses
+          ? query(addressesRef)
+          : query(addressesRef, where('setor', '==', '01')); // Ferramentaria
         const addressesSnapshot = await getDocs(qAddresses);
         
-        const allFerramentariaAddresses = addressesSnapshot.docs
+        const fetchedAddresses = addressesSnapshot.docs
           .map(doc => doc.data() as Address)
           .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
             
-        setAvailableAddresses(allFerramentariaAddresses);
+        setAvailableAddresses(fetchedAddresses);
       } catch (error) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar endereços.' });
       } finally {
@@ -158,7 +162,7 @@ const CadastroFerramentasPage = () => {
     };
 
     fetchAddresses();
-  }, [isFormDialogOpen, firestore, toast]);
+  }, [isFormDialogOpen, firestore, toast, showAllAddresses]);
   
 
   useEffect(() => {
@@ -539,7 +543,13 @@ const CadastroFerramentasPage = () => {
                      {(newFerramenta.tipo === 'ESP' || newFerramenta.tipo === 'EQV') && (
                          <>
                             <div className="col-span-1">
-                                <Label htmlFor="enderecamento">Endereçamento <span className='text-destructive'>*</span></Label>
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <Label htmlFor="enderecamento">Endereçamento <span className='text-destructive'>*</span></Label>
+                                    <div className="flex items-center space-x-2">
+                                        <Switch id="show-all-addresses" checked={showAllAddresses} onCheckedChange={setShowAllAddresses} />
+                                        <Label htmlFor="show-all-addresses" className="text-xs font-normal">Ver todos</Label>
+                                    </div>
+                                </div>
                                 <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <Button

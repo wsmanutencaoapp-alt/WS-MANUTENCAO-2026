@@ -27,6 +27,7 @@ import { Separator } from './ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { cn } from '@/lib/utils';
+import { Switch } from './ui/switch';
 
 type InspectionStatus = 'ok' | 'nok';
 interface InspectionState {
@@ -63,6 +64,7 @@ export default function ManualCheckInDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [availableAddresses, setAvailableAddresses] = useState<{ value: string, label: string }[]>([]);
   const [activePopover, setActivePopover] = useState<string | null>(null);
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
   
   const preselectedIdsString = useMemo(() => preselectedToolIds.sort().join(','), [preselectedToolIds]);
 
@@ -71,14 +73,16 @@ export default function ManualCheckInDialog({
         if (!firestore || !isOpen) return;
         try {
             const addressesRef = collection(firestore, 'addresses');
-            const qAddresses = query(addressesRef, where('setor', '==', '01'));
+            const qAddresses = showAllAddresses
+              ? query(addressesRef)
+              : query(addressesRef, where('setor', '==', '01'));
             const addressesSnapshot = await getDocs(qAddresses);
             
-            const allFerramentariaAddresses = addressesSnapshot.docs
+            const fetchedAddresses = addressesSnapshot.docs
                 .map(doc => doc.data() as Address)
                 .map(addr => ({ value: addr.codigoCompleto, label: addr.codigoCompleto }));
                 
-            setAvailableAddresses(allFerramentariaAddresses);
+            setAvailableAddresses(fetchedAddresses);
         } catch (error) {
             console.error("Erro ao buscar endereços disponíveis:", error);
         }
@@ -95,7 +99,7 @@ export default function ManualCheckInDialog({
         });
         setInspectionData(newInspectionData);
     }
-  }, [isOpen, preselectedIdsString, firestore]);
+  }, [isOpen, preselectedIdsString, firestore, showAllAddresses]);
 
 
   const filteredTools = useMemo(() => {
@@ -340,7 +344,13 @@ export default function ManualCheckInDialog({
           </div>
           
           <div className="flex flex-col gap-4">
-            <Label>Checklist de Conformidade ({selectedToolIds.size} selecionadas)</Label>
+            <div className="flex justify-between items-center">
+              <Label>Checklist de Conformidade ({selectedToolIds.size} selecionadas)</Label>
+              <div className="flex items-center space-x-2">
+                <Switch id="show-all-addresses-checkin" checked={showAllAddresses} onCheckedChange={setShowAllAddresses} />
+                <Label htmlFor="show-all-addresses-checkin" className="text-xs font-normal">Ver todos endereços</Label>
+              </div>
+            </div>
             <ScrollArea className="h-96 border rounded-md">
               <div className="p-4 space-y-4">
                 {selectedToolIds.size === 0 && (
