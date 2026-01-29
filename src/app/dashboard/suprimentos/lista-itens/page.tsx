@@ -244,10 +244,10 @@ const SuprimentosPage = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleOpenMovementDialog('entrada', null)}>
+                <DropdownMenuItem onSelect={() => handleOpenMovementDialog('entrada', null)}>
                   Entrada Avulsa / Manual
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/dashboard/compras/controle-compras')}>
+                <DropdownMenuItem onSelect={() => router.push('/dashboard/compras/controle-compras')}>
                   Receber via Ordem de Compra
                 </DropdownMenuItem>
               </DropdownMenuContent>
