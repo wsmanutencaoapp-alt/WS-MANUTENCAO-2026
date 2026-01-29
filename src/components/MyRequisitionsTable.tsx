@@ -77,8 +77,8 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
 const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
     switch(priority) {
         case 'Normal': return 'secondary';
-        case 'Urgente': return 'warning';
-        case 'Muito Urgente': return 'destructive';
+        case 'Média': return 'warning';
+        case 'Urgente': return 'destructive';
         default: return 'secondary';
     }
 }

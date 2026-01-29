@@ -74,8 +74,8 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
 const getPriorityVariant = (priority: PurchaseRequisition['priority']) => {
     switch(priority) {
         case 'Normal': return 'secondary';
-        case 'Urgente': return 'warning';
-        case 'Muito Urgente': return 'destructive';
+        case 'Média': return 'warning';
+        case 'Urgente': return 'destructive';
         default: return 'secondary';
     }
 }
@@ -159,8 +159,8 @@ const ControleComprasPage = () => {
   }, [scRequisitions, firestore]);
   
   const priorityOrder = {
-      'Muito Urgente': 1,
-      'Urgente': 2,
+      'Urgente': 1,
+      'Média': 2,
       'Normal': 3,
   };
 

@@ -260,7 +260,7 @@ export type PurchaseRequisition = {
   status: 'Aberta' | 'Parcialmente Atendida' | 'Totalmente Atendida' | 'Cancelada' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída' | 'Em Revisão' | 'Aguardando Entrega' | 'Pronta para OC' | 'Em Revisão Comprador';
   rejectionReason?: string;
   createdAt: string; // ISO date string
-  priority: 'Normal' | 'Urgente' | 'Muito Urgente';
+  priority: 'Normal' | 'Média' | 'Urgente';
   purchaseReason: string;
   expensiveChoiceJustification?: string;
   purchaseOrderNotes?: string;

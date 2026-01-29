@@ -445,7 +445,7 @@
         },
         "rejectionReason": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "priority": { "type": "string", "enum": ["Normal", "Urgente", "Muito Urgente"] },
+        "priority": { "type": "string", "enum": ["Normal", "Média", "Urgente"] },
         "purchaseReason": { "type": "string" },
         "expensiveChoiceJustification": { "type": "string" },
         "purchaseOrderNotes": { "type": "string" },

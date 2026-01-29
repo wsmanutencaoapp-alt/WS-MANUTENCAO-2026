@@ -269,8 +269,8 @@ const RequisicaoCompraPage = () => {
                                 <SelectTrigger id="priority"><SelectValue/></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="Normal">Normal</SelectItem>
+                                    <SelectItem value="Média">Média</SelectItem>
                                     <SelectItem value="Urgente">Urgente</SelectItem>
-                                    <SelectItem value="Muito Urgente">Muito Urgente</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
