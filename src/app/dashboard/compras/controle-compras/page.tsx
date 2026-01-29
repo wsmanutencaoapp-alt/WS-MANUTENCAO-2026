@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-import type { PurchaseRequisition, CostCenter, Tool, Supply, PurchaseRequisitionItem, Employee } from '@/lib/types';
+import { collection, query, where, doc, getDocs, writeBatch, serverTimestamp, addDoc, orderBy, documentId, updateDoc, deleteDoc, onSnapshot, getDoc } from 'firebase/firestore';
+import type { PurchaseRequisition, CostCenter, Tool, Supply, PurchaseRequisitionItem, Employee, Supplier } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -13,13 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit, AlertCircle, Truck } from 'lucide-react';
+import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit, AlertCircle, Truck, Send } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +39,8 @@ import ReviewPurchaseOrderDialog from '@/components/ReviewPurchaseOrderDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import ReceiveItemsDialog from '@/components/ReceiveItemsDialog';
+import { RequisitionItemWithDetails } from '@/components/PurchaseRequisitionDetailsDialog';
+import { sendPurchaseOrderToSupplier } from '@/lib/email';
 
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
@@ -90,6 +85,7 @@ const ControleComprasPage = () => {
   const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [itemToReceive, setItemToReceive] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [isSendingOC, setIsSendingOC] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -201,6 +197,64 @@ const ControleComprasPage = () => {
           setIsProcessing(null);
       }
   }
+
+  const handleSendToSupplier = async (oc: WithDocId<PurchaseRequisition>) => {
+    if (!firestore || !oc.supplierId) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Dados do fornecedor ausentes na OC.' });
+        return;
+    }
+    setIsSendingOC(oc.docId);
+
+    try {
+        // 1. Fetch Supplier Email
+        const supplierRef = doc(firestore, 'suppliers', oc.supplierId);
+        const supplierSnap = await getDoc(supplierRef);
+        if (!supplierSnap.exists() || !supplierSnap.data().contactEmail) {
+            throw new Error('E-mail de contato do fornecedor não foi encontrado.');
+        }
+        const supplierEmail = supplierSnap.data().contactEmail;
+
+        // 2. Fetch and Enrich OC Items
+        const itemsRef = collection(firestore, 'purchase_requisitions', oc.docId, 'items');
+        const itemsSnapshot = await getDocs(itemsRef);
+        const items = itemsSnapshot.docs.map(d => ({ ...d.data(), docId: d.id })) as WithDocId<PurchaseRequisitionItem>[];
+        if (items.length === 0) throw new Error("A Ordem de Compra não possui itens.");
+        
+        const supplyIds = items.filter(i => i.itemType === 'supply').map(i => i.itemId);
+        const toolIds = items.filter(i => i.itemType === 'tool').map(i => i.itemId);
+
+        const [supplyDocs, toolDocs] = await Promise.all([
+          supplyIds.length > 0 ? getDocs(query(collection(firestore, 'supplies'), where('__name__', 'in', supplyIds))) : Promise.resolve({ docs: [] }),
+          toolIds.length > 0 ? getDocs(query(collection(firestore, 'tools'), where('__name__', 'in', toolIds))) : Promise.resolve({ docs: [] }),
+        ]);
+
+        const masterDataMap = new Map();
+        supplyDocs.docs.forEach(d => masterDataMap.set(d.id, { ...d.data(), docId: d.id }));
+        toolDocs.docs.forEach(d => masterDataMap.set(d.id, { ...d.data(), docId: d.id }));
+
+        const enrichedItems: RequisitionItemWithDetails[] = items.map(item => ({
+            ...item,
+            details: masterDataMap.get(item.itemId) || { descricao: 'Item não encontrado', codigo: 'N/A' },
+        }));
+
+        // 3. Call the email function
+        await sendPurchaseOrderToSupplier(supplierEmail, oc, enrichedItems);
+
+        // 4. Update the OC with the sent timestamp
+        const ocRef = doc(firestore, 'purchase_requisitions', oc.docId);
+        await updateDoc(ocRef, {
+            lastSentToSupplierAt: new Date().toISOString(),
+        });
+        
+        queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
+        toast({ title: 'Sucesso!', description: `Ordem de Compra enviada para ${supplierEmail}.` });
+
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Erro ao Enviar OC', description: error.message });
+    } finally {
+        setIsSendingOC(null);
+    }
+  };
 
 
   const isLoading = isLoadingSCs || isLoadingOCs || isEmployeeLoading;
@@ -379,22 +433,28 @@ const ControleComprasPage = () => {
                                                 )}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right space-x-2">
-                                            {oc.status === 'Aguardando Entrega' || oc.status === 'Recebimento Parcial' ? (
-                                                <Button variant="default" size="sm" onClick={() => setItemToReceive(oc)}>
+                                        <TableCell className="text-right space-x-1">
+                                            {(oc.status === 'Aguardando Entrega' || oc.status === 'Recebimento Parcial') && (
+                                                <>
+                                                 <Button variant="default" size="sm" onClick={() => setItemToReceive(oc)}>
                                                     <Truck className="mr-2 h-4 w-4" />
-                                                    Receber Itens
+                                                    Receber
                                                 </Button>
-                                            ) : oc.status === 'Em Revisão Comprador' ? (
+                                                 <Button variant="secondary" size="sm" onClick={() => handleSendToSupplier(oc)} disabled={isSendingOC === oc.docId}>
+                                                    {isSendingOC === oc.docId ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
+                                                    Enviar
+                                                </Button>
+                                                </>
+                                            )}
+                                            {oc.status === 'Em Revisão Comprador' ? (
                                                 <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(oc)}>
                                                     <Edit className="mr-2 h-4 w-4" />
                                                     Revisar e Reenviar
                                                 </Button>
                                             ) : null}
 
-                                            <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(oc)}>
-                                                <Eye className="mr-2 h-4 w-4" />
-                                                Detalhes
+                                            <Button variant="outline" size="icon" onClick={() => setSelectedRequisition(oc)}>
+                                                <Eye className="h-4 w-4" />
                                             </Button>
 
                                             {isAdmin && (
@@ -464,5 +524,3 @@ const ControleComprasPage = () => {
 };
 
 export default ControleComprasPage;
-
-    

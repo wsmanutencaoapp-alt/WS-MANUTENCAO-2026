@@ -279,6 +279,7 @@ export type PurchaseRequisition = {
   purchaseReason: string;
   expensiveChoiceJustification?: string;
   purchaseOrderNotes?: string;
+  lastSentToSupplierAt?: string;
   supplierId?: string;
   totalValue?: number;
   paymentTerms?: string;

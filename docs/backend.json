@@ -475,6 +475,7 @@
         "purchaseReason": { "type": "string" },
         "expensiveChoiceJustification": { "type": "string" },
         "purchaseOrderNotes": { "type": "string" },
+        "lastSentToSupplierAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the OC was last sent to the supplier." },
         "supplierId": { "type": "string", "description": "ID of the chosen supplier for the OC." },
         "totalValue": { "type": "number", "description": "Final total value for the OC." },
         "paymentTerms": { "type": "string", "description": "Final payment terms for the OC." },

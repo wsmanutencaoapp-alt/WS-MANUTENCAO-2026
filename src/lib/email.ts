@@ -1,6 +1,8 @@
 'use client';
 
 import { toast } from '@/hooks/use-toast';
+import type { PurchaseRequisition, PurchaseRequisitionItem } from '@/lib/types';
+import { RequisitionItemWithDetails } from '@/components/PurchaseRequisitionDetailsDialog';
 
 // A generic email sending function that accepts single or multiple recipients
 async function sendEmail(to: string | string[], subject: string, html: string) {
@@ -78,7 +80,7 @@ export const sendPurchaseRequisitionEmail = async (recipients: string[], requisi
     await sendEmail(recipients, subject, htmlBody);
 };
 
-// Specific function for Purchase Order notifications
+// Specific function for Purchase Order notifications (Internal Approval)
 export const sendPurchaseOrderEmail = async (recipients: string[], orderData: any) => {
     if (recipients.length === 0) return;
     
@@ -115,4 +117,67 @@ export const sendPurchaseOrderEmail = async (recipients: string[], orderData: an
 
     // Send one email to all recipients at once
     await sendEmail(recipients, subject, htmlBody);
+};
+
+// New function to send the PO to the supplier
+export const sendPurchaseOrderToSupplier = async (supplierEmail: string, order: PurchaseRequisition, items: RequisitionItemWithDetails[]) => {
+    const subject = `Ordem de Compra: ${order.protocol}`;
+    
+    const itemsHtml = items.map(item => `
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">${item.details.codigo || 'N/A'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${item.details.descricao || 'N/A'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+            <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${(item.estimatedPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+            <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${((item.estimatedPrice || 0) * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        </tr>
+    `).join('');
+
+    const htmlBody = `
+      <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;">
+        <div style="max-width: 800px; margin: auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden;">
+          <div style="background-color: #4A5568; color: #ffffff; padding: 20px;">
+            <h1 style="margin: 0;">ORDEM DE COMPRA: ${order.protocol}</h1>
+          </div>
+          <div style="padding: 20px 30px; color: #333;">
+            <p style="font-size: 16px;">Prezados,</p>
+            <p style="font-size: 16px;">Segue nossa ordem de compra formal. Por favor, confirmar o recebimento e a data de entrega prevista.</p>
+            
+            <h3 style="margin-top: 25px; color: #2d3748; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">Itens Solicitados</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+              <thead>
+                <tr style="background-color: #edf2f7;">
+                  <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Código</th>
+                  <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Descrição</th>
+                  <th style="padding: 10px; border: 1px solid #ddd;">Qtd.</th>
+                  <th style="padding: 10px; border: 1px solid #ddd;">Preço Un.</th>
+                  <th style="padding: 10px; border: 1px solid #ddd;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+              <tfoot>
+                <tr>
+                    <td colspan="4" style="padding: 10px; text-align: right; font-weight: bold;">VALOR TOTAL:</td>
+                    <td style="padding: 10px; text-align: right; font-weight: bold; border: 1px solid #ddd;">${(order.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                </tr>
+              </tfoot>
+            </table>
+
+             <h3 style="margin-top: 25px; color: #2d3748; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">Condições</h3>
+             <p><strong>Condição de Pagamento:</strong> ${order.paymentTerms || 'N/A'}</p>
+             <p><strong>Data Limite para Entrega:</strong> ${new Date(order.neededByDate).toLocaleDateString('pt-BR')}</p>
+
+            <p style="margin-top: 30px;">Atenciosamente,</p>
+            <p><strong>Setor de Compras</strong></p>
+          </div>
+          <div style="background-color: #edf2f7; text-align: center; padding: 15px; font-size: 12px; color: #718096;">
+            <p>Este é um e-mail automático do sistema APP WS.</p>
+          </div>
+        </div>
+      </body>
+    `;
+
+    await sendEmail(supplierEmail, subject, htmlBody);
 };
