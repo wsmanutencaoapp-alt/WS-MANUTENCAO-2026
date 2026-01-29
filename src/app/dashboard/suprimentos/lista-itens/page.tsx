@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
@@ -46,6 +45,12 @@ import { Badge } from '@/components/ui/badge';
 import EditStockItemDialog from '@/components/EditStockItemDialog';
 import { useToast } from '@/hooks/use-toast';
 import ReturnMovementDialog from '@/components/ReturnMovementDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 
 type EnrichedStockItem = WithDocId<SupplyStock> & {
@@ -231,10 +236,22 @@ const SuprimentosPage = () => {
        <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Inventário de Suprimentos por Lote</h1>
         <div className="flex gap-2">
-            <Button onClick={() => handleOpenMovementDialog('entrada', null)}>
-                <LogIn className="mr-2 h-4 w-4"/>
-                Registrar Entrada
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button>
+                  <LogIn className="mr-2 h-4 w-4"/>
+                  Registrar Entrada <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleOpenMovementDialog('entrada', null)}>
+                  Entrada Avulsa / Manual
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/dashboard/compras/controle-compras')}>
+                  Receber via Ordem de Compra
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={() => handleOpenMovementDialog('saida', null)}>
                 <LogOut className="mr-2 h-4 w-4"/>
                 Registrar Saída
