@@ -50,11 +50,6 @@ import ReviewRequisitionDialog from './ReviewRequisitionDialog';
 import { cn } from '@/lib/utils';
 
 
-type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
-    progress: number;
-    totalItems: number;
-};
-
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
     'Aberta': 'secondary',
@@ -91,7 +86,6 @@ export default function MyRequisitionsTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
-  const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
   const [isProcessingDelete, setIsProcessingDelete] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(
@@ -128,37 +122,6 @@ export default function MyRequisitionsTable() {
       enabled: !isEmployeeLoading && !!user,
   });
   
-  useEffect(() => {
-    if (!requisitions || !firestore) return;
-    
-    const fetchProgress = async () => {
-      const enrichedReqs: RequisitionWithProgress[] = [];
-      for (const req of requisitions) {
-        if (req.type === 'Ordem de Compra') {
-            enrichedReqs.push({ ...req, progress: 0, totalItems: 0 });
-            continue;
-        }
-        const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
-        const itemsSnapshot = await getDocs(itemsRef);
-        const totalItems = itemsSnapshot.size;
-        let attendedItems = 0;
-        
-        itemsSnapshot.forEach(doc => {
-          const item = doc.data() as PurchaseRequisitionItem;
-          if (['Recebido', 'Cancelado'].includes(item.status)) {
-            attendedItems++;
-          }
-        });
-        
-        const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
-        enrichedReqs.push({ ...req, progress, totalItems });
-      }
-      setRequisitionsWithProgress(enrichedReqs);
-    };
-
-    fetchProgress();
-  }, [requisitions, firestore]);
-
   const costCenterIds = useMemo(() => {
     if (!requisitions) return [];
     return [...new Set(requisitions.map(r => r.costCenterId))];
@@ -180,15 +143,15 @@ export default function MyRequisitionsTable() {
 
 
   const filteredRequisitions = useMemo(() => {
-    if (!requisitionsWithProgress) return [];
-    if (!searchTerm) return requisitionsWithProgress;
+    if (!requisitions) return [];
+    if (!searchTerm) return requisitions;
     const lowercasedTerm = searchTerm.toLowerCase();
-    return requisitionsWithProgress.filter(req => 
+    return requisitions.filter(req => 
         (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
         req.status.toLowerCase().includes(lowercasedTerm) ||
         (costCenterMap.get(req.costCenterId) || '').toLowerCase().includes(lowercasedTerm)
     );
-  }, [requisitionsWithProgress, searchTerm, costCenterMap]);
+  }, [requisitions, searchTerm, costCenterMap]);
 
   const handleReviewSuccess = () => {
     setRequisitionToReview(null);
@@ -251,7 +214,6 @@ export default function MyRequisitionsTable() {
                   <TableHead>Protocolo</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[20%]">Atendimento</TableHead>
                   <TableHead>Centro de Custo</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -259,13 +221,13 @@ export default function MyRequisitionsTable() {
               </TableHeader>
               <TableBody>
                 {isLoading && (
-                  <TableRow><TableCell colSpan={7} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                 )}
                 {requisitionsError && (
-                  <TableRow><TableCell colSpan={7} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{requisitionsError.message}</TableCell></TableRow>
                 )}
                 {!isLoading && filteredRequisitions.length === 0 && (
-                   <TableRow><TableCell colSpan={7} className="h-24 text-center">Nenhuma requisição encontrada.</TableCell></TableRow>
+                   <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição encontrada.</TableCell></TableRow>
                 )}
                 {!isLoading && filteredRequisitions.map(req => {
                   const showReason = (req.status === 'Recusada' || req.status === 'Em Revisão') && req.rejectionReason;
@@ -292,14 +254,6 @@ export default function MyRequisitionsTable() {
                               </Tooltip>
                             )}
                          </div>
-                      </TableCell>
-                      <TableCell>
-                        {req.type === 'Solicitação de Compra' && req.totalItems > 0 ? (
-                           <div className="flex flex-col">
-                             <Progress value={req.progress} className="h-2" />
-                             <span className="text-xs text-muted-foreground text-right">{Math.round(req.progress)}%</span>
-                           </div>
-                        ) : <span className="text-xs text-muted-foreground">N/A</span> }
                       </TableCell>
                       <TableCell>{costCenterMap.get(req.costCenterId) || req.costCenterId}</TableCell>
                       <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>

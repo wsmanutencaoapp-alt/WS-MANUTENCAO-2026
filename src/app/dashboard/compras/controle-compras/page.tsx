@@ -47,11 +47,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 
 
-type RequisitionWithProgress = WithDocId<PurchaseRequisition> & {
-    progress: number;
-    totalItems: number;
-};
-
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
   const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
     'Aberta': 'secondary',
@@ -90,7 +85,6 @@ const ControleComprasPage = () => {
   const [searchTermOC, setSearchTermOC] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
-  const [requisitionsWithProgress, setRequisitionsWithProgress] = useState<RequisitionWithProgress[]>([]);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(
@@ -120,44 +114,6 @@ const ControleComprasPage = () => {
       queryKey: [ocQueryKey]
   });
   
-  useEffect(() => {
-    if (!scRequisitions || !firestore) {
-      setRequisitionsWithProgress([]);
-      return;
-    }
-
-    const unsubscribers = scRequisitions.map(req => {
-        const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
-        return onSnapshot(itemsRef, (itemsSnapshot) => {
-            const totalItems = itemsSnapshot.size;
-            let attendedItems = 0;
-            itemsSnapshot.forEach(itemDoc => {
-                const item = itemDoc.data() as PurchaseRequisitionItem;
-                // Item is considered "attended" if it's no longer pending.
-                if (item.status === 'Em Cotação' || item.status === 'Cotado' || item.status === 'Recebido' || item.status === 'Cancelado') {
-                    attendedItems++;
-                }
-            });
-            const progress = totalItems > 0 ? (attendedItems / totalItems) * 100 : 0;
-
-            setRequisitionsWithProgress(prev => {
-                const index = prev.findIndex(r => r.docId === req.docId);
-                const updatedReq = { ...req, progress, totalItems };
-                if (index > -1) {
-                    const newProgress = [...prev];
-                    newProgress[index] = updatedReq;
-                    return newProgress;
-                } else {
-                    return [...prev, updatedReq];
-                }
-            });
-        });
-    });
-
-    return () => unsubscribers.forEach(unsub => unsub());
-
-  }, [scRequisitions, firestore]);
-  
   const priorityOrder = {
       'Urgente': 1,
       'Média': 2,
@@ -165,9 +121,9 @@ const ControleComprasPage = () => {
   };
 
   const sortedAndFilteredSCs = useMemo(() => {
-    if (!requisitionsWithProgress) return [];
+    if (!scRequisitions) return [];
 
-    let relevantRequisitions = requisitionsWithProgress.filter(req => ['Aprovada', 'Parcialmente Atendida', 'Em Cotação', 'Em Revisão'].includes(req.status));
+    let relevantRequisitions = scRequisitions.filter(req => ['Aprovada', 'Parcialmente Atendida', 'Em Cotação', 'Em Revisão'].includes(req.status));
 
     if (searchTermSC) {
         const lowercasedTerm = searchTermSC.toLowerCase();
@@ -186,7 +142,7 @@ const ControleComprasPage = () => {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 
-  }, [requisitionsWithProgress, searchTermSC]);
+  }, [scRequisitions, searchTermSC]);
   
   const filteredOCs = useMemo(() => {
     if(!ocRequisitions) return [];
@@ -280,19 +236,18 @@ const ControleComprasPage = () => {
                         <TableHead>Prioridade</TableHead>
                         <TableHead>Solicitante</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="w-[20%]">Atendimento</TableHead>
                         <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading && (
-                        <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                         )}
                         {scError && (
-                        <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{scError.message}</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-24 text-center text-destructive">{scError.message}</TableCell></TableRow>
                         )}
                         {!isLoading && sortedAndFilteredSCs.length === 0 && (
-                        <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição aprovada ou em cotação encontrada.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-24 text-center">Nenhuma requisição aprovada ou em cotação encontrada.</TableCell></TableRow>
                         )}
                         {!isLoading && sortedAndFilteredSCs.map(req => (
                         <TableRow key={req.docId} className={cn(req.status === 'Em Revisão' && 'bg-yellow-50 dark:bg-yellow-900/20')}>
@@ -315,14 +270,6 @@ const ControleComprasPage = () => {
                                     </Tooltip>
                                   )}
                                 </div>
-                            </TableCell>
-                            <TableCell>
-                                {req.totalItems > 0 ? (
-                                <div className="flex flex-col">
-                                    <Progress value={req.progress} className="h-2" />
-                                    <span className="text-xs text-muted-foreground text-right">{Math.round(req.progress)}%</span>
-                                </div>
-                                ) : <span className="text-xs text-muted-foreground">N/A</span> }
                             </TableCell>
                             <TableCell className="text-right space-x-2">
                                <Button variant="default" size="sm" onClick={() => setSelectedRequisition(req)}>
