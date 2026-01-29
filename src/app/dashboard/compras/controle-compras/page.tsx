@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit, AlertCircle } from 'lucide-react';
+import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit, AlertCircle, Truck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -45,6 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ReviewPurchaseOrderDialog from '@/components/ReviewPurchaseOrderDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import ReceiveItemsDialog from '@/components/ReceiveItemsDialog';
 
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
@@ -54,6 +55,8 @@ const getStatusVariant = (status: PurchaseRequisition['status']) => {
     'Em Aprovação': 'default',
     'Aprovada': 'success',
     'Aguardando Entrega': 'default',
+    'Recebimento Parcial': 'warning',
+    'Recebimento Concluído': 'success',
     'Recusada': 'destructive',
     'Concluída': 'secondary',
     'Em Revisão': 'warning',
@@ -85,6 +88,7 @@ const ControleComprasPage = () => {
   const [searchTermOC, setSearchTermOC] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
+  const [itemToReceive, setItemToReceive] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(
@@ -158,6 +162,7 @@ const ControleComprasPage = () => {
   const handleSuccess = () => {
     setRequisitionToReview(null);
     setSelectedRequisition(null);
+    setItemToReceive(null);
     queryClient.invalidateQueries({ queryKey: [scQueryKey] });
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
@@ -209,7 +214,7 @@ const ControleComprasPage = () => {
         <Tabs defaultValue="requisicoes">
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="requisicoes">Requisições para Cotação</TabsTrigger>
-                <TabsTrigger value="ordens">Ordens de Compra Aprovadas</TabsTrigger>
+                <TabsTrigger value="ordens">Ordens de Compra</TabsTrigger>
             </TabsList>
             <TabsContent value="requisicoes">
                 <Card>
@@ -375,17 +380,22 @@ const ControleComprasPage = () => {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right space-x-2">
-                                            {oc.status === 'Em Revisão Comprador' ? (
+                                            {oc.status === 'Aguardando Entrega' || oc.status === 'Recebimento Parcial' ? (
+                                                <Button variant="default" size="sm" onClick={() => setItemToReceive(oc)}>
+                                                    <Truck className="mr-2 h-4 w-4" />
+                                                    Receber Itens
+                                                </Button>
+                                            ) : oc.status === 'Em Revisão Comprador' ? (
                                                 <Button variant="secondary" size="sm" onClick={() => setRequisitionToReview(oc)}>
                                                     <Edit className="mr-2 h-4 w-4" />
                                                     Revisar e Reenviar
                                                 </Button>
-                                            ) : (
-                                                <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(oc)}>
-                                                    <Eye className="mr-2 h-4 w-4" />
-                                                    Detalhes
-                                                </Button>
-                                            )}
+                                            ) : null}
+
+                                            <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(oc)}>
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                Detalhes
+                                            </Button>
 
                                             {isAdmin && (
                                                 <AlertDialog>
@@ -440,8 +450,19 @@ const ControleComprasPage = () => {
             onSuccess={handleSuccess}
         />
       )}
+
+      {itemToReceive && (
+        <ReceiveItemsDialog
+          isOpen={!!itemToReceive}
+          onClose={() => setItemToReceive(null)}
+          purchaseOrder={itemToReceive}
+          onSuccess={handleSuccess}
+        />
+      )}
     </>
   );
 };
 
 export default ControleComprasPage;
+
+    
