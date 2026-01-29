@@ -424,6 +424,19 @@
       },
       "required": ["supplierId", "supplierName", "totalValue", "deliveryTime", "paymentTerms"]
     },
+    "Delivery": {
+      "title": "Delivery",
+      "type": "object",
+      "description": "Represents a single delivery event for a purchase order.",
+      "properties": {
+        "id": { "type": "string" },
+        "nfNumber": { "type": "string", "description": "The Nota Fiscal number." },
+        "nfUrl": { "type": "string", "format": "uri", "description": "URL of the Nota Fiscal document." },
+        "receivedAt": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "nfNumber", "nfUrl", "receivedAt"]
+    },
     "PurchaseRequisition": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "PurchaseRequisition",
@@ -440,7 +453,7 @@
         "type": { "type": "string", "enum": ["Solicitação de Compra", "Ordem de Compra"], "description": "Distinguishes between a requisition and an order." },
         "status": {
           "type": "string",
-          "enum": ["Aberta", "Parcialmente Atendida", "Totalmente Atendida", "Cancelada", "Em Cotação", "Em Aprovação", "Aprovada", "Recusada", "Concluída", "Em Revisão", "Aguardando Entrega"],
+          "enum": ["Aberta", "Parcialmente Atendida", "Totalmente Atendida", "Cancelada", "Em Cotação", "Em Aprovação", "Aprovada", "Recusada", "Concluída", "Em Revisão", "Aguardando Entrega", "Recebimento Parcial", "Recebimento Concluído"],
           "description": "Current status of the document."
         },
         "rejectionReason": { "type": "string" },
@@ -451,7 +464,12 @@
         "purchaseOrderNotes": { "type": "string" },
         "supplierId": { "type": "string", "description": "ID of the chosen supplier for the OC." },
         "totalValue": { "type": "number", "description": "Final total value for the OC." },
-        "paymentTerms": { "type": "string", "description": "Final payment terms for the OC." }
+        "paymentTerms": { "type": "string", "description": "Final payment terms for the OC." },
+        "deliveries": {
+          "type": "array",
+          "description": "A list of delivery records for this purchase order.",
+          "items": { "$ref": "#/entities/Delivery" }
+        }
       },
       "required": ["protocol", "requesterId", "requesterName", "costCenterId", "neededByDate", "type", "status", "createdAt", "priority", "purchaseReason"]
     },
@@ -465,6 +483,7 @@
         "itemId": { "type": "string" },
         "itemType": { "type": "string", "enum": ["supply", "tool"] },
         "quantity": { "type": "number" },
+        "receivedQuantity": { "type": "number" },
         "estimatedPrice": { "type": "number" },
         "status": { "type": "string", "enum": ["Pendente", "Em Cotação", "Cotado", "Recebido", "Cancelado"], "description": "Tracks the status of an individual item within the original SC." },
         "notes": { "type": "string" },

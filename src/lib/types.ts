@@ -247,6 +247,20 @@ export type Quotation = {
   attachmentUrl?: string;
 };
 
+export type Delivery = {
+  id: string;
+  nfNumber: string;
+  nfUrl: string;
+  receivedAt: string; // ISO date string
+  notes?: string;
+  items: {
+      itemId: string;
+      itemName: string;
+      quantityReceived: number;
+  }[];
+};
+
+
 export type PurchaseRequisition = {
   id?: string;
   protocol: string;
@@ -257,7 +271,7 @@ export type PurchaseRequisition = {
   costCenterId: string;
   neededByDate: string; // ISO date string
   type: 'Solicitação de Compra' | 'Ordem de Compra';
-  status: 'Aberta' | 'Parcialmente Atendida' | 'Totalmente Atendida' | 'Cancelada' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída' | 'Em Revisão' | 'Aguardando Entrega' | 'Pronta para OC' | 'Em Revisão Comprador';
+  status: 'Aberta' | 'Parcialmente Atendida' | 'Totalmente Atendida' | 'Cancelada' | 'Em Cotação' | 'Em Aprovação' | 'Aprovada' | 'Recusada' | 'Concluída' | 'Em Revisão' | 'Aguardando Entrega' | 'Recebimento Parcial' | 'Recebimento Concluído';
   rejectionReason?: string;
   createdAt: string; // ISO date string
   priority: 'Normal' | 'Média' | 'Urgente';
@@ -267,6 +281,7 @@ export type PurchaseRequisition = {
   supplierId?: string;
   totalValue?: number;
   paymentTerms?: string;
+  deliveries?: Delivery[];
 };
 
 
@@ -275,6 +290,7 @@ export type PurchaseRequisitionItem = {
     itemId: string; // ID of the Supply or Tool item
     itemType: 'supply' | 'tool';
     quantity: number;
+    receivedQuantity?: number;
     estimatedPrice?: number;
     status: 'Pendente' | 'Em Cotação' | 'Cotado' | 'Recebido' | 'Cancelado';
     notes?: string;
