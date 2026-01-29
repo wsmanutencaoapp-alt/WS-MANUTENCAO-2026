@@ -14,13 +14,18 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { ScrollArea } from './ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useStorage, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, arrayUnion, writeBatch, collection, query, getDocs, where } from 'firebase/firestore';
+import { useFirestore, useStorage, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { doc, updateDoc, arrayUnion, writeBatch, collection, query, getDocs, where, runTransaction } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Loader2, Upload, FileText, Package } from 'lucide-react';
-import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, Delivery } from '@/lib/types';
+import { Loader2, Upload, FileText, Package, AlertTriangle, ChevronsUpDown, Check } from 'lucide-react';
+import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, Delivery, Address, SupplyStock, SupplyMovement } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { cn } from '@/lib/utils';
+import { parse, isValid } from 'date-fns';
 
 interface ReceiveItemsDialogProps {
   isOpen: boolean;
@@ -29,26 +34,44 @@ interface ReceiveItemsDialogProps {
   onSuccess: () => void;
 }
 
+interface ItemReceiveDetails {
+  quantity: number;
+  localizacao: string;
+  custoUnitario: number;
+  loteFornecedor: string;
+  dataValidade: string;
+  documentoFile: File | null;
+}
+
 export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onSuccess }: ReceiveItemsDialogProps) {
   const firestore = useFirestore();
   const storage = useStorage();
+  const { user } = useUser();
   const { toast } = useToast();
   
   const [items, setItems] = useState<RequisitionItemWithDetails[]>([]);
-  const [isLoadingItems, setIsLoadingItems] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [nfNumber, setNfNumber] = useState('');
   const [nfFile, setNfFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [receivedQuantities, setReceivedQuantities] = useState<Record<string, number>>({});
+  const [itemDetails, setItemDetails] = useState<Record<string, Partial<ItemReceiveDetails>>>({});
   const [isSaving, setIsSaving] = useState(false);
+  
+  const addressesQuery = useMemoFirebase(() => (
+      firestore ? query(collection(firestore, 'addresses')) : null
+  ), [firestore]);
+  const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, { 
+      queryKey: ['all_addresses_for_receive'],
+      enabled: isOpen,
+  });
 
   useEffect(() => {
     if (!isOpen || !firestore || !purchaseOrder) return;
 
     const fetchItems = async () => {
-      setIsLoadingItems(true);
+      setIsLoading(true);
       try {
         const itemsRef = collection(firestore, 'purchase_requisitions', purchaseOrder.docId, 'items');
         const itemsSnapshot = await getDocs(itemsRef);
@@ -73,35 +96,49 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
 
         setItems(enriched);
         
-        // Initialize received quantities
-        const initialQuantities: Record<string, number> = {};
+        const initialDetails: Record<string, Partial<ItemReceiveDetails>> = {};
         enriched.forEach(item => {
             const remaining = item.quantity - (item.receivedQuantity || 0);
-            initialQuantities[item.docId] = remaining > 0 ? remaining : 0;
+            initialDetails[item.docId] = {
+                quantity: remaining > 0 ? remaining : 0,
+                localizacao: (item.details as Supply)?.localizacaoPadrao || '',
+            };
         });
-        setReceivedQuantities(initialQuantities);
+        setItemDetails(initialDetails);
 
       } catch (error) {
         console.error("Error fetching PO items:", error);
         toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar os itens da OC.' });
       } finally {
-        setIsLoadingItems(false);
+        setIsLoading(false);
       }
     };
     
     fetchItems();
   }, [isOpen, firestore, purchaseOrder, toast]);
   
-  const handleQuantityChange = (itemId: string, value: string) => {
-    const originalItem = items.find(i => i.docId === itemId);
-    if (!originalItem) return;
-    
-    const maxReceivable = originalItem.quantity - (originalItem.receivedQuantity || 0);
-    let numValue = parseInt(value, 10);
-    if (isNaN(numValue) || numValue < 0) numValue = 0;
-    if (numValue > maxReceivable) numValue = maxReceivable;
+  const handleDetailChange = (itemId: string, field: keyof ItemReceiveDetails, value: any) => {
+    setItemDetails(prev => {
+        const currentItem = items.find(i => i.docId === itemId);
+        if (!currentItem) return prev;
+        
+        let processedValue = value;
+        if (field === 'quantity') {
+            const maxReceivable = currentItem.quantity - (currentItem.receivedQuantity || 0);
+            let numValue = parseInt(value, 10);
+            if (isNaN(numValue) || numValue < 0) numValue = 0;
+            if (numValue > maxReceivable) numValue = maxReceivable;
+            processedValue = numValue;
+        }
 
-    setReceivedQuantities(prev => ({ ...prev, [itemId]: numValue }));
+        return {
+            ...prev,
+            [itemId]: {
+                ...prev[itemId],
+                [field]: processedValue
+            }
+        };
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,24 +150,21 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
   const resetAndClose = () => {
     setNfNumber('');
     setNfFile(null);
-    setReceivedQuantities({});
+    setItemDetails({});
     setIsSaving(false);
     onClose();
   };
 
   const handleSave = async () => {
-    if (!firestore || !storage) return;
-    if (!nfNumber) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'O número da Nota Fiscal é obrigatório.' });
+    if (!firestore || !storage || !user) return;
+    if (!nfNumber || !nfFile) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Número e anexo da Nota Fiscal são obrigatórios.' });
       return;
     }
-    if (!nfFile) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'O anexo da Nota Fiscal é obrigatório.' });
-        return;
-    }
-     const totalReceived = Object.values(receivedQuantities).reduce((sum, qty) => sum + qty, 0);
-    if (totalReceived === 0) {
-        toast({ variant: 'destructive', title: 'Erro', description: 'Nenhuma quantidade foi recebida.' });
+    
+    const itemsToReceive = Object.entries(itemDetails).filter(([_, details]) => (details.quantity || 0) > 0);
+    if (itemsToReceive.length === 0) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Nenhuma quantidade foi informada para recebimento.' });
         return;
     }
 
@@ -140,29 +174,31 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
         const batch = writeBatch(firestore);
         const poRef = doc(firestore, 'purchase_requisitions', purchaseOrder.docId);
         
-        // 1. Upload NF-e
         const nfFileRef = storageRef(storage, `notas_fiscais/${purchaseOrder.docId}/${nfNumber}-${nfFile.name}`);
         await uploadBytes(nfFileRef, nfFile);
         const nfUrl = await getDownloadURL(nfFileRef);
         
-        // 2. Create Delivery object
         const newDelivery: Delivery = {
             id: doc(collection(firestore, 'temp')).id,
-            nfNumber,
-            nfUrl,
-            receivedAt: new Date().toISOString(),
-            items: [],
+            nfNumber, nfUrl, receivedAt: new Date().toISOString(), items: [],
         };
         
         let allItemsFullyReceived = true;
+        let anyItemReceived = false;
 
-        // 3. Update each item
         for (const item of items) {
-            const receivedQty = receivedQuantities[item.docId] || 0;
+            const details = itemDetails[item.docId];
+            const receivedQty = details?.quantity || 0;
+            const isFullyReceived = (item.receivedQuantity || 0) + receivedQty >= item.quantity;
+            
+            if (!isFullyReceived) {
+                allItemsFullyReceived = false;
+            }
+
             if (receivedQty > 0) {
+                anyItemReceived = true;
                 const itemRef = doc(firestore, 'purchase_requisitions', purchaseOrder.docId, 'items', item.docId);
-                const currentReceived = item.receivedQuantity || 0;
-                const newTotalReceived = currentReceived + receivedQty;
+                const newTotalReceived = (item.receivedQuantity || 0) + receivedQty;
                 
                 batch.update(itemRef, { receivedQuantity: newTotalReceived });
                 
@@ -171,22 +207,75 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                     itemName: item.details.descricao || 'N/A',
                     quantityReceived: receivedQty,
                 });
-            }
-             if ((item.receivedQuantity || 0) + receivedQty < item.quantity) {
-                allItemsFullyReceived = false;
+
+                if (item.itemType === 'supply') {
+                    // Logic to create SupplyStock and SupplyMovement
+                    if (!details.localizacao) throw new Error(`Localização não definida para ${item.details.descricao}`);
+                    let validadeDate: Date | null = null;
+                    if ((item.details as Supply).exigeValidade) {
+                        if (!details.dataValidade) throw new Error(`Data de validade obrigatória para ${item.details.descricao}`);
+                        validadeDate = parse(details.dataValidade, 'yyyy-MM-dd', new Date());
+                        if (!isValid(validadeDate)) throw new Error(`Data de validade inválida para ${item.details.descricao}`);
+                    }
+
+                    const counterRef = doc(firestore, 'counters', `loteInterno_${new Date().getFullYear()}_${String(new Date().getMonth() + 1).padStart(2, '0')}`);
+                    const newSequencial = await runTransaction(firestore, async (t) => {
+                        const counterDoc = await t.get(counterRef);
+                        const lastId = counterDoc.exists() ? counterDoc.data().lastId : 0;
+                        const newId = lastId + 1;
+                        t.set(counterRef, { lastId: newId }, { merge: true });
+                        return newId;
+                    });
+                    const loteInterno = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(newSequencial).padStart(4, '0')}`;
+
+                    let docUrl = '';
+                    if (details.documentoFile) {
+                        const docRef = storageRef(storage, `supply_documents/${item.itemId}/${loteInterno}/${details.documentoFile.name}`);
+                        await uploadBytes(docRef, details.documentoFile);
+                        docUrl = await getDownloadURL(docRef);
+                    }
+
+                    const stockData: Omit<SupplyStock, 'id'> = {
+                        loteInterno, loteFornecedor: details.loteFornecedor || '',
+                        quantidade: receivedQty, localizacao: details.localizacao,
+                        dataEntrada: new Date().toISOString(),
+                        dataValidade: validadeDate ? validadeDate.toISOString() : undefined,
+                        custoUnitario: details.custoUnitario || 0,
+                        status: 'Disponível', documentoUrl: docUrl,
+                        pesoLiquido: (item.details as Supply).fatorConversao ? (item.details as Supply).fatorConversao! * receivedQty : undefined,
+                    };
+
+                    const newStockRef = doc(collection(firestore, 'supplies', item.itemId, 'stock'));
+                    batch.set(newStockRef, stockData);
+
+                    const movementData: Omit<SupplyMovement, 'id'> = {
+                        supplyId: item.itemId, supplyStockId: newStockRef.id,
+                        supplyCodigo: item.details.codigo!, type: 'entrada',
+                        quantity: receivedQty, responsibleId: user.uid,
+                        responsibleName: user.displayName || 'Sistema',
+                        date: new Date().toISOString(),
+                        origin: `OC: ${purchaseOrder.protocol} / NF-e: ${nfNumber}`
+                    };
+                    batch.set(doc(collection(firestore, 'supply_movements')), movementData);
+                } else if (item.itemType === 'tool') {
+                    // Placeholder logic for tools
+                    toast({title: `Aviso: Recebimento de Ferramenta`, description: `O recebimento da ferramenta '${item.details.descricao}' deve ser feito manualmente no cadastro de ferramentas.`})
+                }
             }
         }
         
-        // 4. Update the Purchase Order itself
+        if (!anyItemReceived) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Nenhuma quantidade foi informada para recebimento.' });
+            setIsSaving(false);
+            return;
+        }
+
         const newStatus = allItemsFullyReceived ? 'Recebimento Concluído' : 'Recebimento Parcial';
-        batch.update(poRef, {
-            status: newStatus,
-            deliveries: arrayUnion(newDelivery)
-        });
+        batch.update(poRef, { status: newStatus, deliveries: arrayUnion(newDelivery) });
 
         await batch.commit();
         
-        toast({ title: "Sucesso!", description: "Recebimento registrado com sucesso." });
+        toast({ title: "Sucesso!", description: "Recebimento registrado com sucesso. O estoque foi atualizado." });
         onSuccess();
         resetAndClose();
 
@@ -198,18 +287,17 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
     }
   };
 
-
   return (
     <Dialog open={isOpen} onOpenChange={resetAndClose}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
             <DialogHeader>
                 <DialogTitle>Registrar Recebimento de Itens</DialogTitle>
                 <DialogDescription>
                     Confirme as quantidades recebidas para a OC <span className="font-bold">{purchaseOrder.protocol}</span> e anexe a NF-e.
                 </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-[60vh] py-4">
-                 <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4 max-h-[70vh] py-4 pr-2">
+                 <div className="grid grid-cols-2 gap-4 px-2">
                      <div className="space-y-1.5">
                         <Label htmlFor="nfNumber">Número da NF-e <span className="text-destructive">*</span></Label>
                         <Input id="nfNumber" value={nfNumber} onChange={e => setNfNumber(e.target.value)} />
@@ -226,42 +314,90 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                     </div>
                 </div>
 
-                <ScrollArea className="h-72 border rounded-md">
-                    <div className="p-2 space-y-2">
-                        {isLoadingItems ? <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin"/> : null}
-                        {!isLoadingItems && items.map(item => {
+                <ScrollArea className="h-96 border rounded-md">
+                    <Accordion type="multiple" className="w-full">
+                        {isLoading ? <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin"/> : null}
+                        {!isLoading && items.map(item => {
                             const remaining = item.quantity - (item.receivedQuantity || 0);
                             if(remaining <= 0) return null;
+                            const isSupply = item.itemType === 'supply';
                             return (
-                                <div key={item.docId} className="flex items-center gap-4 p-2 border rounded-lg bg-background">
-                                    <Package className="h-6 w-6 text-muted-foreground"/>
-                                    <div className="flex-1 text-sm">
-                                        <p className="font-bold">{item.details.descricao}</p>
-                                        <p className="text-xs text-muted-foreground">Pedido: {item.quantity} | Recebido: {item.receivedQuantity || 0} | Restante: {remaining}</p>
-                                    </div>
-                                    <div>
-                                        <Label htmlFor={`qty-${item.docId}`} className="sr-only">Quantidade Recebida</Label>
-                                        <Input
-                                            id={`qty-${item.docId}`}
-                                            type="number"
-                                            value={receivedQuantities[item.docId] || ''}
-                                            onChange={(e) => handleQuantityChange(item.docId, e.target.value)}
-                                            className="w-24 h-8 text-center"
-                                            max={remaining}
-                                            placeholder="0"
-                                        />
-                                    </div>
-                                </div>
-                            )
+                                <AccordionItem value={item.docId} key={item.docId} className="px-2 border-b">
+                                    <AccordionTrigger>
+                                        <div className="flex items-center gap-4 text-left w-full">
+                                            <Package className="h-6 w-6 text-muted-foreground shrink-0"/>
+                                            <div className="flex-1 text-sm">
+                                                <p className="font-bold">{item.details.descricao}</p>
+                                                <p className="text-xs text-muted-foreground">Pedido: {item.quantity} | Recebido: {item.receivedQuantity || 0} | Restante: {remaining}</p>
+                                            </div>
+                                            <div className="w-24">
+                                                <Label htmlFor={`qty-${item.docId}`} className="sr-only">Qtd Recebida</Label>
+                                                <Input
+                                                    id={`qty-${item.docId}`}
+                                                    type="number"
+                                                    value={itemDetails[item.docId]?.quantity || ''}
+                                                    onChange={(e) => { e.stopPropagation(); handleDetailChange(item.docId, 'quantity', e.target.value); }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="w-24 h-8 text-center"
+                                                    max={remaining}
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="p-4 bg-muted/50 rounded-b-md">
+                                        {isSupply ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in-50">
+                                                 <div className="space-y-1.5">
+                                                    <Label>Localização <span className="text-destructive">*</span></Label>
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                        <Button variant="outline" className="w-full justify-between font-normal bg-background" disabled={isLoadingAddresses}>
+                                                            {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : itemDetails[item.docId]?.localizacao || "Selecione..."}
+                                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                        </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Pesquisar..." /><CommandList><CommandEmpty>Nenhum endereço.</CommandEmpty><CommandGroup>
+                                                            {addresses?.map(addr => (
+                                                            <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => handleDetailChange(item.docId, 'localizacao', val)}>
+                                                                <Check className={cn("mr-2 h-4 w-4", itemDetails[item.docId]?.localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />
+                                                                {addr.codigoCompleto}
+                                                            </CommandItem>
+                                                            ))}
+                                                        </CommandGroup></CommandList></Command></PopoverContent>
+                                                    </Popover>
+                                                </div>
+                                                <div className="space-y-1.5"><Label>Custo Unitário (R$)</Label><Input type="number" value={itemDetails[item.docId]?.custoUnitario || ''} onChange={(e) => handleDetailChange(item.docId, 'custoUnitario', e.target.value)} /></div>
+                                                <div className="space-y-1.5"><Label>Lote do Fornecedor</Label><Input value={itemDetails[item.docId]?.loteFornecedor || ''} onChange={(e) => handleDetailChange(item.docId, 'loteFornecedor', e.target.value)} /></div>
+                                                {(item.details as Supply).exigeValidade && <div className="space-y-1.5"><Label>Data de Validade <span className="text-destructive">*</span></Label><Input type="date" value={itemDetails[item.docId]?.dataValidade || ''} onChange={(e) => handleDetailChange(item.docId, 'dataValidade', e.target.value)} /></div>}
+                                                <div className="space-y-1.5 col-span-2"><Label>Anexo do Lote (Certificado, etc.)</Label>
+                                                    <Button asChild variant="outline" className="w-full bg-background">
+                                                        <label className="cursor-pointer flex items-center">
+                                                            {itemDetails[item.docId]?.documentoFile ? <FileText className="mr-2 h-4 w-4 text-green-600"/> : <Upload className="mr-2 h-4 w-4" />}
+                                                            <span className="truncate max-w-xs">{itemDetails[item.docId]?.documentoFile?.name || 'Anexar documento'}</span>
+                                                            <Input type="file" className="sr-only" onChange={(e) => handleDetailChange(item.docId, 'documentoFile', e.target.files?.[0] || null)} />
+                                                        </label>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 text-center text-sm text-muted-foreground bg-yellow-50 border border-yellow-200 rounded-md">
+                                                <AlertTriangle className="inline-block h-4 w-4 mr-2"/>
+                                                O recebimento de ferramentas é um processo manual no Cadastro de Ferramentas. Apenas a quantidade recebida na OC será atualizada.
+                                            </div>
+                                        )}
+                                    </AccordionContent>
+                                </AccordionItem>
+                            );
                         })}
-                    </div>
+                    </Accordion>
                 </ScrollArea>
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={resetAndClose} disabled={isSaving}>Cancelar</Button>
-                <Button onClick={handleSave} disabled={isSaving || isLoadingItems}>
+                <Button onClick={handleSave} disabled={isSaving || isLoading}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Salvar Recebimento
+                    Confirmar Recebimento
                 </Button>
             </DialogFooter>
         </DialogContent>

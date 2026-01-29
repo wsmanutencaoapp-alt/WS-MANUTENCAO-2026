@@ -433,9 +433,22 @@
         "nfNumber": { "type": "string", "description": "The Nota Fiscal number." },
         "nfUrl": { "type": "string", "format": "uri", "description": "URL of the Nota Fiscal document." },
         "receivedAt": { "type": "string", "format": "date-time" },
-        "notes": { "type": "string" }
+        "notes": { "type": "string" },
+        "items": {
+          "type": "array",
+          "description": "The items and quantities received in this specific delivery.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "itemId": { "type": "string" },
+              "itemName": { "type": "string" },
+              "quantityReceived": { "type": "number" }
+            },
+            "required": ["itemId", "itemName", "quantityReceived"]
+          }
+        }
       },
-      "required": ["id", "nfNumber", "nfUrl", "receivedAt"]
+      "required": ["id", "nfNumber", "nfUrl", "receivedAt", "items"]
     },
     "PurchaseRequisition": {
       "$schema": "http://json-schema.org/draft-07/schema#",
