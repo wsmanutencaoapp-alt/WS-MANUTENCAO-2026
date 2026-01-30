@@ -110,14 +110,21 @@ const CadastroEnderecosPage = () => {
   
   useEffect(() => {
     const generateNextDetalhe = async () => {
-      if (!firestore || !useDetalhe || !formState.setor) {
+      const { unidade, unidadeOutro, setor, rua, movel, nivel } = formState;
+      const activeUnidade = unidade === 'OUTRA' ? unidadeOutro : unidade;
+
+      if (!firestore || !useDetalhe || !activeUnidade || !setor || !rua || !movel || !nivel) {
         setStartDetalheNum(null);
         return;
       }
       
       const q = query(
         collection(firestore, 'addresses'), 
-        where('setor', '==', formState.setor)
+        where('unidade', '==', activeUnidade.toUpperCase()),
+        where('setor', '==', setor),
+        where('rua', '==', `R${rua.padStart(2, '0')}`),
+        where('movel', '==', `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`),
+        where('nivel', '==', `N${nivel.padStart(2, '0')}`)
       );
 
       const querySnapshot = await getDocs(q);
@@ -126,9 +133,8 @@ const CadastroEnderecosPage = () => {
       if (!querySnapshot.empty) {
           querySnapshot.forEach(doc => {
               const data = doc.data();
-              if (data.detalhe) {
-                  const detalhe = data.detalhe as string;
-                  const currentNumber = parseInt(detalhe.replace('-D', ''), 10);
+              if (data.detalhe && data.detalhe.startsWith('-D')) {
+                  const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
                   if (!isNaN(currentNumber) && currentNumber > lastNumber) {
                       lastNumber = currentNumber;
                   }
@@ -140,7 +146,7 @@ const CadastroEnderecosPage = () => {
       setStartDetalheNum(nextNumber);
     };
     generateNextDetalhe();
-  }, [useDetalhe, formState.setor, firestore]);
+  }, [useDetalhe, formState, firestore]);
   
   const generatedCode = useMemo(() => {
     const activeUnidade = formState.unidade === 'OUTRA' ? formState.unidadeOutro : formState.unidade;
@@ -227,13 +233,20 @@ const CadastroEnderecosPage = () => {
 
         let currentStartDetalheNum = startDetalheNum;
         if (currentStartDetalheNum === null) {
-          const q = query(collection(firestore, 'addresses'), where('setor', '==', formState.setor));
+          const q = query(
+            collection(firestore, 'addresses'), 
+            where('unidade', '==', activeUnidade.toUpperCase()),
+            where('setor', '==', setor),
+            where('rua', '==', `R${rua.padStart(2, '0')}`),
+            where('movel', '==', `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`),
+            where('nivel', '==', `N${nivel.padStart(2, '0')}`)
+          );
           const querySnapshot = await getDocs(q);
           let lastNumber = 0;
           if(!querySnapshot.empty) {
               querySnapshot.forEach(doc => {
                   const data = doc.data();
-                  if (data.detalhe) {
+                  if (data.detalhe && data.detalhe.startsWith('-D')) {
                     const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
                     if (!isNaN(currentNumber) && currentNumber > lastNumber) {
                         lastNumber = currentNumber;
