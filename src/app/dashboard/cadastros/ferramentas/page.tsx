@@ -43,7 +43,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2, Edit, Check, ChevronsUpDown } from 'lucide-react';
+import { PlusCircle, FileText, Loader2, Image as ImageIcon, AlertTriangle, Upload, Paperclip, MoreHorizontal, Trash2, Edit, Check, ChevronsUpDown, Search } from 'lucide-react';
 import type { Tool, Employee, Address } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -100,6 +100,9 @@ const CadastroFerramentasPage = () => {
   const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
   const [showAllAddresses, setShowAllAddresses] = useState(false);
+  
+  const [searchTermModelos, setSearchTermModelos] = useState('');
+  const [searchTermUnicas, setSearchTermUnicas] = useState('');
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -137,6 +140,29 @@ const CadastroFerramentasPage = () => {
     });
     return [modelos, unicas];
   }, [allTools]);
+  
+  const filteredModelos = useMemo(() => {
+    if (!modelos) return [];
+    if (!searchTermModelos) return modelos;
+    const lowercasedTerm = searchTermModelos.toLowerCase();
+    return modelos.filter(tool => 
+        tool.descricao.toLowerCase().includes(lowercasedTerm) ||
+        tool.codigo.toLowerCase().includes(lowercasedTerm) ||
+        (tool.pn_fabricante && tool.pn_fabricante.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [modelos, searchTermModelos]);
+
+  const filteredFerramentasUnicas = useMemo(() => {
+    if (!ferramentasUnicas) return [];
+    if (!searchTermUnicas) return ferramentasUnicas;
+    const lowercasedTerm = searchTermUnicas.toLowerCase();
+    return ferramentasUnicas.filter(tool => 
+        tool.descricao.toLowerCase().includes(lowercasedTerm) ||
+        tool.codigo.toLowerCase().includes(lowercasedTerm) ||
+        (tool.pn_fabricante && tool.pn_fabricante.toLowerCase().includes(lowercasedTerm)) ||
+        (tool.enderecamento && tool.enderecamento.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [ferramentasUnicas, searchTermUnicas]);
   
   useEffect(() => {
     const fetchAddresses = async () => {
@@ -686,6 +712,15 @@ const CadastroFerramentasPage = () => {
                     <CardHeader>
                         <CardTitle>Modelos Cadastrados (Templates)</CardTitle>
                         <CardDescription>Gerencie os modelos para ferramentas STD e GSE. Use-os para adicionar múltiplas ferramentas ao estoque de uma vez.</CardDescription>
+                         <div className="relative pt-4">
+                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                           <Input
+                               placeholder="Pesquisar por descrição ou código..."
+                               value={searchTermModelos}
+                               onChange={(e) => setSearchTermModelos(e.target.value)}
+                               className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                           />
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {isLoadingTools ? (
@@ -705,7 +740,7 @@ const CadastroFerramentasPage = () => {
                             <div className="p-4 border rounded-lg bg-destructive/10 text-destructive text-center">
                                 <p>Erro ao carregar os modelos. Verifique suas permissões.</p>
                             </div>
-                        ) : renderToolList(modelos, 'Nenhum modelo de ferramenta cadastrado. Clique em "Adicionar" para criar um.')}
+                        ) : renderToolList(filteredModelos, 'Nenhum modelo de ferramenta encontrado.')}
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -714,6 +749,15 @@ const CadastroFerramentasPage = () => {
                     <CardHeader>
                         <CardTitle>Ferramentas Únicas Cadastradas</CardTitle>
                         <CardDescription>Gerencie ferramentas específicas ou equivalentes que foram cadastradas diretamente no inventário.</CardDescription>
+                        <div className="relative pt-4">
+                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                           <Input
+                               placeholder="Pesquisar por descrição, código ou endereço..."
+                               value={searchTermUnicas}
+                               onChange={(e) => setSearchTermUnicas(e.target.value)}
+                               className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                           />
+                        </div>
                     </CardHeader>
                     <CardContent>
                        {isLoadingTools ? (
@@ -733,7 +777,7 @@ const CadastroFerramentasPage = () => {
                              <div className="p-4 border rounded-lg bg-destructive/10 text-destructive text-center">
                                 <p>Erro ao carregar as ferramentas. Verifique suas permissões.</p>
                             </div>
-                        ) : renderToolList(ferramentasUnicas, 'Nenhuma ferramenta única (ESP/EQV) cadastrada. Clique em "Adicionar" para criar uma.')}
+                        ) : renderToolList(filteredFerramentasUnicas, 'Nenhuma ferramenta única (ESP/EQV) encontrada.')}
                     </CardContent>
                 </Card>
             </TabsContent>
