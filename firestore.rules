@@ -66,7 +66,7 @@ service cloud.firestore {
       
       match /stock/{stockId} {
         allow get, list: if hasPermission('suprimentos_lista_view');
-        allow create: if hasPermission('suprimentos_movimentacao_create');
+        allow create: if hasPermission('suprimentos_movimentacao_create') || hasPermission('compras_controle_create');
         allow update: if hasPermission('suprimentos_lista_update');
         allow delete: if hasPermission('suprimentos_lista_delete');
       }
@@ -74,7 +74,7 @@ service cloud.firestore {
     
     match /supply_movements/{movementId} {
       allow get, list: if hasPermission('suprimentos_movimentacao_view');
-      allow create: if hasPermission('suprimentos_movimentacao_create');
+      allow create: if hasPermission('suprimentos_movimentacao_create') || hasPermission('compras_controle_create');
       // Immutable log
       allow update, delete: if false; 
     }
@@ -83,13 +83,13 @@ service cloud.firestore {
     match /tools/{toolId} {
       allow get: if isAuthenticated();
       allow list: if hasPermission('cadastros_ferramentas_view') || hasPermission('ferramentaria_lista_view') || hasPermission('calibracao_view');
-      allow create: if hasPermission('cadastros_ferramentas_create');
+      allow create: if hasPermission('cadastros_ferramentas_create') || hasPermission('compras_controle_create');
       allow update: if hasPermission('cadastros_ferramentas_update') || hasPermission('ferramentaria_lista_update') || hasPermission('calibracao_update');
       allow delete: if hasPermission('cadastros_ferramentas_delete');
       
       match /calibration_history/{calibrationId} {
         allow get, list: if hasPermission('calibracao_view');
-        allow create: if hasPermission('calibracao_create');
+        allow create: if hasPermission('calibracao_create') || hasPermission('compras_controle_create');
         allow update: if hasPermission('calibracao_update');
         allow delete: if hasPermission('calibracao_delete');
       }

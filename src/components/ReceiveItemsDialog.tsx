@@ -17,15 +17,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useStorage, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { doc, updateDoc, arrayUnion, writeBatch, collection, query, getDocs, where, runTransaction } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Loader2, Upload, FileText, Package, AlertTriangle, ChevronsUpDown, Check } from 'lucide-react';
-import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, Delivery, Address, SupplyStock, SupplyMovement } from '@/lib/types';
+import { Loader2, Upload, FileText, Package, AlertTriangle, ChevronsUpDown, Check, CalendarIcon } from 'lucide-react';
+import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, Delivery, Address, SupplyStock, SupplyMovement, CalibrationRecord } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
-import { parse, isValid } from 'date-fns';
+import { parse, isValid, format } from 'date-fns';
 
 interface ReceiveItemsDialogProps {
   isOpen: boolean;
@@ -36,11 +37,18 @@ interface ReceiveItemsDialogProps {
 
 interface ItemReceiveDetails {
   quantity: number;
-  localizacao: string;
-  custoUnitario: number;
-  loteFornecedor: string;
-  dataValidade: string;
-  documentoFile: File | null;
+  // Supply fields
+  localizacao?: string;
+  custoUnitario?: number;
+  loteFornecedor?: string;
+  dataValidade?: string;
+  documentoFile?: File | null;
+  // Tool fields
+  marca?: string;
+  patrimonio?: string;
+  data_referencia?: string;
+  data_vencimento?: string;
+  certificateFile?: File | null;
 }
 
 export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onSuccess }: ReceiveItemsDialogProps) {
@@ -59,6 +67,10 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
   const [itemDetails, setItemDetails] = useState<Record<string, Partial<ItemReceiveDetails>>>({});
   const [isSaving, setIsSaving] = useState(false);
   
+  const [activeAddressPopover, setActiveAddressPopover] = useState<string | null>(null);
+  const [activeCalDatePopover, setActiveCalDatePopover] = useState<string | null>(null);
+  const [activeDueDatePopover, setActiveDueDatePopover] = useState<string | null>(null);
+
   const addressesQuery = useMemoFirebase(() => (
       firestore ? query(collection(firestore, 'addresses')) : null
   ), [firestore]);
@@ -158,8 +170,8 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
   const handleSave = async () => {
     if (!firestore || !storage || !user) return;
     if (!nfNumber || !nfFile) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Número e anexo da Nota Fiscal são obrigatórios.' });
-      return;
+        toast({ variant: 'destructive', title: 'Erro', description: 'Número e anexo da Nota Fiscal são obrigatórios.' });
+        return;
     }
     
     const itemsToReceive = Object.entries(itemDetails).filter(([_, details]) => (details.quantity || 0) > 0);
@@ -209,7 +221,6 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                 });
 
                 if (item.itemType === 'supply') {
-                    // Logic to create SupplyStock and SupplyMovement
                     if (!details.localizacao) throw new Error(`Localização não definida para ${item.details.descricao}`);
                     let validadeDate: Date | null = null;
                     if ((item.details as Supply).exigeValidade) {
@@ -258,8 +269,61 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                     };
                     batch.set(doc(collection(firestore, 'supply_movements')), movementData);
                 } else if (item.itemType === 'tool') {
-                    // Placeholder logic for tools
-                    toast({title: `Aviso: Recebimento de Ferramenta`, description: `O recebimento da ferramenta '${item.details.descricao}' deve ser feito manualmente no cadastro de ferramentas.`})
+                    const modelTool = item.details as WithDocId<Tool>;
+                    const { tipo, familia, classificacao } = modelTool;
+                    if (!details?.localizacao) throw new Error(`Localização é obrigatória para a nova ferramenta ${modelTool.descricao}.`);
+                    
+                    const isCalibratable = ['C', 'L', 'V'].includes(classificacao);
+                    if (isCalibratable && (!details.data_referencia || !details.data_vencimento || !details.certificateFile)) {
+                        throw new Error(`Dados de calibração são obrigatórios para a ferramenta ${modelTool.descricao}`);
+                    }
+                    
+                    const counterRef = doc(firestore, 'counters', `${tipo}-${familia}-${classificacao}`);
+                    const seqNumbers = await runTransaction(firestore, async (t) => {
+                        const counterDoc = await t.get(counterRef);
+                        const lastId = counterDoc.exists() ? counterDoc.data().lastId : 0;
+                        const newLastId = lastId + receivedQty;
+                        t.set(counterRef, { lastId: newLastId }, { merge: true });
+                        return Array.from({ length: receivedQty }, (_, i) => lastId + 1 + i);
+                    });
+                    
+                    let certificateUrl = '';
+                    if (isCalibratable && details.certificateFile) {
+                        const certFileRef = storageRef(storage, `calibration_certificates/${purchaseOrder.docId}/${item.docId}-${Date.now()}-${details.certificateFile.name}`);
+                        await uploadBytes(certFileRef, details.certificateFile);
+                        certificateUrl = await getDownloadURL(certFileRef);
+                    }
+
+                    for (const sequencial of seqNumbers) {
+                        const newToolRef = doc(collection(firestore, 'tools'));
+                        const { docId, sequencial: modelSeq, ...baseData } = modelTool; // Exclude model specific fields
+                        const newToolData: Omit<Tool, 'id'> = {
+                            ...baseData,
+                            codigo: `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`,
+                            sequencial: sequencial,
+                            status: 'Disponível',
+                            enderecamento: details.localizacao,
+                            marca: details.marca || modelTool.marca,
+                            patrimonio: details.patrimonio || '',
+                            data_referencia: details.data_referencia,
+                            data_vencimento: details.data_vencimento,
+                            documento_anexo_url: certificateUrl || undefined,
+                        };
+                        batch.set(newToolRef, newToolData);
+
+                        if (isCalibratable && certificateUrl && details.data_referencia && details.data_vencimento) {
+                            const historyRef = doc(collection(newToolRef, 'calibration_history'));
+                            const historyRecord: Omit<CalibrationRecord, 'id'> = {
+                                toolId: newToolRef.id,
+                                calibrationDate: new Date(details.data_referencia).toISOString(),
+                                dueDate: new Date(details.data_vencimento).toISOString(),
+                                certificateUrl: certificateUrl,
+                                calibratedBy: 'Entrada via OC',
+                                timestamp: new Date().toISOString(),
+                            };
+                            batch.set(historyRef, historyRecord);
+                        }
+                    }
                 }
             }
         }
@@ -321,6 +385,9 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                             const remaining = item.quantity - (item.receivedQuantity || 0);
                             if(remaining <= 0) return null;
                             const isSupply = item.itemType === 'supply';
+                            const isTool = item.itemType === 'tool';
+                            const isCalibratable = isTool && ['C', 'L', 'V'].includes((item.details as Tool).classificacao);
+
                             return (
                                 <AccordionItem value={item.docId} key={item.docId} className="px-2 border-b">
                                     <AccordionTrigger>
@@ -346,26 +413,21 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="p-4 bg-muted/50 rounded-b-md">
-                                        {isSupply ? (
+                                        {isSupply && (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in-50">
-                                                 <div className="space-y-1.5">
-                                                    <Label>Localização <span className="text-destructive">*</span></Label>
-                                                    <Popover>
-                                                        <PopoverTrigger asChild>
-                                                        <Button variant="outline" className="w-full justify-between font-normal bg-background" disabled={isLoadingAddresses}>
-                                                            {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : itemDetails[item.docId]?.localizacao || "Selecione..."}
-                                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                        </Button>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Pesquisar..." /><CommandList><CommandEmpty>Nenhum endereço.</CommandEmpty><CommandGroup>
-                                                            {addresses?.map(addr => (
-                                                            <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => handleDetailChange(item.docId, 'localizacao', val)}>
-                                                                <Check className={cn("mr-2 h-4 w-4", itemDetails[item.docId]?.localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />
-                                                                {addr.codigoCompleto}
-                                                            </CommandItem>
-                                                            ))}
-                                                        </CommandGroup></CommandList></Command></PopoverContent>
-                                                    </Popover>
+                                                <div className="space-y-1.5"><Label>Localização <span className="text-destructive">*</span></Label>
+                                                    <Popover><PopoverTrigger asChild>
+                                                    <Button variant="outline" className="w-full justify-between font-normal bg-background" disabled={isLoadingAddresses}>
+                                                        {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : itemDetails[item.docId]?.localizacao || "Selecione..."}
+                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                    </Button></PopoverTrigger>
+                                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Pesquisar..." /><CommandList><CommandEmpty>Nenhum endereço.</CommandEmpty><CommandGroup>
+                                                        {addresses?.map(addr => (
+                                                        <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => handleDetailChange(item.docId, 'localizacao', val)}>
+                                                            <Check className={cn("mr-2 h-4 w-4", itemDetails[item.docId]?.localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />{addr.codigoCompleto}
+                                                        </CommandItem>
+                                                        ))}
+                                                    </CommandGroup></CommandList></Command></PopoverContent></Popover>
                                                 </div>
                                                 <div className="space-y-1.5"><Label>Custo Unitário (R$)</Label><Input type="number" value={itemDetails[item.docId]?.custoUnitario || ''} onChange={(e) => handleDetailChange(item.docId, 'custoUnitario', e.target.value)} /></div>
                                                 <div className="space-y-1.5"><Label>Lote do Fornecedor</Label><Input value={itemDetails[item.docId]?.loteFornecedor || ''} onChange={(e) => handleDetailChange(item.docId, 'loteFornecedor', e.target.value)} /></div>
@@ -380,10 +442,48 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                                                     </Button>
                                                 </div>
                                             </div>
-                                        ) : (
-                                            <div className="p-4 text-center text-sm text-muted-foreground bg-yellow-50 border border-yellow-200 rounded-md">
-                                                <AlertTriangle className="inline-block h-4 w-4 mr-2"/>
-                                                O recebimento de ferramentas é um processo manual no Cadastro de Ferramentas. Apenas a quantidade recebida na OC será atualizada.
+                                        )}
+                                        {isTool && (
+                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in-50">
+                                                 <div className="space-y-1.5 col-span-2"><Label>Endereço de Armazenamento <span className="text-destructive">*</span></Label>
+                                                    <Popover open={activeAddressPopover === item.docId} onOpenChange={(open) => setActiveAddressPopover(open ? item.docId : null)}><PopoverTrigger asChild>
+                                                    <Button variant="outline" className="w-full justify-between font-normal bg-background" disabled={isLoadingAddresses}>
+                                                        {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : itemDetails[item.docId]?.localizacao || "Selecione..."}
+                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                    </Button></PopoverTrigger>
+                                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Pesquisar..." /><CommandList><CommandEmpty>Nenhum endereço.</CommandEmpty><CommandGroup>
+                                                        {addresses?.filter(a => a.setor === '01').map(addr => (
+                                                        <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => {handleDetailChange(item.docId, 'localizacao', val); setActiveAddressPopover(null);}}>
+                                                            <Check className={cn("mr-2 h-4 w-4", itemDetails[item.docId]?.localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />{addr.codigoCompleto}
+                                                        </CommandItem>
+                                                        ))}
+                                                    </CommandGroup></CommandList></Command></PopoverContent></Popover>
+                                                </div>
+                                                <div className="space-y-1.5"><Label>Marca</Label><Input value={itemDetails[item.docId]?.marca || ''} onChange={(e) => handleDetailChange(item.docId, 'marca', e.target.value)} /></div>
+                                                <div className="space-y-1.5"><Label>Nº Patrimônio</Label><Input value={itemDetails[item.docId]?.patrimonio || ''} onChange={(e) => handleDetailChange(item.docId, 'patrimonio', e.target.value)} /></div>
+                                                {isCalibratable && (
+                                                    <>
+                                                        <div className="space-y-1.5"><Label>Data de Referência <span className="text-destructive">*</span></Label>
+                                                           <Popover open={activeCalDatePopover === item.docId} onOpenChange={(open) => setActiveCalDatePopover(open ? item.docId : null)}>
+                                                               <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal bg-background"><CalendarIcon className="mr-2 h-4 w-4" />{itemDetails[item.docId]?.data_referencia ? format(new Date(itemDetails[item.docId]!.data_referencia!), 'dd/MM/yyyy') : <span>Escolha a data</span>}</Button></PopoverTrigger>
+                                                               <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={itemDetails[item.docId]?.data_referencia ? new Date(itemDetails[item.docId]!.data_referencia!) : undefined} onSelect={(day) => {if(day) handleDetailChange(item.docId, 'data_referencia', day.toISOString()); setActiveCalDatePopover(null);}} initialFocus /></PopoverContent>
+                                                           </Popover>
+                                                        </div>
+                                                        <div className="space-y-1.5"><Label>Data de Vencimento <span className="text-destructive">*</span></Label>
+                                                          <Popover open={activeDueDatePopover === item.docId} onOpenChange={(open) => setActiveDueDatePopover(open ? item.docId : null)}>
+                                                               <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal bg-background"><CalendarIcon className="mr-2 h-4 w-4" />{itemDetails[item.docId]?.data_vencimento ? format(new Date(itemDetails[item.docId]!.data_vencimento!), 'dd/MM/yyyy') : <span>Escolha a data</span>}</Button></PopoverTrigger>
+                                                               <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={itemDetails[item.docId]?.data_vencimento ? new Date(itemDetails[item.docId]!.data_vencimento!) : undefined} onSelect={(day) => {if(day) handleDetailChange(item.docId, 'data_vencimento', day.toISOString()); setActiveDueDatePopover(null);}} initialFocus /></PopoverContent>
+                                                           </Popover>
+                                                        </div>
+                                                        <div className="space-y-1.5 col-span-2"><Label>Certificado <span className="text-destructive">*</span></Label>
+                                                            <Button asChild variant="outline" className="w-full bg-background"><label className="cursor-pointer flex items-center">
+                                                                {itemDetails[item.docId]?.certificateFile ? <FileText className="mr-2 h-4 w-4 text-green-600"/> : <Upload className="mr-2 h-4 w-4" />}
+                                                                <span className="truncate max-w-xs">{itemDetails[item.docId]?.certificateFile?.name || 'Anexar certificado'}</span>
+                                                                <Input type="file" className="sr-only" onChange={(e) => handleDetailChange(item.docId, 'certificateFile', e.target.files?.[0] || null)} />
+                                                            </label></Button>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </AccordionContent>
