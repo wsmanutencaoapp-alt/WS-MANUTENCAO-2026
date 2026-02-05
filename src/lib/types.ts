@@ -1,5 +1,17 @@
+
 'use client';
 
+
+export type Vehicle = {
+  id?: string;
+  prefixo: string;
+  placa: string;
+  marca: string;
+  modelo: string;
+  ano: number;
+  tipo: 'Carro' | 'Moto' | 'Caminhão' | 'Van' | 'Outro';
+  status: 'Ativo' | 'Inativo' | 'Em Manutenção';
+};
 
 export type Supply = {
   id?: string;

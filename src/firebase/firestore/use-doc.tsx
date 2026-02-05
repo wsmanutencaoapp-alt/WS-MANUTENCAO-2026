@@ -1,3 +1,4 @@
+
 'use client';
     
 import { useState, useEffect, useMemo } from 'react';
@@ -97,7 +98,7 @@ export function useDoc<T = any>(
           operation: 'get',
           path: memoizedDocRef.path,
         });
-        queryClient.setQueryData(queryKey, (oldData: any) => ({ ...oldData, error: contextualError }));
+        errorEmitter.emit('permission-error', contextualError);
       }
     );
 

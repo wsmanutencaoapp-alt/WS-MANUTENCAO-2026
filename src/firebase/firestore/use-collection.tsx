@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -96,8 +97,7 @@ export function useCollection<T = any>(
             ? (memoizedTargetRefOrQuery as CollectionReference).path
             : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
         const contextualError = new FirestorePermissionError({ operation: 'list', path });
-        // Optionally, you can also update the query's error state in react-query
-        queryClient.setQueryData(queryKey, (oldData: any) => ({ ...oldData, error: contextualError }));
+        errorEmitter.emit('permission-error', contextualError);
       }
     );
 

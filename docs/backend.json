@@ -1,6 +1,23 @@
 
 {
   "entities": {
+    "Vehicle": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Vehicle",
+      "type": "object",
+      "description": "Represents a company vehicle.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the Vehicle entity." },
+        "prefixo": { "type": "string", "description": "The company's internal prefix for the vehicle." },
+        "placa": { "type": "string", "description": "The vehicle's license plate." },
+        "marca": { "type": "string", "description": "The manufacturer of the vehicle." },
+        "modelo": { "type": "string", "description": "The model of the vehicle." },
+        "ano": { "type": "number", "description": "The manufacturing year of the vehicle." },
+        "tipo": { "type": "string", "enum": ["Carro", "Moto", "Caminhão", "Van", "Outro"], "description": "The type of vehicle." },
+        "status": { "type": "string", "enum": ["Ativo", "Inativo", "Em Manutenção"], "description": "The current status of the vehicle." }
+      },
+      "required": ["prefixo", "placa", "marca", "modelo", "ano", "tipo", "status"]
+    },
     "Address": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Address",
@@ -887,72 +904,76 @@
   "firestore": {
     "structure": [
       {
+        "path": "/vehicles/{vehicleId}",
+        "definition": { "schema": { "$ref": "#/entities/Vehicle" }, "description": "Stores company vehicles." }
+      },
+      {
         "path": "/addresses/{addressId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/Address" }, "description": "Stores hierarchical storage addresses." }
+        "definition": { "schema": { "$ref": "#/entities/Address" }, "description": "Stores hierarchical storage addresses." }
       },
       {
         "path": "/budgets/{budgetId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/Budget" }, "description": "Stores budget allocations for different sectors." }
+        "definition": { "schema": { "$ref": "#/entities/Budget" }, "description": "Stores budget allocations for different sectors." }
       },
       {
         "path": "/supplies/{supplyId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/Supply" }, "description": "Stores the master data for supply items." }
+        "definition": { "schema": { "$ref": "#/entities/Supply" }, "description": "Stores the master data for supply items." }
       },
       {
         "path": "/supplies/{supplyId}/stock/{stockId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/SupplyStock" }, "description": "Stores individual, trackable batches of supplies as a subcollection of the master supply item." }
+        "definition": { "schema": { "$ref": "#/entities/SupplyStock" }, "description": "Stores individual, trackable batches of supplies as a subcollection of the master supply item." }
       },
       {
         "path": "/supply_movements/{movementId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/SupplyMovement" }, "description": "Stores the historical log of all supply movements." }
+        "definition": { "schema": { "$ref": "#/entities/SupplyMovement" }, "description": "Stores the historical log of all supply movements." }
       },
       {
         "path": "/tools/{toolId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/Tool" }, "description": "Stores aircraft maintenance tools and their calibration details based on intelligent taxonomy." }
+        "definition": { "schema": { "$ref": "#/entities/Tool" }, "description": "Stores aircraft maintenance tools and their calibration details based on intelligent taxonomy." }
       },
        {
         "path": "/kits/{kitId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/Kit" }, "description": "Stores tool kits, each containing references to multiple tools." }
+        "definition": { "schema": { "$ref": "#/entities/Kit" }, "description": "Stores tool kits, each containing references to multiple tools." }
       },
       {
         "path": "/tools/{toolId}/calibration_history/{calibrationId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/CalibrationRecord" }, "description": "Stores the historical records of all calibrations for a specific tool, ensuring traceability." }
+        "definition": { "schema": { "$ref": "#/entities/CalibrationRecord" }, "description": "Stores the historical records of all calibrations for a specific tool, ensuring traceability." }
       },
       {
         "path": "/suppliers/{supplierId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/Supplier" }, "description": "Stores information about suppliers of aircraft maintenance supplies." }
+        "definition": { "schema": { "$ref": "#/entities/Supplier" }, "description": "Stores information about suppliers of aircraft maintenance supplies." }
       },
       {
         "path": "/employees/{employeeId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/Employee" }, "description": "Stores employee information." }
+        "definition": { "schema": { "$ref": "#/entities/Employee" }, "description": "Stores employee information." }
       },
       {
         "path": "/employees/{employeeId}/notifications/{notificationId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/Notification" }, "description": "Stores user-specific notifications." }
+        "definition": { "schema": { "$ref": "#/entities/Notification" }, "description": "Stores user-specific notifications." }
       },
       {
         "path": "/expenses/{expenseId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/Despesa" }, "description": "Stores financial expense records." }
+        "definition": { "schema": { "$ref": "#/entities/Despesa" }, "description": "Stores financial expense records." }
       },
       {
         "path": "/tool_requests/{requestId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/ToolRequest" }, "description": "Stores requests for tool loans." }
+        "definition": { "schema": { "$ref": "#/entities/ToolRequest" }, "description": "Stores requests for tool loans." }
       },
       {
         "path": "/cost_centers/{costCenterId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/CostCenter" }, "description": "Stores cost center master data." }
+        "definition": { "schema": { "$ref": "#/entities/CostCenter" }, "description": "Stores cost center master data." }
       },
       {
         "path": "/purchase_requisitions/{requisitionId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/PurchaseRequisition" }, "description": "Stores the header for purchase requisitions and orders." }
+        "definition": { "schema": { "$ref": "#/entities/PurchaseRequisition" }, "description": "Stores the header for purchase requisitions and orders." }
       },
       {
         "path": "/purchase_requisitions/{requisitionId}/items/{itemId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/PurchaseRequisitionItem" }, "description": "Stores the items within a specific purchase requisition or order." }
+        "definition": { "schema": { "$ref": "#/entities/PurchaseRequisitionItem" }, "description": "Stores the items within a specific purchase requisition or order." }
       },
       {
         "path": "/email_configurations/{configId}",
-        "definition": { "schema": { "$ref": "#/backend/entities/EmailConfiguration" }, "description": "Stores configurations for various email notifications." }
+        "definition": { "schema": { "$ref": "#/entities/EmailConfiguration" }, "description": "Stores configurations for various email notifications." }
       }
     ]
   }
