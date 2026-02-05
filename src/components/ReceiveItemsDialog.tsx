@@ -374,7 +374,7 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={resetAndClose}>
+    <Dialog open={isOpen} onOpenChange={resetAndClose} modal={false}>
         <DialogContent className="max-w-3xl">
             <DialogHeader>
                 <DialogTitle>Registrar Recebimento de Itens</DialogTitle>
