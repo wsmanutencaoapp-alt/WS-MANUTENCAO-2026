@@ -1,7 +1,7 @@
 'use client';
 
 import { toast } from '@/hooks/use-toast';
-import type { PurchaseRequisition, PurchaseRequisitionItem } from '@/lib/types';
+import type { PurchaseRequisition, PurchaseRequisitionItem, Delivery } from '@/lib/types';
 import { RequisitionItemWithDetails } from '@/components/PurchaseRequisitionDetailsDialog';
 
 // A generic email sending function that accepts single or multiple recipients
@@ -180,4 +180,47 @@ export const sendPurchaseOrderToSupplier = async (supplierEmail: string, order: 
     `;
 
     await sendEmail(supplierEmail, subject, htmlBody);
+};
+
+export const sendItemsReceivedEmail = async (recipients: string[], order: PurchaseRequisition, delivery: Delivery) => {
+    if (recipients.length === 0) return;
+
+    const subject = `Itens Recebidos da Ordem de Compra: ${order.protocol}`;
+
+    const itemsHtml = delivery.items.map(item => `
+        <li style="margin-bottom: 10px;">
+            <strong>${item.itemName}</strong><br>
+            <span style="font-size: 14px; color: #555;">Quantidade Recebida: ${item.quantityReceived}</span>
+        </li>
+    `).join('');
+
+    const htmlBody = `
+      <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden;">
+          <div style="background-color: #16a34a; color: #ffffff; padding: 20px; text-align: center;">
+            <h1>Recebimento de Itens Concluído</h1>
+          </div>
+          <div style="padding: 20px 30px; color: #333;">
+            <p style="font-size: 16px;">Olá,</p>
+            <p style="font-size: 16px;">Informamos que os seguintes itens da Ordem de Compra <strong>${order.protocol}</strong> foram recebidos com a Nota Fiscal <strong>${delivery.nfNumber}</strong>.</p>
+            <div style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-top: 20px;">
+              <h3 style="margin-top: 0; color: #2d3748;">Itens Recebidos</h3>
+              <ul style="list-style-type: none; padding: 0;">
+                ${itemsHtml}
+              </ul>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="${window.location.origin}/dashboard/compras/controle-compras" style="background-color: #3b82f6; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; display: inline-block;">
+                Ver Detalhes da OC
+              </a>
+            </div>
+          </div>
+          <div style="background-color: #edf2f7; text-align: center; padding: 15px; font-size: 12px; color: #718096;">
+            <p>Este é um e-mail automático do sistema APP WS.</p>
+          </div>
+        </div>
+      </body>
+    `;
+
+    await sendEmail(recipients, subject, htmlBody);
 };

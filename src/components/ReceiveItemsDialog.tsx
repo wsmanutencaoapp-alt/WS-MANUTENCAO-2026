@@ -15,10 +15,10 @@ import { Label } from './ui/label';
 import { ScrollArea } from './ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useStorage, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { doc, updateDoc, arrayUnion, writeBatch, collection, query, getDocs, where, runTransaction } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, writeBatch, collection, query, getDocs, where, runTransaction, getDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Loader2, Upload, FileText, Package, AlertTriangle, ChevronsUpDown, Check, CalendarIcon } from 'lucide-react';
-import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, Delivery, Address, SupplyStock, SupplyMovement, CalibrationRecord } from '@/lib/types';
+import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, Delivery, Address, SupplyStock, SupplyMovement, CalibrationRecord, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
@@ -28,6 +28,7 @@ import { Calendar } from './ui/calendar';
 import { cn } from '@/lib/utils';
 import { parse, isValid, format } from 'date-fns';
 import { Switch } from './ui/switch';
+import { sendItemsReceivedEmail } from '@/lib/email';
 
 
 interface ReceiveItemsDialogProps {
@@ -341,6 +342,24 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
         batch.update(poRef, { status: newStatus, deliveries: arrayUnion(newDelivery) });
 
         await batch.commit();
+        
+        try {
+            const recipients = ['suprimento@manutencaows.com'];
+            
+            const requesterDocRef = doc(firestore, 'employees', purchaseOrder.requesterId);
+            const requesterDoc = await getDoc(requesterDocRef);
+            if (requesterDoc.exists()) {
+                const requesterData = requesterDoc.data() as Employee;
+                if (requesterData.email) {
+                    recipients.push(requesterData.email);
+                }
+            }
+
+            await sendItemsReceivedEmail(recipients, purchaseOrder, newDelivery);
+
+        } catch (emailError) {
+            console.error("Falha ao enviar e-mail de notificação de recebimento:", emailError);
+        }
         
         toast({ title: "Sucesso!", description: "Recebimento registrado com sucesso. O estoque foi atualizado." });
         onSuccess();
