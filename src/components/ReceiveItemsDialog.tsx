@@ -438,14 +438,15 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                                         {isSupply && (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in-50">
                                                 <div className="space-y-1.5"><Label>Localização <span className="text-destructive">*</span></Label>
-                                                    <Popover><PopoverTrigger asChild>
+                                                    <Popover open={activeAddressPopover === item.docId} onOpenChange={(open) => setActiveAddressPopover(open ? item.docId : null)}>
+                                                    <PopoverTrigger asChild>
                                                     <Button variant="outline" className="w-full justify-between font-normal bg-background" disabled={isLoadingAddresses}>
                                                         {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : itemDetails[item.docId]?.localizacao || "Selecione..."}
                                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                                     </Button></PopoverTrigger>
                                                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Pesquisar..." /><CommandList><CommandEmpty>Nenhum endereço.</CommandEmpty><CommandGroup>
                                                         {addresses?.map(addr => (
-                                                        <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => handleDetailChange(item.docId, 'localizacao', val)}>
+                                                        <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => {handleDetailChange(item.docId, 'localizacao', val); setActiveAddressPopover(null);}}>
                                                             <Check className={cn("mr-2 h-4 w-4", itemDetails[item.docId]?.localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />{addr.codigoCompleto}
                                                         </CommandItem>
                                                         ))}
