@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -33,6 +32,8 @@ import {
   FileCog,
   Car,
   DoorOpen,
+  Camera,
+  Receipt,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -185,6 +186,16 @@ const allNavItems: NavItem[] = [
     permission: 'portaria',
     subItems: [
       { href: '/dashboard/portaria/controle-veiculos', label: 'Controle de Veículos', permission: 'portaria_controle_veiculos' },
+    ]
+  },
+  {
+    href: '/dashboard/selfie',
+    icon: Camera,
+    label: 'Selfie',
+    permission: 'selfie',
+    subItems: [
+        { href: '/dashboard/selfie/retirada-veiculo', label: 'Retirada de Veículo', permission: 'selfie_retirada_veiculo', icon: Car },
+        { href: '/dashboard/selfie/comprovantes-reembolso', label: 'Apresentar Comprovantes', permission: 'selfie_comprovantes', icon: Receipt },
     ]
   },
   { 

@@ -114,6 +114,17 @@ export const permissionStructure = [
         ]
     },
     {
+        id: 'selfie',
+        label: 'Selfie',
+        path: '/dashboard/selfie',
+        isModule: true,
+        actions: ['view'],
+        submodules: [
+            { id: 'selfie_retirada_veiculo', label: 'Retirada de Veículo', path: '/dashboard/selfie/retirada-veiculo', actions: ['view', 'create'] },
+            { id: 'selfie_comprovantes', label: 'Apresentar Comprovantes', path: '/dashboard/selfie/comprovantes-reembolso', actions: ['view', 'create'] },
+        ]
+    },
+    {
         id: 'userManagement',
         label: 'Gerenciar Usuários',
         path: '/dashboard/user-management',
