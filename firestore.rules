@@ -31,15 +31,15 @@ service cloud.firestore {
     }
     
     match /vehicles/{vehicleId} {
-      allow get, list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_view');
+      allow get, list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
       allow create: if hasPermission('cadastros_veiculos_create');
-      allow update: if hasPermission('cadastros_veiculos_update') || hasPermission('portaria_update');
+      allow update: if hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update');
       allow delete: if hasPermission('cadastros_veiculos_delete');
     }
     
     match /vehicle_movements/{movementId} {
-      allow read: if hasPermission('portaria_view');
-      allow write: if hasPermission('portaria_create');
+      allow read: if hasPermission('portaria_controle_veiculos_view');
+      allow write: if hasPermission('portaria_controle_veiculos_create');
     }
 
     match /supplies/{supplyId} {
@@ -147,5 +147,3 @@ service cloud.firestore {
     }
   }
 }
-
-    

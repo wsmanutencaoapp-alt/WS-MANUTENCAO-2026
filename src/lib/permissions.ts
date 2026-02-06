@@ -108,7 +108,10 @@ export const permissionStructure = [
         label: 'Portaria',
         path: '/dashboard/portaria',
         isModule: true,
-        actions: ['view', 'create', 'update'],
+        actions: ['view'],
+        submodules: [
+            { id: 'portaria_controle_veiculos', label: 'Controle de Veículos', path: '/dashboard/portaria/controle-veiculos', actions: ['view', 'create', 'update'] },
+        ]
     },
     {
         id: 'userManagement',

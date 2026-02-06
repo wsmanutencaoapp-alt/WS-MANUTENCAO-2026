@@ -183,6 +183,9 @@ const allNavItems: NavItem[] = [
     icon: DoorOpen,
     label: 'Portaria',
     permission: 'portaria',
+    subItems: [
+      { href: '/dashboard/portaria/controle-veiculos', label: 'Controle de Veículos', permission: 'portaria_controle_veiculos' },
+    ]
   },
   { 
     href: '/dashboard/user-management', 
