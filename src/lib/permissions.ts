@@ -53,9 +53,10 @@ export const permissionStructure = [
             { id: 'cadastros_ferramentas', label: 'Ferramentas', path: '/dashboard/cadastros/ferramentas', actions: ['view', 'create', 'update', 'delete'] },
             { id: 'cadastros_suprimentos', label: 'Suprimentos', path: '/dashboard/cadastros/suprimentos', actions: ['view', 'create', 'update', 'delete'] },
             { id: 'cadastros_fornecedores', label: 'Fornecedores', path: '/dashboard/cadastros/fornecedores', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'cadastros_veiculos', label: 'Veículos', path: '/dashboard/cadastros/veiculos', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'cadastros_funcionarios', label: 'Funcionários', path: '/dashboard/cadastros/funcionarios', actions: ['view', 'create', 'update', 'delete'] },
             { id: 'cadastros_enderecos', label: 'Endereços', path: '/dashboard/cadastros/enderecos', actions: ['view', 'create', 'delete'] },
             { id: 'cadastros_centro_custo', label: 'Centro de Custo', path: '/dashboard/cadastros/centro-de-custo', actions: ['view', 'create', 'update', 'delete'] },
-            { id: 'cadastros_veiculos', label: 'Veículos', path: '/dashboard/cadastros/veiculos', actions: ['view', 'create', 'update', 'delete'] },
         ]
     },
     {
@@ -114,7 +115,7 @@ export const permissionStructure = [
         label: 'Gerenciar Usuários',
         path: '/dashboard/user-management',
         isModule: true,
-        actions: ['view', 'update'],
+        actions: ['view', 'update', 'create'],
     },
     {
         id: 'configurador',
@@ -163,3 +164,5 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
 
     return null;
 };
+
+  

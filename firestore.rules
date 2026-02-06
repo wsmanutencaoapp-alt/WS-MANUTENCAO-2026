@@ -31,7 +31,7 @@ service cloud.firestore {
     }
     
     match /vehicles/{vehicleId} {
-      allow get, list: if isAuthenticated();
+      allow get, list: if hasPermission('cadastros_veiculos_view');
       allow create: if hasPermission('cadastros_veiculos_create');
       allow update: if hasPermission('cadastros_veiculos_update');
       allow delete: if hasPermission('cadastros_veiculos_delete');
@@ -72,13 +72,13 @@ service cloud.firestore {
     
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(employeeId);
-      
-      allow update: if isAdmin() || 
+      allow create: if hasPermission('cadastros_funcionarios_create') || isOwner(employeeId);
+      allow update: if hasPermission('cadastros_funcionarios_update') ||
                      (isOwner(employeeId) && 
                       !('accessLevel' in request.resource.data) &&
                       !('permissions' in request.resource.data) &&
                       !('status' in request.resource.data));
+      allow delete: if hasPermission('cadastros_funcionarios_delete');
       
       match /notifications/{notificationId} {
         allow read, update, delete: if isOwner(employeeId);
@@ -142,3 +142,5 @@ service cloud.firestore {
     }
   }
 }
+
+  

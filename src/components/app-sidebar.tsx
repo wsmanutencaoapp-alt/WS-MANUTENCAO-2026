@@ -86,6 +86,7 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/cadastros/suprimentos', label: 'Suprimentos', permission: 'cadastros_suprimentos' },
         { href: '/dashboard/cadastros/fornecedores', label: 'Fornecedores', permission: 'cadastros_fornecedores' },
         { href: '/dashboard/cadastros/veiculos', label: 'Veículos', permission: 'cadastros_veiculos', icon: Car },
+        { href: '/dashboard/cadastros/funcionarios', label: 'Funcionários', permission: 'cadastros_funcionarios', icon: Users },
         { href: '/dashboard/cadastros/enderecos', label: 'Endereços', permission: 'cadastros_enderecos' },
         { href: '/dashboard/cadastros/centro-de-custo', label: 'Centro de Custo', permission: 'cadastros_centro_custo' },
     ]
@@ -172,7 +173,7 @@ const allNavItems: NavItem[] = [
 ];
 
 const allBottomNavItems: NavItem[] = [
-    { href: '/dashboard/user-management', icon: Users, label: 'Usuários', permission: 'userManagement' },
+    { href: '/dashboard/user-management', icon: Users, label: 'Permissões', permission: 'userManagement' },
     { 
         href: '/dashboard/configurador', 
         icon: SlidersHorizontal, 
@@ -308,3 +309,5 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+  

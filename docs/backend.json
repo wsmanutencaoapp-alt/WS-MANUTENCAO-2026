@@ -589,33 +589,14 @@
           "description": "URL of the employee's profile picture.",
           "format": "uri"
         },
+        "status": {
+          "type": "string",
+          "description": "The current status of the employee's account.",
+          "enum": ["Ativo", "Pendente", "Inativo"]
+        },
         "permissions": {
           "type": "object",
-          "description": "A map of screen names to booleans indicating access rights.",
-          "properties": {
-            "ferramentaria": {
-              "type": "boolean"
-            },
-            "suprimentos": {
-              "type": "boolean"
-            },
-            "compras": {
-              "type": "boolean"
-            },
-            "financeiro": {
-              "type": "boolean"
-            },
-            "configurador": {
-              "type": "boolean"
-            },
-            "userManagement": {
-              "type": "boolean"
-            },
-            "engenharia": {
-              "type": "boolean"
-            }
-          },
-          "additionalProperties": false
+          "description": "A map of screen names to booleans indicating access rights."
         }
       },
       "required": [
@@ -624,7 +605,8 @@
         "firstName",
         "lastName",
         "email",
-        "accessLevel"
+        "accessLevel",
+        "status"
       ]
     },
     "Despesa": {
@@ -1001,3 +983,5 @@
   }
 }
       
+
+  
