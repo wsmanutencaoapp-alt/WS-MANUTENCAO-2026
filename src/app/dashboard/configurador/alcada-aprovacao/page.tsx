@@ -17,15 +17,27 @@ function CostCenterApprovalCard({
     costCenter,
     employees,
     approvalTiers,
+    tierChanges,
     onTierChange
 }: {
     costCenter: WithDocId<CostCenter>;
     employees: WithDocId<Employee>[];
     approvalTiers: Map<string, WithDocId<ApprovalTier>>;
+    tierChanges: Map<string, { level: 1 | 2; approverId: string; }>;
     onTierChange: (costCenterId: string, level: 1 | 2, approverId: string) => void;
 }) {
-    const level1Tier = approvalTiers.get(`${costCenter.docId}-1`);
-    const level2Tier = approvalTiers.get(`${costCenter.docId}-2`);
+    const level1Key = `${costCenter.docId}-1`;
+    const level2Key = `${costCenter.docId}-2`;
+
+    // Check for pending changes first, then fallback to saved data
+    const level1PendingChange = tierChanges.get(level1Key);
+    const level2PendingChange = tierChanges.get(level2Key);
+    
+    const level1SavedTier = approvalTiers.get(level1Key);
+    const level2SavedTier = approvalTiers.get(level2Key);
+
+    const level1Value = level1PendingChange ? level1PendingChange.approverId : (level1SavedTier?.approverId || '--none--');
+    const level2Value = level2PendingChange ? level2PendingChange.approverId : (level2SavedTier?.approverId || '--none--');
 
     const handleSelect = (level: 1 | 2, approverId: string) => {
         onTierChange(costCenter.docId, level, approverId);
@@ -41,7 +53,7 @@ function CostCenterApprovalCard({
                 <div className="space-y-2">
                     <Label>Aprovador Nível 1</Label>
                     <Select
-                        value={level1Tier?.approverId || '--none--'}
+                        value={level1Value}
                         onValueChange={(value) => handleSelect(1, value)}
                     >
                         <SelectTrigger>
@@ -58,7 +70,7 @@ function CostCenterApprovalCard({
                 <div className="space-y-2">
                     <Label>Aprovador Nível 2</Label>
                     <Select
-                        value={level2Tier?.approverId || '--none--'}
+                        value={level2Value}
                         onValueChange={(value) => handleSelect(2, value)}
                     >
                         <SelectTrigger>
@@ -220,6 +232,7 @@ export default function AlcadaAprovacaoPage() {
                     costCenter={selectedCostCenter}
                     employees={employees || []}
                     approvalTiers={approvalTiersMap}
+                    tierChanges={tierChanges}
                     onTierChange={handleTierChange}
                 />
             )}
