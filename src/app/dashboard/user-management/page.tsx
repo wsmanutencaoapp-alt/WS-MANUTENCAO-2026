@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, doc, query, orderBy, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '@/firebase';
 import {
@@ -22,7 +22,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, ShieldCheck, Settings, CheckCircle, Loader2, Trash2 } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Settings, CheckCircle, Loader2, Trash2, Search } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import UserPermissionsDialog from '@/components/UserPermissionsDialog';
+import { Input } from '@/components/ui/input';
 
 function getInitials(firstName?: string, lastName?: string) {
   const first = firstName?.charAt(0) || '';
@@ -39,12 +40,13 @@ function getInitials(firstName?: string, lastName?: string) {
 
 export default function UserManagementPage() {
   const firestore = useFirestore();
-  const auth = useAuth();
+  const { user } = useUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [permissionsEmployee, setPermissionsEmployee] = useState<WithDocId<Employee> | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const employeesQueryKey = ['employeesForManagement'];
   const employeesCollectionRef = useMemoFirebase(
@@ -55,6 +57,18 @@ export default function UserManagementPage() {
   const { data: employees, isLoading, error } = useCollection<WithDocId<Employee>>(employeesCollectionRef, {
     queryKey: employeesQueryKey,
   });
+
+  const filteredEmployees = useMemo(() => {
+    if (!employees) return [];
+    if (!searchTerm) return employees;
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return employees.filter(
+      (e) =>
+        (e.firstName && e.firstName.toLowerCase().includes(lowercasedTerm)) ||
+        (e.lastName && e.lastName.toLowerCase().includes(lowercasedTerm)) ||
+        (e.email && e.email.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [employees, searchTerm]);
 
   const handleApproveUser = async (employeeId: string) => {
     if (!firestore) return;
@@ -89,6 +103,35 @@ export default function UserManagementPage() {
         setIsProcessing(null);
     }
   }
+  
+  const handleToggleAdminStatus = async (employee: WithDocId<Employee>) => {
+    if (!firestore || !user) {
+        toast({ variant: 'destructive', title: 'Ação não permitida' });
+        return;
+    }
+    if (employee.uid === user.uid) {
+        toast({ variant: 'destructive', title: 'Ação Inválida', description: 'Você não pode alterar seu próprio nível de acesso.' });
+        return;
+    }
+
+    setIsProcessing(employee.docId);
+    const newLevel = employee.accessLevel === 'Admin' ? 'Técnico' : 'Admin';
+
+    try {
+        const employeeRef = doc(firestore, 'employees', employee.docId);
+        await updateDoc(employeeRef, { accessLevel: newLevel });
+        toast({
+            title: 'Sucesso!',
+            description: `O nível de acesso de ${employee.firstName} foi alterado para ${newLevel}.`,
+        });
+        queryClient.invalidateQueries({ queryKey: employeesQueryKey });
+    } catch (err) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível alterar o nível de acesso.' });
+        console.error(err);
+    } finally {
+        setIsProcessing(null);
+    }
+  };
 
   const handlePermissionsChanged = () => {
       queryClient.invalidateQueries({ queryKey: employeesQueryKey });
@@ -116,6 +159,15 @@ export default function UserManagementPage() {
           <CardDescription>
             Gerencie o status e as permissões de acesso de cada funcionário no sistema.
           </CardDescription>
+          <div className="relative pt-4">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Pesquisar por nome ou e-mail..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -148,7 +200,7 @@ export default function UserManagementPage() {
                     </TableRow>
                 ))
               )}
-              {!isLoading && employees?.map((employee) => (
+              {!isLoading && filteredEmployees?.map((employee) => (
                 <TableRow key={employee.docId}>
                     <TableCell>
                         <div className="flex items-center gap-4">
@@ -174,6 +226,32 @@ export default function UserManagementPage() {
                                 Aprovar
                             </Button>
                         )}
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    title="Alternar Nível de Acesso"
+                                    disabled={isProcessing === employee.docId || employee.uid === user?.uid}
+                                >
+                                    <ShieldCheck className="h-4 w-4" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Alterar Nível de Acesso</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Tem certeza que deseja {employee.accessLevel === 'Admin' ? 'remover o acesso de administrador' : 'promover para administrador'} do usuário <span className="font-bold">{employee.firstName}</span>?
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleToggleAdminStatus(employee)}>
+                                        Confirmar
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                          <Button variant="outline" size="icon" title="Gerenciar Permissões" onClick={() => setPermissionsEmployee(employee)} disabled={isProcessing === employee.docId}>
                             <Settings className="h-4 w-4" />
                         </Button>

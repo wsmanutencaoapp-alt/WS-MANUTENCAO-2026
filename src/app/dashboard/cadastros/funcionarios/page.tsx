@@ -23,7 +23,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ShieldCheck, Loader2, PlusCircle, User } from 'lucide-react';
+import { ShieldCheck, Loader2, PlusCircle, User, Search } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useToast } from '@/hooks/use-toast';
@@ -35,7 +35,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formSchema = z.object({
   firstName: z.string().min(1, 'O nome é obrigatório'),
@@ -57,6 +56,7 @@ export default function CadastroFuncionariosPage() {
   const { toast } = useToast();
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const employeesQueryKey = ['employees'];
   const employeesCollectionRef = useMemoFirebase(
@@ -67,6 +67,18 @@ export default function CadastroFuncionariosPage() {
   const { data: employees, isLoading, error } = useCollection<WithDocId<Employee>>(employeesCollectionRef, {
     queryKey: employeesQueryKey,
   });
+
+  const filteredEmployees = useMemo(() => {
+    if (!employees) return [];
+    if (!searchTerm) return employees;
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return employees.filter(
+      (e) =>
+        (e.firstName && e.firstName.toLowerCase().includes(lowercasedTerm)) ||
+        (e.lastName && e.lastName.toLowerCase().includes(lowercasedTerm)) ||
+        (e.email && e.email.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [employees, searchTerm]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -164,6 +176,15 @@ export default function CadastroFuncionariosPage() {
           <CardDescription>
             Visualize os funcionários da empresa e seus status.
           </CardDescription>
+           <div className="relative pt-4">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Pesquisar por nome, sobrenome ou e-mail..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -194,7 +215,7 @@ export default function CadastroFuncionariosPage() {
                     </TableRow>
                 ))
               )}
-              {!isLoading && employees?.map((employee) => (
+              {!isLoading && filteredEmployees?.map((employee) => (
                 <TableRow key={employee.docId}>
                     <TableCell>
                         <div className="flex items-center gap-4">
