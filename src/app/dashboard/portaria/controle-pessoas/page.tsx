@@ -14,11 +14,11 @@ import {
 } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserPlus, LogOut, Users } from 'lucide-react';
+import { Loader2, UserPlus, LogOut, Users, Eye } from 'lucide-react';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -36,6 +36,7 @@ const ControlePessoasPage = () => {
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitWithId | null>(null);
+  const [selectedVisitDetails, setSelectedVisitDetails] = useState<VisitWithId | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -181,16 +182,19 @@ const ControlePessoasPage = () => {
                 <CardHeader><CardTitle>Histórico de Visitas</CardTitle><CardDescription>Registros de visitantes que já saíram.</CardDescription></CardHeader>
                 <CardContent>
                  <Table>
-                    <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Empresa</TableHead><TableHead>Entrada</TableHead><TableHead>Saída</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Empresa</TableHead><TableHead>Entrada</TableHead><TableHead>Saída</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
                     <TableBody>
-                        {isLoading && <TableRow><TableCell colSpan={4} className="text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                        {!isLoading && visitHistory.length === 0 && <TableRow><TableCell colSpan={4} className="h-24 text-center">Nenhum registro no histórico.</TableCell></TableRow>}
+                        {isLoading && <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
+                        {!isLoading && visitHistory.length === 0 && <TableRow><TableCell colSpan={5} className="h-24 text-center">Nenhum registro no histórico.</TableCell></TableRow>}
                         {!isLoading && visitHistory.map(v => (
                             <TableRow key={v.docId}>
                                 <TableCell><div className="font-medium">{v.name}</div><div className="text-sm text-muted-foreground">{v.documentNumber}</div></TableCell>
                                 <TableCell>{v.company}</TableCell>
                                 <TableCell>{format(new Date(v.entryTimestamp), 'dd/MM/yy HH:mm')}</TableCell>
                                 <TableCell>{v.exitTimestamp ? format(new Date(v.exitTimestamp), 'dd/MM/yy HH:mm') : 'N/A'}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="ghost" size="icon" onClick={() => setSelectedVisitDetails(v)}><Eye className="h-4 w-4" /></Button>
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -241,6 +245,38 @@ const ControlePessoasPage = () => {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Details Dialog */}
+      {selectedVisitDetails && (
+        <Dialog open={!!selectedVisitDetails} onOpenChange={() => setSelectedVisitDetails(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Detalhes da Visita</DialogTitle>
+                    <DialogDescription>
+                        Informações completas do registro de visita de <span className="font-bold">{selectedVisitDetails.name}</span>.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><p className="font-medium text-muted-foreground">Nome</p><p>{selectedVisitDetails.name}</p></div>
+                        <div><p className="font-medium text-muted-foreground">Documento</p><p>{selectedVisitDetails.documentNumber}</p></div>
+                    </div>
+                    <div><p className="font-medium text-muted-foreground">Empresa</p><p>{selectedVisitDetails.company}</p></div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><p className="font-medium text-muted-foreground">Pessoa Visitada</p><p>{selectedVisitDetails.personToVisit}</p></div>
+                        <div><p className="font-medium text-muted-foreground">Motivo</p><p>{selectedVisitDetails.reason}</p></div>
+                    </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div><p className="font-medium text-muted-foreground">Entrada</p><p>{format(new Date(selectedVisitDetails.entryTimestamp), 'dd/MM/yyyy HH:mm')}</p></div>
+                        <div><p className="font-medium text-muted-foreground">Saída</p><p>{selectedVisitDetails.exitTimestamp ? format(new Date(selectedVisitDetails.exitTimestamp), 'dd/MM/yyyy HH:mm') : 'N/A'}</p></div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setSelectedVisitDetails(null)}>Fechar</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
 
     </div>
   );
