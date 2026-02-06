@@ -42,7 +42,6 @@ const formSchema = z.object({
   lastName: z.string().min(1, 'O sobrenome é obrigatório'),
   email: z.string().email('Endereço de e-mail inválido'),
   password: z.string().min(8, 'A senha deve ter pelo menos 8 caracteres'),
-  accessLevel: z.enum(['Admin', 'Técnico']),
 });
 
 function getInitials(firstName?: string, lastName?: string) {
@@ -76,7 +75,6 @@ export default function CadastroFuncionariosPage() {
       lastName: '',
       email: '',
       password: '',
-      accessLevel: 'Técnico',
     },
   });
 
@@ -105,8 +103,8 @@ export default function CadastroFuncionariosPage() {
         lastName: values.lastName,
         email: values.email,
         phone: '',
-        accessLevel: values.accessLevel,
-        status: 'Ativo', // Directly active
+        accessLevel: 'Técnico', // Default access level
+        status: 'Ativo',
       };
       
       await setDoc(userDocRef, userData);
@@ -227,7 +225,7 @@ export default function CadastroFuncionariosPage() {
             <DialogHeader>
                 <DialogTitle>Adicionar Novo Funcionário</DialogTitle>
                 <DialogDescription>
-                    Crie uma nova conta de usuário. Uma senha temporária será definida.
+                    Crie uma nova conta de usuário. O nível de acesso padrão será 'Técnico'.
                 </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -245,19 +243,6 @@ export default function CadastroFuncionariosPage() {
                     )}/>
                     <FormField control={form.control} name="password" render={({ field }) => (
                         <FormItem><FormLabel>Senha Temporária</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={form.control} name="accessLevel" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Nível de Acesso</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                    <SelectItem value="Técnico">Técnico</SelectItem>
-                                    <SelectItem value="Admin">Admin</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
                     )}/>
                     <DialogFooter>
                         <Button variant="outline" type="button" onClick={() => setIsCreateDialogOpen(false)}>Cancelar</Button>
