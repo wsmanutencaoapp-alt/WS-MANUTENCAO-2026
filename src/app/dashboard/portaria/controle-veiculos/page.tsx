@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -30,7 +31,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -78,12 +78,11 @@ const ControleVeiculosPage = () => {
     type: 'saida' | 'entrada' | null;
   }>({ isOpen: false, type: null });
 
-  const [formData, setFormData] = useState({
-    vehicleId: '',
-    driverName: '',
-    km: '',
-    notes: '',
-  });
+  // State refactoring to fix selection bug
+  const [selectedVehicle, setSelectedVehicle] = useState<WithDocId<Vehicle> | null>(null);
+  const [driverName, setDriverName] = useState('');
+  const [km, setKm] = useState('');
+  const [notes, setNotes] = useState('');
   
   const [isExternalVehicle, setIsExternalVehicle] = useState(false);
   const [externalPlate, setExternalPlate] = useState('');
@@ -126,7 +125,10 @@ const ControleVeiculosPage = () => {
   }, [allVehicles, dialogState.type]);
 
   const resetForm = () => {
-    setFormData({ vehicleId: '', driverName: '', km: '', notes: '' });
+    setSelectedVehicle(null);
+    setDriverName('');
+    setKm('');
+    setNotes('');
     setIsExternalVehicle(false);
     setExternalPlate('');
   };
@@ -148,31 +150,25 @@ const ControleVeiculosPage = () => {
     
     try {
         if (dialogState.type === 'entrada' && isExternalVehicle) {
-            if (!externalPlate || !formData.driverName) {
+            if (!externalPlate || !driverName) {
                 toast({ variant: 'destructive', title: 'Erro', description: 'Placa e motorista são obrigatórios para veículo externo.' });
                 return;
             }
 
             const movementData: Partial<VehicleMovement> = {
                 vehiclePlaca: externalPlate.toUpperCase(),
-                driverName: formData.driverName,
+                driverName: driverName,
                 type: 'entrada',
                 date: new Date().toISOString(),
-                notes: formData.notes,
+                notes: notes,
                 isExternal: true,
             };
             
             await addDoc(collection(firestore, 'vehicle_movements'), movementData);
 
         } else { // Internal vehicle logic for both 'entrada' and 'saida'
-            if (!formData.vehicleId || !formData.driverName || !formData.km) {
+            if (!selectedVehicle || !driverName || !km) {
                 toast({ variant: 'destructive', title: 'Erro', description: 'Veículo, motorista e KM são obrigatórios.' });
-                return;
-            }
-        
-            const selectedVehicle = allVehicles?.find(v => v.docId === formData.vehicleId);
-            if (!selectedVehicle) {
-                toast({ variant: 'destructive', title: 'Erro', description: 'Veículo selecionado não encontrado.' });
                 return;
             }
 
@@ -182,11 +178,11 @@ const ControleVeiculosPage = () => {
                 vehicleId: selectedVehicle.docId,
                 vehiclePrefixo: selectedVehicle.prefixo,
                 vehiclePlaca: selectedVehicle.placa,
-                driverName: formData.driverName,
+                driverName: driverName,
                 type: dialogState.type!,
                 date: new Date().toISOString(),
-                km: Number(formData.km),
-                notes: formData.notes,
+                km: Number(km),
+                notes: notes,
             };
             batch.set(movementRef, movementData);
             
@@ -329,41 +325,36 @@ const ControleVeiculosPage = () => {
                       role="combobox"
                       className="w-full justify-between"
                     >
-                      {formData.vehicleId
-                        ? vehiclesForDialog.find(
-                            (v) => v.docId === formData.vehicleId
-                          )?.prefixo
+                      {selectedVehicle
+                        ? `${selectedVehicle.prefixo} - ${selectedVehicle.placa} (${selectedVehicle.modelo})`
                         : 'Selecione um veículo...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                     <Command>
-                      <CommandInput placeholder="Buscar prefixo ou placa..." />
+                      <CommandInput placeholder="Buscar prefixo, placa ou modelo..." />
                       <CommandList>
                         <CommandEmpty>Nenhum veículo encontrado.</CommandEmpty>
                         <CommandGroup>
                           {vehiclesForDialog.map((vehicle) => (
                             <CommandItem
                               key={vehicle.docId}
-                              value={`${vehicle.prefixo} ${vehicle.placa}`}
+                              value={`${vehicle.prefixo} ${vehicle.placa} ${vehicle.modelo}`}
                               onSelect={() => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  vehicleId: vehicle.docId,
-                                }));
+                                setSelectedVehicle(vehicle);
                                 setVehiclePopoverOpen(false);
                               }}
                             >
                               <Check
                                 className={cn(
                                   'mr-2 h-4 w-4',
-                                  formData.vehicleId === vehicle.docId
+                                  selectedVehicle?.docId === vehicle.docId
                                     ? 'opacity-100'
                                     : 'opacity-0'
                                 )}
                               />
-                              {vehicle.prefixo} - {vehicle.placa}
+                              {vehicle.prefixo} - {vehicle.placa} ({vehicle.modelo})
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -378,10 +369,8 @@ const ControleVeiculosPage = () => {
               <Label htmlFor="driverName">Nome do Motorista <span className="text-destructive">*</span></Label>
               <Input
                 id="driverName"
-                value={formData.driverName}
-                onChange={(e) =>
-                  setFormData((p) => ({ ...p, driverName: e.target.value }))
-                }
+                value={driverName}
+                onChange={(e) => setDriverName(e.target.value)}
               />
             </div>
             {!(isExternalVehicle && dialogState.type === 'entrada') && (
@@ -390,10 +379,8 @@ const ControleVeiculosPage = () => {
                 <Input
                   id="km"
                   type="number"
-                  value={formData.km}
-                  onChange={(e) =>
-                    setFormData((p) => ({ ...p, km: e.target.value }))
-                  }
+                  value={km}
+                  onChange={(e) => setKm(e.target.value)}
                 />
               </div>
             )}
@@ -401,10 +388,8 @@ const ControleVeiculosPage = () => {
               <Label htmlFor="notes">Observações</Label>
               <Textarea
                 id="notes"
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData((p) => ({ ...p, notes: e.target.value }))
-                }
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 placeholder="Ex: avarias, nível de combustível, etc."
               />
             </div>
@@ -422,3 +407,5 @@ const ControleVeiculosPage = () => {
 };
 
 export default ControleVeiculosPage;
+
+    
