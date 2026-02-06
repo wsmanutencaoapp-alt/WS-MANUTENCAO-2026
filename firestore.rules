@@ -53,7 +53,7 @@ service cloud.firestore {
 
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if hasPermission('ferramentaria');
+      allow create, update, delete: if hasPermission('ferramentaria') || hasPermission('compras_controle_create');
       
       match /calibration_history/{calibrationId} {
         allow read: if hasPermission('ferramentaria');
@@ -81,7 +81,8 @@ service cloud.firestore {
                       !('status' in request.resource.data));
       
       match /notifications/{notificationId} {
-        allow read, write: if isOwner(employeeId);
+        allow read, update, delete: if isOwner(employeeId);
+        allow create: if isAuthenticated();
       }
     }
     
@@ -124,6 +125,11 @@ service cloud.firestore {
             allow read: if isAuthenticated();
             allow write: if hasPermission('compras') || request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId;
         }
+    }
+    
+    match /email_configurations/{configId} {
+      allow read: if hasPermission('configurador_disparo_email_view');
+      allow write: if hasPermission('configurador_disparo_email_update');
     }
 
     match /counters/{counterId} {
