@@ -172,6 +172,7 @@ const allNavItems: NavItem[] = [
     permission: 'portaria',
     subItems: [
       { href: '/dashboard/portaria/controle-veiculos', label: 'Controle de Veículos', permission: 'portaria_controle_veiculos' },
+      { href: '/dashboard/portaria/controle-pessoas', label: 'Controle de Pessoas', permission: 'portaria_controle_pessoas' },
     ]
   },
   {

@@ -25,6 +25,18 @@ export type VehicleMovement = {
     isExternal?: boolean;
 };
 
+export type Visit = {
+  id?: string;
+  name: string;
+  documentNumber: string;
+  company: string;
+  personToVisit: string;
+  reason: string;
+  entryTimestamp: string; // ISO String
+  exitTimestamp?: string; // ISO String
+  status: 'Dentro' | 'Fora';
+};
+
 export type Supply = {
   id?: string;
   // Identificação
@@ -192,6 +204,8 @@ export type Permissions = {
   cadastros_ferramentas?: boolean;
   cadastros_suprimentos?: boolean;
   cadastros_fornecedores?: boolean;
+  cadastros_veiculos?: boolean;
+  cadastros_funcionarios?: boolean;
   cadastros_enderecos?: boolean;
   cadastros_centro_custo?: boolean;
   engenharia?: boolean;

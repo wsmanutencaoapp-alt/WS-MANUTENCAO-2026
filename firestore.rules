@@ -40,6 +40,13 @@ service cloud.firestore {
     match /vehicle_movements/{movementId} {
       allow read: if hasPermission('portaria_controle_veiculos_view');
       allow write: if hasPermission('portaria_controle_veiculos_create');
+      allow delete: if hasPermission('portaria_controle_veiculos_delete');
+    }
+
+    match /visits/{visitId} {
+      allow read: if hasPermission('portaria_controle_pessoas_view');
+      allow create: if hasPermission('portaria_controle_pessoas_create');
+      allow update: if hasPermission('portaria_controle_pessoas_update');
     }
 
     match /supplies/{supplyId} {
