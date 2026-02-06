@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -7,6 +6,7 @@ import {
   useCollection,
   useMemoFirebase,
   useUser,
+  useDoc,
 } from '@/firebase';
 import {
   collection,
@@ -16,6 +16,7 @@ import {
   doc,
   writeBatch,
   orderBy,
+  deleteDoc,
 } from 'firebase/firestore';
 import {
   Card,
@@ -44,10 +45,10 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowLeft, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Vehicle, VehicleMovement } from '@/lib/types';
+import type { Vehicle, VehicleMovement, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Popover,
@@ -66,6 +67,17 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const ControleVeiculosPage = () => {
   const firestore = useFirestore();
@@ -87,6 +99,13 @@ const ControleVeiculosPage = () => {
   const [externalPlate, setExternalPlate] = useState('');
 
   const [isVehiclePopoverOpen, setVehiclePopoverOpen] = useState(false);
+  
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData } = useDoc<Employee>(userDocRef);
+  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
 
   // Queries
   const vehiclesQueryKey = 'allVehiclesForGate';
@@ -172,8 +191,12 @@ const ControleVeiculosPage = () => {
             await addDoc(collection(firestore, 'vehicle_movements'), movementData);
 
         } else { // Internal vehicle logic for both 'entrada' and 'saida'
-            if (!selectedVehicle || !driverName || !km) {
-                toast({ variant: 'destructive', title: 'Erro', description: 'Veículo, motorista e KM são obrigatórios.' });
+            if (!selectedVehicle || !driverName) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'Veículo e motorista são obrigatórios.' });
+                return;
+            }
+            if (!isExternalVehicle && !km) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'KM é obrigatório para veículos da frota.' });
                 return;
             }
 
@@ -211,6 +234,28 @@ const ControleVeiculosPage = () => {
         });
     }
   };
+  
+  const handleDeleteMovement = async (movementId: string) => {
+    if (!firestore) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Serviço indisponível.' });
+        return;
+    }
+    try {
+      await deleteDoc(doc(firestore, 'vehicle_movements', movementId));
+      toast({
+        title: 'Sucesso!',
+        description: 'Registro de movimentação excluído.',
+      });
+      queryClient.invalidateQueries({ queryKey: [movementsQueryKey] });
+    } catch (e) {
+      console.error('Erro ao excluir movimentação:', e);
+      toast({
+        variant: 'destructive',
+        title: 'Erro na Exclusão',
+        description: 'Não foi possível excluir o registro. Verifique suas permissões.',
+      });
+    }
+  };
 
 
   return (
@@ -245,19 +290,20 @@ const ControleVeiculosPage = () => {
                 <TableHead>Veículo</TableHead>
                 <TableHead>Motorista</TableHead>
                 <TableHead>KM</TableHead>
+                {isAdmin && <TableHead className="text-right">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoadingMovements && (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={isAdmin ? 6 : 5} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                   </TableCell>
                 </TableRow>
               )}
               {!isLoadingMovements && movements?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={isAdmin ? 6 : 5} className="h-24 text-center">
                     Nenhuma movimentação registrada.
                   </TableCell>
                 </TableRow>
@@ -282,6 +328,31 @@ const ControleVeiculosPage = () => {
                   </TableCell>
                   <TableCell>{mov.driverName}</TableCell>
                   <TableCell>{mov.km?.toLocaleString('pt-BR') ?? 'N/A'}</TableCell>
+                   {isAdmin && (
+                    <TableCell className="text-right">
+                       <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja excluir este registro de movimentação? Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteMovement(mov.docId)}>
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -330,8 +401,10 @@ const ControleVeiculosPage = () => {
                       role="combobox"
                       className="w-full justify-between"
                     >
-                      {selectedVehicle
-                        ? `${selectedVehicle.prefixo} - ${selectedVehicle.placa}`
+                      {selectedVehicleId
+                        ? allVehicles?.find(v => v.docId === selectedVehicleId)?.prefixo
+                          ? `${allVehicles?.find(v => v.docId === selectedVehicleId)?.prefixo} - ${allVehicles?.find(v => v.docId === selectedVehicleId)?.placa}`
+                          : 'Selecione um veículo...'
                         : 'Selecione um veículo...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -378,7 +451,7 @@ const ControleVeiculosPage = () => {
                 onChange={(e) => setDriverName(e.target.value)}
               />
             </div>
-            {!(isExternalVehicle && dialogState.type === 'entrada') && (
+            {!(dialogState.type === 'entrada' && isExternalVehicle) && (
               <div className="space-y-1.5">
                 <Label htmlFor="km">Quilometragem (KM) <span className="text-destructive">*</span></Label>
                 <Input
