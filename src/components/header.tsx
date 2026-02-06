@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -30,6 +31,7 @@ import {
   History,
   FileSignature,
   FileCog,
+  DoorOpen,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -172,6 +174,12 @@ const allNavItems: NavItem[] = [
     icon: HardHat,
     label: 'Manutenção',
     permission: 'manutencao',
+  },
+   {
+    href: '/dashboard/portaria',
+    icon: DoorOpen,
+    label: 'Portaria',
+    permission: 'portaria',
   },
   { 
     href: '/dashboard/user-management', 

@@ -7,8 +7,13 @@ import {
   Send,
   Box,
   Wrench,
-  Thermometer,
+  PanelLeft,
+  Search,
   Settings,
+  LogIn,
+  LogOut,
+  UserPlus,
+  Thermometer,
   ShoppingCart,
   Landmark,
   Users,
@@ -23,12 +28,12 @@ import {
   CalendarCheck,
   HardHat,
   LayoutDashboard,
-  Search,
   Package,
   History,
   FileSignature,
   FileCog,
   Car,
+  DoorOpen,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -157,6 +162,12 @@ const allNavItems: NavItem[] = [
     icon: HardHat,
     label: 'Manutenção',
     permission: 'manutencao',
+  },
+  {
+    href: '/dashboard/portaria',
+    icon: DoorOpen,
+    label: 'Portaria',
+    permission: 'portaria',
   },
 ];
 

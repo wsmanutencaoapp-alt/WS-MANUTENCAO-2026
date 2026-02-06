@@ -103,6 +103,13 @@ export const permissionStructure = [
         ]
     },
     {
+        id: 'portaria',
+        label: 'Portaria',
+        path: '/dashboard/portaria',
+        isModule: true,
+        actions: ['view'],
+    },
+    {
         id: 'userManagement',
         label: 'Gerenciar Usuários',
         path: '/dashboard/user-management',

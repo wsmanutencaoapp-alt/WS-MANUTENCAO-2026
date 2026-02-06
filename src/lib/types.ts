@@ -189,6 +189,7 @@ export type Permissions = {
   gso?: boolean;
   planejamento?: boolean;
   manutencao?: boolean;
+  portaria?: boolean;
   contabilidade_classificacao?: boolean;
   suprimentos_controle_almoxarifado?: boolean;
   ferramentaria_kits?: boolean;
