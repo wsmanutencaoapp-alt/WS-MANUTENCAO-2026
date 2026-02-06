@@ -116,6 +116,7 @@ export const permissionStructure = [
         isModule: true,
         actions: ['view'],
         submodules: [
+            { id: 'configurador_alcada', label: 'Alçada de Aprovação', path: '/dashboard/configurador/alcada-aprovacao', actions: ['view', 'update'] },
             { id: 'configurador_disparo_email', label: 'Disparo de E-mail', path: '/dashboard/configurador/disparo-email', actions: ['view', 'update'] },
         ],
     },

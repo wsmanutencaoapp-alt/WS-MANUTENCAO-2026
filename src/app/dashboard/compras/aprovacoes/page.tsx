@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, where, doc, updateDoc, getDocs, documentId, writeBatch, addDoc, onSnapshot } from 'firebase/firestore';
-import type { PurchaseRequisition, PurchaseRequisitionItem, CostCenter, Supply, Tool, Notification, Employee } from '@/lib/types';
+import type { PurchaseRequisition, PurchaseRequisitionItem, CostCenter, Supply, Tool, Notification, Employee, Budget, ApprovalTier } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
   Table,
@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, Eye, CheckCircle, XCircle, MessageSquareWarning } from 'lucide-react';
+import { Loader2, Search, Eye, CheckCircle, XCircle, MessageSquareWarning, ArrowSwitch } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,10 +39,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import ApprovalDetailsDialog from '@/components/ApprovalDetailsDialog';
+import { Switch } from '@/components/ui/switch';
 
 
 type RequisitionWithTotal = WithDocId<PurchaseRequisition> & {
     totalValue: number;
+    needsLevel2Approval: boolean;
 };
 
 const AprovacoesComprasPage = () => {
@@ -61,39 +63,51 @@ const AprovacoesComprasPage = () => {
       reason: string;
   }>({ isOpen: false, requisition: null, type: 'reject', reason: '' });
   
+  const [showAllForLevel2, setShowAllForLevel2] = useState(false);
   const [requisitionsWithTotals, setRequisitionsWithTotals] = useState<RequisitionWithTotal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const queryKey = 'pendingPurchaseRequisitions';
+  // --- DATA FETCHING ---
+  const { data: currentUserData } = useDoc<Employee>(useMemoFirebase(() => (firestore && user) ? doc(firestore, 'employees', user.uid) : null, [firestore, user]));
+  const { data: approvalTiers, isLoading: isLoadingTiers } = useCollection<WithDocId<ApprovalTier>>(useMemoFirebase(() => firestore ? query(collection(firestore, 'approval_tiers')) : null, [firestore]));
+  const { data: budgets, isLoading: isLoadingBudgets } = useCollection<WithDocId<Budget>>(useMemoFirebase(() => firestore ? query(collection(firestore, 'budgets')) : null, [firestore]));
+
   const requisitionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'purchase_requisitions'), where('status', '==', 'Em Aprovação'));
   }, [firestore]);
 
-  // Main listener for requisitions
   useEffect(() => {
-    if (!requisitionsQuery) {
+    if (!requisitionsQuery || !budgets) {
         setIsLoading(false);
         return;
     };
     setIsLoading(true);
+
+    const budgetsMap = new Map(budgets.map(b => [`${b.costCenterId}-${b.period}`, b]));
+    const currentPeriod = format(new Date(), 'yyyy-MM');
 
     const unsubscribe = onSnapshot(requisitionsQuery, async (querySnapshot) => {
       const reqs = querySnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() } as WithDocId<PurchaseRequisition>));
       
       const reqsWithTotals: RequisitionWithTotal[] = await Promise.all(
           reqs.map(async (req) => {
-              if (req.type === 'Ordem de Compra') {
-                  return { ...req, totalValue: req.totalValue || 0 };
+              let totalValue = req.totalValue || 0;
+              if (req.type === 'Solicitação de Compra') {
+                  const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
+                  const itemsSnapshot = await getDocs(itemsRef);
+                  totalValue = itemsSnapshot.docs.reduce((sum, doc) => {
+                      const item = doc.data() as PurchaseRequisitionItem;
+                      const winningQuote = (item.quotations && item.selectedQuotationIndex !== undefined) ? item.quotations[item.selectedQuotationIndex] : null;
+                      return sum + (winningQuote?.totalValue || item.estimatedPrice || 0) * item.quantity;
+                  }, 0);
               }
-              // For SC, calculate total from items
-              const itemsRef = collection(firestore, 'purchase_requisitions', req.docId, 'items');
-              const itemsSnapshot = await getDocs(itemsRef);
-              const total = itemsSnapshot.docs.reduce((sum, doc) => {
-                  const item = doc.data() as PurchaseRequisitionItem;
-                  return sum + (item.estimatedPrice || 0) * item.quantity;
-              }, 0);
-              return { ...req, totalValue: total };
+              
+              const budgetKey = `${req.costCenterId}-${currentPeriod}`;
+              const costCenterBudget = budgetsMap.get(budgetKey);
+              const needsLevel2Approval = !costCenterBudget || totalValue > ((costCenterBudget.totalAmount || 0) - (costCenterBudget.spentAmount || 0));
+
+              return { ...req, totalValue, needsLevel2Approval };
           })
       );
       
@@ -101,68 +115,97 @@ const AprovacoesComprasPage = () => {
       setIsLoading(false);
     }, (error) => {
         console.error("Error fetching requisitions:", error);
-        toast({ variant: 'destructive', title: 'Erro de Conexão', description: 'Não foi possível carregar as requisições.' });
         setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [requisitionsQuery, firestore, toast]);
+  }, [requisitionsQuery, firestore, budgets]);
 
-  const costCenterIds = useMemo(() => {
-    if (!requisitionsWithTotals) return [];
-    return [...new Set(requisitionsWithTotals.map(r => r.costCenterId))];
-  }, [requisitionsWithTotals]);
+
+  // --- PERMISSION LOGIC ---
+  const { isLevel2Approver, level1CostCenterIds } = useMemo(() => {
+    if (!approvalTiers || !user) return { isLevel2Approver: false, level1CostCenterIds: new Set() };
+    
+    const level1CostCenterIds = new Set<string>();
+    let isL2 = false;
+
+    approvalTiers.forEach(tier => {
+        if (tier.approverId === user.uid) {
+            if (tier.level === 1) level1CostCenterIds.add(tier.costCenterId);
+            if (tier.level === 2) isL2 = true;
+        }
+    });
+    return { isLevel2Approver: isL2, level1CostCenterIds };
+
+  }, [approvalTiers, user]);
   
-  const costCentersQuery = useMemoFirebase(() => {
-      if (!firestore || costCenterIds.length === 0) return null;
-      return query(collection(firestore, 'cost_centers'), where(documentId(), 'in', costCenterIds));
-  }, [firestore, costCenterIds]);
-  const { data: costCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery);
+  // --- FILTERING LOGIC ---
+  const filteredRequisitions = useMemo(() => {
+    let displayList = requisitionsWithTotals;
 
-  const costCenterMap = useMemo(() => {
-      if (!costCenters) return new Map<string, string>();
-      return new Map(costCenters.map(cc => [cc.docId, `${cc.code} - ${cc.description}`]));
-  }, [costCenters]);
+    if (currentUserData?.accessLevel !== 'Admin') {
+        if (isLevel2Approver && showAllForLevel2) {
+            // Show all, no extra filtering needed
+        } else {
+            displayList = requisitionsWithTotals.filter(req => {
+                const isL1ForItem = level1CostCenterIds.has(req.costCenterId);
+                if (isL1ForItem && !req.needsLevel2Approval) return true;
+                if (isLevel2Approver && req.needsLevel2Approval) return true;
+                return false;
+            });
+        }
+    }
 
-
-  const handleDecision = async (req: WithDocId<PurchaseRequisition>, newStatus: 'Aprovada' | 'Recusada' | 'Em Revisão' | 'Em Revisão Comprador', reason?: string) => {
+    if (!searchTerm) return displayList;
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return displayList.filter(req => 
+        (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
+        req.requesterName.toLowerCase().includes(lowercasedTerm)
+    );
+  }, [requisitionsWithTotals, searchTerm, currentUserData, isLevel2Approver, level1CostCenterIds, showAllForLevel2]);
+  
+  
+  // --- ACTIONS ---
+  const handleDecision = async (req: RequisitionWithTotal, newStatus: 'Aprovada' | 'Recusada' | 'Em Revisão', reason?: string) => {
       if (!firestore) return;
       setIsProcessing(req.docId);
       
-      const batch = writeBatch(firestore);
-      const reqRef = doc(firestore, 'purchase_requisitions', req.docId);
-
-      let updateData: { status: string; rejectionReason?: string } = { status: newStatus };
-      if (reason) {
-          updateData.rejectionReason = reason;
-      }
-      
-      if (newStatus === 'Aprovada' && req.type === 'Ordem de Compra') {
-        updateData.status = 'Aguardando Entrega';
-      }
-
-      batch.update(reqRef, updateData);
-      
-      const notificationRef = doc(collection(firestore, `employees/${req.requesterId}/notifications`));
-      const notification: Omit<Notification, 'id'> = {
-          userId: req.requesterId,
-          title: `Requisição ${newStatus}`,
-          message: `Sua requisição ${req.protocol} foi marcada como "${newStatus}". ${reason ? `Motivo: ${reason}` : ''}`,
-          link: '/dashboard/compras/requisicao',
-          read: false,
-          createdAt: new Date().toISOString(),
-      };
-      batch.set(notificationRef, notification);
-
       try {
+          const batch = writeBatch(firestore);
+          const reqRef = doc(firestore, 'purchase_requisitions', req.docId);
+
+          let updateData: { status: string; rejectionReason?: string } = { status: newStatus };
+          if (reason) updateData.rejectionReason = reason;
+          if (newStatus === 'Aprovada' && req.type === 'Ordem de Compra') {
+            updateData.status = 'Aguardando Entrega';
+          }
+
+          batch.update(reqRef, updateData);
+          
+          if (newStatus === 'Aprovada') {
+              const currentPeriod = format(new Date(), 'yyyy-MM');
+              const budgetQuery = query(collection(firestore, 'budgets'), where('costCenterId', '==', req.costCenterId), where('period', '==', currentPeriod));
+              const budgetSnapshot = await getDocs(budgetQuery);
+
+              if (!budgetSnapshot.empty) {
+                  const budgetDoc = budgetSnapshot.docs[0];
+                  const budgetData = budgetDoc.data() as Budget;
+                  batch.update(budgetDoc.ref, { spentAmount: (budgetData.spentAmount || 0) + req.totalValue });
+              }
+          }
+          
+          const notificationRef = doc(collection(firestore, `employees/${req.requesterId}/notifications`));
+          batch.set(notificationRef, {
+              userId: req.requesterId, title: `Requisição ${newStatus}`,
+              message: `Sua requisição ${req.protocol} foi marcada como "${newStatus}". ${reason ? `Motivo: ${reason}` : ''}`,
+              link: '/dashboard/compras/requisicao', read: false, createdAt: new Date().toISOString(),
+          });
+
           await batch.commit();
           toast({
-              title: `Requisição ${newStatus}`,
-              description: `A requisição foi atualizada e as partes notificadas.`,
+              title: `Requisição ${newStatus}`, description: `A requisição foi atualizada.`,
               variant: newStatus === 'Recusada' ? 'destructive' : 'default',
           });
-          // Invalidation is implicitly handled by onSnapshot, but we can do it for safety
-          queryClient.invalidateQueries({ queryKey: [queryKey] }); 
       } catch (err) {
           console.error("Erro ao atualizar requisição:", err);
           toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível processar a sua decisão.' });
@@ -176,32 +219,11 @@ const AprovacoesComprasPage = () => {
       setDecisionState({ isOpen: true, requisition: req, type, reason: '' });
   }
 
-  const filteredRequisitions = useMemo(() => {
-    if (!requisitionsWithTotals) return [];
-    if (!searchTerm) return requisitionsWithTotals;
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return requisitionsWithTotals.filter(req => 
-        (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
-        req.requesterName.toLowerCase().includes(lowercasedTerm) ||
-        (costCenterMap.get(req.costCenterId) || '').toLowerCase().includes(lowercasedTerm)
-    );
-  }, [requisitionsWithTotals, searchTerm, costCenterMap]);
-
   const getStatusVariant = (status: PurchaseRequisition['status']) => {
-    const variants: { [key in PurchaseRequisition['status']]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
-        'Aberta': 'secondary',
-        'Em Aprovação': 'default',
-        'Em Revisão': 'warning',
-        'Em Revisão Comprador': 'warning',
-        'Aprovada': 'success',
-        'Recusada': 'destructive',
-        'Concluída': 'secondary',
-        'Parcialmente Atendida': 'warning',
-        'Totalmente Atendida': 'success',
-        'Cancelada': 'destructive',
-        'Em Cotação': 'default',
-        'Aguardando Entrega': 'default',
-        'Pronta para OC': 'success',
+    const variants: { [key: string]: 'default' | 'warning' | 'destructive' | 'secondary' | 'success' } = {
+        'Aberta': 'secondary', 'Em Aprovação': 'default', 'Em Revisão': 'warning', 'Aprovada': 'success',
+        'Recusada': 'destructive', 'Concluída': 'secondary', 'Cancelada': 'destructive',
+        'Em Cotação': 'default', 'Aguardando Entrega': 'default',
     };
     return variants[status] || 'secondary';
   }
@@ -212,10 +234,18 @@ const AprovacoesComprasPage = () => {
         <h1 className="text-2xl font-bold">Aprovação de Requisições e Ordens</h1>
         <Card>
           <CardHeader>
-            <CardTitle>Requisições e Ordens Pendentes</CardTitle>
-            <CardDescription>
-              Analise, aprove ou recuse documentos que aguardam sua ação.
-            </CardDescription>
+            <div className="flex justify-between items-center">
+                <div>
+                    <CardTitle>Requisições e Ordens Pendentes</CardTitle>
+                    <CardDescription>Analise, aprove ou recuse documentos que aguardam sua ação.</CardDescription>
+                </div>
+                {(isLevel2Approver || currentUserData?.accessLevel === 'Admin') && (
+                    <div className="flex items-center space-x-2">
+                        <Switch id="show-all-switch" checked={showAllForLevel2} onCheckedChange={setShowAllForLevel2} />
+                        <Label htmlFor="show-all-switch" className="flex items-center gap-1"><ArrowSwitch className="h-4 w-4"/> Ver Todas</Label>
+                    </div>
+                )}
+            </div>
             <div className="relative pt-4">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -243,35 +273,26 @@ const AprovacoesComprasPage = () => {
                   <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                 )}
                 {!isLoading && filteredRequisitions.length === 0 && (
-                   <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição pendente de aprovação.</TableCell></TableRow>
+                   <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma requisição aguardando sua ação.</TableCell></TableRow>
                 )}
                 {!isLoading && filteredRequisitions.map(req => (
                   <TableRow key={req.docId} className={cn(req.type === 'Ordem de Compra' && 'bg-blue-50 dark:bg-blue-900/20')}>
                     <TableCell>
                       <Badge variant={req.type === 'Ordem de Compra' ? 'default' : 'secondary'}>{req.type}</Badge>
-                       {req.originalRequisitionProtocol && <p className="text-xs text-muted-foreground mt-1">Origem: {req.originalRequisitionProtocol}</p>}
                     </TableCell>
                     <TableCell className="font-mono">{req.protocol || req.docId.substring(0, 8)}</TableCell>
                     <TableCell>{req.requesterName}</TableCell>
                     <TableCell className="font-medium">{(req.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                      <TableCell>
-                        <Badge variant={getStatusVariant(req.status)}>{req.status}</Badge>
+                        <Badge variant={req.needsLevel2Approval ? 'destructive' : 'default'}>{req.needsLevel2Approval ? 'Nível 2' : 'Nível 1'}</Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
                         {isProcessing === req.docId ? <Loader2 className="animate-spin h-5 w-5 ml-auto"/> : (
                             <>
-                                <Button variant="ghost" size="icon" onClick={() => setSelectedRequisition(req)} title="Ver Itens">
-                                    <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700" onClick={() => handleDecision(req, 'Aprovada')} title="Aprovar">
-                                    <CheckCircle className="h-5 w-5" />
-                                </Button>
-                                 <Button variant="ghost" size="icon" className="text-orange-500 hover:text-orange-600" onClick={() => openDecisionDialog(req, 'review')} title="Pedir Revisão">
-                                    <MessageSquareWarning className="h-5 w-5" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => openDecisionDialog(req, 'reject')} title="Rejeitar">
-                                    <XCircle className="h-5 w-5" />
-                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => setSelectedRequisition(req)} title="Ver Itens"><Eye className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700" onClick={() => handleDecision(req, 'Aprovada')} title="Aprovar"><CheckCircle className="h-5 w-5" /></Button>
+                                <Button variant="ghost" size="icon" className="text-orange-500 hover:text-orange-600" onClick={() => openDecisionDialog(req, 'review')} title="Pedir Revisão"><MessageSquareWarning className="h-5 w-5" /></Button>
+                                <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => openDecisionDialog(req, 'reject')} title="Rejeitar"><XCircle className="h-5 w-5" /></Button>
                             </>
                         )}
                     </TableCell>
@@ -294,36 +315,16 @@ const AprovacoesComprasPage = () => {
        <Dialog open={decisionState.isOpen} onOpenChange={() => setDecisionState(prev => ({...prev, isOpen: false}))}>
           <DialogContent>
               <DialogHeader>
-                  <DialogTitle>
-                      {decisionState.type === 'reject' ? 'Rejeitar Documento' : 'Pedir Revisão do Documento'}
-                  </DialogTitle>
-                  <DialogDescription>
-                      Por favor, informe o motivo para esta ação. A justificativa será enviada ao solicitante.
-                  </DialogDescription>
+                  <DialogTitle>{decisionState.type === 'reject' ? 'Rejeitar Documento' : 'Pedir Revisão do Documento'}</DialogTitle>
+                  <DialogDescription>Por favor, informe o motivo para esta ação. A justificativa será enviada ao solicitante.</DialogDescription>
               </DialogHeader>
               <div className="py-4 space-y-2">
                   <Label htmlFor="reason">Justificativa <span className="text-destructive">*</span></Label>
-                  <Textarea
-                      id="reason"
-                      value={decisionState.reason}
-                      onChange={(e) => setDecisionState(prev => ({...prev, reason: e.target.value}))}
-                      placeholder="Ex: Item fora de especificação, valor acima do orçado, etc."
-                  />
+                  <Textarea id="reason" value={decisionState.reason} onChange={(e) => setDecisionState(prev => ({...prev, reason: e.target.value}))} placeholder="Ex: Item fora de especificação, valor acima do orçado, etc."/>
               </div>
               <DialogFooter>
                   <Button variant="ghost" onClick={() => setDecisionState(prev => ({...prev, isOpen: false}))}>Cancelar</Button>
-                  <Button
-                      onClick={() => {
-                        const newStatus = decisionState.requisition?.type === 'Ordem de Compra' && decisionState.type === 'review'
-                          ? 'Em Revisão Comprador'
-                          : decisionState.type === 'reject'
-                          ? 'Recusada'
-                          : 'Em Revisão';
-                        handleDecision(decisionState.requisition!, newStatus, decisionState.reason);
-                      }}
-                      disabled={!decisionState.reason || isProcessing === decisionState.requisition?.docId}
-                      variant={decisionState.type === 'reject' ? 'destructive' : 'default'}
-                  >
+                  <Button onClick={() => handleDecision(decisionState.requisition! as RequisitionWithTotal, decisionState.type === 'reject' ? 'Recusada' : 'Em Revisão', decisionState.reason)} disabled={!decisionState.reason || isProcessing === decisionState.requisition?.docId} variant={decisionState.type === 'reject' ? 'destructive' : 'default'}>
                       {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'Confirmar'}
                   </Button>
               </DialogFooter>

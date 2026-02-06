@@ -31,7 +31,7 @@ service cloud.firestore {
     }
     
     match /vehicles/{vehicleId} {
-      allow get, list: if hasPermission('cadastros_veiculos_view');
+      allow get, list: if isAuthenticated();
       allow create: if hasPermission('cadastros_veiculos_create');
       allow update: if hasPermission('cadastros_veiculos_update');
       allow delete: if hasPermission('cadastros_veiculos_delete');
@@ -108,6 +108,11 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros');
     }
+    
+    match /approval_tiers/{tierId} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('configurador_alcada');
+    }
 
     match /purchase_requisitions/{requisitionId} {
         allow read: if isAuthenticated();
@@ -128,8 +133,8 @@ service cloud.firestore {
     }
     
     match /email_configurations/{configId} {
-      allow read: if hasPermission('configurador_disparo_email_view');
-      allow write: if hasPermission('configurador_disparo_email_update');
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('configurador_disparo_email');
     }
 
     match /counters/{counterId} {

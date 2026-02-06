@@ -78,6 +78,10 @@
           "type": "string",
           "description": "The name or code of the cost center."
         },
+        "costCenterId": {
+          "type": "string",
+          "description": "The ID of the Cost Center."
+        },
         "sector": {
           "type": "string",
           "description": "The specific sector the budget is allocated to (e.g., 'Ferramentaria', 'Suprimentos')."
@@ -96,6 +100,20 @@
         }
       },
       "required": ["costCenter", "sector", "totalAmount", "spentAmount", "period"]
+    },
+    "ApprovalTier": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Approval Tier",
+      "type": "object",
+      "description": "Defines an approver for a specific cost center and level.",
+      "properties": {
+        "id": { "type": "string" },
+        "costCenterId": { "type": "string", "description": "The ID of the Cost Center." },
+        "level": { "type": "number", "enum": [1, 2], "description": "Approval level (1 or 2)." },
+        "approverId": { "type": "string", "description": "The UID of the employee who is the approver." },
+        "approverName": { "type": "string", "description": "The name of the approver, for display." }
+      },
+      "required": ["costCenterId", "level", "approverId", "approverName"]
     },
     "Supply": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -914,6 +932,10 @@
       {
         "path": "/budgets/{budgetId}",
         "definition": { "schema": { "$ref": "#/entities/Budget" }, "description": "Stores budget allocations for different sectors." }
+      },
+      {
+        "path": "/approval_tiers/{tierId}",
+        "definition": { "schema": { "$ref": "#/entities/ApprovalTier" }, "description": "Stores approval tier configurations." }
       },
       {
         "path": "/supplies/{supplyId}",

@@ -1,4 +1,3 @@
-
 'use client';
 
 
@@ -226,6 +225,7 @@ export type Despesa = {
 export type Budget = {
     id?: string;
     costCenter: string;
+    costCenterId?: string; // Add this to link to the CostCenter entity
     sector: string;
     totalAmount: number;
     spentAmount: number;
@@ -249,6 +249,14 @@ export type CostCenter = {
     code: string;
     description: string;
     sector: string;
+};
+
+export type ApprovalTier = {
+  id?: string;
+  costCenterId: string;
+  level: 1 | 2;
+  approverId: string;
+  approverName: string;
 };
 
 export type Quotation = {
