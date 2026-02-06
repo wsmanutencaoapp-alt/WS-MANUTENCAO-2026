@@ -256,7 +256,7 @@ const CadastroVeiculosPage = () => {
        <Dialog open={isDialogOpen} onOpenChange={(open) => {
            if (!open) resetForm();
            setIsDialogOpen(open);
-        }}>
+        }} modal={false}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingVehicle ? 'Editar Veículo' : 'Adicionar Novo Veículo'}</DialogTitle>

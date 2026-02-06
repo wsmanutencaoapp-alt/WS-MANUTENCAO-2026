@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -254,7 +255,7 @@ const BudgetPage = () => {
         </CardContent>
       </Card>
       
-       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} modal={false}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingBudget ? 'Editar Orçamento' : 'Adicionar Novo Orçamento'}</DialogTitle>

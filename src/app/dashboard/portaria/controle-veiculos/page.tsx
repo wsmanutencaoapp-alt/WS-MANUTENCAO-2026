@@ -78,8 +78,7 @@ const ControleVeiculosPage = () => {
     type: 'saida' | 'entrada' | null;
   }>({ isOpen: false, type: null });
 
-  // State refactoring to fix selection bug
-  const [selectedVehicle, setSelectedVehicle] = useState<WithDocId<Vehicle> | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [driverName, setDriverName] = useState('');
   const [km, setKm] = useState('');
   const [notes, setNotes] = useState('');
@@ -112,6 +111,12 @@ const ControleVeiculosPage = () => {
     useCollection<WithDocId<VehicleMovement>>(movementsQuery, {
       queryKey: [movementsQueryKey],
     });
+    
+  const selectedVehicle = useMemo(() => {
+    if (!selectedVehicleId || !allVehicles) return null;
+    return allVehicles.find(v => v.docId === selectedVehicleId) || null;
+  }, [selectedVehicleId, allVehicles]);
+
 
   const vehiclesForDialog = useMemo(() => {
     if (!allVehicles) return [];
@@ -125,7 +130,7 @@ const ControleVeiculosPage = () => {
   }, [allVehicles, dialogState.type]);
 
   const resetForm = () => {
-    setSelectedVehicle(null);
+    setSelectedVehicleId(null);
     setDriverName('');
     setKm('');
     setNotes('');
@@ -284,7 +289,7 @@ const ControleVeiculosPage = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogState.isOpen} onOpenChange={handleCloseDialog}>
+      <Dialog open={dialogState.isOpen} onOpenChange={handleCloseDialog} modal={false}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -326,7 +331,7 @@ const ControleVeiculosPage = () => {
                       className="w-full justify-between"
                     >
                       {selectedVehicle
-                        ? `${selectedVehicle.prefixo} - ${selectedVehicle.placa} (${selectedVehicle.modelo})`
+                        ? `${selectedVehicle.prefixo} - ${selectedVehicle.placa}`
                         : 'Selecione um veículo...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -340,16 +345,16 @@ const ControleVeiculosPage = () => {
                           {vehiclesForDialog.map((vehicle) => (
                             <CommandItem
                               key={vehicle.docId}
-                              value={`${vehicle.prefixo} ${vehicle.placa} ${vehicle.modelo}`}
-                              onSelect={() => {
-                                setSelectedVehicle(vehicle);
+                              value={vehicle.docId}
+                              onSelect={(currentValue) => {
+                                setSelectedVehicleId(currentValue === selectedVehicleId ? null : currentValue);
                                 setVehiclePopoverOpen(false);
                               }}
                             >
                               <Check
                                 className={cn(
                                   'mr-2 h-4 w-4',
-                                  selectedVehicle?.docId === vehicle.docId
+                                  selectedVehicleId === vehicle.docId
                                     ? 'opacity-100'
                                     : 'opacity-0'
                                 )}
@@ -407,5 +412,3 @@ const ControleVeiculosPage = () => {
 };
 
 export default ControleVeiculosPage;
-
-    

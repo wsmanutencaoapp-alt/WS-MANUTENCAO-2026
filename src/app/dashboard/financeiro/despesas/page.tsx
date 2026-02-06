@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -179,7 +180,7 @@ const DespesasPage = () => {
             <Wallet />
             Registro de Despesas
         </h1>
-        <Dialog open={isNewExpenseDialogOpen} onOpenChange={setIsNewExpenseDialogOpen}>
+        <Dialog open={isNewExpenseDialogOpen} onOpenChange={setIsNewExpenseDialogOpen} modal={false}>
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
