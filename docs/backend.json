@@ -29,6 +29,7 @@
         "vehiclePrefixo": { "type": "string", "description": "Denormalized vehicle prefix for display. Optional for external vehicles." },
         "vehiclePlaca": { "type": "string", "description": "Vehicle license plate." },
         "driverName": { "type": "string", "description": "Name of the driver." },
+        "driverPhotoUrl": { "type": "string", "format": "uri", "description": "URL of the driver's selfie taken at checkout." },
         "type": { "type": "string", "enum": ["saida", "entrada"], "description": "Type of movement." },
         "date": { "type": "string", "format": "date-time", "description": "Timestamp of the movement." },
         "km": { "type": "number", "description": "Vehicle mileage at the time of movement. Optional for external vehicles." },
@@ -36,6 +37,24 @@
         "isExternal": { "type": "boolean", "description": "Flag to indicate if the vehicle is external to the company." }
       },
       "required": ["vehiclePlaca", "driverName", "type", "date"]
+    },
+    "Visit": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Visit",
+      "type": "object",
+      "description": "Records the entry or exit of a visitor.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Full name of the visitor." },
+        "documentNumber": { "type": "string", "description": "Visitor's ID number (e.g., RG or CPF)." },
+        "company": { "type": "string", "description": "Company the visitor represents." },
+        "personToVisit": { "type": "string", "description": "Employee being visited." },
+        "reason": { "type": "string", "description": "Reason for the visit." },
+        "entryTimestamp": { "type": "string", "format": "date-time", "description": "Timestamp of entry." },
+        "exitTimestamp": { "type": "string", "format": "date-time", "description": "Timestamp of exit." },
+        "status": { "type": "string", "enum": ["Dentro", "Fora"], "description": "Current status of the visitor." }
+      },
+      "required": ["name", "documentNumber", "company", "personToVisit", "reason", "entryTimestamp", "status"]
     },
     "Address": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -929,6 +948,10 @@
       {
         "path": "/vehicle_movements/{movementId}",
         "definition": { "schema": { "$ref": "#/entities/VehicleMovement" }, "description": "Stores vehicle entry and exit records." }
+      },
+      {
+        "path": "/visits/{visitId}",
+        "definition": { "schema": { "$ref": "#/entities/Visit" }, "description": "Stores visitor entry and exit records." }
       },
       {
         "path": "/addresses/{addressId}",

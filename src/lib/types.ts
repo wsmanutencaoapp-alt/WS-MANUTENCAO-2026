@@ -18,6 +18,7 @@ export type VehicleMovement = {
     vehiclePrefixo?: string;
     vehiclePlaca: string;
     driverName: string;
+    driverPhotoUrl?: string;
     type: 'saida' | 'entrada';
     date: string; // ISO String
     km?: number;
