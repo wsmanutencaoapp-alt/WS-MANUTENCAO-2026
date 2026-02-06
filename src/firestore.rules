@@ -29,6 +29,13 @@ service cloud.firestore {
     function isOwner(userId) {
         return request.auth.uid == userId;
     }
+    
+    match /vehicles/{vehicleId} {
+      allow get, list: if hasPermission('cadastros_veiculos_view');
+      allow create: if hasPermission('cadastros_veiculos_create');
+      allow update: if hasPermission('cadastros_veiculos_update');
+      allow delete: if hasPermission('cadastros_veiculos_delete');
+    }
 
     match /supplies/{supplyId} {
       allow read: if isAuthenticated();
@@ -46,7 +53,7 @@ service cloud.firestore {
 
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if hasPermission('ferramentaria');
+      allow create, update, delete: if hasPermission('ferramentaria') || hasPermission('compras_controle_create');
       
       match /calibration_history/{calibrationId} {
         allow read: if hasPermission('ferramentaria');
@@ -74,7 +81,8 @@ service cloud.firestore {
                       !('status' in request.resource.data));
       
       match /notifications/{notificationId} {
-        allow read, write: if isOwner(employeeId);
+        allow read, update, delete: if isOwner(employeeId);
+        allow create: if isAuthenticated();
       }
     }
     
