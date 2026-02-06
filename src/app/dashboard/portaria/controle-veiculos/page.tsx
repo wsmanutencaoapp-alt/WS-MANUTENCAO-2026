@@ -65,6 +65,7 @@ import {
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 
 const ControleVeiculosPage = () => {
   const firestore = useFirestore();
@@ -83,6 +84,9 @@ const ControleVeiculosPage = () => {
     km: '',
     notes: '',
   });
+  
+  const [isExternalVehicle, setIsExternalVehicle] = useState(false);
+  const [externalPlate, setExternalPlate] = useState('');
 
   const [isVehiclePopoverOpen, setVehiclePopoverOpen] = useState(false);
 
@@ -123,6 +127,8 @@ const ControleVeiculosPage = () => {
 
   const resetForm = () => {
     setFormData({ vehicleId: '', driverName: '', km: '', notes: '' });
+    setIsExternalVehicle(false);
+    setExternalPlate('');
   };
 
   const handleOpenDialog = (type: 'saida' | 'entrada') => {
@@ -135,75 +141,82 @@ const ControleVeiculosPage = () => {
   };
 
   const handleSave = async () => {
-    if (!firestore || !user || !formData.vehicleId || !formData.driverName || !formData.km) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: 'Veículo, motorista e KM são obrigatórios.',
-      });
+    if (!firestore || !user) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado.' });
       return;
     }
-
-    const selectedVehicle = allVehicles?.find(
-      (v) => v.docId === formData.vehicleId
-    );
-    if (!selectedVehicle) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: 'Veículo selecionado não encontrado.',
-      });
-      return;
-    }
-
+    
     try {
-      const batch = writeBatch(firestore);
+        if (dialogState.type === 'entrada' && isExternalVehicle) {
+            if (!externalPlate || !formData.driverName) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'Placa e motorista são obrigatórios para veículo externo.' });
+                return;
+            }
 
-      // Create Movement Record
-      const movementRef = doc(collection(firestore, 'vehicle_movements'));
-      const movementData: Omit<VehicleMovement, 'id'> = {
-        vehicleId: selectedVehicle.docId,
-        vehiclePrefixo: selectedVehicle.prefixo,
-        vehiclePlaca: selectedVehicle.placa,
-        driverName: formData.driverName,
-        type: dialogState.type!,
-        date: new Date().toISOString(),
-        km: Number(formData.km),
-        notes: formData.notes,
-      };
-      batch.set(movementRef, movementData);
+            const movementData: Partial<VehicleMovement> = {
+                vehiclePlaca: externalPlate.toUpperCase(),
+                driverName: formData.driverName,
+                type: 'entrada',
+                date: new Date().toISOString(),
+                notes: formData.notes,
+                isExternal: true,
+            };
+            
+            await addDoc(collection(firestore, 'vehicle_movements'), movementData);
 
-      // Update Vehicle Status
-      const vehicleRef = doc(firestore, 'vehicles', selectedVehicle.docId);
-      const newStatus = dialogState.type === 'saida' ? 'Em Viagem' : 'Ativo';
-      batch.update(vehicleRef, { status: newStatus });
+        } else { // Internal vehicle logic for both 'entrada' and 'saida'
+            if (!formData.vehicleId || !formData.driverName || !formData.km) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'Veículo, motorista e KM são obrigatórios.' });
+                return;
+            }
+        
+            const selectedVehicle = allVehicles?.find(v => v.docId === formData.vehicleId);
+            if (!selectedVehicle) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'Veículo selecionado não encontrado.' });
+                return;
+            }
 
-      await batch.commit();
+            const batch = writeBatch(firestore);
+            const movementRef = doc(collection(firestore, 'vehicle_movements'));
+            const movementData: Omit<VehicleMovement, 'id' | 'isExternal'> = {
+                vehicleId: selectedVehicle.docId,
+                vehiclePrefixo: selectedVehicle.prefixo,
+                vehiclePlaca: selectedVehicle.placa,
+                driverName: formData.driverName,
+                type: dialogState.type!,
+                date: new Date().toISOString(),
+                km: Number(formData.km),
+                notes: formData.notes,
+            };
+            batch.set(movementRef, movementData);
+            
+            const vehicleRef = doc(firestore, 'vehicles', selectedVehicle.docId);
+            const newStatus = dialogState.type === 'saida' ? 'Em Viagem' : 'Ativo';
+            batch.update(vehicleRef, { status: newStatus });
+            await batch.commit();
+        }
 
-      toast({
-        title: 'Sucesso!',
-        description: `Registro de ${dialogState.type} para o veículo ${selectedVehicle.prefixo} salvo.`,
-      });
+        toast({ title: 'Sucesso!', description: `Registro de ${dialogState.type} salvo.` });
+        queryClient.invalidateQueries({ queryKey: [vehiclesQueryKey] });
+        queryClient.invalidateQueries({ queryKey: [movementsQueryKey] });
+        handleCloseDialog();
 
-      queryClient.invalidateQueries({ queryKey: [vehiclesQueryKey] });
-      queryClient.invalidateQueries({ queryKey: [movementsQueryKey] });
-
-      handleCloseDialog();
     } catch (err) {
-      console.error('Erro ao salvar movimentação:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Erro na Operação',
-        description: 'Não foi possível salvar a movimentação do veículo.',
-      });
+        console.error('Erro ao salvar movimentação:', err);
+        toast({
+            variant: 'destructive',
+            title: 'Erro na Operação',
+            description: 'Não foi possível salvar a movimentação do veículo.',
+        });
     }
   };
+
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold mb-4">Controle de Veículos</h1>
-        <div className="flex gap-2">
+        <h1 className="text-2xl font-bold">Controle de Veículos</h1>
+        <div className="flex gap-2 mt-4">
           <Button onClick={() => handleOpenDialog('saida')}>
             <ArrowRight className="mr-2" />
             Registrar Saída
@@ -261,13 +274,13 @@ const ControleVeiculosPage = () => {
                     {format(new Date(mov.date), 'dd/MM/yyyy HH:mm')}
                   </TableCell>
                   <TableCell>
-                    <div className="font-medium">{mov.vehiclePrefixo}</div>
+                    <div className="font-medium">{mov.isExternal ? 'EXTERNO' : mov.vehiclePrefixo}</div>
                     <div className="text-sm text-muted-foreground">
                       {mov.vehiclePlaca}
                     </div>
                   </TableCell>
                   <TableCell>{mov.driverName}</TableCell>
-                  <TableCell>{mov.km.toLocaleString('pt-BR')}</TableCell>
+                  <TableCell>{mov.km?.toLocaleString('pt-BR') ?? 'N/A'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -283,63 +296,86 @@ const ControleVeiculosPage = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {dialogState.type === 'entrada' && (
+              <div className="flex items-center space-x-2">
+                  <Switch
+                      id="external-vehicle"
+                      checked={isExternalVehicle}
+                      onCheckedChange={setIsExternalVehicle}
+                  />
+                  <Label htmlFor="external-vehicle">Veículo Externo</Label>
+              </div>
+            )}
+            
+            {dialogState.type === 'entrada' && isExternalVehicle ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="externalPlate">Placa do Veículo <span className="text-destructive">*</span></Label>
+                <Input
+                  id="externalPlate"
+                  value={externalPlate}
+                  onChange={(e) => setExternalPlate(e.target.value.toUpperCase())}
+                />
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Veículo <span className="text-destructive">*</span></Label>
+                <Popover
+                  open={isVehiclePopoverOpen}
+                  onOpenChange={setVehiclePopoverOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {formData.vehicleId
+                        ? vehiclesForDialog.find(
+                            (v) => v.docId === formData.vehicleId
+                          )?.prefixo
+                        : 'Selecione um veículo...'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar prefixo ou placa..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum veículo encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {vehiclesForDialog.map((vehicle) => (
+                            <CommandItem
+                              key={vehicle.docId}
+                              value={`${vehicle.prefixo} ${vehicle.placa}`}
+                              onSelect={() => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  vehicleId: vehicle.docId,
+                                }));
+                                setVehiclePopoverOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  formData.vehicleId === vehicle.docId
+                                    ? 'opacity-100'
+                                    : 'opacity-0'
+                                )}
+                              />
+                              {vehicle.prefixo} - {vehicle.placa}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
             <div className="space-y-1.5">
-              <Label>Veículo</Label>
-              <Popover
-                open={isVehiclePopoverOpen}
-                onOpenChange={setVehiclePopoverOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between"
-                  >
-                    {formData.vehicleId
-                      ? vehiclesForDialog.find(
-                          (v) => v.docId === formData.vehicleId
-                        )?.prefixo
-                      : 'Selecione um veículo...'}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput placeholder="Buscar prefixo ou placa..." />
-                    <CommandList>
-                      <CommandEmpty>Nenhum veículo encontrado.</CommandEmpty>
-                      <CommandGroup>
-                        {vehiclesForDialog.map((vehicle) => (
-                          <CommandItem
-                            key={vehicle.docId}
-                            value={`${vehicle.prefixo} ${vehicle.placa}`}
-                            onSelect={() => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                vehicleId: vehicle.docId,
-                              }));
-                              setVehiclePopoverOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                formData.vehicleId === vehicle.docId
-                                  ? 'opacity-100'
-                                  : 'opacity-0'
-                              )}
-                            />
-                            {vehicle.prefixo} - {vehicle.placa}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="driverName">Nome do Motorista</Label>
+              <Label htmlFor="driverName">Nome do Motorista <span className="text-destructive">*</span></Label>
               <Input
                 id="driverName"
                 value={formData.driverName}
@@ -349,7 +385,7 @@ const ControleVeiculosPage = () => {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="km">Quilometragem (KM)</Label>
+              <Label htmlFor="km">Quilometragem (KM) {!(isExternalVehicle && dialogState.type === 'entrada') && <span className="text-destructive">*</span>}</Label>
               <Input
                 id="km"
                 type="number"
@@ -357,6 +393,7 @@ const ControleVeiculosPage = () => {
                 onChange={(e) =>
                   setFormData((p) => ({ ...p, km: e.target.value }))
                 }
+                disabled={isExternalVehicle && dialogState.type === 'entrada'}
               />
             </div>
             <div className="space-y-1.5">

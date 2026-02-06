@@ -14,14 +14,15 @@ export type Vehicle = {
 
 export type VehicleMovement = {
     id?: string;
-    vehicleId: string;
-    vehiclePrefixo: string;
+    vehicleId?: string;
+    vehiclePrefixo?: string;
     vehiclePlaca: string;
     driverName: string;
     type: 'saida' | 'entrada';
     date: string; // ISO String
-    km: number;
+    km?: number;
     notes?: string;
+    isExternal?: boolean;
 };
 
 export type Supply = {

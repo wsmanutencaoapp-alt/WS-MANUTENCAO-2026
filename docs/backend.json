@@ -25,16 +25,17 @@
       "description": "Records the entry or exit of a vehicle.",
       "properties": {
         "id": { "type": "string" },
-        "vehicleId": { "type": "string", "description": "ID of the related vehicle." },
-        "vehiclePrefixo": { "type": "string", "description": "Denormalized vehicle prefix for display." },
-        "vehiclePlaca": { "type": "string", "description": "Denormalized vehicle license plate for display." },
+        "vehicleId": { "type": "string", "description": "ID of the related vehicle. Optional for external vehicles." },
+        "vehiclePrefixo": { "type": "string", "description": "Denormalized vehicle prefix for display. Optional for external vehicles." },
+        "vehiclePlaca": { "type": "string", "description": "Vehicle license plate." },
         "driverName": { "type": "string", "description": "Name of the driver." },
         "type": { "type": "string", "enum": ["saida", "entrada"], "description": "Type of movement." },
         "date": { "type": "string", "format": "date-time", "description": "Timestamp of the movement." },
-        "km": { "type": "number", "description": "Vehicle mileage at the time of movement." },
-        "notes": { "type": "string", "description": "Optional notes about the movement." }
+        "km": { "type": "number", "description": "Vehicle mileage at the time of movement. Optional for external vehicles." },
+        "notes": { "type": "string", "description": "Optional notes about the movement." },
+        "isExternal": { "type": "boolean", "description": "Flag to indicate if the vehicle is external to the company." }
       },
-      "required": ["vehicleId", "vehiclePrefixo", "vehiclePlaca", "driverName", "type", "date", "km"]
+      "required": ["vehiclePlaca", "driverName", "type", "date"]
     },
     "Address": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1005,5 +1006,3 @@
   }
 }
       
-
-    
