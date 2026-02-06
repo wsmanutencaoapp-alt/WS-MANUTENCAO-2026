@@ -8,7 +8,7 @@ export type Vehicle = {
   marca: string;
   modelo: string;
   ano: number;
-  tipo: 'Carro' | 'Moto' | 'Caminhão' | 'Van' | 'Outro';
+  tipo: 'Carro' | 'Moto' | 'Caminhão' | 'Van' | 'Caminhonete' | 'Outro';
   status: 'Ativo' | 'Inativo' | 'Em Manutenção' | 'Em Viagem';
 };
 

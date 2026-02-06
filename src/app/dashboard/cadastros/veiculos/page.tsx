@@ -277,6 +277,7 @@ const CadastroVeiculosPage = () => {
                             <SelectItem value="Carro">Carro</SelectItem>
                             <SelectItem value="Moto">Moto</SelectItem>
                             <SelectItem value="Caminhão">Caminhão</SelectItem>
+                            <SelectItem value="Caminhonete">Caminhonete</SelectItem>
                             <SelectItem value="Van">Van</SelectItem>
                             <SelectItem value="Outro">Outro</SelectItem>
                         </SelectContent>

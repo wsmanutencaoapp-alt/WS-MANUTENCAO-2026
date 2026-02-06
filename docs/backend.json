@@ -13,7 +13,7 @@
         "marca": { "type": "string", "description": "The manufacturer of the vehicle." },
         "modelo": { "type": "string", "description": "The model of the vehicle." },
         "ano": { "type": "number", "description": "The manufacturing year of the vehicle." },
-        "tipo": { "type": "string", "enum": ["Carro", "Moto", "Caminhão", "Van", "Outro"], "description": "The type of vehicle." },
+        "tipo": { "type": "string", "enum": ["Carro", "Moto", "Caminhão", "Van", "Caminhonete", "Outro"], "description": "The type of vehicle." },
         "status": { "type": "string", "enum": ["Ativo", "Inativo", "Em Manutenção", "Em Viagem"], "description": "The current status of the vehicle." }
       },
       "required": ["prefixo", "placa", "marca", "modelo", "ano", "tipo", "status"]
