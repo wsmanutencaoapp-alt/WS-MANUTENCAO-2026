@@ -32,7 +32,7 @@ function CostCenterApprovalCard({
     };
 
     return (
-        <Card>
+        <Card className="mt-6 animate-in fade-in-50">
             <CardHeader>
                 <CardTitle>{costCenter.code} - {costCenter.description}</CardTitle>
                 <CardDescription>Setor: {costCenter.sector}</CardDescription>
@@ -41,7 +41,7 @@ function CostCenterApprovalCard({
                 <div className="space-y-2">
                     <Label>Aprovador Nível 1</Label>
                     <Select
-                        value={level1Tier?.approverId}
+                        value={level1Tier?.approverId || '--none--'}
                         onValueChange={(value) => handleSelect(1, value)}
                     >
                         <SelectTrigger>
@@ -58,7 +58,7 @@ function CostCenterApprovalCard({
                 <div className="space-y-2">
                     <Label>Aprovador Nível 2</Label>
                     <Select
-                        value={level2Tier?.approverId}
+                        value={level2Tier?.approverId || '--none--'}
                         onValueChange={(value) => handleSelect(2, value)}
                     >
                         <SelectTrigger>
@@ -83,6 +83,7 @@ export default function AlcadaAprovacaoPage() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
+    const [selectedCostCenterId, setSelectedCostCenterId] = useState<string | null>(null);
     const [tierChanges, setTierChanges] = useState<Map<string, { level: 1 | 2; approverId: string; }>>(new Map());
     const [isSaving, setIsSaving] = useState(false);
 
@@ -110,6 +111,12 @@ export default function AlcadaAprovacaoPage() {
         const key = `${costCenterId}-${level}`;
         setTierChanges(prev => new Map(prev).set(key, { level, approverId }));
     };
+    
+    const selectedCostCenter = useMemo(() => {
+        if (!selectedCostCenterId || !costCenters) return null;
+        return costCenters.find(cc => cc.docId === selectedCostCenterId);
+    }, [selectedCostCenterId, costCenters]);
+
     
     const handleSaveChanges = async () => {
         if (!firestore) return;
@@ -165,47 +172,56 @@ export default function AlcadaAprovacaoPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Configurar Alçada de Aprovação</h1>
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold">Configurar Alçada de Aprovação</h1>
+                     <p className="text-muted-foreground mt-2">
+                        Defina os aprovadores Nível 1 e Nível 2 para cada centro de custo.
+                    </p>
+                </div>
                 <Button onClick={handleSaveChanges} disabled={tierChanges.size === 0 || isSaving}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
                     Salvar Alterações
                 </Button>
             </div>
             
-            <p className="text-muted-foreground">
-                Defina os aprovadores Nível 1 e Nível 2 para cada centro de custo. O Nível 1 aprova dentro do budget, o Nível 2 aprova exceções ou se não houver budget.
-            </p>
-
-            {isLoading && (
-                <div className="space-y-4">
-                    {[...Array(3)].map((_, i) => (
-                        <Card key={i}>
-                            <CardHeader>
-                                <CardTitle className="h-6 bg-muted rounded w-1/2"></CardTitle>
-                                <CardDescription className="h-4 bg-muted rounded w-1/4"></CardDescription>
-                            </CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                               <div className="h-10 bg-muted rounded w-full"></div>
-                               <div className="h-10 bg-muted rounded w-full"></div>
-                            </CardContent>
-                        </Card>
-                    ))}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Selecionar Centro de Custo</CardTitle>
+                    <CardDescription>
+                        Escolha um centro de custo para visualizar ou editar os aprovadores.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Select onValueChange={setSelectedCostCenterId} disabled={isLoading}>
+                        <SelectTrigger className="w-full md:w-1/2">
+                            <SelectValue placeholder={isLoading ? "Carregando centros de custo..." : "Selecione um centro de custo"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {costCenters?.map(cc => (
+                                <SelectItem key={cc.docId} value={cc.docId}>
+                                    ({cc.code}) - {cc.description}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </CardContent>
+            </Card>
+            
+            {isLoading && !selectedCostCenter && (
+                 <div className="mt-6 space-y-4">
+                    <div className="h-40 bg-muted rounded-lg animate-pulse w-full"></div>
                 </div>
             )}
             
-            {!isLoading && (
-                <div className="space-y-4">
-                    {costCenters?.map(cc => (
-                        <CostCenterApprovalCard
-                            key={cc.docId}
-                            costCenter={cc}
-                            employees={employees || []}
-                            approvalTiers={approvalTiersMap}
-                            onTierChange={handleTierChange}
-                        />
-                    ))}
-                </div>
+            {selectedCostCenter && (
+                <CostCenterApprovalCard
+                    key={selectedCostCenter.docId}
+                    costCenter={selectedCostCenter}
+                    employees={employees || []}
+                    approvalTiers={approvalTiersMap}
+                    onTierChange={handleTierChange}
+                />
             )}
         </div>
     );
