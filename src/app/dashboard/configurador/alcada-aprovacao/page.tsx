@@ -41,14 +41,14 @@ function CostCenterApprovalCard({
                 <div className="space-y-2">
                     <Label>Aprovador Nível 1</Label>
                     <Select
-                        value={level1Tier?.approverId || ''}
+                        value={level1Tier?.approverId}
                         onValueChange={(value) => handleSelect(1, value)}
                     >
                         <SelectTrigger>
                             <SelectValue placeholder="Selecione o aprovador..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">Nenhum</SelectItem>
+                            <SelectItem value="--none--">Nenhum</SelectItem>
                             {employees.map(emp => (
                                 <SelectItem key={emp.docId} value={emp.docId}>{emp.firstName} {emp.lastName}</SelectItem>
                             ))}
@@ -58,14 +58,14 @@ function CostCenterApprovalCard({
                 <div className="space-y-2">
                     <Label>Aprovador Nível 2</Label>
                     <Select
-                        value={level2Tier?.approverId || ''}
+                        value={level2Tier?.approverId}
                         onValueChange={(value) => handleSelect(2, value)}
                     >
                         <SelectTrigger>
                             <SelectValue placeholder="Selecione o aprovador..." />
                         </SelectTrigger>
                         <SelectContent>
-                             <SelectItem value="">Nenhum</SelectItem>
+                             <SelectItem value="--none--">Nenhum</SelectItem>
                             {employees.map(emp => (
                                 <SelectItem key={emp.docId} value={emp.docId}>{emp.firstName} {emp.lastName}</SelectItem>
                             ))}
@@ -122,13 +122,16 @@ export default function AlcadaAprovacaoPage() {
                 const level = parseInt(levelStr) as 1 | 2;
                 
                 const existingTier = approvalTiersMap.get(key);
-                const selectedEmployee = employees?.find(e => e.docId === change.approverId);
                 
-                if (change.approverId === '' && existingTier) {
-                    // Remove the tier
-                    const tierRef = doc(firestore, 'approval_tiers', existingTier.docId);
-                    batch.delete(tierRef);
-                } else if (change.approverId !== '') {
+                if (change.approverId === '--none--') {
+                    if (existingTier) {
+                        const tierRef = doc(firestore, 'approval_tiers', existingTier.docId);
+                        batch.delete(tierRef);
+                    }
+                } else {
+                    const selectedEmployee = employees?.find(e => e.docId === change.approverId);
+                    if (!selectedEmployee) continue;
+
                     const newTierData = {
                         costCenterId,
                         level,
@@ -137,11 +140,9 @@ export default function AlcadaAprovacaoPage() {
                     };
                     
                     if (existingTier) {
-                        // Update existing tier
                         const tierRef = doc(firestore, 'approval_tiers', existingTier.docId);
                         batch.update(tierRef, newTierData);
                     } else {
-                        // Create new tier
                         const tierRef = doc(collection(firestore, 'approval_tiers'));
                         batch.set(tierRef, newTierData);
                     }
