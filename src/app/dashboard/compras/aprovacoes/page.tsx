@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, Eye, CheckCircle, XCircle, MessageSquareWarning, ArrowSwitch } from 'lucide-react';
+import { Loader2, Search, Eye, CheckCircle, XCircle, MessageSquareWarning, ArrowRightLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -242,7 +242,7 @@ const AprovacoesComprasPage = () => {
                 {(isLevel2Approver || currentUserData?.accessLevel === 'Admin') && (
                     <div className="flex items-center space-x-2">
                         <Switch id="show-all-switch" checked={showAllForLevel2} onCheckedChange={setShowAllForLevel2} />
-                        <Label htmlFor="show-all-switch" className="flex items-center gap-1"><ArrowSwitch className="h-4 w-4"/> Ver Todas</Label>
+                        <Label htmlFor="show-all-switch" className="flex items-center gap-1"><ArrowRightLeft className="h-4 w-4"/> Ver Todas</Label>
                     </div>
                 )}
             </div>
