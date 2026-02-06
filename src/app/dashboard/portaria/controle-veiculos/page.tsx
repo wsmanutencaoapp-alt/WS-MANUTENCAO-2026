@@ -384,18 +384,19 @@ const ControleVeiculosPage = () => {
                 }
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="km">Quilometragem (KM) {!(isExternalVehicle && dialogState.type === 'entrada') && <span className="text-destructive">*</span>}</Label>
-              <Input
-                id="km"
-                type="number"
-                value={formData.km}
-                onChange={(e) =>
-                  setFormData((p) => ({ ...p, km: e.target.value }))
-                }
-                disabled={isExternalVehicle && dialogState.type === 'entrada'}
-              />
-            </div>
+            {!(isExternalVehicle && dialogState.type === 'entrada') && (
+              <div className="space-y-1.5">
+                <Label htmlFor="km">Quilometragem (KM) <span className="text-destructive">*</span></Label>
+                <Input
+                  id="km"
+                  type="number"
+                  value={formData.km}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, km: e.target.value }))
+                  }
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="notes">Observações</Label>
               <Textarea
