@@ -108,7 +108,7 @@ export const permissionStructure = [
         label: 'Portaria',
         path: '/dashboard/portaria',
         isModule: true,
-        actions: ['view'],
+        actions: ['view', 'create', 'update'],
     },
     {
         id: 'userManagement',
@@ -166,3 +166,5 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
 };
 
   
+
+    

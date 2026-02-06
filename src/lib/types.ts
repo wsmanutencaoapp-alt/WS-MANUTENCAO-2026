@@ -9,7 +9,19 @@ export type Vehicle = {
   modelo: string;
   ano: number;
   tipo: 'Carro' | 'Moto' | 'Caminhão' | 'Van' | 'Outro';
-  status: 'Ativo' | 'Inativo' | 'Em Manutenção';
+  status: 'Ativo' | 'Inativo' | 'Em Manutenção' | 'Em Viagem';
+};
+
+export type VehicleMovement = {
+    id?: string;
+    vehicleId: string;
+    vehiclePrefixo: string;
+    vehiclePlaca: string;
+    driverName: string;
+    type: 'saida' | 'entrada';
+    date: string; // ISO String
+    km: number;
+    notes?: string;
 };
 
 export type Supply = {
@@ -349,4 +361,6 @@ export type EmailConfiguration = {
     recipients: string[];
 };
     
+    
+
     

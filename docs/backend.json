@@ -14,9 +14,27 @@
         "modelo": { "type": "string", "description": "The model of the vehicle." },
         "ano": { "type": "number", "description": "The manufacturing year of the vehicle." },
         "tipo": { "type": "string", "enum": ["Carro", "Moto", "Caminhão", "Van", "Outro"], "description": "The type of vehicle." },
-        "status": { "type": "string", "enum": ["Ativo", "Inativo", "Em Manutenção"], "description": "The current status of the vehicle." }
+        "status": { "type": "string", "enum": ["Ativo", "Inativo", "Em Manutenção", "Em Viagem"], "description": "The current status of the vehicle." }
       },
       "required": ["prefixo", "placa", "marca", "modelo", "ano", "tipo", "status"]
+    },
+    "VehicleMovement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Vehicle Movement",
+      "type": "object",
+      "description": "Records the entry or exit of a vehicle.",
+      "properties": {
+        "id": { "type": "string" },
+        "vehicleId": { "type": "string", "description": "ID of the related vehicle." },
+        "vehiclePrefixo": { "type": "string", "description": "Denormalized vehicle prefix for display." },
+        "vehiclePlaca": { "type": "string", "description": "Denormalized vehicle license plate for display." },
+        "driverName": { "type": "string", "description": "Name of the driver." },
+        "type": { "type": "string", "enum": ["saida", "entrada"], "description": "Type of movement." },
+        "date": { "type": "string", "format": "date-time", "description": "Timestamp of the movement." },
+        "km": { "type": "number", "description": "Vehicle mileage at the time of movement." },
+        "notes": { "type": "string", "description": "Optional notes about the movement." }
+      },
+      "required": ["vehicleId", "vehiclePrefixo", "vehiclePlaca", "driverName", "type", "date", "km"]
     },
     "Address": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -908,6 +926,10 @@
         "definition": { "schema": { "$ref": "#/entities/Vehicle" }, "description": "Stores company vehicles." }
       },
       {
+        "path": "/vehicle_movements/{movementId}",
+        "definition": { "schema": { "$ref": "#/entities/VehicleMovement" }, "description": "Stores vehicle entry and exit records." }
+      },
+      {
         "path": "/addresses/{addressId}",
         "definition": { "schema": { "$ref": "#/entities/Address" }, "description": "Stores hierarchical storage addresses." }
       },
@@ -984,4 +1006,4 @@
 }
       
 
-  
+    
