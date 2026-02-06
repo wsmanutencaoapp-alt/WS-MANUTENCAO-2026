@@ -201,8 +201,8 @@ const ControleVeiculosPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Controle de Veículos</h1>
+      <div>
+        <h1 className="text-2xl font-bold mb-4">Controle de Veículos</h1>
         <div className="flex gap-2">
           <Button onClick={() => handleOpenDialog('saida')}>
             <ArrowRight className="mr-2" />
