@@ -166,27 +166,6 @@ const RequisicaoCompraPage = () => {
             batch.set(counterRef, { lastId: newId });
         }
 
-        // Create in-app notifications for approvers
-        const approversQuery = query(collection(firestore, 'employees'), where('permissions.compras', '==', true));
-        const approversSnapshot = await getDocs(approversQuery);
-
-        if (!approversSnapshot.empty) {
-            approversSnapshot.forEach(approverDoc => {
-                const approver = approverDoc.data() as Employee;
-                const approverId = approverDoc.id;
-                const notificationRef = doc(collection(firestore, `employees/${approverId}/notifications`));
-                const notificationData: Omit<Notification, 'id'> = {
-                    userId: approverId,
-                    title: 'Nova Requisição para Aprovação',
-                    message: `A solicitação ${protocol} de ${user.displayName || user.email} aguarda sua aprovação.`,
-                    link: '/dashboard/compras/aprovacoes',
-                    read: false,
-                    createdAt: new Date().toISOString(),
-                };
-                batch.set(notificationRef, notificationData);
-            });
-        }
-        
         await batch.commit();
 
         // Send email notifications based on configuration (after commit)
