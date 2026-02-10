@@ -115,11 +115,15 @@ export const permissionStructure = [
         ]
     },
     {
-        id: 'selfie',
-        label: 'Selfie (Público)',
+        id: 'self',
+        label: 'Self (Público)',
         path: '/retirada-veiculo',
         isModule: true,
         actions: ['view'],
+        submodules: [
+            { id: 'self_retirada', label: 'Retirada de Veículo', path: '/retirada-veiculo', actions: ['view'] },
+            { id: 'self_comprovante', label: 'Anexo de Comprovante', path: '/anexo-comprovante', actions: ['view'] },
+        ],
     },
     {
         id: 'userManagement',
@@ -152,7 +156,7 @@ export const allPermissionIDs = permissionStructure.flatMap(module => {
 
 
 export const getRequiredPermissionForPath = (path: string): string | null => {
-    if (path.startsWith('/retirada-veiculo')) return null; // Public page
+    if (path.startsWith('/retirada-veiculo') || path.startsWith('/anexo-comprovante')) return null; // Public page
     if (path === '/dashboard' || path === '/dashboard/') return 'dashboard_view';
     if (path === '/dashboard/settings') return null; // All users can see their own settings
 
@@ -176,9 +180,3 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
 
     return null;
 };
-
-  
-
-    
-
-  

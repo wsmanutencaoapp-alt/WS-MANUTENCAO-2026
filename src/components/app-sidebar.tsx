@@ -179,8 +179,11 @@ const allNavItems: NavItem[] = [
    {
     href: '/retirada-veiculo',
     icon: Camera,
-    label: 'Selfie (Público)',
-    permission: 'selfie',
+    label: 'Self (Público)',
+    subItems: [
+        { href: '/retirada-veiculo', label: 'Retirada de Veículo', icon: Car },
+        { href: '/anexo-comprovante', label: 'Anexo de Comprovante', icon: Receipt },
+    ]
   },
 ];
 
@@ -202,14 +205,18 @@ const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permi
   if (!permissions && !isAdmin) return [];
 
   return items.reduce((acc, item) => {
-    const hasViewPermission = isAdmin || !item.permission || (permissions?.[`${item.permission}_view`]);
+    // For public items with no permission property, always show them.
+    const hasPermission = isAdmin || !item.permission || (permissions?.[`${item.permission}_view`]);
 
-    if (hasViewPermission) {
+    if (hasPermission) {
       if (item.subItems) {
         const permittedSubItems = item.subItems.filter(subItem => 
           isAdmin || !subItem.permission || (permissions?.[`${subItem.permission}_view`])
         );
         
+        // If the main item itself is a link, keep it even if subItems are filtered, 
+        // but if it's just a category, only keep it if it has children.
+        // For this app, parents with subItems are categories.
         if (permittedSubItems.length > 0) {
           acc.push({ ...item, subItems: permittedSubItems });
         }
@@ -269,9 +276,16 @@ export function AppSidebar() {
 
   const navItems = useMemo(() => {
     if (!employeeData) return [];
-    const baseItems = allNavItems.filter(item => item.permission === 'dashboard');
-    const permittedItems = filterItemsByPermissions(allNavItems.filter(item => item.permission !== 'dashboard'), employeeData.permissions, isAdmin);
-    return filterNavItemsBySearch([...baseItems, ...permittedItems], searchTerm);
+    
+    // Separate public items from permission-based items
+    const publicItems = allNavItems.filter(item => !item.permission);
+    const permissionItems = allNavItems.filter(item => item.permission);
+
+    const permittedItems = filterItemsByPermissions(permissionItems, employeeData.permissions, isAdmin);
+    
+    // Combine and then filter by search
+    return filterNavItemsBySearch([...permittedItems, ...publicItems], searchTerm);
+
   }, [employeeData, isAdmin, searchTerm]);
 
   const bottomNavItems = useMemo(() => {
@@ -321,7 +335,3 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
-
-  
-
-  

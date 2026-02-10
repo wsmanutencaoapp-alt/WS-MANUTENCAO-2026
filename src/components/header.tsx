@@ -193,8 +193,11 @@ const allNavItems: NavItem[] = [
   {
     href: '/retirada-veiculo',
     icon: Camera,
-    label: 'Selfie (Público)',
-    permission: 'selfie',
+    label: 'Self (Público)',
+    subItems: [
+        { href: '/retirada-veiculo', label: 'Retirada de Veículo', icon: Car },
+        { href: '/anexo-comprovante', label: 'Anexo de Comprovante', icon: Receipt },
+    ]
   },
   { 
     href: '/dashboard/user-management', 
@@ -261,7 +264,16 @@ export function Header() {
 
   const navItems = useMemo(() => {
     if (!employeeData) return [];
-    return filterItemsByPermissions(allNavItems, employeeData?.permissions, isAdmin);
+    
+    // Separate public items from permission-based items
+    const publicItems = allNavItems.filter(item => !item.permission);
+    const permissionItems = allNavItems.filter(item => item.permission);
+
+    const permittedItems = filterItemsByPermissions(permissionItems, employeeData.permissions, isAdmin);
+    
+    // Combine and return
+    return [...permittedItems, ...publicItems];
+
   }, [employeeData, isAdmin]);
 
 
@@ -362,7 +374,3 @@ export function Header() {
     </header>
   );
 }
-
-  
-
-  
