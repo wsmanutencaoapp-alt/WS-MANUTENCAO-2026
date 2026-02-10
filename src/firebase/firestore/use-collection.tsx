@@ -11,8 +11,6 @@ import {
   CollectionReference,
   getDocs,
 } from 'firebase/firestore';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type WithDocId<T> = T & { docId: string };
@@ -38,24 +36,12 @@ export interface InternalQuery extends Query<DocumentData> {
 }
 
 async function fetchCollection<T>(query: CollectionReference<DocumentData> | Query<DocumentData>): Promise<WithDocId<T>[]> {
-  try {
     const snapshot = await getDocs(query);
     const results: WithDocId<T>[] = [];
     snapshot.forEach(doc => {
       results.push({ ...(doc.data() as T), docId: doc.id });
     });
     return results;
-  } catch (error) {
-    if (error instanceof FirestoreError) {
-      const path = query.type === 'collection' ? (query as CollectionReference).path : (query as unknown as InternalQuery)._query.path.canonicalString();
-      const contextualError = new FirestorePermissionError({
-        operation: 'list',
-        path,
-      });
-      throw contextualError; // Re-throw the rich error for react-query
-    }
-    throw error; // Re-throw other errors
-  }
 }
 
 
@@ -96,8 +82,7 @@ export function useCollection<T = any>(
         const path = memoizedTargetRefOrQuery.type === 'collection'
             ? (memoizedTargetRefOrQuery as CollectionReference).path
             : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
-        const contextualError = new FirestorePermissionError({ operation: 'list', path });
-        errorEmitter.emit('permission-error', contextualError);
+        console.error(`Error in useCollection snapshot listener for path: ${path}`, err);
       }
     );
 

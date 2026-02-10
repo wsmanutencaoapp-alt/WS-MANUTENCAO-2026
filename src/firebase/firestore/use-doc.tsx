@@ -9,8 +9,6 @@ import {
   DocumentSnapshot,
   getDoc,
 } from 'firebase/firestore';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from './use-collection';
 
@@ -34,22 +32,11 @@ export interface UseDocResult<T> {
 }
 
 async function fetchDoc<T>(docRef: DocumentReference<DocumentData>): Promise<WithDocId<T> | null> {
-    try {
-        const snapshot = await getDoc(docRef);
-        if (snapshot.exists()) {
-            return { ...(snapshot.data() as T), docId: snapshot.id };
-        }
-        return null;
-    } catch (error) {
-        if (error instanceof FirestoreError) {
-            const contextualError = new FirestorePermissionError({
-                operation: 'get',
-                path: docRef.path,
-            });
-            throw contextualError;
-        }
-        throw error;
+    const snapshot = await getDoc(docRef);
+    if (snapshot.exists()) {
+        return { ...(snapshot.data() as T), docId: snapshot.id };
     }
+    return null;
 }
 
 
@@ -102,11 +89,7 @@ export function useDoc<T = any>(
         }
       },
       (err: FirestoreError) => {
-        const contextualError = new FirestorePermissionError({
-          operation: 'get',
-          path: memoizedDocRef.path,
-        });
-        errorEmitter.emit('permission-error', contextualError);
+        console.error(`Error in useDoc snapshot listener for path: ${memoizedDocRef.path}`, err);
       }
     );
 
