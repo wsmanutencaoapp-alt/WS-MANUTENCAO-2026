@@ -35,6 +35,7 @@ import {
   DoorOpen,
   Camera,
   Receipt,
+  ExternalLink,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -175,15 +176,11 @@ const allNavItems: NavItem[] = [
       { href: '/dashboard/portaria/controle-pessoas', label: 'Controle de Pessoas', permission: 'portaria_controle_pessoas' },
     ]
   },
-  {
-    href: '/dashboard/selfie',
+   {
+    href: '/retirada-veiculo',
     icon: Camera,
-    label: 'Selfie',
+    label: 'Selfie (Público)',
     permission: 'selfie',
-    subItems: [
-        { href: '/dashboard/selfie/retirada-veiculo', label: 'Retirada de Veículo', permission: 'selfie_retirada_veiculo', icon: Car },
-        { href: '/dashboard/selfie/comprovantes-reembolso', label: 'Apresentar Comprovantes', permission: 'selfie_comprovantes', icon: Receipt },
-    ]
   },
 ];
 
@@ -324,5 +321,7 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+  
 
   

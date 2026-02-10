@@ -38,7 +38,7 @@ service cloud.firestore {
     }
     
     match /vehicle_movements/{movementId} {
-      allow read: if hasPermission('portaria_controle_veiculos_view');
+      allow read: if true; // Public read for vehicle check-in
       allow write: if hasPermission('portaria_controle_veiculos_create');
       allow delete: if hasPermission('portaria_controle_veiculos_delete');
     }
@@ -154,3 +154,5 @@ service cloud.firestore {
     }
   }
 }
+
+  

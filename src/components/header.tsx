@@ -34,6 +34,7 @@ import {
   DoorOpen,
   Camera,
   Receipt,
+  ExternalLink,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -190,14 +191,10 @@ const allNavItems: NavItem[] = [
     ]
   },
   {
-    href: '/dashboard/selfie',
+    href: '/retirada-veiculo',
     icon: Camera,
-    label: 'Selfie',
+    label: 'Selfie (Público)',
     permission: 'selfie',
-    subItems: [
-        { href: '/dashboard/selfie/retirada-veiculo', label: 'Retirada de Veículo', permission: 'selfie_retirada_veiculo', icon: Car },
-        { href: '/dashboard/selfie/comprovantes-reembolso', label: 'Apresentar Comprovantes', permission: 'selfie_comprovantes', icon: Receipt },
-    ]
   },
   { 
     href: '/dashboard/user-management', 
@@ -365,5 +362,7 @@ export function Header() {
     </header>
   );
 }
+
+  
 
   

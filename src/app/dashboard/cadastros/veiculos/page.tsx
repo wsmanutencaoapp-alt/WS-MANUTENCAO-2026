@@ -54,13 +54,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Printer } from 'lucide-react';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
+import Image from 'next/image';
 
 const CadastroVeiculosPage = () => {
   const firestore = useFirestore();
@@ -71,6 +71,8 @@ const CadastroVeiculosPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<WithDocId<Vehicle> | null>(null);
+  const [qrCodeVehicle, setQrCodeVehicle] = useState<WithDocId<Vehicle> | null>(null);
+  
   const [formData, setFormData] = useState<Partial<Vehicle>>({
     prefixo: '',
     placa: '',
@@ -179,6 +181,40 @@ const CadastroVeiculosPage = () => {
         }));
     }
   };
+  
+  const handlePrintQrCode = (vehicle: WithDocId<Vehicle>) => {
+    setQrCodeVehicle(vehicle);
+  };
+
+  const executePrint = () => {
+    if (!qrCodeVehicle) return;
+    const printWindow = window.open('', '_blank', 'height=400,width=400');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>QR Code Veículo</title>
+            <style>
+              body { margin: 20px; text-align: center; font-family: sans-serif; }
+              img { max-width: 100%; height: auto; }
+            </style>
+          </head>
+          <body>
+            <h2>${qrCodeVehicle.prefixo} - ${qrCodeVehicle.placa}</h2>
+            <img src="${`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}/retirada-veiculo?vehicleId=${qrCodeVehicle.docId}`)}`}" />
+            <script>
+              window.onload = function() {
+                window.print();
+                window.onafterprint = function() { window.close(); };
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -220,6 +256,9 @@ const CadastroVeiculosPage = () => {
                     <TableCell>{v.ano}</TableCell>
                     <TableCell>{v.status}</TableCell>
                     <TableCell className="text-right space-x-2">
+                       <Button variant="ghost" size="icon" title="Imprimir QR Code" onClick={() => handlePrintQrCode(v)}>
+                        <Printer className="h-4 w-4" />
+                      </Button>
                       <Button variant="outline" size="icon" onClick={() => handleOpenDialog(v)}>
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -305,9 +344,39 @@ const CadastroVeiculosPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {qrCodeVehicle && (
+        <Dialog open={!!qrCodeVehicle} onOpenChange={() => setQrCodeVehicle(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>QR Code para Retirada</DialogTitle>
+                    <DialogDescription>
+                        Imprima este QR Code e cole no veículo <span className="font-bold">{qrCodeVehicle.prefixo}</span>.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex justify-center items-center py-4">
+                     <Image
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/retirada-veiculo?vehicleId=${qrCodeVehicle.docId}`)}`}
+                        alt={`QR Code for ${qrCodeVehicle.prefixo}`}
+                        width={250}
+                        height={250}
+                    />
+                </div>
+                 <DialogFooter>
+                    <Button variant="outline" onClick={() => setQrCodeVehicle(null)}>Fechar</Button>
+                    <Button onClick={executePrint}>
+                        <Printer className="mr-2 h-4 w-4"/>
+                        Imprimir
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
 
     </div>
   );
 };
 
 export default CadastroVeiculosPage;
+
+  
