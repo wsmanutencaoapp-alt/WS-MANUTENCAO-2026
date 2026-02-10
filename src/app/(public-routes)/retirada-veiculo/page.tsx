@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, Suspense } from 'react';
-import { useFirestore, useStorage, useDoc, useMemoFirebase } from '@/firebase';
+import { useFirestore, useStorage, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import {
   collection,
   query,
@@ -165,7 +165,7 @@ function VehicleCheckoutComponent() {
         const batch = writeBatch(firestore);
 
         const movementRef = doc(collection(firestore, 'vehicle_movements'));
-        const movementData: Omit<VehicleMovement, 'id' | 'isExternal'> = {
+        const movementData: Omit<VehicleMovement, 'id' | 'isExternal' | 'driverPhotoUrl'> & {driverPhotoUrl: string} = {
             vehicleId: selectedVehicle.docId,
             vehiclePrefixo: selectedVehicle.prefixo,
             vehiclePlaca: selectedVehicle.placa,
@@ -333,5 +333,3 @@ export default function RetiradaVeiculoPage() {
         </Suspense>
     );
 }
-
-  
