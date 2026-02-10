@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, Suspense } from 'react';
-import { useFirestore, useStorage, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useFirestore, useStorage, useMemoFirebase } from '@/firebase/provider';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import {
   collection,
   query,
@@ -73,23 +75,29 @@ function VehicleMovementComponent() {
       enabled: !!vehicleIdFromUrl,
   });
 
-  const availableVehiclesForCheckoutQuery = useMemoFirebase(
+  const availableVehiclesQuery = useMemoFirebase(
     () => (firestore && !vehicleIdFromUrl ? query(collection(firestore, 'vehicles'), where('status', '==', 'Ativo')) : null),
     [firestore, vehicleIdFromUrl]
   );
-  const { data: availableVehicles, isLoading: isLoadingVehicles } = useCollection<WithDocId<Vehicle>>(availableVehiclesForCheckoutQuery, {
+  const { data: availableVehicles, isLoading: isLoadingVehicles } = useCollection<WithDocId<Vehicle>>(availableVehiclesQuery, {
       enabled: !vehicleIdFromUrl,
   });
   
+  const { data: allVehicles } = useCollection<WithDocId<Vehicle>>(useMemoFirebase(() => (firestore ? collection(firestore, 'vehicles') : null), [firestore]), {
+      queryKey: ['allVehiclesForGate'],
+      enabled: !vehicleIdFromUrl,
+  });
+
+
   const selectedVehicle = useMemo(() => {
     if (vehicleIdFromUrl) return vehicleFromUrl;
     return allVehicles?.find(v => v.docId === selectedVehicleId);
   }, [vehicleIdFromUrl, vehicleFromUrl, allVehicles, selectedVehicleId]);
   
   // This combines all vehicles for the dropdown, since a user might need to check-in a vehicle not in the "Ativo" list.
-  const { data: allVehicles } = useCollection<WithDocId<Vehicle>>(useMemoFirebase(() => (firestore ? collection(firestore, 'vehicles') : null), [firestore]), {
-      enabled: !vehicleIdFromUrl,
-  });
+  // const { data: allVehicles } = useCollection<WithDocId<Vehicle>>(useMemoFirebase(() => (firestore ? collection(firestore, 'vehicles') : null), [firestore]), {
+  //     enabled: !vehicleIdFromUrl,
+  // });
 
 
   useEffect(() => {
@@ -493,3 +501,5 @@ export default function RetiradaVeiculoPage() {
         </Suspense>
     );
 }
+
+    
