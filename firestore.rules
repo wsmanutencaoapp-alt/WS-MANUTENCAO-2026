@@ -34,7 +34,14 @@ service cloud.firestore {
       allow get: if true; // Public read for QR code check-out
       allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
       allow create: if hasPermission('cadastros_veiculos_create');
-      allow update: if hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update');
+      allow update: if 
+        (hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update')) ||
+        (
+          request.auth == null && // Is a public user
+          request.resource.data.status == 'Em Viagem' &&
+          resource.data.status == 'Ativo' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        );
       allow delete: if hasPermission('cadastros_veiculos_delete');
     }
     
