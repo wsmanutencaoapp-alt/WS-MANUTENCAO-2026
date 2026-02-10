@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 
 function VehicleMovementComponent() {
   const firestore = useFirestore();
@@ -41,6 +42,7 @@ function VehicleMovementComponent() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [driverName, setDriverName] = useState('');
   const [km, setKm] = useState('');
+  const [notes, setNotes] = useState('');
   const [isVehiclePopoverOpen, setVehiclePopoverOpen] = useState(false);
 
   // Set selected vehicle ID from URL after client-side hydration
@@ -80,6 +82,7 @@ function VehicleMovementComponent() {
       }
       setDriverName('');
       setKm('');
+      setNotes('');
   }
 
   const handleCheckout = async () => {
@@ -106,6 +109,7 @@ function VehicleMovementComponent() {
             type: 'saida',
             date: new Date().toISOString(),
             km: Number(km),
+            notes: notes,
         };
         batch.set(movementRef, movementData);
 
@@ -152,6 +156,7 @@ function VehicleMovementComponent() {
           type: 'entrada',
           date: new Date().toISOString(),
           km: Number(km),
+          notes: notes,
       };
       batch.set(movementRef, movementData);
 
@@ -287,6 +292,10 @@ function VehicleMovementComponent() {
                     <Label htmlFor="km">KM Atual</Label>
                     <Input id="km" type="number" placeholder="Ex: 123456" value={km} onChange={(e) => setKm(e.target.value)} />
                 </div>
+                <div className="space-y-1.5">
+                    <Label htmlFor="notes">Avarias ou Observações (Opcional)</Label>
+                    <Textarea id="notes" placeholder="Ex: Risco no para-choque, pneu baixo..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+                </div>
             </CardContent>
           </Card>
           
@@ -330,6 +339,10 @@ function VehicleMovementComponent() {
                     <div className="space-y-1.5">
                         <Label htmlFor="km">KM na Chegada</Label>
                         <Input id="km" type="number" placeholder="Ex: 123999" value={km} onChange={(e) => setKm(e.target.value)} />
+                    </div>
+                     <div className="space-y-1.5">
+                        <Label htmlFor="notes">Avarias ou Observações (Opcional)</Label>
+                        <Textarea id="notes" placeholder="Relate qualquer problema ocorrido durante a viagem." value={notes} onChange={(e) => setNotes(e.target.value)} />
                     </div>
                 </CardContent>
             </Card>

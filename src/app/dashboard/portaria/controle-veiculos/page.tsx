@@ -33,6 +33,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,7 +47,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowRight, ArrowLeft, Trash2, User } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowLeft, Trash2, User, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Vehicle, VehicleMovement, Employee } from '@/lib/types';
@@ -102,6 +103,7 @@ const ControleVeiculosPage = () => {
   const [externalPlate, setExternalPlate] = useState('');
 
   const [isVehiclePopoverOpen, setVehiclePopoverOpen] = useState(false);
+  const [movementDetails, setMovementDetails] = useState<WithDocId<VehicleMovement> | null>(null);
   
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -293,20 +295,21 @@ const ControleVeiculosPage = () => {
                 <TableHead>Veículo</TableHead>
                 <TableHead>Motorista</TableHead>
                 <TableHead>KM</TableHead>
+                <TableHead className="text-center">Detalhes</TableHead>
                 {isAdmin && <TableHead className="text-right">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoadingMovements && (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 6 : 5} className="h-24 text-center">
+                  <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                   </TableCell>
                 </TableRow>
               )}
               {!isLoadingMovements && movements?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 6 : 5} className="h-24 text-center">
+                  <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">
                     Nenhuma movimentação registrada.
                   </TableCell>
                 </TableRow>
@@ -331,6 +334,12 @@ const ControleVeiculosPage = () => {
                   </TableCell>
                   <TableCell>{mov.driverName}</TableCell>
                   <TableCell>{mov.km?.toLocaleString('pt-BR') ?? 'N/A'}</TableCell>
+                   <TableCell className="text-center">
+                    <Button variant="ghost" size="icon" onClick={() => setMovementDetails(mov)}>
+                        <Info className="h-4 w-4" />
+                        <span className="sr-only">Ver Detalhes</span>
+                    </Button>
+                  </TableCell>
                    {isAdmin && (
                     <TableCell className="text-right">
                        <AlertDialog>
@@ -483,6 +492,50 @@ const ControleVeiculosPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {movementDetails && (
+        <Dialog open={!!movementDetails} onOpenChange={() => setMovementDetails(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Detalhes da Movimentação</DialogTitle>
+                    <DialogDescription>
+                        Registro de {movementDetails.type} para {movementDetails.vehiclePrefixo || movementDetails.vehiclePlaca} em {format(new Date(movementDetails.date), 'dd/MM/yyyy HH:mm')}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <p className="font-medium text-muted-foreground">Veículo</p>
+                            <p>{movementDetails.vehiclePrefixo} ({movementDetails.vehiclePlaca})</p>
+                        </div>
+                        <div>
+                            <p className="font-medium text-muted-foreground">Motorista</p>
+                            <p>{movementDetails.driverName}</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <p className="font-medium text-muted-foreground">Tipo</p>
+                            <p>{movementDetails.type === 'saida' ? 'Saída' : 'Entrada'}</p>
+                        </div>
+                        <div>
+                            <p className="font-medium text-muted-foreground">KM</p>
+                            <p>{movementDetails.km?.toLocaleString('pt-BR') ?? 'N/A'}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <p className="font-medium text-muted-foreground">Observações</p>
+                        <p className="mt-1 rounded-md border bg-muted p-3">
+                            {movementDetails.notes || 'Nenhuma observação registrada.'}
+                        </p>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setMovementDetails(null)}>Fechar</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
