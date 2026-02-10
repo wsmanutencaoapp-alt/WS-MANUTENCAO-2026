@@ -42,7 +42,7 @@ function VehicleCheckoutComponent() {
   const [selfie, setSelfie] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(vehicleIdFromUrl);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [driverName, setDriverName] = useState('');
   const [km, setKm] = useState('');
 
@@ -51,6 +51,13 @@ function VehicleCheckoutComponent() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const [isVehiclePopoverOpen, setVehiclePopoverOpen] = useState(false);
+
+  // Set selected vehicle ID from URL after client-side hydration
+  useEffect(() => {
+    if (vehicleIdFromUrl) {
+      setSelectedVehicleId(vehicleIdFromUrl);
+    }
+  }, [vehicleIdFromUrl]);
 
   // Data fetching
   const vehicleFromUrlRef = useMemoFirebase(() => {
