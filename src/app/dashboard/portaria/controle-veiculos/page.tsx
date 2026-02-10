@@ -80,7 +80,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import Image from 'next/image';
+
 
 const ControleVeiculosPage = () => {
   const firestore = useFirestore();
@@ -102,7 +102,6 @@ const ControleVeiculosPage = () => {
   const [externalPlate, setExternalPlate] = useState('');
 
   const [isVehiclePopoverOpen, setVehiclePopoverOpen] = useState(false);
-  const [imageToView, setImageToView] = useState<{src: string, driver: string} | null>(null);
   
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -289,7 +288,6 @@ const ControleVeiculosPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Foto</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Veículo</TableHead>
@@ -301,26 +299,20 @@ const ControleVeiculosPage = () => {
             <TableBody>
               {isLoadingMovements && (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">
+                  <TableCell colSpan={isAdmin ? 6 : 5} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                   </TableCell>
                 </TableRow>
               )}
               {!isLoadingMovements && movements?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">
+                  <TableCell colSpan={isAdmin ? 6 : 5} className="h-24 text-center">
                     Nenhuma movimentação registrada.
                   </TableCell>
                 </TableRow>
               )}
               {movements?.map((mov) => (
                 <TableRow key={mov.docId}>
-                   <TableCell>
-                      <Avatar className="cursor-pointer" onClick={() => mov.driverPhotoUrl && setImageToView({src: mov.driverPhotoUrl, driver: mov.driverName})}>
-                          <AvatarImage src={mov.driverPhotoUrl} />
-                          <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
-                      </Avatar>
-                  </TableCell>
                   <TableCell>
                     <Badge
                       variant={mov.type === 'saida' ? 'destructive' : 'success'}
@@ -491,20 +483,6 @@ const ControleVeiculosPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {imageToView && (
-          <Dialog open={!!imageToView} onOpenChange={() => setImageToView(null)}>
-              <DialogContent>
-                  <DialogHeader>
-                      <DialogTitle>Foto de {imageToView.driver}</DialogTitle>
-                  </DialogHeader>
-                  <div className="flex justify-center items-center py-4">
-                      <Image src={imageToView.src} alt={`Foto de ${imageToView.driver}`} width={400} height={400} className="rounded-md object-contain" />
-                  </div>
-              </DialogContent>
-          </Dialog>
-      )}
-
     </div>
   );
 };

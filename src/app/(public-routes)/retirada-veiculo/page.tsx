@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, Suspense } from 'react';
-import { useFirestore, useStorage, useMemoFirebase } from '@/firebase/provider';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import {
@@ -11,7 +11,6 @@ import {
   writeBatch,
   doc,
 } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { useSearchParams } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
@@ -20,9 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, RefreshCw, Loader2, ChevronsUpDown, Check, AlertTriangle, Car, LogIn, LogOut } from 'lucide-react';
-import Image from 'next/image';
-
+import { Loader2, ChevronsUpDown, Check, AlertTriangle, Car, LogIn, LogOut } from 'lucide-react';
 import type { Vehicle, VehicleMovement } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -34,25 +31,16 @@ import { Badge } from '@/components/ui/badge';
 
 function VehicleMovementComponent() {
   const firestore = useFirestore();
-  const storage = useStorage();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const vehicleIdFromUrl = searchParams.get('vehicleId');
 
   // State
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const [selfie, setSelfie] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [driverName, setDriverName] = useState('');
   const [km, setKm] = useState('');
-
-  // Refs
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  
   const [isVehiclePopoverOpen, setVehiclePopoverOpen] = useState(false);
 
   // Set selected vehicle ID from URL after client-side hydration
@@ -75,15 +63,7 @@ function VehicleMovementComponent() {
       enabled: !!vehicleIdFromUrl,
   });
 
-  const availableVehiclesQuery = useMemoFirebase(
-    () => (firestore && !vehicleIdFromUrl ? query(collection(firestore, 'vehicles'), where('status', '==', 'Ativo')) : null),
-    [firestore, vehicleIdFromUrl]
-  );
-  const { data: availableVehicles, isLoading: isLoadingVehicles } = useCollection<WithDocId<Vehicle>>(availableVehiclesQuery, {
-      enabled: !vehicleIdFromUrl,
-  });
-  
-  const { data: allVehicles } = useCollection<WithDocId<Vehicle>>(useMemoFirebase(() => (firestore ? collection(firestore, 'vehicles') : null), [firestore]), {
+  const { data: allVehicles, isLoading: isLoadingVehicles } = useCollection<WithDocId<Vehicle>>(useMemoFirebase(() => (firestore ? collection(firestore, 'vehicles') : null), [firestore]), {
       queryKey: ['allVehiclesForGate'],
       enabled: !vehicleIdFromUrl,
   });
@@ -94,72 +74,7 @@ function VehicleMovementComponent() {
     return allVehicles?.find(v => v.docId === selectedVehicleId);
   }, [vehicleIdFromUrl, vehicleFromUrl, allVehicles, selectedVehicleId]);
   
-  // This combines all vehicles for the dropdown, since a user might need to check-in a vehicle not in the "Ativo" list.
-  // const { data: allVehicles } = useCollection<WithDocId<Vehicle>>(useMemoFirebase(() => (firestore ? collection(firestore, 'vehicles') : null), [firestore]), {
-  //     enabled: !vehicleIdFromUrl,
-  // });
-
-
-  useEffect(() => {
-    if (selectedVehicle?.status !== 'Ativo') return;
-    
-    const getCameraPermission = async () => {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        toast({ variant: 'destructive', title: 'Erro de Câmera', description: 'Seu navegador não suporta o acesso à câmera.' });
-        setHasCameraPermission(false);
-        return;
-      }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        setHasCameraPermission(true);
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
-        toast({
-          variant: 'destructive',
-          title: 'Acesso à Câmera Negado',
-          description: 'Por favor, habilite a permissão de câmera nas configurações do seu navegador para usar esta funcionalidade.',
-        });
-      }
-    };
-
-    getCameraPermission();
-
-    return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [toast, selectedVehicle]);
-
-  const takePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-    
-    if (context) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-        
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        setSelfie(dataUrl);
-    }
-  };
-
-  const retakePhoto = () => {
-    setSelfie(null);
-  };
-  
   const resetForm = () => {
-      setSelfie(null);
       if (!vehicleIdFromUrl) {
           setSelectedVehicleId(null);
       }
@@ -168,11 +83,11 @@ function VehicleMovementComponent() {
   }
 
   const handleCheckout = async () => {
-    if (!selfie || !selectedVehicle || !driverName || !km) {
-        toast({ variant: 'destructive', title: 'Campos Obrigatórios', description: 'Por favor, tire uma selfie e preencha todos os campos.' });
+    if (!selectedVehicle || !driverName || !km) {
+        toast({ variant: 'destructive', title: 'Campos Obrigatórios', description: 'Por favor, preencha todos os campos.' });
         return;
     }
-    if (!firestore || !storage) {
+    if (!firestore) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Serviço indisponível. Tente novamente.' });
         return;
     }
@@ -180,20 +95,14 @@ function VehicleMovementComponent() {
     setIsSubmitting(true);
 
     try {
-        const filePath = `selfie_retirada/${selectedVehicle.docId}_${Date.now()}.jpg`;
-        const storageReference = storageRef(storage, filePath);
-        const snapshot = await uploadString(storageReference, selfie, 'data_url');
-        const downloadURL = await getDownloadURL(snapshot.ref);
-
         const batch = writeBatch(firestore);
 
         const movementRef = doc(collection(firestore, 'vehicle_movements'));
-        const movementData: Omit<VehicleMovement, 'id' | 'isExternal' | 'driverPhotoUrl'> & {driverPhotoUrl: string} = {
+        const movementData: Omit<VehicleMovement, 'id' | 'isExternal' | 'driverPhotoUrl'> = {
             vehicleId: selectedVehicle.docId,
             vehiclePrefixo: selectedVehicle.prefixo,
             vehiclePlaca: selectedVehicle.placa,
             driverName: driverName,
-            driverPhotoUrl: downloadURL,
             type: 'saida',
             date: new Date().toISOString(),
             km: Number(km),
@@ -276,7 +185,6 @@ function VehicleMovementComponent() {
   }
 
   if (!selectedVehicleId) {
-      // Logic for when no QR code is scanned, user must select a vehicle
        return (
         <div className="mx-auto w-full max-w-md space-y-6 py-12 px-4">
             <div className="text-center">
@@ -356,47 +264,8 @@ function VehicleMovementComponent() {
         <div className="mx-auto w-full max-w-md space-y-6 py-4 px-4">
           <div className="text-center">
             <h1 className="text-3xl font-bold">Retirada de Veículo</h1>
-            <p className="text-muted-foreground">Tire uma selfie para registrar a retirada.</p>
+            <p className="text-muted-foreground">Preencha os dados para registrar a retirada.</p>
           </div>
-    
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Camera /> Selfie do Motorista</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-4">
-              <div className="w-full aspect-square bg-muted rounded-lg overflow-hidden flex items-center justify-center relative">
-                {hasCameraPermission === false && (
-                    <Alert variant="destructive" className="m-4">
-                        <AlertTitle>Câmera Indisponível</AlertTitle>
-                        <AlertDescription>
-                            Não foi possível acessar sua câmera. Verifique as permissões.
-                        </AlertDescription>
-                    </Alert>
-                )}
-                 <video
-                  ref={videoRef}
-                  className={cn("w-full h-full object-cover", selfie ? 'hidden' : 'block')}
-                  autoPlay
-                  muted
-                  playsInline
-                />
-                {selfie && (
-                    <Image src={selfie} alt="Selfie do motorista" layout="fill" objectFit="cover" />
-                )}
-                 <canvas ref={canvasRef} className="hidden" />
-              </div>
-    
-              {selfie ? (
-                 <Button variant="outline" onClick={retakePhoto} className="w-full">
-                    <RefreshCw className="mr-2" /> Tirar Outra Foto
-                 </Button>
-              ) : (
-                 <Button onClick={takePhoto} disabled={!hasCameraPermission} className="w-full">
-                    <Camera className="mr-2" /> Tirar Foto
-                 </Button>
-              )}
-            </CardContent>
-          </Card>
           
           <Card>
             <CardHeader>
@@ -473,7 +342,6 @@ function VehicleMovementComponent() {
         </div>
       );
   } else {
-    // Handle other statuses like 'Em Manutenção'
     return (
         <div className="mx-auto w-full max-w-md space-y-6 py-12 px-4">
             <Card>
@@ -501,5 +369,3 @@ export default function RetiradaVeiculoPage() {
         </Suspense>
     );
 }
-
-    
