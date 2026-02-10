@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ChevronsUpDown, Check, AlertTriangle, Car, LogIn, LogOut } from 'lucide-react';
 import type { Vehicle, VehicleMovement } from '@/lib/types';
@@ -280,7 +281,7 @@ function VehicleMovementComponent() {
                <div className="space-y-1.5">
                   <Label htmlFor="vehicle">Veículo</Label>
                     <div className="p-3 border rounded-md bg-muted">
-                        <p className="font-bold">{selectedVehicle.prefixo} - {selectedVehicle.placa}</p>
+                        <p className="font-bold">{selectedVehicle.prefixo} - ${selectedVehicle.placa}</p>
                         <p className="text-sm text-muted-foreground">{selectedVehicle.marca} {selectedVehicle.modelo}</p>
                     </div>
                 </div>
@@ -299,11 +300,29 @@ function VehicleMovementComponent() {
             </CardContent>
           </Card>
           
-           <Button onClick={handleCheckout} disabled={isSubmitting} className="w-full text-lg py-6">
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <LogOut className="mr-2 h-5 w-5"/>
-                Concluir Retirada
-            </Button>
+           <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button disabled={isSubmitting} className="w-full text-lg py-6">
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <LogOut className="mr-2 h-5 w-5"/>
+                        Concluir Retirada
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar Operação</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            ATENÇÃO: TEM CERTEZA QUE DESEJA CONCLUIR? NÃO QUER INFORMAR ALGUMA AVARIA OU OBSERVAÇÃO?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleCheckout} disabled={isSubmitting}>
+                            {isSubmitting ? 'Concluindo...' : 'Sim, Concluir'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
       );
   } else if (selectedVehicle.status === 'Em Viagem') {
@@ -320,7 +339,7 @@ function VehicleMovementComponent() {
                 </CardHeader>
                 <CardContent>
                     <div className="p-3 border rounded-md bg-yellow-100 dark:bg-yellow-900/20">
-                        <p className="font-bold">{selectedVehicle.prefixo} - {selectedVehicle.placa}</p>
+                        <p className="font-bold">{selectedVehicle.prefixo} - ${selectedVehicle.placa}</p>
                         <p className="text-sm text-muted-foreground">{selectedVehicle.marca} {selectedVehicle.modelo}</p>
                         <Badge variant="warning" className="mt-2">Em Viagem</Badge>
                     </div>
@@ -347,11 +366,29 @@ function VehicleMovementComponent() {
                 </CardContent>
             </Card>
             
-            <Button onClick={handleCheckIn} disabled={isSubmitting} className="w-full text-lg py-6">
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                 <LogIn className="mr-2 h-5 w-5"/>
-                Concluir Devolução
-            </Button>
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button disabled={isSubmitting} className="w-full text-lg py-6">
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <LogIn className="mr-2 h-5 w-5"/>
+                        Concluir Devolução
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar Operação</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            ATENÇÃO: TEM CERTEZA QUE DESEJA CONCLUIR? NÃO QUER INFORMAR ALGUMA AVARIA OU OBSERVAÇÃO?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleCheckIn} disabled={isSubmitting}>
+                            {isSubmitting ? 'Concluindo...' : 'Sim, Concluir'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
       );
   } else {
