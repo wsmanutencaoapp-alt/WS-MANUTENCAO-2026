@@ -503,7 +503,7 @@ const CadastroFerramentasPage = () => {
         <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
             if (!isOpen) resetForm();
             setIsFormDialogOpen(isOpen);
-        }}>
+        }} modal={false}>
           <DialogTrigger asChild>
             <Button onClick={() => { setEditingTool(null); resetForm(); }}>
               <PlusCircle className="mr-2 h-4 w-4" />
