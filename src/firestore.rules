@@ -31,10 +31,33 @@ service cloud.firestore {
     }
     
     match /vehicles/{vehicleId} {
-      allow get, list: if hasPermission('cadastros_veiculos_view');
+      allow get: if true; // Public read for QR code check-out
+      allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
       allow create: if hasPermission('cadastros_veiculos_create');
-      allow update: if hasPermission('cadastros_veiculos_update');
+      allow update: if 
+        (hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update')) ||
+        (
+            request.auth == null &&
+            (
+              (resource.data.status == 'Ativo' && request.resource.data.status == 'Em Viagem') ||
+              (resource.data.status == 'Em Viagem' && request.resource.data.status == 'Ativo')
+            ) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        );
       allow delete: if hasPermission('cadastros_veiculos_delete');
+    }
+    
+    match /vehicle_movements/{movementId} {
+      allow read: if hasPermission('portaria_controle_veiculos_view'); // Secured endpoint
+      allow create: if true; // Public write for vehicle check-out and check-in
+      allow update: if hasPermission('portaria_controle_veiculos_update'); // Secured
+      allow delete: if hasPermission('portaria_controle_veiculos_delete'); // Secured
+    }
+
+    match /visits/{visitId} {
+      allow read: if hasPermission('portaria_controle_pessoas_view');
+      allow create: if hasPermission('portaria_controle_pessoas_create');
+      allow update: if hasPermission('portaria_controle_pessoas_update');
     }
 
     match /supplies/{supplyId} {
@@ -72,13 +95,14 @@ service cloud.firestore {
     
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(employeeId);
+      allow create: if hasPermission('cadastros_funcionarios_create') || isOwner(employeeId);
       
-      allow update: if isAdmin() || 
+      allow update: if hasPermission('cadastros_funcionarios_update') || 
                      (isOwner(employeeId) && 
                       !('accessLevel' in request.resource.data) &&
                       !('permissions' in request.resource.data) &&
                       !('status' in request.resource.data));
+      allow delete: if hasPermission('cadastros_funcionarios_delete');
       
       match /notifications/{notificationId} {
         allow read, update, delete: if isOwner(employeeId);
@@ -87,8 +111,9 @@ service cloud.firestore {
     }
     
     match /expenses/{expenseId} {
-      allow create: if hasPermission('financeiro');
-      allow read, update, delete: if hasPermission('financeiro');
+      allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
+      allow read: if hasPermission('financeiro_despesas_view') || (isAuthenticated() && resource.data.employeeId == request.auth.uid);
+      allow update, delete: if hasPermission('financeiro_despesas_update') || hasPermission('financeiro_despesas_delete');
     }
 
     match /tool_requests/{requestId} {
@@ -108,6 +133,11 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros');
     }
+    
+     match /approval_tiers/{tierId} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('configurador_alcada');
+    }
 
     match /purchase_requisitions/{requisitionId} {
         allow read: if isAuthenticated();
@@ -125,6 +155,11 @@ service cloud.firestore {
             allow read: if isAuthenticated();
             allow write: if hasPermission('compras') || request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId;
         }
+    }
+    
+    match /email_configurations/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('configurador_disparo_email');
     }
 
     match /counters/{counterId} {
