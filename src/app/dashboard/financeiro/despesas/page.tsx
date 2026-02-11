@@ -41,7 +41,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Loader2, Paperclip, Image as ImageIcon, Wallet, ExternalLink } from 'lucide-react';
+import { PlusCircle, Loader2, Paperclip, Image as ImageIcon, Wallet, ExternalLink, Upload } from 'lucide-react';
 import type { Despesa, Employee } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
