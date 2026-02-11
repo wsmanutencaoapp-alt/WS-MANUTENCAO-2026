@@ -126,9 +126,9 @@ const allNavItems: NavItem[] = [
     label: 'Financeiro',
     permission: 'financeiro',
     subItems: [
-        { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral', permission: 'financeiro_visao_geral' },
+        { href: '/dashboard/financeiro/despesas-individuais', label: 'Minhas Despesas' },
+        { href: '/dashboard/financeiro/despesas', label: 'Gerenciar Despesas', permission: 'financeiro_despesas' },
         { href: '/dashboard/financeiro/budget', label: 'Budget', permission: 'financeiro_budget' },
-        { href: '/dashboard/financeiro/despesas', label: 'Despesas', permission: 'financeiro_despesas' },
     ]
   },
   { 

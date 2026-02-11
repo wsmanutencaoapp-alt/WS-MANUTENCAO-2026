@@ -89,8 +89,8 @@ export const permissionStructure = [
         isModule: true,
         actions: ['view'],
         submodules: [
+            { id: 'financeiro_despesas', label: 'Gerenciar Despesas', path: '/dashboard/financeiro/despesas', actions: ['view', 'update', 'delete'] },
             { id: 'financeiro_budget', label: 'Budget', path: '/dashboard/financeiro/budget', actions: ['view', 'create', 'update', 'delete'] },
-            { id: 'financeiro_despesas', label: 'Despesas', path: '/dashboard/financeiro/despesas', actions: ['view', 'create'] },
         ]
     },
      {
@@ -159,6 +159,7 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
     if (path.startsWith('/retirada-veiculo') || path.startsWith('/anexo-comprovante')) return null; // Public page
     if (path === '/dashboard' || path === '/dashboard/') return 'dashboard_view';
     if (path === '/dashboard/settings') return null; // All users can see their own settings
+    if (path === '/dashboard/financeiro/despesas-individuais') return null;
 
     // Find the most specific submodule path match first
     for (const module of permissionStructure) {

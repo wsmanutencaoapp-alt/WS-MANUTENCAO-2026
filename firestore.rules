@@ -110,8 +110,9 @@ service cloud.firestore {
     }
     
     match /expenses/{expenseId} {
-      allow create: if hasPermission('financeiro');
-      allow read, update, delete: if hasPermission('financeiro');
+      allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
+      allow read: if hasPermission('financeiro_despesas_view') || (isAuthenticated() && resource.data.employeeId == request.auth.uid);
+      allow update, delete: if hasPermission('financeiro_despesas_update') || hasPermission('financeiro_despesas_delete');
     }
 
     match /tool_requests/{requestId} {

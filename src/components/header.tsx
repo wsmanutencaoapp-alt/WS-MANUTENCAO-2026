@@ -140,9 +140,9 @@ const allNavItems: NavItem[] = [
     label: 'Financeiro',
     permission: 'financeiro',
     subItems: [
-        { href: '/dashboard/financeiro/visao-geral', label: 'Visão Geral', permission: 'financeiro_visao_geral' },
+        { href: '/dashboard/financeiro/despesas-individuais', label: 'Minhas Despesas' },
+        { href: '/dashboard/financeiro/despesas', label: 'Gerenciar Despesas', permission: 'financeiro_despesas' },
         { href: '/dashboard/financeiro/budget', label: 'Budget', permission: 'financeiro_budget' },
-        { href: '/dashboard/financeiro/despesas', label: 'Despesas', permission: 'financeiro_despesas' },
     ]
   },
    { 
@@ -311,7 +311,7 @@ export function Header() {
         </SheetContent>
       </Sheet>
       <div className="relative ml-auto flex items-center gap-2 md:grow-0">
-        <Link href="/dashboard/financeiro/despesas">
+        <Link href="/dashboard/financeiro/despesas-individuais">
           <Button>
             <Wallet className="mr-2 h-4 w-4" />
             Registro de despesas
