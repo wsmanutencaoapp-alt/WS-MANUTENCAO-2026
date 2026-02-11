@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   collection,
   addDoc,
@@ -16,15 +15,6 @@ import {
 } from 'firebase/storage';
 import { useAuth, useFirestore, useUser, useCollection, useMemoFirebase, useStorage } from '@/firebase';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -33,6 +23,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from '@/components/ui/card';
 import {
   Table,
@@ -63,7 +54,6 @@ const DespesasPage = () => {
   const storage = useStorage();
   const { toast } = useToast();
   
-  const [isNewExpenseDialogOpen, setIsNewExpenseDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newExpense, setNewExpense] = useState({
     description: '',
@@ -134,12 +124,10 @@ const DespesasPage = () => {
           return;
       }
 
-      // Upload attachment
       const attachmentRef = storageRef(storage, `expense_proofs/${user.uid}/${Date.now()}-${attachmentName}`);
       const snapshot = await uploadString(attachmentRef, attachment, 'data_url');
       const paymentProofUrl = await getDownloadURL(snapshot.ref);
 
-      // Save expense to Firestore
       const expenseData: Omit<Despesa, 'id'> = {
         description: newExpense.description,
         amount: amountNumber,
@@ -155,12 +143,10 @@ const DespesasPage = () => {
       toast({ title: "Sucesso!", description: "Despesa registrada." });
       
       resetForm();
-      setIsNewExpenseDialogOpen(false);
 
     } catch (error) {
       console.error("Erro ao salvar despesa:", error);
       toast({ variant: "destructive", title: "Erro ao Salvar", description: `Não foi possível registrar a despesa.` });
-      // Example of how to emit a permission error
       if (error instanceof Error && error.message.includes('permission-denied')) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: 'expenses/{expenseId}',
@@ -175,26 +161,20 @@ const DespesasPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+      <h1 className="text-2xl font-bold flex items-center gap-2">
             <Wallet />
             Registro de Despesas
-        </h1>
-        <Dialog open={isNewExpenseDialogOpen} onOpenChange={setIsNewExpenseDialogOpen} modal={false}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Adicionar Despesa
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Registrar Nova Despesa</DialogTitle>
-              <DialogDescription>
+      </h1>
+
+      <Card>
+        <CardHeader>
+            <CardTitle>Registrar Nova Despesa</CardTitle>
+            <CardDescription>
                 Preencha os detalhes da despesa e anexe o comprovante.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="space-y-4">
               <div className="grid items-center gap-1.5">
                 <Label htmlFor="description">Descrição</Label>
                 <Input id="description" value={newExpense.description} onChange={handleInputChange} />
@@ -219,37 +199,38 @@ const DespesasPage = () => {
                     </Select>
                 </div>
               </div>
-              <div className="grid items-center gap-1.5">
+            </div>
+            <div className="space-y-2">
                 <Label>Comprovante</Label>
-                {attachment ? (
-                    <div className="flex items-center justify-between gap-2 text-sm p-2 bg-muted rounded-md">
-                       <div className="flex items-center gap-2 overflow-hidden">
-                         <ImageIcon className="h-5 w-5 flex-shrink-0" />
-                         <span className="truncate">{attachmentName}</span>
+                 {attachment ? (
+                    <div className="relative group aspect-video w-full border rounded-md overflow-hidden">
+                       <Image src={attachment} alt="Preview do comprovante" layout="fill" objectFit="contain" />
+                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button variant="secondary" size="sm" onClick={() => setAttachment(null)}>Alterar</Button>
                        </div>
-                        <Button variant="ghost" size="sm" onClick={() => setAttachment(null)}>Alterar</Button>
                     </div>
                 ) : (
-                    <Button asChild variant="outline">
-                        <label htmlFor="file-upload" className="cursor-pointer">
-                            <Paperclip className="mr-2 h-4 w-4" />
-                            Anexar Comprovante
-                            <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept="image/*,.pdf" />
-                        </label>
-                    </Button>
+                    <div className="flex items-center justify-center w-full">
+                      <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80">
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
+                              <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Clique para anexar</span> ou arraste</p>
+                              <p className="text-xs text-muted-foreground">PDF, PNG, JPG ou GIF</p>
+                          </div>
+                          <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept="image/*,.pdf" />
+                      </label>
+                    </div> 
                 )}
-              </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsNewExpenseDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={handleSaveNewExpense} disabled={isSaving}>
+        </CardContent>
+         <CardFooter>
+            <Button onClick={handleSaveNewExpense} disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar Despesa
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </Button>
+        </CardFooter>
+      </Card>
+
 
       <Card>
         <CardHeader>
