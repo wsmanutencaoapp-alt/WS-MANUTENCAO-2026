@@ -311,6 +311,12 @@ export function Header() {
         </SheetContent>
       </Sheet>
       <div className="relative ml-auto flex items-center gap-2 md:grow-0">
+        <Link href="/dashboard/financeiro/despesas">
+          <Button>
+            <Wallet className="mr-2 h-4 w-4" />
+            Registro de despesas
+          </Button>
+        </Link>
         <ThemeToggle />
         <Notifications />
         <DropdownMenu>
