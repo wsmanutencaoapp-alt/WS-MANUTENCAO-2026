@@ -674,11 +674,23 @@
           "type": "string",
           "description": "Category of the expense.",
           "enum": [
-            "Suprimentos",
-            "Manutenção",
-            "Administrativo",
+            "Alimentação",
+            "Hospedagem",
+            "Transporte",
             "Outros"
           ]
+        },
+        "otherCategoryDetail": {
+            "type": "string",
+            "description": "Details if the category is 'Outros'."
+        },
+        "costCenterId": {
+            "type": "string",
+            "description": "ID of the cost center this expense is associated with."
+        },
+        "costCenterCode": {
+            "type": "string",
+            "description": "Denormalized code of the cost center for display."
         },
         "paymentProofUrl": {
           "type": "string",
@@ -695,11 +707,12 @@
         }
       },
       "required": [
-        "id",
         "description",
         "amount",
         "date",
         "category",
+        "costCenterId",
+        "costCenterCode",
         "paymentProofUrl",
         "employeeId",
         "employeeName"
@@ -1029,5 +1042,3 @@
   }
 }
       
-
-  

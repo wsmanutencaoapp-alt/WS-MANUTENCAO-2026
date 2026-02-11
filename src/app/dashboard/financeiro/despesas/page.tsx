@@ -47,7 +47,9 @@ const GerenciarDespesasPage = () => {
     return expenses.filter(exp => 
         exp.description.toLowerCase().includes(lowerTerm) ||
         exp.employeeName.toLowerCase().includes(lowerTerm) ||
-        exp.category.toLowerCase().includes(lowerTerm)
+        exp.category.toLowerCase().includes(lowerTerm) ||
+        (exp.otherCategoryDetail && exp.otherCategoryDetail.toLowerCase().includes(lowerTerm)) ||
+        (exp.costCenterCode && exp.costCenterCode.toLowerCase().includes(lowerTerm))
     );
   }, [expenses, searchTerm]);
 
@@ -64,7 +66,7 @@ const GerenciarDespesasPage = () => {
           <div className="relative pt-4">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                  placeholder="Pesquisar por descrição, funcionário ou categoria..."
+                  placeholder="Pesquisar por descrição, funcionário, categoria..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -78,6 +80,7 @@ const GerenciarDespesasPage = () => {
                 <TableHead>Data</TableHead>
                 <TableHead>Funcionário</TableHead>
                 <TableHead>Descrição</TableHead>
+                <TableHead>Centro de Custo</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead className="text-center">Comprovante</TableHead>
@@ -86,19 +89,19 @@ const GerenciarDespesasPage = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">
+                  <TableCell colSpan={7} className="text-center h-24">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                   </TableCell>
                 </TableRow>
               ) : firestoreError ? (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center text-destructive h-24">
+                    <TableCell colSpan={7} className="text-center text-destructive h-24">
                         Erro ao carregar despesas: {firestoreError.message}
                     </TableCell>
                 </TableRow>
               ) : filteredExpenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">
+                  <TableCell colSpan={7} className="text-center h-24">
                     Nenhuma despesa encontrada.
                   </TableCell>
                 </TableRow>
@@ -108,7 +111,8 @@ const GerenciarDespesasPage = () => {
                     <TableCell>{format(new Date(expense.date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{expense.employeeName}</TableCell>
                     <TableCell className="font-medium">{expense.description}</TableCell>
-                    <TableCell>{expense.category}</TableCell>
+                    <TableCell>{expense.costCenterCode}</TableCell>
+                    <TableCell>{expense.category === 'Outros' ? expense.otherCategoryDetail : expense.category}</TableCell>
                     <TableCell className="text-right">
                         {expense.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </TableCell>

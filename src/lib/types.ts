@@ -244,8 +244,11 @@ export type Despesa = {
   id?: string;
   description: string;
   amount: number;
-  date: string;
-  category: 'Suprimentos' | 'Manutenção' | 'Administrativo' | 'Outros';
+  date: string; // ISO String
+  category: 'Alimentação' | 'Hospedagem' | 'Transporte' | 'Outros';
+  otherCategoryDetail?: string;
+  costCenterId: string;
+  costCenterCode: string;
   paymentProofUrl: string;
   employeeId: string;
   employeeName: string;
@@ -380,5 +383,3 @@ export type EmailConfiguration = {
     
 
     
-
-  
