@@ -1,8 +1,6 @@
-// This file is intentionally modified to resolve a build conflict.
-// The active page for this route is located at:
+// This file's content has been removed to resolve a build conflict.
+// The active page for this route is now located at:
 // src/app/(public-routes)/retirada-veiculo/page.tsx
 
-export default function RetiradaVeiculoDuplicatePage() {
-  // This component returns null to prevent rendering and resolve the route conflict.
-  return null;
-}
+// By not exporting a default React component, we prevent Next.js from treating this as a page,
+// which resolves the "failed to build" error caused by duplicate routes.
