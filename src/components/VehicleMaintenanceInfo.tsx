@@ -13,6 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import MaintenancePlanDialog from './MaintenancePlanDialog';
 import MaintenanceRecordDialog from './MaintenanceRecordDialog';
 import MaintenanceHistoryDialog from './MaintenanceHistoryDialog'; // Will be created later if needed
+import { cn } from '@/lib/utils';
 
 interface VehicleMaintenanceInfoProps {
   vehicle: WithDocId<Vehicle>;
