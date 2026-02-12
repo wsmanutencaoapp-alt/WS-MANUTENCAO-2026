@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation';
+
 export default function ManutencaoPage() {
-  return <div>Página de Manutenção</div>;
+  redirect('/dashboard/manutencao/veiculos');
 }

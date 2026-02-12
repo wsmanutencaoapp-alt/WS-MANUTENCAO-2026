@@ -179,6 +179,9 @@ const allNavItems: NavItem[] = [
     icon: HardHat,
     label: 'Manutenção',
     permission: 'manutencao',
+    subItems: [
+        { href: '/dashboard/manutencao/veiculos', label: 'Manutenção de Veículos', permission: 'manutencao_veiculos' },
+    ]
   },
    {
     href: '/dashboard/portaria',

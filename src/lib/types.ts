@@ -217,7 +217,6 @@ export type Permissions = {
   gso?: boolean;
   planejamento?: boolean;
   manutencao?: boolean;
-  portaria?: boolean;
   contabilidade_classificacao?: boolean;
   suprimentos_controle_almoxarifado?: boolean;
   ferramentaria_kits?: boolean;
@@ -382,4 +381,24 @@ export type EmailConfiguration = {
     
     
 
+export type MaintenancePlan = {
+  id?: string;
+  vehicleId: string;
+  serviceType: string;
+  frequencyKm: number;
+  lastServiceKm: number;
+};
+
+export type MaintenanceRecord = {
+  id?: string;
+  vehicleId: string;
+  planId?: string;
+  serviceType: string;
+  date: string; // ISO String
+  mileage: number;
+  notes: string;
+  cost?: number;
+};
     
+
+```

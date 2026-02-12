@@ -126,6 +126,16 @@ export const permissionStructure = [
         ],
     },
     {
+        id: 'manutencao',
+        label: 'Manutenção',
+        path: '/dashboard/manutencao',
+        isModule: true,
+        actions: ['view'],
+        submodules: [
+            { id: 'manutencao_veiculos', label: 'Manutenção de Veículos', path: '/dashboard/manutencao/veiculos', actions: ['view', 'create', 'update', 'delete'] },
+        ]
+    },
+    {
         id: 'userManagement',
         label: 'Gerenciar Usuários',
         path: '/dashboard/user-management',
