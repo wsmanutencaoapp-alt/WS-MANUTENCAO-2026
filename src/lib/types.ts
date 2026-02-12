@@ -8,6 +8,7 @@ export type Vehicle = {
   marca: string;
   modelo: string;
   ano: number;
+  km: number;
   tipo: 'Carro' | 'Moto' | 'Caminhão' | 'Van' | 'Caminhonete' | 'Outro';
   status: 'Ativo' | 'Inativo' | 'Em Manutenção' | 'Em Viagem';
 };
@@ -400,5 +401,3 @@ export type MaintenanceRecord = {
   cost?: number;
 };
     
-
-```

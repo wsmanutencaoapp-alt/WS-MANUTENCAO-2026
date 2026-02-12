@@ -79,6 +79,7 @@ const CadastroVeiculosPage = () => {
     marca: '',
     modelo: '',
     ano: new Date().getFullYear(),
+    km: 0,
     tipo: 'Carro',
     status: 'Ativo',
   });
@@ -108,6 +109,7 @@ const CadastroVeiculosPage = () => {
       marca: '',
       modelo: '',
       ano: new Date().getFullYear(),
+      km: 0,
       tipo: 'Carro',
       status: 'Ativo',
     });
@@ -139,6 +141,7 @@ const CadastroVeiculosPage = () => {
         marca: formData.marca!,
         modelo: formData.modelo!,
         ano: Number(formData.ano)!,
+        km: Number(formData.km) || 0,
         tipo: formData.tipo as any,
         status: formData.status as any,
     };
@@ -241,19 +244,21 @@ const CadastroVeiculosPage = () => {
                 <TableHead>Placa</TableHead>
                 <TableHead>Marca/Modelo</TableHead>
                 <TableHead>Ano</TableHead>
+                <TableHead>KM</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && <TableRow><TableCell colSpan={6} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>}
-              {error && <TableRow><TableCell colSpan={6} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
+              {isLoading && <TableRow><TableCell colSpan={7} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>}
+              {error && <TableRow><TableCell colSpan={7} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
               {!isLoading && vehicles?.map(v => (
                   <TableRow key={v.docId}>
                     <TableCell className="font-mono">{v.prefixo}</TableCell>
                     <TableCell>{v.placa}</TableCell>
                     <TableCell>{v.marca} {v.modelo}</TableCell>
                     <TableCell>{v.ano}</TableCell>
+                    <TableCell>{v.km?.toLocaleString('pt-BR') || 0}</TableCell>
                     <TableCell>{v.status}</TableCell>
                     <TableCell className="text-right space-x-2">
                        <Button variant="ghost" size="icon" title="Imprimir QR Code" onClick={() => handlePrintQrCode(v)}>
@@ -309,6 +314,9 @@ const CadastroVeiculosPage = () => {
             <div className="space-y-1"><Label htmlFor="modelo">Modelo</Label><Input id="modelo" value={formData.modelo || ''} onChange={handleInputChange} /></div>
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1"><Label htmlFor="ano">Ano</Label><Input id="ano" type="number" value={formData.ano || ''} onChange={handleInputChange} /></div>
+                <div className="space-y-1"><Label htmlFor="km">KM Inicial</Label><Input id="km" type="number" value={formData.km || 0} onChange={handleInputChange} /></div>
+            </div>
+             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1"><Label htmlFor="tipo">Tipo</Label>
                     <Select value={formData.tipo} onValueChange={(v) => handleSelectChange('tipo', v as any)}>
                         <SelectTrigger id="tipo"><SelectValue/></SelectTrigger>
@@ -322,17 +330,17 @@ const CadastroVeiculosPage = () => {
                         </SelectContent>
                     </Select>
                 </div>
-            </div>
-            <div className="space-y-1">
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(v) => handleSelectChange('status', v as any)}>
-                    <SelectTrigger id="status"><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Ativo">Ativo</SelectItem>
-                        <SelectItem value="Inativo">Inativo</SelectItem>
-                        <SelectItem value="Em Manutenção">Em Manutenção</SelectItem>
-                    </SelectContent>
-                </Select>
+                <div className="space-y-1">
+                    <Label htmlFor="status">Status</Label>
+                    <Select value={formData.status} onValueChange={(v) => handleSelectChange('status', v as any)}>
+                        <SelectTrigger id="status"><SelectValue/></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Ativo">Ativo</SelectItem>
+                            <SelectItem value="Inativo">Inativo</SelectItem>
+                            <SelectItem value="Em Manutenção">Em Manutenção</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
           </div>
           <DialogFooter>
@@ -378,5 +386,3 @@ const CadastroVeiculosPage = () => {
 };
 
 export default CadastroVeiculosPage;
-
-  

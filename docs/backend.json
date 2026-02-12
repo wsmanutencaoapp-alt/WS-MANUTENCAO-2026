@@ -30,6 +30,10 @@
           "type": "number",
           "description": "The manufacturing year of the vehicle."
         },
+        "km": {
+          "type": "number",
+          "description": "The last recorded mileage of the vehicle."
+        },
         "tipo": {
           "type": "string",
           "enum": [
@@ -59,6 +63,7 @@
         "marca",
         "modelo",
         "ano",
+        "km",
         "tipo",
         "status"
       ]
