@@ -115,7 +115,7 @@ function VehicleMovementComponent() {
         batch.set(movementRef, movementData);
 
         const vehicleRef = doc(firestore, 'vehicles', selectedVehicle.docId);
-        batch.update(vehicleRef, { status: 'Em Viagem' });
+        batch.update(vehicleRef, { status: 'Em Viagem', km: Number(km) });
         
         await batch.commit();
         
@@ -162,7 +162,7 @@ function VehicleMovementComponent() {
       batch.set(movementRef, movementData);
 
       const vehicleRef = doc(firestore, 'vehicles', selectedVehicle.docId);
-      batch.update(vehicleRef, { status: 'Ativo' });
+      batch.update(vehicleRef, { status: 'Ativo', km: Number(km) });
       
       await batch.commit();
       
