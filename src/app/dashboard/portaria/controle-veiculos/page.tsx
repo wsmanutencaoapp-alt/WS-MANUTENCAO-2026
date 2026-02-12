@@ -207,7 +207,7 @@ const ControleVeiculosPage = () => {
 
             const batch = writeBatch(firestore);
             const movementRef = doc(collection(firestore, 'vehicle_movements'));
-            const movementData: Omit<VehicleMovement, 'id' | 'isExternal'> = {
+            const movementData: Omit<VehicleMovement, 'id' | 'isExternal' | 'driverPhotoUrl'> = {
                 vehicleId: selectedVehicle.docId,
                 vehiclePrefixo: selectedVehicle.prefixo,
                 vehiclePlaca: selectedVehicle.placa,
@@ -221,7 +221,7 @@ const ControleVeiculosPage = () => {
             
             const vehicleRef = doc(firestore, 'vehicles', selectedVehicle.docId);
             const newStatus = dialogState.type === 'saida' ? 'Em Viagem' : 'Ativo';
-            batch.update(vehicleRef, { status: newStatus });
+            batch.update(vehicleRef, { status: newStatus, km: Number(km) });
             await batch.commit();
         }
 
