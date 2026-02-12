@@ -42,7 +42,7 @@ service cloud.firestore {
               (resource.data.status == 'Ativo' && request.resource.data.status == 'Em Viagem') ||
               (resource.data.status == 'Em Viagem' && request.resource.data.status == 'Ativo')
             ) &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'km'])
         );
       allow delete: if hasPermission('cadastros_veiculos_delete');
 
