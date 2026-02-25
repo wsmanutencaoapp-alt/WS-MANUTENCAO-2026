@@ -217,7 +217,7 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                 custoUnitario: parseFloat(unitCost) || 0, 
                 status: 'Disponível', 
                 documentoUrl: documentoUrl,
-                pesoLiquido: selectedSupply.fatorConversao ? selectedSupply.fatorConversao * numQuantity : undefined,
+                ...(selectedSupply.fatorConversao && { pesoLiquido: selectedSupply.fatorConversao * numQuantity })
             };
 
             if (loteFornecedor) stockData.loteFornecedor = loteFornecedor;
