@@ -371,18 +371,18 @@ const CadastroEnderecosPage = () => {
         addressesToPrint.forEach(address => {
             if (printSize === '100mm x 60mm') {
                 contentToPrint += `
-                    <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 4mm; box-sizing: border-box; break-inside: avoid; text-align: center;">
-                        <img src="/logo.png" alt="Logo" style="height: 18px; object-fit: contain; margin-bottom: 4px;" />
-                        <p style="font-size: 32px; line-height: 1.1; font-weight: bold; color: black; margin-top: 8px; margin-bottom: 4px;">
+                    <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding-top: 8mm; box-sizing: border-box; break-inside: avoid; text-align: center;">
+                        <img src="/logo.png" alt="Logo" style="height: 12px; object-fit: contain; margin-bottom: 8px;" />
+                        <p style="font-size: 40px; line-height: 1.1; font-weight: 900; color: rgb(0, 0, 0); margin-top: 16px; margin-bottom: 8px;">
                             ${address.codigoCompleto}
                         </p>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 80px; height: 80px; margin-top: 8px;" />
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 70px; height: 70px; margin-top: 16px;" />
                     </div>`;
             } else {
                  contentToPrint += `
                     <div style="width: 120mm; height: 23mm; display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding: 0 2mm; gap: 8mm; box-sizing: border-box; break-inside: avoid;">
                         <img src="/logo.png" alt="Logo" style="height: 18mm; width: auto; object-fit: contain; align-self: center;" />
-                        <p style="font-size: 24px; font-weight: bold; text-align: center; color: black;">
+                        <p style="font-size: 24px; font-weight: 900; text-align: center; color: rgb(0, 0, 0);">
                             ${address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
                         </p>
                         <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 20mm; height: 20mm;" />
@@ -594,12 +594,12 @@ const CadastroEnderecosPage = () => {
                 <div ref={printableAreaRef} className="flex flex-col items-center gap-4 max-h-96 overflow-y-auto p-4 bg-muted/50 rounded-md">
                     {addressesToPrint.map(address =>
                     printSize === '100mm x 60mm' ? (
-                        <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 box-border text-center border">
-                           <img src="/logo.png" alt="Logo" className="h-[18px] object-contain mb-1" />
-                           <p className="text-[32px] leading-tight font-bold text-black mt-2 mb-1">
+                        <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 pt-8 box-border text-center border">
+                           <img src="/logo.png" alt="Logo" className="h-3 object-contain mb-2" />
+                           <p className="text-[40px] leading-tight font-bold text-black mt-4 mb-2">
                                {address.codigoCompleto}
                            </p>
-                           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[80px] h-[80px] mt-2" />
+                           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[70px] h-[70px] mt-4" />
                        </div>
                     ) : (
                         <div key={address.docId} className="bg-white w-[452px] h-[87px] p-2 grid grid-cols-[auto_1fr_auto] gap-8 items-center border">
