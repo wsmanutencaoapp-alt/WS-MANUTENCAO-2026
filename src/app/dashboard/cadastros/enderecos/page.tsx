@@ -360,22 +360,9 @@ const CadastroEnderecosPage = () => {
               padding: 0; 
               font-family: sans-serif; 
               -webkit-print-color-adjust: exact; 
-            }
-            .label-container {
               background-color: white;
-              box-sizing: border-box;
-              break-inside: avoid;
             }
-            .label-container-small {
-              width: 120mm; 
-              height: 23mm; 
-              display: grid; 
-              grid-template-columns: auto 1fr auto; 
-              align-items: center; 
-              padding: 0 2mm; 
-              gap: 8mm;
-            }
-            .label-container-large {
+            .label-container-large-print {
               width: 100mm; 
               height: 60mm; 
               display: grid; 
@@ -384,13 +371,54 @@ const CadastroEnderecosPage = () => {
               justify-content: center;
               padding: 5mm; 
               gap: 2mm;
+              box-sizing: border-box;
+              break-inside: avoid;
+            }
+            .label-container-small-print {
+              width: 120mm; 
+              height: 23mm; 
+              display: grid; 
+              grid-template-columns: auto 1fr auto; 
+              align-items: center; 
+              padding: 0 2mm; 
+              gap: 8mm;
+              box-sizing: border-box;
+              break-inside: avoid;
             }
           }
         `;
         
         printWindow.document.write(`<style>${styles}</style>`);
         printWindow.document.write('</head><body>');
-        printWindow.document.write(printableArea.innerHTML);
+        
+        let contentToPrint = '';
+        addressesToPrint.forEach(address => {
+            if (printSize === '100mm x 60mm') {
+                contentToPrint += `
+                    <div class="label-container-large-print">
+                        <div style="justify-self: center;">
+                            <img src="/logo.png" alt="Logo" style="height: 25px; object-fit: contain;" />
+                        </div>
+                        <p style="font-size: 48px; line-height: 1.1; font-weight: bold; text-align: center; align-self: center; color: black;">
+                            ${address.codigoCompleto}
+                        </p>
+                        <div style="justify-self: center;">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 100px; height: 100px;" />
+                        </div>
+                    </div>`;
+            } else {
+                 contentToPrint += `
+                    <div class="label-container-small-print">
+                        <img src="/logo.png" alt="Logo" style="height: 40px; width: auto; object-fit: contain; align-self: center;" />
+                        <p style="font-size: 24px; font-weight: bold; text-align: center; color: black;">
+                            ${address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
+                        </p>
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 80px; height: 80px;" />
+                    </div>`;
+            }
+        });
+
+        printWindow.document.write(contentToPrint);
         printWindow.document.write('</body></html>');
         printWindow.document.close();
         printWindow.focus();
@@ -455,7 +483,7 @@ const CadastroEnderecosPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
              <div>
                 <Label>Nível 3: Rua / Corredor</Label>
-                <Input value={formState.rua} onChange={(e) => setFormState(p => ({...p, rua: e.target.value.replace(/\D/g, '')}))} placeholder="Ex: 01" maxLength={2}/>
+                <Input value={formState.rua} onChange={(e) => setFormState(p => ({...p, rua: e.target.value.replace(/\\D/g, '')}))} placeholder="Ex: 01" maxLength={2}/>
             </div>
             <div>
                 <Label>Nível 4: Móvel / Estante</Label>
@@ -463,7 +491,7 @@ const CadastroEnderecosPage = () => {
             </div>
             <div>
                 <Label>Nível 5: Nível / Vão</Label>
-                <Input value={formState.nivel} onChange={(e) => setFormState(p => ({...p, nivel: e.target.value.replace(/\D/g, '')}))} placeholder="Ex: 03" maxLength={2}/>
+                <Input value={formState.nivel} onChange={(e) => setFormState(p => ({...p, nivel: e.target.value.replace(/\\D/g, '')}))} placeholder="Ex: 03" maxLength={2}/>
             </div>
              <div className="flex items-center space-x-2 h-10">
                 <Checkbox id="useDetalhe" checked={useDetalhe} onCheckedChange={(checked) => setUseDetalhe(!!checked)} disabled={!formState.setor} />
@@ -587,27 +615,23 @@ const CadastroEnderecosPage = () => {
                         </Select>
                     </div>
                 </DialogHeader>
-                <div id="printable-label-area" className="flex flex-col items-center gap-2 max-h-80 overflow-y-auto p-4 bg-muted/50 rounded-md">
+                <div id="printable-label-area" className="flex flex-col items-center gap-4 max-h-96 overflow-y-auto p-4 bg-muted/50 rounded-md">
                     {addressesToPrint.map(address =>
                     printSize === '100mm x 60mm' ? (
-                        <div key={address.docId} className="label-container label-container-large">
-                            <div style={{ justifySelf: 'center' }}>
-                                <img src="/logo.png" alt="Logo" style={{ height: '25px', objectFit: 'contain' }} />
-                            </div>
-                            <p className="address-text-large" style={{ fontSize: '48px', lineHeight: '1.1' }}>
-                                {address.codigoCompleto}
-                            </p>
-                            <div style={{ justifySelf: 'center' }}>
-                                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} style={{ width: '100px', height: '100px' }} />
-                            </div>
-                        </div>
+                        <div key={address.docId} className="bg-white w-[377px] h-[226px] p-4 grid grid-rows-[auto_1fr_auto] gap-2 items-center justify-center border">
+                           <img src="/logo.png" alt="Logo" className="h-[25px] object-contain justify-self-center" />
+                           <p className="text-5xl leading-tight font-bold text-black text-center self-center break-all">
+                               {address.codigoCompleto}
+                           </p>
+                           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[100px] h-[100px] justify-self-center" />
+                       </div>
                     ) : (
-                        <div key={address.docId} className="label-container label-container-small">
-                            <img src="/logo.png" alt="Logo" style={{ height: '40px', width: 'auto', objectFit: 'contain', alignSelf: 'center' }} />
-                            <p className="address-text-small">
+                        <div key={address.docId} className="bg-white w-[452px] h-[87px] p-2 grid grid-cols-[auto_1fr_auto] gap-8 items-center border">
+                            <img src="/logo.png" alt="Logo" className="h-[40px] w-auto object-contain" />
+                            <p className="text-2xl font-bold text-black text-center">
                                 {address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
                             </p>
-                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} style={{ width: '80px', height: '80px' }} />
+                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[80px] h-[80px]" />
                         </div>
                     )
                     )}
