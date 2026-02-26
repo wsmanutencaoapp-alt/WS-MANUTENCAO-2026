@@ -3,9 +3,8 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// ATENÇÃO: Medida temporária e insegura para testes de funcionalidade.
-// Recomenda-se fortemente voltar a usar o Secret Manager em produção.
-const apiKey = 're_UsnkMP6W_8nH5PhoDA8jvVyoxsiBkz9DN';
+// A chave da API agora é acessada com segurança a partir das variáveis de ambiente.
+const apiKey = process.env.RESEND_API_KEY;
 
 export async function POST(request: Request) {
   const { to, subject, html } = await request.json();
