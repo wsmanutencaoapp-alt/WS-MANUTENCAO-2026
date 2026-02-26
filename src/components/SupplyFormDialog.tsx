@@ -321,7 +321,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   const isPartNumberRequired = useMemo(() => familia !== 'CG', [familia]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={resetFormAndClose}>
+    <Dialog open={isOpen} onOpenChange={resetFormAndClose} modal={false}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>{supply ? 'Editar Item de Suprimento' : 'Novo Item de Suprimento'}</DialogTitle>
