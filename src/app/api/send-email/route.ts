@@ -3,10 +3,9 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// TODO: Por favor, substitua 'YOUR_RESEND_API_KEY_HERE' pela sua chave de API real do Resend.
-// Para maior segurança em produção, é altamente recomendável configurar esta chave como um "secret"
+// TODO: Para maior segurança em produção, é altamente recomendável configurar esta chave como um "secret"
 // no seu provedor de nuvem (ex: Google Secret Manager) e acessá-la via process.env.RESEND_API_KEY.
-const apiKey = 'YOUR_RESEND_API_KEY_HERE';
+const apiKey = 're_UsnkMP6W_8nH5PhoDA8jvVyoxsiBkz9DN';
 
 
 export async function POST(request: Request) {
