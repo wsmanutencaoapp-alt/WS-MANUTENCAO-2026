@@ -140,7 +140,8 @@ service cloud.firestore {
     }
     
     match /addresses/{addressId} {
-        allow read, write: if hasPermission('cadastros');
+        allow read: if hasPermission('cadastros') || hasPermission('suprimentos');
+        allow write: if hasPermission('cadastros');
     }
 
     match /cost_centers/{costCenterId} {
