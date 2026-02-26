@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -371,12 +372,12 @@ const CadastroEnderecosPage = () => {
         addressesToPrint.forEach(address => {
             if (printSize === '100mm x 60mm') {
                 contentToPrint += `
-                    <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding-top: 8mm; box-sizing: border-box; break-inside: avoid; text-align: center;">
+                    <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding-top: 8mm; box-sizing: border-box; text-align: center;">
                         <img src="/logo.png" alt="Logo" style="height: 12px; object-fit: contain; margin-bottom: 8px;" />
-                        <p style="font-size: 38px; line-height: 1.1; font-weight: 900; color: rgb(0, 0, 0); margin-top: 16px; margin-bottom: 8px;">
+                        <p style="font-size: 32px; line-height: 1.1; font-weight: 900; color: rgb(0, 0, 0); margin-top: 22px; margin-bottom: 12px;">
                             ${address.codigoCompleto}
                         </p>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 70px; height: 70px; margin-top: 16px;" />
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 60px; height: 60px; margin-top: 20px;" />
                     </div>`;
             } else {
                  contentToPrint += `
@@ -401,7 +402,6 @@ const CadastroEnderecosPage = () => {
     }
   };
 
-  // Ref for the printable area to pass to the print function
   const printableAreaRef = useRef<HTMLDivElement>(null);
 
 
@@ -594,17 +594,17 @@ const CadastroEnderecosPage = () => {
                 <div ref={printableAreaRef} className="flex flex-col items-center gap-4 max-h-96 overflow-y-auto p-4 bg-muted/50 rounded-md">
                     {addressesToPrint.map(address =>
                     printSize === '100mm x 60mm' ? (
-                        <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 pt-8 box-border text-center border">
-                           <img src="/logo.png" alt="Logo" className="h-3 object-contain mb-2" />
-                           <p className="leading-tight font-bold text-black mt-4 mb-2" style={{ fontSize: '38px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
+                        <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 box-border text-center border">
+                           <img src="/logo.png" alt="Logo" className="h-3 object-contain mt-2 mb-2" />
+                           <p className="leading-tight font-black text-black mt-5 mb-3" style={{ fontSize: '32px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
                                {address.codigoCompleto}
                            </p>
-                           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[70px] h-[70px] mt-4" />
+                           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[60px] h-[60px] mt-5" />
                        </div>
                     ) : (
-                        <div key={address.docId} className="bg-white w-[452px] h-[87px] p-2 grid grid-cols-[auto_1fr_auto] gap-8 items-center border">
+                        <div key={address.docId} className="bg-white w-[452px] h-[87px] grid grid-cols-[auto_1fr_auto] gap-8 items-center p-2 border">
                             <img src="/logo.png" alt="Logo" className="h-[40px] w-auto object-contain" />
-                            <p className="text-2xl font-bold text-black text-center" style={{ color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
+                            <p className="text-2xl font-black text-black text-center" style={{ color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
                                 {address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
                             </p>
                             <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[80px] h-[80px]" />
@@ -627,3 +627,5 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
+
+    
