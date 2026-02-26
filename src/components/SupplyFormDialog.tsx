@@ -27,7 +27,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, ImageIcon, FileText, ExternalLink } from 'lucide-react';
+import { Loader2, Upload, ImageIcon, FileText, ExternalLink, ChevronsUpDown, Check } from 'lucide-react';
 import type { Supply, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import {
@@ -50,6 +50,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from './ui/separator';
 import Image from 'next/image';
+import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
+import { Command, CommandInput, CommandEmpty, CommandGroup, CommandList, CommandItem } from './ui/command';
+import { cn } from '@/lib/utils';
 
 const familyCodes: Record<Supply['familia'], string> = {
   MP: '10',
@@ -122,13 +125,21 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+
+  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
   
-  const addressesQuery = useMemoFirebase(() => (
-      firestore ? query(collection(firestore, 'addresses'), where('setor', '==', '02')) : null
-    ), [firestore]);
+  const addressesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    const baseQuery = collection(firestore, 'addresses');
+    if (showAllAddresses) {
+        return query(baseQuery);
+    }
+    return query(baseQuery, where('setor', '==', '02'));
+  }, [firestore, showAllAddresses]);
     
   const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, { 
-      queryKey: ['addresses_suprimentos'],
+      queryKey: ['addresses_suprimentos', showAllAddresses],
       enabled: isOpen,
     });
 
@@ -158,6 +169,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
     setDocumentoFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (docInputRef.current) docInputRef.current.value = '';
+    setShowAllAddresses(false);
     onClose();
   }
 
@@ -175,6 +187,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
       setPreviewImage(null);
     }
     setDocumentoFile(null);
+    setShowAllAddresses(false);
   }, [supply, form, isOpen]);
 
   useEffect(() => {
@@ -511,19 +524,57 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                       name="localizacaoPadrao"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Localização Padrão</FormLabel>
-                           <Select onValueChange={field.onChange} value={field.value} >
-                            <FormControl>
-                              <SelectTrigger disabled={isLoadingAddresses}>
-                                <SelectValue placeholder={isLoadingAddresses ? "Carregando endereços..." : "Selecione a localização"} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {addresses?.map(addr => (
-                                <SelectItem key={addr.docId} value={addr.codigoCompleto}>{addr.codigoCompleto}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="flex justify-between items-center">
+                            <FormLabel>Localização Padrão <span className="text-destructive">*</span></FormLabel>
+                            <div className="flex items-center space-x-2">
+                                <Switch id="show-all-addresses-supply" checked={showAllAddresses} onCheckedChange={setShowAllAddresses} />
+                                <Label htmlFor="show-all-addresses-supply" className="text-xs font-normal">Ver todos</Label>
+                            </div>
+                          </div>
+                          <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                                >
+                                  {isLoadingAddresses ? "Carregando..." : field.value ? field.value : "Selecione a localização"}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                              <Command>
+                                <CommandInput placeholder="Pesquisar endereço..." />
+                                <CommandList>
+                                  {isLoadingAddresses && <div className="p-4 text-center text-sm"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></div>}
+                                  {!isLoadingAddresses && (
+                                    <>
+                                      <CommandEmpty>Nenhum endereço encontrado.</CommandEmpty>
+                                      <CommandGroup>
+                                        {addresses?.map((addr) => (
+                                          <CommandItem
+                                            value={addr.codigoCompleto}
+                                            key={addr.docId}
+                                            onSelect={() => {
+                                              form.setValue("localizacaoPadrao", addr.codigoCompleto);
+                                              setIsAddressPopoverOpen(false);
+                                            }}
+                                          >
+                                            <Check
+                                              className={cn("mr-2 h-4 w-4", addr.codigoCompleto === field.value ? "opacity-100" : "opacity-0")}
+                                            />
+                                            {addr.codigoCompleto}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </>
+                                  )}
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
                         </FormItem>
                       )}
