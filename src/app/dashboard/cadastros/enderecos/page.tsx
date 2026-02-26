@@ -342,8 +342,7 @@ const CadastroEnderecosPage = () => {
   };
 
   const executePrint = () => {
-    const printableArea = document.getElementById('printable-label-area');
-    if (!printableArea) return;
+    if (!printableAreaRef.current) return;
 
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
@@ -362,29 +361,6 @@ const CadastroEnderecosPage = () => {
               -webkit-print-color-adjust: exact; 
               background-color: white;
             }
-            .label-container-large-print {
-              width: 100mm; 
-              height: 60mm; 
-              display: grid; 
-              grid-template-rows: auto 1fr auto; 
-              align-items: center; 
-              justify-content: center;
-              padding: 5mm; 
-              gap: 2mm;
-              box-sizing: border-box;
-              break-inside: avoid;
-            }
-            .label-container-small-print {
-              width: 120mm; 
-              height: 23mm; 
-              display: grid; 
-              grid-template-columns: auto 1fr auto; 
-              align-items: center; 
-              padding: 0 2mm; 
-              gap: 8mm;
-              box-sizing: border-box;
-              break-inside: avoid;
-            }
           }
         `;
         
@@ -395,25 +371,21 @@ const CadastroEnderecosPage = () => {
         addressesToPrint.forEach(address => {
             if (printSize === '100mm x 60mm') {
                 contentToPrint += `
-                    <div class="label-container-large-print">
-                        <div style="justify-self: center;">
-                            <img src="/logo.png" alt="Logo" style="height: 25px; object-fit: contain;" />
-                        </div>
-                        <p style="font-size: 36px; line-height: 1.1; font-weight: bold; text-align: center; align-self: center; color: black;">
+                    <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 4mm; box-sizing: border-box; break-inside: avoid; text-align: center;">
+                        <img src="/logo.png" alt="Logo" style="height: 18px; object-fit: contain; margin-bottom: 8px;" />
+                        <p style="font-size: 32px; line-height: 1.1; font-weight: bold; color: black; margin: 0; margin-bottom: 8px;">
                             ${address.codigoCompleto}
                         </p>
-                        <div style="justify-self: center;">
-                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 100px; height: 100px;" />
-                        </div>
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 100px; height: 100px;" />
                     </div>`;
             } else {
                  contentToPrint += `
-                    <div class="label-container-small-print">
-                        <img src="/logo.png" alt="Logo" style="height: 40px; width: auto; object-fit: contain; align-self: center;" />
+                    <div style="width: 120mm; height: 23mm; display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding: 0 2mm; gap: 8mm; box-sizing: border-box; break-inside: avoid;">
+                        <img src="/logo.png" alt="Logo" style="height: 18mm; width: auto; object-fit: contain; align-self: center;" />
                         <p style="font-size: 24px; font-weight: bold; text-align: center; color: black;">
                             ${address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
                         </p>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 80px; height: 80px;" />
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 20mm; height: 20mm;" />
                     </div>`;
             }
         });
@@ -428,6 +400,10 @@ const CadastroEnderecosPage = () => {
         }, 250);
     }
   };
+
+  // Ref for the printable area to pass to the print function
+  const printableAreaRef = useRef<HTMLDivElement>(null);
+
 
   return (
     <div className="space-y-6">
@@ -615,12 +591,12 @@ const CadastroEnderecosPage = () => {
                         </Select>
                     </div>
                 </DialogHeader>
-                <div id="printable-label-area" className="flex flex-col items-center gap-4 max-h-96 overflow-y-auto p-4 bg-muted/50 rounded-md">
+                <div ref={printableAreaRef} className="flex flex-col items-center gap-4 max-h-96 overflow-y-auto p-4 bg-muted/50 rounded-md">
                     {addressesToPrint.map(address =>
                     printSize === '100mm x 60mm' ? (
                         <div key={address.docId} className="bg-white w-[377px] h-[226px] p-4 grid grid-rows-[auto_1fr_auto] gap-2 items-center justify-center border">
-                           <img src="/logo.png" alt="Logo" className="h-[25px] object-contain justify-self-center" />
-                           <p className="text-4xl leading-tight font-bold text-black text-center self-center break-all">
+                           <img src="/logo.png" alt="Logo" className="h-[20px] object-contain justify-self-center" />
+                           <p className="text-[32px] leading-tight font-bold text-black text-center self-center break-all">
                                {address.codigoCompleto}
                            </p>
                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[100px] h-[100px] justify-self-center" />
