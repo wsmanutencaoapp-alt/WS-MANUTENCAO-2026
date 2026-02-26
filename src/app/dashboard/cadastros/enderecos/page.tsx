@@ -62,7 +62,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Checkbox } from '@/components/ui/checkbox';
-import Image from 'next/image';
 
 const CadastroEnderecosPage = () => {
   const firestore = useFirestore();
@@ -83,6 +82,7 @@ const CadastroEnderecosPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [addressesToPrint, setAddressesToPrint] = useState<WithDocId<Address>[]>([]);
+  const [printSize, setPrintSize] = useState<'120mm x 23mm' | '100mm x 60mm'>('120mm x 23mm');
   const [searchTerm, setSearchTerm] = useState('');
 
 
@@ -348,7 +348,47 @@ const CadastroEnderecosPage = () => {
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
         printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
-        printWindow.document.write('<style>@media print { @page { size: 120mm 23mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; box-sizing: border-box; padding: 0 2mm; gap: 8mm; break-inside: avoid; } .logo { height: 40px; object-fit: contain; } .address-text { font-size: 24px; font-weight: bold; font-family: monospace; text-align: center; } .qr-code { width: 21mm; height: 21mm; justify-self: end; }  }</style>');
+        
+        const styles = `
+          @media print {
+            @page {
+              size: ${printSize === '100mm x 60mm' ? '100mm 60mm' : '120mm 23mm'};
+              margin: 0;
+            }
+            body { 
+              margin: 0; 
+              padding: 0; 
+              font-family: sans-serif; 
+              -webkit-print-color-adjust: exact; 
+            }
+            .label-container {
+              background-color: white;
+              box-sizing: border-box;
+              break-inside: avoid;
+            }
+            .label-container-small {
+              width: 120mm; 
+              height: 23mm; 
+              display: grid; 
+              grid-template-columns: auto 1fr auto; 
+              align-items: center; 
+              padding: 0 2mm; 
+              gap: 8mm;
+            }
+            .label-container-large {
+              width: 100mm; 
+              height: 60mm; 
+              display: grid; 
+              grid-template-rows: auto 1fr auto; 
+              align-items: center; 
+              justify-content: center;
+              padding: 5mm; 
+              gap: 2mm;
+            }
+          }
+        `;
+        
+        printWindow.document.write(`<style>${styles}</style>`);
         printWindow.document.write('</head><body>');
         printWindow.document.write(printableArea.innerHTML);
         printWindow.document.write('</body></html>');
@@ -527,39 +567,50 @@ const CadastroEnderecosPage = () => {
         </CardContent>
       </Card>
       
-      {addressesToPrint.length > 0 && (
-        <Dialog open={addressesToPrint.length > 0} onOpenChange={closePrintDialog}>
-            <DialogContent className="max-w-xl">
+      <Dialog open={addressesToPrint.length > 0} onOpenChange={closePrintDialog}>
+            <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                    <DialogTitle>Etiqueta(s) de Endereçamento</DialogTitle>
+                    <DialogTitle>Imprimir Etiqueta(s)</DialogTitle>
                     <DialogDescription>
-                        Confirme a(s) etiqueta(s) e clique em imprimir. Dimensões: 120mm x 23mm.
+                    Escolha o tamanho da etiqueta e clique em imprimir.
                     </DialogDescription>
+                    <div className="pt-2">
+                        <Label htmlFor="print-size">Tamanho da Etiqueta</Label>
+                        <Select value={printSize} onValueChange={(v) => setPrintSize(v as any)}>
+                            <SelectTrigger id="print-size" className="w-[200px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="120mm x 23mm">Pequena (120mm x 23mm)</SelectItem>
+                                <SelectItem value="100mm x 60mm">Grande (100mm x 60mm)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </DialogHeader>
-                <div id="printable-label-area" className="flex flex-col items-center gap-2 max-h-60 overflow-y-auto p-4 bg-muted/50 rounded-md">
-                   {addressesToPrint.map(address => (
-                        <div key={address.docId} className="label-container grid grid-cols-[auto_1fr_auto] items-center p-1 border rounded-lg bg-white" style={{ width: '452px', height: '87px', boxSizing: 'content-box', gap: '8mm', padding: '0 2mm' }}>
-                           <Image
-                                src="/logo.png"
-                                alt="Logo"
-                                height={40}
-                                width={60}
-                                style={{ objectFit: 'contain', width: 'auto' }}
-                                className="self-center"
-                            />
-                           <p className="address-text text-center font-mono font-bold text-black text-3xl leading-tight">
-                               {address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
-                           </p>
-                           <div className="qr-code" style={{width: '80px', height: '80px'}}>
-                                <Image
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`}
-                                    alt={`QR Code for ${address.codigoCompleto}`}
-                                    width={80}
-                                    height={80}
-                                />
-                           </div>
+                <div id="printable-label-area" className="flex flex-col items-center gap-2 max-h-80 overflow-y-auto p-4 bg-muted/50 rounded-md">
+                    {addressesToPrint.map(address =>
+                    printSize === '100mm x 60mm' ? (
+                        <div key={address.docId} className="label-container label-container-large">
+                            <div style={{ justifySelf: 'center' }}>
+                                <img src="/logo.png" alt="Logo" style={{ height: '25px', objectFit: 'contain' }} />
+                            </div>
+                            <p className="address-text-large" style={{ fontSize: '48px', lineHeight: '1.1' }}>
+                                {address.codigoCompleto}
+                            </p>
+                            <div style={{ justifySelf: 'center' }}>
+                                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} style={{ width: '100px', height: '100px' }} />
+                            </div>
                         </div>
-                    ))}
+                    ) : (
+                        <div key={address.docId} className="label-container label-container-small">
+                            <img src="/logo.png" alt="Logo" style={{ height: '40px', width: 'auto', objectFit: 'contain', alignSelf: 'center' }} />
+                            <p className="address-text-small">
+                                {address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
+                            </p>
+                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} style={{ width: '80px', height: '80px' }} />
+                        </div>
+                    )
+                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={closePrintDialog}>Cancelar</Button>
@@ -570,11 +621,9 @@ const CadastroEnderecosPage = () => {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-      )}
 
     </div>
   );
 }
 
 export default CadastroEnderecosPage;
-    
