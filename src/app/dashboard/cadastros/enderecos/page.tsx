@@ -399,7 +399,7 @@ const CadastroEnderecosPage = () => {
                         <div style="justify-self: center;">
                             <img src="/logo.png" alt="Logo" style="height: 25px; object-fit: contain;" />
                         </div>
-                        <p style="font-size: 48px; line-height: 1.1; font-weight: bold; text-align: center; align-self: center; color: black;">
+                        <p style="font-size: 36px; line-height: 1.1; font-weight: bold; text-align: center; align-self: center; color: black;">
                             ${address.codigoCompleto}
                         </p>
                         <div style="justify-self: center;">
@@ -620,7 +620,7 @@ const CadastroEnderecosPage = () => {
                     printSize === '100mm x 60mm' ? (
                         <div key={address.docId} className="bg-white w-[377px] h-[226px] p-4 grid grid-rows-[auto_1fr_auto] gap-2 items-center justify-center border">
                            <img src="/logo.png" alt="Logo" className="h-[25px] object-contain justify-self-center" />
-                           <p className="text-5xl leading-tight font-bold text-black text-center self-center break-all">
+                           <p className="text-4xl leading-tight font-bold text-black text-center self-center break-all">
                                {address.codigoCompleto}
                            </p>
                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[100px] h-[100px] justify-self-center" />
@@ -629,7 +629,7 @@ const CadastroEnderecosPage = () => {
                         <div key={address.docId} className="bg-white w-[452px] h-[87px] p-2 grid grid-cols-[auto_1fr_auto] gap-8 items-center border">
                             <img src="/logo.png" alt="Logo" className="h-[40px] w-auto object-contain" />
                             <p className="text-2xl font-bold text-black text-center">
-                                {address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
+                                {address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
                             </p>
                             <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[80px] h-[80px]" />
                         </div>
