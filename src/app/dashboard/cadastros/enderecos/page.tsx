@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import {
   collection,
@@ -372,11 +373,11 @@ const CadastroEnderecosPage = () => {
             if (printSize === '100mm x 60mm') {
                 contentToPrint += `
                     <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 4mm; box-sizing: border-box; break-inside: avoid; text-align: center;">
-                        <img src="/logo.png" alt="Logo" style="height: 18px; object-fit: contain; margin-bottom: 8px;" />
-                        <p style="font-size: 32px; line-height: 1.1; font-weight: bold; color: black; margin: 0; margin-bottom: 8px;">
+                        <img src="/logo.png" alt="Logo" style="height: 18px; object-fit: contain; margin-bottom: 4px;" />
+                        <p style="font-size: 28px; line-height: 1.1; font-weight: bold; color: black; margin: 0; margin-bottom: 4px;">
                             ${address.codigoCompleto}
                         </p>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 100px; height: 100px;" />
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 80px; height: 80px;" />
                     </div>`;
             } else {
                  contentToPrint += `
@@ -594,12 +595,12 @@ const CadastroEnderecosPage = () => {
                 <div ref={printableAreaRef} className="flex flex-col items-center gap-4 max-h-96 overflow-y-auto p-4 bg-muted/50 rounded-md">
                     {addressesToPrint.map(address =>
                     printSize === '100mm x 60mm' ? (
-                        <div key={address.docId} className="bg-white w-[377px] h-[226px] p-4 grid grid-rows-[auto_1fr_auto] gap-2 items-center justify-center border">
-                           <img src="/logo.png" alt="Logo" className="h-[20px] object-contain justify-self-center" />
-                           <p className="text-[32px] leading-tight font-bold text-black text-center self-center break-all">
+                        <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 box-border text-center border">
+                           <img src="/logo.png" alt="Logo" className="h-[18px] object-contain mb-1" />
+                           <p className="text-[28px] leading-tight font-bold text-black m-0 mb-1">
                                {address.codigoCompleto}
                            </p>
-                           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[100px] h-[100px] justify-self-center" />
+                           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[80px] h-[80px]" />
                        </div>
                     ) : (
                         <div key={address.docId} className="bg-white w-[452px] h-[87px] p-2 grid grid-cols-[auto_1fr_auto] gap-8 items-center border">
@@ -627,3 +628,5 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
+
+    
