@@ -3,8 +3,11 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// A chave da API agora é acessada com segurança a partir das variáveis de ambiente.
-const apiKey = process.env.RESEND_API_KEY;
+// TODO: Por favor, substitua 'YOUR_RESEND_API_KEY_HERE' pela sua chave de API real do Resend.
+// Para maior segurança em produção, é altamente recomendável configurar esta chave como um "secret"
+// no seu provedor de nuvem (ex: Google Secret Manager) e acessá-la via process.env.RESEND_API_KEY.
+const apiKey = 'YOUR_RESEND_API_KEY_HERE';
+
 
 export async function POST(request: Request) {
   const { to, subject, html } = await request.json();
@@ -18,10 +21,10 @@ export async function POST(request: Request) {
     }, { status: 500 });
   }
   
-  if (!apiKey) {
+  if (!apiKey || apiKey === 'YOUR_RESEND_API_KEY_HERE') {
     return NextResponse.json({
         error: 'Server Configuration Error',
-        message: 'A RESEND_API_KEY está faltando. Verifique a configuração de segredos no Google Cloud e seu arquivo apphosting.yaml.'
+        message: 'A RESEND_API_KEY está faltando. Verifique a configuração de segredos no Google Cloud e seu arquivo apphosting.yaml ou insira a chave no código.'
     }, { status: 500 });
   }
 
