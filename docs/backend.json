@@ -1583,6 +1583,18 @@
         "date",
         "mileage"
       ]
+    },
+    "AppAppearance": {
+      "title": "App Appearance",
+      "type": "object",
+      "description": "Stores application-wide appearance settings.",
+      "properties": {
+        "loginBackgroundUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL for the login screen background image."
+        }
+      }
     }
   },
   "auth": {
@@ -1797,6 +1809,15 @@
             "$ref": "#/entities/MaintenanceRecord"
           },
           "description": "Stores maintenance history for a vehicle."
+        }
+      },
+      {
+        "path": "/app_config/{configId}",
+        "definition": {
+          "schema": {
+            "$ref": "#/entities/AppAppearance"
+          },
+          "description": "Stores application-wide configuration documents, like appearance settings."
         }
       }
     ]

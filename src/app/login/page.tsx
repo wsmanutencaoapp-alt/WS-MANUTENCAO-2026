@@ -24,10 +24,10 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import type { Employee } from '@/lib/types';
+import type { Employee, AppAppearance } from '@/lib/types';
 import Image from 'next/image';
 
 const formSchema = z.object({
@@ -174,11 +174,21 @@ function LoginForm() {
   );
 }
 
+const CONFIG_DOC_ID = 'appearance';
+
 export default function LoginPage() {
+    const firestore = useFirestore();
+    const configRef = useMemoFirebase(() => firestore ? doc(firestore, 'app_config', CONFIG_DOC_ID) : null, [firestore]);
+    const { data: appearanceConfig } = useDoc<AppAppearance>(configRef);
+
+    const backgroundStyle = appearanceConfig?.loginBackgroundUrl
+        ? { backgroundImage: `url(${appearanceConfig.loginBackgroundUrl})` }
+        : { backgroundImage: "url(/login-background.jpg)" };
+
   return (
     <div 
-        className="flex min-h-screen flex-col items-center justify-center p-4 bg-cover bg-center"
-        style={{ backgroundImage: "url(/login-background.jpg)" }}
+        className="flex min-h-screen flex-col items-center justify-center p-4 bg-cover bg-center transition-all duration-500"
+        style={backgroundStyle}
     >
         <div className="absolute inset-0 bg-black/50 z-0" />
         <div className="z-10 flex flex-col items-center justify-center">

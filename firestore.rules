@@ -30,6 +30,11 @@ service cloud.firestore {
         return request.auth.uid == userId;
     }
     
+    match /app_config/{configId} {
+      allow read: if true;
+      allow write: if hasPermission('configurador_personalizar_update');
+    }
+
     match /vehicles/{vehicleId} {
       allow get: if true; // Public read for QR code check-out
       allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');

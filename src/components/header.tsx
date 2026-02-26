@@ -35,6 +35,7 @@ import {
   Camera,
   Receipt,
   ExternalLink,
+  Paintbrush,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -215,7 +216,8 @@ const allNavItems: NavItem[] = [
     permission: 'configurador',
     subItems: [
         { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação', permission: 'configurador_alcada' },
-        { href: '/dashboard/configurador/disparo-email', label: 'Disparo de E-mail', permission: 'configurador_disparo_email' }
+        { href: '/dashboard/configurador/disparo-email', label: 'Disparo de E-mail', permission: 'configurador_disparo_email' },
+        { href: '/dashboard/configurador/personalizar', icon: Paintbrush, label: 'Personalizar Aparência', permission: 'configurador_personalizar' }
     ]
   },
   { 

@@ -379,7 +379,11 @@ export type EmailConfiguration = {
     enabled: boolean;
     recipients: string[];
 };
-    
+
+export type AppAppearance = {
+  id?: string;
+  loginBackgroundUrl?: string;
+};
     
 
 export type MaintenancePlan = {
