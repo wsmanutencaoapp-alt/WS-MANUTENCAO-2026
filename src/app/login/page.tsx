@@ -104,7 +104,7 @@ function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md border-0 shadow-none sm:border sm:shadow-sm">
+    <Card className="w-full max-w-md border-0 shadow-none sm:border sm:shadow-sm bg-card/80 backdrop-blur-sm">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Login</CardTitle>
         <CardDescription>
@@ -123,7 +123,7 @@ function LoginForm() {
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="joao.silva@example.com"
+                      placeholder="joao.silva@exemplo.com"
                       {...field}
                     />
                   </FormControl>
@@ -176,17 +176,23 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background sm:bg-muted/40 p-4">
-      <div className="mb-8">
-        <Image
-            src="/logo.png"
-            alt="APP WS Logo"
-            width={150}
-            height={150}
-            priority
-        />
-      </div>
-      <LoginForm />
+    <div 
+        className="flex min-h-screen flex-col items-center justify-center p-4 bg-cover bg-center"
+        style={{ backgroundImage: "url(/login-background.jpg)" }}
+    >
+        <div className="absolute inset-0 bg-black/50 z-0" />
+        <div className="z-10 flex flex-col items-center justify-center">
+            <div className="mb-8">
+                <Image
+                    src="/logo.png"
+                    alt="APP WS Logo"
+                    width={150}
+                    height={150}
+                    priority
+                />
+            </div>
+            <LoginForm />
+        </div>
     </div>
   );
 }
