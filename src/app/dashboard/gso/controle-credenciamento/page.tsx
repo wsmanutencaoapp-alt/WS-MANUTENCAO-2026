@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, where } from 'firebase/firestore';
 import type { Employee, Vehicle } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Edit, Users, Car } from 'lucide-react';
+import { Loader2, Search, Edit, Users, Car, HardHat } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import EditCredenciamentoDialog from '@/components/EditCredenciamentoDialog';
@@ -35,18 +35,18 @@ const getCredentialStatus = (dueDate: string | undefined): { text: string; varia
 
 
 // =====================================================================
-// Funcionários Tab Component
+// Funcionários Ativos Tab Component
 // =====================================================================
-const FuncionariosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>) => void }) => {
+const FuncionariosAtivosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>) => void }) => {
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
 
   const employeesQuery = useMemoFirebase(() => (
-    firestore ? query(collection(firestore, 'employees'), orderBy('firstName')) : null
+    firestore ? query(collection(firestore, 'employees'), where('status', 'in', ['Ativo', 'Pendente']), orderBy('firstName')) : null
   ), [firestore]);
 
   const { data: employees, isLoading, error } = useCollection<WithDocId<Employee>>(employeesQuery, {
-      queryKey: ['all_employees_for_credenciamento']
+      queryKey: ['active_employees_for_credenciamento']
   });
 
   const filteredEmployees = useMemo(() => {
@@ -64,8 +64,8 @@ const FuncionariosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>) => vo
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Credenciamento de Funcionários</CardTitle>
-        <CardDescription>Gerencie as credenciais, cargos e bases de todos os funcionários.</CardDescription>
+        <CardTitle>Credenciamento de Funcionários Ativos</CardTitle>
+        <CardDescription>Gerencie as credenciais, cargos e bases dos funcionários ativos e pendentes.</CardDescription>
         <div className="relative pt-4">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -120,6 +120,100 @@ const FuncionariosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>) => vo
     </Card>
   );
 };
+
+
+// =====================================================================
+// Ex-Funcionários Tab Component
+// =====================================================================
+const ExFuncionariosTab = () => {
+    const firestore = useFirestore();
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const employeesQuery = useMemoFirebase(() => (
+        firestore ? query(collection(firestore, 'employees'), where('status', '==', 'Inativo'), orderBy('firstName')) : null
+    ), [firestore]);
+
+    const { data: employees, isLoading, error } = useCollection<WithDocId<Employee>>(employeesQuery, {
+        queryKey: ['inactive_employees_for_credenciamento']
+    });
+
+    const filteredEmployees = useMemo(() => {
+        if (!employees) return [];
+        if (!searchTerm) return employees;
+        const lowercasedTerm = searchTerm.toLowerCase();
+        return employees.filter(e =>
+            e.firstName.toLowerCase().includes(lowercasedTerm) ||
+            e.lastName.toLowerCase().includes(lowercasedTerm) ||
+            e.id.toString().includes(lowercasedTerm)
+        );
+    }, [employees, searchTerm]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Ex-Funcionários</CardTitle>
+                <CardDescription>Lista de funcionários com status "Inativo".</CardDescription>
+                <div className="relative pt-4">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Pesquisar por nome ou matrícula..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full rounded-lg bg-background pl-8 md:w-[300px]"
+                    />
+                </div>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Matrícula</TableHead>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Cargo</TableHead>
+                             <TableHead>Status</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading && <TableRow><TableCell colSpan={4} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
+                        {error && <TableRow><TableCell colSpan={4} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
+                        {!isLoading && filteredEmployees.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">Nenhum ex-funcionário encontrado.</TableCell></TableRow>}
+                        {!isLoading && filteredEmployees.map(employee => (
+                            <TableRow key={employee.docId}>
+                                <TableCell className="font-mono">{employee.id}</TableCell>
+                                <TableCell className="font-medium">{employee.firstName} {employee.lastName}</TableCell>
+                                <TableCell>{employee.cargo || '-'}</TableCell>
+                                <TableCell><Badge variant="destructive">{employee.status}</Badge></TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+};
+
+
+// =====================================================================
+// Temporários Tab Component
+// =====================================================================
+const TemporariosTab = () => {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Controle de Temporários</CardTitle>
+                <CardDescription>Gerencie as credenciais para funcionários temporários e terceirizados.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-col items-center justify-center gap-4 py-8 h-64 border-2 border-dashed rounded-lg">
+                    <HardHat className="h-16 w-16 text-muted-foreground"/>
+                    <p className="text-muted-foreground">Esta funcionalidade está em construção.</p>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
+
 
 // =====================================================================
 // Veículos Tab Component
@@ -226,7 +320,8 @@ export default function ControleCredenciamentoPage() {
     
     const handleSuccess = () => {
         if(dialogState.itemType === 'employee') {
-            queryClient.invalidateQueries({ queryKey: ['all_employees_for_credenciamento'] });
+            queryClient.invalidateQueries({ queryKey: ['active_employees_for_credenciamento'] });
+            queryClient.invalidateQueries({ queryKey: ['inactive_employees_for_credenciamento'] });
         } else {
             queryClient.invalidateQueries({ queryKey: ['all_vehicles_for_credenciamento'] });
         }
@@ -236,16 +331,24 @@ export default function ControleCredenciamentoPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Controle de Credenciamento</h1>
-      <Tabs defaultValue="funcionarios">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs defaultValue="funcionarios" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="funcionarios"><Users className="mr-2 h-4 w-4"/> Funcionários</TabsTrigger>
             <TabsTrigger value="veiculos"><Car className="mr-2 h-4 w-4"/> Veículos</TabsTrigger>
+            <TabsTrigger value="temporarios"><HardHat className="mr-2 h-4 w-4"/> Temporários</TabsTrigger>
+            <TabsTrigger value="ex-funcionarios"><Users className="mr-2 h-4 w-4"/> Ex-Funcionários</TabsTrigger>
         </TabsList>
         <TabsContent value="funcionarios">
-            <FuncionariosTab onEdit={(item) => handleOpenDialog(item, 'employee')} />
+            <FuncionariosAtivosTab onEdit={(item) => handleOpenDialog(item, 'employee')} />
         </TabsContent>
         <TabsContent value="veiculos">
             <VeiculosTab onEdit={(item) => handleOpenDialog(item, 'vehicle')} />
+        </TabsContent>
+         <TabsContent value="temporarios">
+            <TemporariosTab />
+        </TabsContent>
+        <TabsContent value="ex-funcionarios">
+            <ExFuncionariosTab />
         </TabsContent>
       </Tabs>
       
