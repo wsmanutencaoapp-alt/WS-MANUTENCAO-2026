@@ -42,7 +42,7 @@ const FuncionariosAtivosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>)
   const [searchTerm, setSearchTerm] = useState('');
 
   const employeesQuery = useMemoFirebase(() => (
-    firestore ? query(collection(firestore, 'employees'), where('status', 'in', ['Ativo', 'Pendente']), orderBy('firstName')) : null
+    firestore ? query(collection(firestore, 'employees'), where('status', 'in', ['Ativo', 'Pendente'])) : null
   ), [firestore]);
 
   const { data: employees, isLoading, error } = useCollection<WithDocId<Employee>>(employeesQuery, {
@@ -51,9 +51,12 @@ const FuncionariosAtivosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>)
 
   const filteredEmployees = useMemo(() => {
     if (!employees) return [];
-    if (!searchTerm) return employees;
+    
+    const sortedEmployees = [...employees].sort((a, b) => (a.firstName || '').localeCompare(b.firstName || ''));
+
+    if (!searchTerm) return sortedEmployees;
     const lowercasedTerm = searchTerm.toLowerCase();
-    return employees.filter(e => 
+    return sortedEmployees.filter(e => 
       e.firstName.toLowerCase().includes(lowercasedTerm) ||
       e.lastName.toLowerCase().includes(lowercasedTerm) ||
       e.id.toString().includes(lowercasedTerm) ||
@@ -130,7 +133,7 @@ const ExFuncionariosTab = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const employeesQuery = useMemoFirebase(() => (
-        firestore ? query(collection(firestore, 'employees'), where('status', '==', 'Inativo'), orderBy('firstName')) : null
+        firestore ? query(collection(firestore, 'employees'), where('status', '==', 'Inativo')) : null
     ), [firestore]);
 
     const { data: employees, isLoading, error } = useCollection<WithDocId<Employee>>(employeesQuery, {
@@ -139,9 +142,12 @@ const ExFuncionariosTab = () => {
 
     const filteredEmployees = useMemo(() => {
         if (!employees) return [];
-        if (!searchTerm) return employees;
+        
+        const sortedEmployees = [...employees].sort((a, b) => (a.firstName || '').localeCompare(b.firstName || ''));
+
+        if (!searchTerm) return sortedEmployees;
         const lowercasedTerm = searchTerm.toLowerCase();
-        return employees.filter(e =>
+        return sortedEmployees.filter(e =>
             e.firstName.toLowerCase().includes(lowercasedTerm) ||
             e.lastName.toLowerCase().includes(lowercasedTerm) ||
             e.id.toString().includes(lowercasedTerm)
