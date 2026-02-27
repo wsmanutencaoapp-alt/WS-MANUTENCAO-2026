@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, where, doc, updateDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import type { Employee, Vehicle, TemporaryEmployee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -248,8 +248,8 @@ const TemporariosTab = () => {
         const lowercasedTerm = searchTerm.toLowerCase();
         return tempEmployees.filter(e => 
             e.name.toLowerCase().includes(lowercasedTerm) ||
-            (e.id && e.id.toLowerCase().includes(lowercasedTerm)) ||
-            (e.company && e.company.toLowerCase().includes(lowercasedTerm))
+            (e.company && e.company.toLowerCase().includes(lowercasedTerm)) ||
+            (e.servico && e.servico.toLowerCase().includes(lowercasedTerm))
         );
     }, [tempEmployees, searchTerm]);
 
@@ -260,12 +260,12 @@ const TemporariosTab = () => {
         } else {
             setEditingTemp(null);
             setFormData({
-                id: '',
                 name: '',
                 company: '',
                 status: 'Ativo',
                 base: '',
-                cargo: '',
+                servico: '',
+                observacao: '',
                 acesso: '',
                 credencialVencimento: '',
                 coleteNumero: ''
@@ -285,14 +285,24 @@ const TemporariosTab = () => {
 
     const handleSave = async () => {
         if (!firestore) return;
-        if (!formData.id || !formData.name || !formData.company) {
-            toast({ variant: 'destructive', title: 'Erro', description: 'Matrícula, Nome e Empresa são obrigatórios.' });
+        if (!formData.name || !formData.company) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Nome e Empresa são obrigatórios.' });
             return;
         }
 
         setIsSaving(true);
         try {
-            const dataToSave: Partial<TemporaryEmployee> = { ...formData };
+            const dataToSave: Partial<TemporaryEmployee> = { 
+                name: formData.name,
+                company: formData.company,
+                status: formData.status,
+                base: formData.base,
+                servico: formData.servico,
+                observacao: formData.observacao,
+                acesso: formData.acesso,
+                credencialVencimento: formData.credencialVencimento,
+                coleteNumero: formData.coleteNumero,
+             };
             if (dataToSave.credencialVencimento) {
                  const vencimentoDate = parse(dataToSave.credencialVencimento, 'yyyy-MM-dd', new Date());
                  if (!isValid(vencimentoDate)) {
@@ -308,8 +318,7 @@ const TemporariosTab = () => {
                 await updateDoc(docRef, dataToSave);
                 toast({ title: 'Sucesso', description: 'Dados do temporário atualizados.' });
             } else {
-                const docRef = doc(firestore, 'temporary_employees', formData.id);
-                await setDoc(docRef, dataToSave);
+                await addDoc(collection(firestore, 'temporary_employees'), dataToSave);
                 toast({ title: 'Sucesso', description: 'Funcionário temporário cadastrado.' });
             }
             queryClient.invalidateQueries({ queryKey: ['temporary_employees'] });
@@ -343,7 +352,7 @@ const TemporariosTab = () => {
                      <div className="relative">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Pesquisar por nome, matrícula, empresa..."
+                            placeholder="Pesquisar por nome, serviço, empresa..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full rounded-lg bg-background pl-8 md:w-[300px]"
@@ -358,10 +367,10 @@ const TemporariosTab = () => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Matrícula</TableHead>
                             <TableHead>Nome</TableHead>
                             <TableHead>Empresa</TableHead>
                             <TableHead>Base</TableHead>
+                            <TableHead>Serviço</TableHead>
                             <TableHead>Venc. Credencial</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
@@ -374,10 +383,10 @@ const TemporariosTab = () => {
                             const status = getCredentialStatus(temp.credencialVencimento);
                             return (
                                 <TableRow key={temp.docId}>
-                                    <TableCell className="font-mono">{temp.id}</TableCell>
                                     <TableCell className="font-medium">{temp.name}</TableCell>
                                     <TableCell>{temp.company}</TableCell>
                                     <TableCell>{temp.base || '-'}</TableCell>
+                                    <TableCell>{temp.servico || '-'}</TableCell>
                                     <TableCell>{temp.credencialVencimento ? format(new Date(temp.credencialVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
                                     <TableCell><Badge variant={status.variant}>{status.text}</Badge></TableCell>
                                     <TableCell className="text-right space-x-2">
@@ -409,14 +418,11 @@ const TemporariosTab = () => {
                     <DialogTitle>{editingTemp ? 'Editar' : 'Adicionar'} Funcionário Temporário</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="space-y-1.5">
-                        <Label htmlFor="id">Matrícula / ID</Label>
-                        <Input id="id" value={formData.id || ''} onChange={handleInputChange} disabled={!!editingTemp} />
-                    </div>
                     <div className="space-y-1.5"><Label htmlFor="name">Nome Completo</Label><Input id="name" value={formData.name || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="company">Empresa</Label><Input id="company" value={formData.company || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="base">Base</Label><Input id="base" value={formData.base || ''} onChange={handleInputChange}/></div>
-                    <div className="space-y-1.5"><Label htmlFor="cargo">Cargo</Label><Input id="cargo" value={formData.cargo || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="servico">Serviço</Label><Input id="servico" value={formData.servico || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="observacao">Observação</Label><Input id="observacao" value={formData.observacao || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="acesso">Acesso</Label><Input id="acesso" value={formData.acesso || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="credencialVencimento">Venc. Credencial</Label><Input id="credencialVencimento" type="date" value={formData.credencialVencimento ? format(new Date(formData.credencialVencimento), 'yyyy-MM-dd') : ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="coleteNumero">Nº Colete</Label><Input id="coleteNumero" value={formData.coleteNumero || ''} onChange={handleInputChange}/></div>

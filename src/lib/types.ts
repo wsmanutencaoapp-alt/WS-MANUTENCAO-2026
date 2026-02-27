@@ -248,11 +248,12 @@ export type Employee = {
 };
 
 export type TemporaryEmployee = {
-  id: string; // Matricula
+  id?: string;
   name: string;
   company: string;
   base?: string;
-  cargo?: string;
+  servico?: string;
+  observacao?: string;
   acesso?: string;
   credencialVencimento?: string; // date
   coleteNumero?: string;

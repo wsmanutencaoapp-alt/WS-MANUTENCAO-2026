@@ -1194,7 +1194,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the temporary employee (e.g., a registration number)."
+          "description": "Unique identifier for the temporary employee (document ID)."
         },
         "name": {
           "type": "string",
@@ -1208,9 +1208,13 @@
           "type": "string",
           "description": "The primary location or base for the temporary employee."
         },
-        "cargo": {
+        "servico": {
           "type": "string",
-          "description": "The job title or function of the temporary employee."
+          "description": "The service to be performed by the temporary employee."
+        },
+        "observacao": {
+          "type": "string",
+          "description": "General observations about the temporary employee."
         },
         "acesso": {
           "type": "string",
@@ -1227,11 +1231,18 @@
         },
         "status": {
           "type": "string",
-          "enum": ["Ativo", "Inativo"],
+          "enum": [
+            "Ativo",
+            "Inativo"
+          ],
           "description": "The current status of the temporary employee's credential."
         }
       },
-      "required": ["name", "company", "status"]
+      "required": [
+        "name",
+        "company",
+        "status"
+      ]
     },
     "Despesa": {
       "$schema": "http://json-schema.org/draft-07/schema#",
