@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Vehicle": {
@@ -55,6 +56,15 @@
             "Em Viagem"
           ],
           "description": "The current status of the vehicle."
+        },
+        "base": {
+          "type": "string",
+          "description": "A base ou localidade principal do veículo."
+        },
+        "credencialVencimento": {
+          "type": "string",
+          "format": "date",
+          "description": "A data de vencimento da credencial de acesso do veículo."
         }
       },
       "required": [
@@ -1143,6 +1153,23 @@
         "permissions": {
           "type": "object",
           "description": "A map of screen names to booleans indicating access rights."
+        },
+        "base": {
+          "type": "string",
+          "description": "A base ou localidade principal do funcionário."
+        },
+        "cargo": {
+          "type": "string",
+          "description": "O cargo ou função do funcionário."
+        },
+        "credencialVencimento": {
+          "type": "string",
+          "format": "date",
+          "description": "A data de vencimento da credencial do funcionário."
+        },
+        "coleteNumero": {
+          "type": "string",
+          "description": "O número do colete de identificação do funcionário."
         }
       },
       "required": [

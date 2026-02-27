@@ -11,6 +11,8 @@ export type Vehicle = {
   km: number;
   tipo: 'Carro' | 'Moto' | 'Caminhão' | 'Van' | 'Caminhonete' | 'Outro';
   status: 'Ativo' | 'Inativo' | 'Em Manutenção' | 'Em Viagem';
+  base?: string;
+  credencialVencimento?: string; // date
 };
 
 export type VehicleMovement = {
@@ -238,6 +240,10 @@ export type Employee = {
   photoURL?: string | null;
   permissions?: Permissions;
   status: 'Ativo' | 'Pendente' | 'Inativo';
+  base?: string;
+  cargo?: string;
+  credencialVencimento?: string; // date
+  coleteNumero?: string;
 };
 
 export type Despesa = {
