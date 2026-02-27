@@ -35,6 +35,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
   const [isSaving, setIsSaving] = useState(false);
 
   // Form state
+  const [matricula, setMatricula] = useState('');
   const [base, setBase] = useState('');
   const [cargo, setCargo] = useState('');
   const [credencialVencimento, setCredencialVencimento] = useState('');
@@ -48,6 +49,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
 
       if (itemType === 'employee') {
         const employeeItem = item as Employee;
+        setMatricula(employeeItem.id ? String(employeeItem.id) : '');
         setCargo(employeeItem.cargo || '');
         setColeteNumero(employeeItem.coleteNumero || '');
         setAcesso(employeeItem.acesso || '');
@@ -76,7 +78,13 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
     const collectionName = itemType === 'employee' ? 'employees' : 'vehicles';
 
     if (itemType === 'employee') {
-      dataToUpdate = { ...dataToUpdate, cargo, coleteNumero, acesso };
+      const numMatricula = Number(matricula);
+      if (isNaN(numMatricula)) {
+          toast({ variant: 'destructive', title: 'Erro', description: 'Matrícula inválida. Deve ser um número.' });
+          setIsSaving(false);
+          return;
+      }
+      dataToUpdate = { ...dataToUpdate, id: numMatricula, cargo, coleteNumero, acesso };
     }
 
     try {
@@ -109,6 +117,14 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          
+          {itemType === 'employee' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="matricula">Matrícula</Label>
+              <Input id="matricula" value={matricula} onChange={e => setMatricula(e.target.value)} />
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="base">Base / Localidade</Label>
             <Input id="base" value={base} onChange={e => setBase(e.target.value)} placeholder="Ex: SBEG, SBGR" />
