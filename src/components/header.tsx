@@ -168,6 +168,9 @@ const allNavItems: NavItem[] = [
     icon: Plane,
     label: 'GSO',
     permission: 'gso',
+    subItems: [
+      { href: '/dashboard/gso/controle-credenciamento', icon: Users, label: 'Controle de Credenciamento', permission: 'gso_controle_credenciamento' },
+    ]
   },
   {
     href: '/dashboard/planejamento',

@@ -136,6 +136,16 @@ export const permissionStructure = [
         ]
     },
     {
+        id: 'gso',
+        label: 'GSO',
+        path: '/dashboard/gso',
+        isModule: true,
+        actions: ['view'],
+        submodules: [
+          { id: 'gso_controle_credenciamento', label: 'Controle de Credenciamento', path: '/dashboard/gso/controle-credenciamento', actions: ['view', 'create', 'update', 'delete'] },
+        ]
+    },
+    {
         id: 'userManagement',
         label: 'Gerenciar Usuários',
         path: '/dashboard/user-management',

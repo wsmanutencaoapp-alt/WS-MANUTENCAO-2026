@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation';
+
 export default function GSOPage() {
-  return <div>Página de GSO</div>;
+  redirect('/dashboard/gso/controle-credenciamento');
 }
