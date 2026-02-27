@@ -40,7 +40,7 @@ service cloud.firestore {
       allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
       allow create: if hasPermission('cadastros_veiculos_create');
       allow update: if 
-        (hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update')) ||
+        (hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update') || hasPermission('gso_controle_credenciamento_update')) ||
         (
             request.auth == null &&
             (
@@ -118,7 +118,7 @@ service cloud.firestore {
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
       allow create: if hasPermission('cadastros_funcionarios_create') || isOwner(employeeId);
-      allow update: if hasPermission('cadastros_funcionarios_update') ||
+      allow update: if hasPermission('cadastros_funcionarios_update') || hasPermission('gso_controle_credenciamento_update') ||
                      (isOwner(employeeId) && 
                       !('accessLevel' in request.resource.data) &&
                       !('permissions' in request.resource.data) &&

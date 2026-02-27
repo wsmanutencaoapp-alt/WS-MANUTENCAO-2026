@@ -19,6 +19,7 @@ import type { Employee, Vehicle } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Loader2, CalendarIcon } from 'lucide-react';
 import { parse, isValid, format } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface EditCredenciamentoDialogProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
   const [cargo, setCargo] = useState('');
   const [credencialVencimento, setCredencialVencimento] = useState('');
   const [coleteNumero, setColeteNumero] = useState('');
+  const [accessLevel, setAccessLevel] = useState('');
 
   useEffect(() => {
     if (item && isOpen) {
@@ -45,8 +47,10 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
       setCredencialVencimento(item.credencialVencimento ? format(new Date(item.credencialVencimento), 'yyyy-MM-dd') : '');
 
       if (itemType === 'employee') {
-        setCargo((item as Employee).cargo || '');
-        setColeteNumero((item as Employee).coleteNumero || '');
+        const employeeItem = item as Employee;
+        setCargo(employeeItem.cargo || '');
+        setColeteNumero(employeeItem.coleteNumero || '');
+        setAccessLevel(employeeItem.accessLevel || 'Técnico');
       }
     }
   }, [item, isOpen, itemType]);
@@ -72,7 +76,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
     const collectionName = itemType === 'employee' ? 'employees' : 'vehicles';
 
     if (itemType === 'employee') {
-      dataToUpdate = { ...dataToUpdate, cargo, coleteNumero };
+      dataToUpdate = { ...dataToUpdate, cargo, coleteNumero, accessLevel };
     }
 
     try {
@@ -111,10 +115,24 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
           </div>
 
           {itemType === 'employee' && (
-            <div className="space-y-1.5">
-              <Label htmlFor="cargo">Cargo</Label>
-              <Input id="cargo" value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Ex: Mecânico de Manutenção" />
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="cargo">Cargo</Label>
+                <Input id="cargo" value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Ex: Mecânico de Manutenção" />
+              </div>
+               <div className="space-y-1.5">
+                    <Label htmlFor="accessLevel">Nível de Acesso</Label>
+                    <Select value={accessLevel} onValueChange={setAccessLevel}>
+                        <SelectTrigger id="accessLevel">
+                            <SelectValue placeholder="Selecione o nível..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Admin">Admin</SelectItem>
+                            <SelectItem value="Técnico">Técnico</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </>
           )}
 
           <div className="space-y-1.5">
