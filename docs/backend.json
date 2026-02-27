@@ -1186,6 +1186,53 @@
         "status"
       ]
     },
+    "TemporaryEmployee": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Temporary Employee",
+      "type": "object",
+      "description": "Represents a temporary or third-party employee who does not have system access.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the temporary employee (e.g., a registration number)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the temporary employee."
+        },
+        "company": {
+          "type": "string",
+          "description": "Company the temporary employee works for."
+        },
+        "base": {
+          "type": "string",
+          "description": "The primary location or base for the temporary employee."
+        },
+        "cargo": {
+          "type": "string",
+          "description": "The job title or function of the temporary employee."
+        },
+        "acesso": {
+          "type": "string",
+          "description": "Internal access level for company control (e.g., Nível 1, Geral)."
+        },
+        "credencialVencimento": {
+          "type": "string",
+          "format": "date",
+          "description": "The expiration date of the temporary employee's credential."
+        },
+        "coleteNumero": {
+          "type": "string",
+          "description": "The identification vest number for the temporary employee."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Ativo", "Inativo"],
+          "description": "The current status of the temporary employee's credential."
+        }
+      },
+      "required": ["name", "company", "status"]
+    },
     "Despesa": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Despesa",
@@ -1768,6 +1815,15 @@
             "$ref": "#/entities/Notification"
           },
           "description": "Stores user-specific notifications."
+        }
+      },
+       {
+        "path": "/temporary_employees/{tempEmployeeId}",
+        "definition": {
+          "schema": {
+            "$ref": "#/entities/TemporaryEmployee"
+          },
+          "description": "Stores temporary and third-party employee information for credentialing purposes."
         }
       },
       {

@@ -247,6 +247,19 @@ export type Employee = {
   coleteNumero?: string;
 };
 
+export type TemporaryEmployee = {
+  id: string; // Matricula
+  name: string;
+  company: string;
+  base?: string;
+  cargo?: string;
+  acesso?: string;
+  credencialVencimento?: string; // date
+  coleteNumero?: string;
+  status: 'Ativo' | 'Inativo';
+};
+
+
 export type Despesa = {
   id?: string;
   description: string;

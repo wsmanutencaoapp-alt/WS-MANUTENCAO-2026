@@ -30,21 +30,36 @@ service cloud.firestore {
         return request.auth.uid == userId;
     }
     
+    match /app_config/{configId} {
+      allow read: if true;
+      allow write: if hasPermission('configurador_personalizar_update');
+    }
+
     match /vehicles/{vehicleId} {
       allow get: if true; // Public read for QR code check-out
       allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
       allow create: if hasPermission('cadastros_veiculos_create');
       allow update: if 
-        (hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update')) ||
+        (hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update') || hasPermission('gso_controle_credenciamento_update')) ||
         (
             request.auth == null &&
             (
               (resource.data.status == 'Ativo' && request.resource.data.status == 'Em Viagem') ||
               (resource.data.status == 'Em Viagem' && request.resource.data.status == 'Ativo')
             ) &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'km'])
         );
       allow delete: if hasPermission('cadastros_veiculos_delete');
+
+      match /maintenance_plans/{planId} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('manutencao');
+      }
+
+      match /maintenance_records/{recordId} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('manutencao');
+      }
     }
     
     match /vehicle_movements/{movementId} {
@@ -62,42 +77,48 @@ service cloud.firestore {
 
     match /supplies/{supplyId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('suprimentos');
+      allow create: if hasPermission('cadastros_suprimentos_create');
+      allow update: if hasPermission('cadastros_suprimentos_update');
+      allow delete: if hasPermission('cadastros_suprimentos_delete');
       
       match /stock/{stockId} {
         allow read: if isAuthenticated();
-        allow write: if hasPermission('suprimentos');
+        // Allow stock writes if user can create movements or edit master data
+        allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update');
       }
     }
     
     match /supply_movements/{movementId} {
-      allow read, write: if hasPermission('suprimentos');
+      allow read: if hasPermission('suprimentos_movimentacao_view');
+      allow create: if hasPermission('suprimentos_movimentacao_create');
     }
 
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if hasPermission('ferramentaria') || hasPermission('compras_controle_create');
+      allow create: if hasPermission('cadastros_ferramentas_create');
+      allow update: if hasPermission('cadastros_ferramentas_update') || hasPermission('ferramentaria_lista_update');
+      allow delete: if hasPermission('cadastros_ferramentas_delete');
       
       match /calibration_history/{calibrationId} {
-        allow read: if hasPermission('ferramentaria');
-        allow create, write: if hasPermission('ferramentaria');
+        allow read: if hasPermission('calibracao_view');
+        allow create, update, delete: if hasPermission('calibracao_create') || hasPermission('calibracao_update') || hasPermission('calibracao_delete');
       }
     }
     
     match /kits/{kitId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('ferramentaria');
+      allow write: if hasPermission('ferramentaria_kits_create') || hasPermission('ferramentaria_kits_update') || hasPermission('ferramentaria_kits_delete');
     }
     
     match /suppliers/{supplierId} {
-      allow read, write: if hasPermission('compras');
+      allow read: if hasPermission('cadastros_fornecedores_view') || hasPermission('compras_requisicao_view') || hasPermission('compras_controle_view');
+      allow write: if hasPermission('cadastros_fornecedores_create') || hasPermission('cadastros_fornecedores_update') || hasPermission('cadastros_fornecedores_delete');
     }
     
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
       allow create: if hasPermission('cadastros_funcionarios_create') || isOwner(employeeId);
-      
-      allow update: if hasPermission('cadastros_funcionarios_update') || 
+      allow update: if hasPermission('cadastros_funcionarios_update') || hasPermission('gso_controle_credenciamento_update') ||
                      (isOwner(employeeId) && 
                       !('accessLevel' in request.resource.data) &&
                       !('permissions' in request.resource.data) &&
@@ -109,57 +130,63 @@ service cloud.firestore {
         allow create: if isAuthenticated();
       }
     }
+
+    match /temporary_employees/{tempEmployeeId} {
+      allow read: if hasPermission('gso_controle_credenciamento_view');
+      allow write: if hasPermission('gso_controle_credenciamento_create') || hasPermission('gso_controle_credenciamento_update') || hasPermission('gso_controle_credenciamento_delete');
+    }
     
     match /expenses/{expenseId} {
       allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
       allow read: if hasPermission('financeiro_despesas_view') || (isAuthenticated() && resource.data.employeeId == request.auth.uid);
-      allow update, delete: if hasPermission('financeiro_despesas_update') || hasPermission('financeiro_despesas_delete');
+      allow update: if hasPermission('financeiro_despesas_update');
+      allow delete: if hasPermission('financeiro_despesas_delete');
     }
 
     match /tool_requests/{requestId} {
-      allow read, write: if (isAuthenticated() && (isOwner(resource.data.requesterId) || isOwner(resource.data.handledBy))) || hasPermission('ferramentaria');
+      allow read: if isAuthenticated();
+      allow write: if (isAuthenticated() && (isOwner(resource.data.requesterId) || hasPermission('ferramentaria_movimentacao_create')));
     }
     
     match /budgets/{budgetId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('financeiro');
+      allow create: if hasPermission('financeiro_budget_create');
+      allow update: if hasPermission('financeiro_budget_update');
+      allow delete: if hasPermission('financeiro_budget_delete');
     }
     
     match /addresses/{addressId} {
-        allow read, write: if hasPermission('cadastros');
+        allow read: if hasPermission('cadastros_enderecos_view') || hasPermission('cadastros_suprimentos_view') || hasPermission('cadastros_ferramentas_view') || hasPermission('suprimentos_lista_view');
+        allow write: if hasPermission('cadastros_enderecos_create') || hasPermission('cadastros_enderecos_delete');
     }
 
     match /cost_centers/{costCenterId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros');
+      allow create: if hasPermission('cadastros_centro_custo_create');
+      allow update: if hasPermission('cadastros_centro_custo_update');
+      allow delete: if hasPermission('cadastros_centro_custo_delete');
     }
     
-     match /approval_tiers/{tierId} {
+    match /approval_tiers/{tierId} {
         allow read: if isAuthenticated();
-        allow write: if hasPermission('configurador_alcada');
+        allow write: if hasPermission('configurador_alcada_update');
     }
 
     match /purchase_requisitions/{requisitionId} {
         allow read: if isAuthenticated();
-
-        allow create: if hasPermission('compras') ||
-                       (request.resource.data.type == 'Solicitação de Compra' && request.auth.uid == request.resource.data.requesterId) ||
-                       (request.resource.data.type == 'Ordem de Compra' && request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(request.resource.data.originalRequisitionId)).data.requesterId);
-
-        allow update: if hasPermission('compras') ||
-                       (request.auth.uid == resource.data.requesterId);
-
-        allow delete: if hasPermission('compras') || isOwner(resource.data.requesterId);
+        allow create: if hasPermission('compras_requisicao_create') || hasPermission('compras_controle_create');
+        allow update: if hasPermission('compras_requisicao_update') || hasPermission('compras_aprovacoes_update') || hasPermission('compras_controle_update') || isOwner(resource.data.requesterId);
+        allow delete: if hasPermission('compras_requisicao_delete') || hasPermission('compras_controle_delete');
         
         match /items/{itemId} {
             allow read: if isAuthenticated();
-            allow write: if hasPermission('compras') || request.auth.uid == get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId;
+            allow write: if hasPermission('compras_controle_update') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
         }
     }
     
     match /email_configurations/{configId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('configurador_disparo_email');
+      allow write: if hasPermission('configurador_disparo_email_update');
     }
 
     match /counters/{counterId} {
