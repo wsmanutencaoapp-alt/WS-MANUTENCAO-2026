@@ -61,7 +61,7 @@
           "type": "string",
           "description": "A base ou localidade principal do veículo."
         },
-        "credencialVencimento": {
+        "dataVencimento": {
           "type": "string",
           "format": "date",
           "description": "A data de vencimento da credencial de acesso do veículo."
@@ -1162,7 +1162,7 @@
           "type": "string",
           "description": "O cargo ou função do funcionário."
         },
-        "credencialVencimento": {
+        "dataVencimento": {
           "type": "string",
           "format": "date",
           "description": "A data de vencimento da credencial do funcionário."
@@ -1220,10 +1220,20 @@
           "type": "string",
           "description": "Internal access level for company control (e.g., Nível 1, Geral)."
         },
-        "credencialVencimento": {
+        "dataSolicitacao": {
           "type": "string",
           "format": "date",
-          "description": "The expiration date of the temporary employee's credential."
+          "description": "The date the credential was requested."
+        },
+        "dataVencimento": {
+          "type": "string",
+          "format": "date",
+          "description": "The expiration date of the credential."
+        },
+        "dataDevolucao": {
+          "type": "string",
+          "format": "date",
+          "description": "The date the credential was returned."
         },
         "coleteNumero": {
           "type": "string",
@@ -1921,3 +1931,5 @@
     ]
   }
 }
+
+    

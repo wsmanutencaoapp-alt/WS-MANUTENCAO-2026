@@ -110,7 +110,7 @@ const FuncionariosAtivosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>)
               <TableHead>Base</TableHead>
               <TableHead>Acesso</TableHead>
               <TableHead>Cargo</TableHead>
-              <TableHead>Venc. Credencial</TableHead>
+              <TableHead>Vencimento</TableHead>
               <TableHead>Status Credencial</TableHead>
               <TableHead>Colete</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -120,7 +120,7 @@ const FuncionariosAtivosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>)
             {isLoading && <TableRow><TableCell colSpan={9} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
             {error && <TableRow><TableCell colSpan={9} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
             {!isLoading && filteredEmployees.map(employee => {
-              const status = getCredentialStatus(employee.credencialVencimento);
+              const status = getCredentialStatus(employee.dataVencimento);
               return (
                 <TableRow key={employee.docId}>
                   <TableCell className="font-mono">{employee.id}</TableCell>
@@ -128,7 +128,7 @@ const FuncionariosAtivosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>)
                   <TableCell>{employee.base || '-'}</TableCell>
                   <TableCell>{employee.acesso || '-'}</TableCell>
                   <TableCell>{employee.cargo || '-'}</TableCell>
-                  <TableCell>{employee.credencialVencimento ? format(new Date(employee.credencialVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
+                  <TableCell>{employee.dataVencimento ? format(new Date(employee.dataVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
                   <TableCell><Badge variant={status.variant}>{status.text}</Badge></TableCell>
                   <TableCell>{employee.coleteNumero || '-'}</TableCell>
                   <TableCell className="text-right">
@@ -256,19 +256,18 @@ const TemporariosTab = () => {
     const handleOpenDialog = (temp: WithDocId<TemporaryEmployee> | null) => {
         if (temp) {
             setEditingTemp(temp);
-            setFormData(temp);
+            setFormData({
+                ...temp,
+                dataSolicitacao: temp.dataSolicitacao ? format(new Date(temp.dataSolicitacao), 'yyyy-MM-dd') : '',
+                dataVencimento: temp.dataVencimento ? format(new Date(temp.dataVencimento), 'yyyy-MM-dd') : '',
+                dataDevolucao: temp.dataDevolucao ? format(new Date(temp.dataDevolucao), 'yyyy-MM-dd') : '',
+            });
         } else {
             setEditingTemp(null);
             setFormData({
-                name: '',
-                company: '',
-                status: 'Ativo',
-                base: '',
-                servico: '',
-                observacao: '',
-                acesso: '',
-                credencialVencimento: '',
-                coleteNumero: ''
+                name: '', company: '', status: 'Ativo', base: '', servico: '',
+                observacao: '', acesso: '', coleteNumero: '',
+                dataSolicitacao: '', dataVencimento: '', dataDevolucao: ''
             });
         }
         setDialogOpen(true);
@@ -292,26 +291,25 @@ const TemporariosTab = () => {
 
         setIsSaving(true);
         try {
-            const dataToSave: Partial<TemporaryEmployee> = { 
-                name: formData.name,
-                company: formData.company,
-                status: formData.status,
-                base: formData.base,
-                servico: formData.servico,
-                observacao: formData.observacao,
-                acesso: formData.acesso,
-                credencialVencimento: formData.credencialVencimento,
-                coleteNumero: formData.coleteNumero,
-             };
-            if (dataToSave.credencialVencimento) {
-                 const vencimentoDate = parse(dataToSave.credencialVencimento, 'yyyy-MM-dd', new Date());
-                 if (!isValid(vencimentoDate)) {
-                    toast({ variant: 'destructive', title: 'Erro', description: 'Formato de data de vencimento inválido. Use AAAA-MM-DD.' });
-                    setIsSaving(false);
-                    return;
-                 }
-                 dataToSave.credencialVencimento = vencimentoDate.toISOString();
+            const dataToSave: Partial<TemporaryEmployee> = {
+                name: formData.name, company: formData.company, status: formData.status,
+                base: formData.base, servico: formData.servico, observacao: formData.observacao,
+                acesso: formData.acesso, coleteNumero: formData.coleteNumero,
+            };
+
+            if (formData.dataSolicitacao) {
+                const parsed = parse(formData.dataSolicitacao, 'yyyy-MM-dd', new Date());
+                if (isValid(parsed)) dataToSave.dataSolicitacao = parsed.toISOString();
             }
+             if (formData.dataVencimento) {
+                const parsed = parse(formData.dataVencimento, 'yyyy-MM-dd', new Date());
+                if (isValid(parsed)) dataToSave.dataVencimento = parsed.toISOString();
+            }
+             if (formData.dataDevolucao) {
+                const parsed = parse(formData.dataDevolucao, 'yyyy-MM-dd', new Date());
+                if (isValid(parsed)) dataToSave.dataDevolucao = parsed.toISOString();
+            }
+
 
             if (editingTemp) {
                 const docRef = doc(firestore, 'temporary_employees', editingTemp.docId);
@@ -369,9 +367,9 @@ const TemporariosTab = () => {
                         <TableRow>
                             <TableHead>Nome</TableHead>
                             <TableHead>Empresa</TableHead>
-                            <TableHead>Base</TableHead>
-                            <TableHead>Serviço</TableHead>
-                            <TableHead>Venc. Credencial</TableHead>
+                            <TableHead>Solicitação</TableHead>
+                            <TableHead>Vencimento</TableHead>
+                            <TableHead>Devolução</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
@@ -380,14 +378,14 @@ const TemporariosTab = () => {
                         {isLoading && <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
                         {error && <TableRow><TableCell colSpan={7} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
                         {!isLoading && filteredTempEmployees.map(temp => {
-                            const status = getCredentialStatus(temp.credencialVencimento);
+                            const status = getCredentialStatus(temp.dataVencimento);
                             return (
                                 <TableRow key={temp.docId}>
                                     <TableCell className="font-medium">{temp.name}</TableCell>
                                     <TableCell>{temp.company}</TableCell>
-                                    <TableCell>{temp.base || '-'}</TableCell>
-                                    <TableCell>{temp.servico || '-'}</TableCell>
-                                    <TableCell>{temp.credencialVencimento ? format(new Date(temp.credencialVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
+                                    <TableCell>{temp.dataSolicitacao ? format(new Date(temp.dataSolicitacao), 'dd/MM/yyyy') : '-'}</TableCell>
+                                    <TableCell>{temp.dataVencimento ? format(new Date(temp.dataVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
+                                    <TableCell>{temp.dataDevolucao ? format(new Date(temp.dataDevolucao), 'dd/MM/yyyy') : '-'}</TableCell>
                                     <TableCell><Badge variant={status.variant}>{status.text}</Badge></TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Button variant="outline" size="icon" onClick={() => handleOpenDialog(temp)}><Edit className="h-4 w-4" /></Button>
@@ -417,14 +415,18 @@ const TemporariosTab = () => {
                 <DialogHeader>
                     <DialogTitle>{editingTemp ? 'Editar' : 'Adicionar'} Funcionário Temporário</DialogTitle>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
                     <div className="space-y-1.5"><Label htmlFor="name">Nome Completo</Label><Input id="name" value={formData.name || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="company">Empresa</Label><Input id="company" value={formData.company || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="base">Base</Label><Input id="base" value={formData.base || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="servico">Serviço</Label><Input id="servico" value={formData.servico || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="observacao">Observação</Label><Input id="observacao" value={formData.observacao || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="acesso">Acesso</Label><Input id="acesso" value={formData.acesso || ''} onChange={handleInputChange}/></div>
-                    <div className="space-y-1.5"><Label htmlFor="credencialVencimento">Venc. Credencial</Label><Input id="credencialVencimento" type="date" value={formData.credencialVencimento ? format(new Date(formData.credencialVencimento), 'yyyy-MM-dd') : ''} onChange={handleInputChange}/></div>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1.5"><Label htmlFor="dataSolicitacao">Data Solicitação</Label><Input id="dataSolicitacao" type="date" value={formData.dataSolicitacao || ''} onChange={handleInputChange}/></div>
+                        <div className="space-y-1.5"><Label htmlFor="dataVencimento">Data Vencimento</Label><Input id="dataVencimento" type="date" value={formData.dataVencimento || ''} onChange={handleInputChange}/></div>
+                        <div className="space-y-1.5"><Label htmlFor="dataDevolucao">Data Devolução</Label><Input id="dataDevolucao" type="date" value={formData.dataDevolucao || ''} onChange={handleInputChange}/></div>
+                    </div>
                     <div className="space-y-1.5"><Label htmlFor="coleteNumero">Nº Colete</Label><Input id="coleteNumero" value={formData.coleteNumero || ''} onChange={handleInputChange}/></div>
                     <div className="space-y-1.5"><Label htmlFor="status">Status</Label>
                         <Select onValueChange={handleSelectChange} value={formData.status}>
@@ -519,7 +521,7 @@ const VeiculosTab = ({ onEdit }: { onEdit: (item: WithDocId<Vehicle>) => void })
               <TableHead>Placa</TableHead>
               <TableHead>Marca/Modelo</TableHead>
               <TableHead>Base</TableHead>
-              <TableHead>Venc. Credencial</TableHead>
+              <TableHead>Vencimento</TableHead>
               <TableHead>Status Credencial</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -528,14 +530,14 @@ const VeiculosTab = ({ onEdit }: { onEdit: (item: WithDocId<Vehicle>) => void })
             {isLoading && <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
             {error && <TableRow><TableCell colSpan={7} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
             {!isLoading && filteredVehicles.map(vehicle => {
-                const status = getCredentialStatus(vehicle.credencialVencimento);
+                const status = getCredentialStatus(vehicle.dataVencimento);
                 return (
                     <TableRow key={vehicle.docId}>
                         <TableCell className="font-mono">{vehicle.prefixo}</TableCell>
                         <TableCell>{vehicle.placa}</TableCell>
                         <TableCell>{vehicle.marca} {vehicle.modelo}</TableCell>
                         <TableCell>{vehicle.base || '-'}</TableCell>
-                        <TableCell>{vehicle.credencialVencimento ? format(new Date(vehicle.credencialVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
+                        <TableCell>{vehicle.dataVencimento ? format(new Date(vehicle.dataVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
                         <TableCell><Badge variant={status.variant}>{status.text}</Badge></TableCell>
                         <TableCell className="text-right">
                           <Button variant="outline" size="icon" onClick={() => onEdit(vehicle)}>
@@ -621,3 +623,5 @@ export default function ControleCredenciamentoPage() {
     </div>
   );
 }
+
+    

@@ -12,7 +12,7 @@ export type Vehicle = {
   tipo: 'Carro' | 'Moto' | 'Caminhão' | 'Van' | 'Caminhonete' | 'Outro';
   status: 'Ativo' | 'Inativo' | 'Em Manutenção' | 'Em Viagem';
   base?: string;
-  credencialVencimento?: string; // date
+  dataVencimento?: string; // date
 };
 
 export type VehicleMovement = {
@@ -243,7 +243,7 @@ export type Employee = {
   status: 'Ativo' | 'Pendente' | 'Inativo';
   base?: string;
   cargo?: string;
-  credencialVencimento?: string; // date
+  dataVencimento?: string; // date
   coleteNumero?: string;
 };
 
@@ -255,7 +255,9 @@ export type TemporaryEmployee = {
   servico?: string;
   observacao?: string;
   acesso?: string;
-  credencialVencimento?: string; // date
+  dataSolicitacao?: string; // date
+  dataVencimento?: string; // date
+  dataDevolucao?: string; // date
   coleteNumero?: string;
   status: 'Ativo' | 'Inativo';
 };
@@ -425,4 +427,6 @@ export type MaintenanceRecord = {
   notes: string;
   cost?: number;
 };
+    
+
     

@@ -38,14 +38,14 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
   const [matricula, setMatricula] = useState('');
   const [base, setBase] = useState('');
   const [cargo, setCargo] = useState('');
-  const [credencialVencimento, setCredencialVencimento] = useState('');
+  const [dataVencimento, setDataVencimento] = useState('');
   const [coleteNumero, setColeteNumero] = useState('');
   const [acesso, setAcesso] = useState('');
 
   useEffect(() => {
     if (item && isOpen) {
       setBase(item.base || '');
-      setCredencialVencimento(item.credencialVencimento ? format(new Date(item.credencialVencimento), 'yyyy-MM-dd') : '');
+      setDataVencimento(item.dataVencimento ? format(new Date(item.dataVencimento), 'yyyy-MM-dd') : '');
 
       if (itemType === 'employee') {
         const employeeItem = item as Employee;
@@ -61,8 +61,8 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
     if (!firestore || !item || !itemType) return;
 
     let vencimentoDate: Date | null = null;
-    if (credencialVencimento) {
-        vencimentoDate = parse(credencialVencimento, 'yyyy-MM-dd', new Date());
+    if (dataVencimento) {
+        vencimentoDate = parse(dataVencimento, 'yyyy-MM-dd', new Date());
         if (!isValid(vencimentoDate)) {
             toast({ variant: 'destructive', title: 'Erro', description: 'Formato de data de vencimento inválido. Use AAAA-MM-DD.' });
             return;
@@ -72,7 +72,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
     setIsSaving(true);
     let dataToUpdate: Partial<Employee & Vehicle> = {
       base,
-      credencialVencimento: vencimentoDate ? vencimentoDate.toISOString() : undefined,
+      dataVencimento: vencimentoDate ? vencimentoDate.toISOString() : undefined,
     };
 
     const collectionName = itemType === 'employee' ? 'employees' : 'vehicles';
@@ -144,8 +144,8 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
           )}
 
           <div className="space-y-1.5">
-            <Label htmlFor="credencialVencimento">Vencimento da Credencial</Label>
-            <Input id="credencialVencimento" type="date" value={credencialVencimento} onChange={e => setCredencialVencimento(e.target.value)} />
+            <Label htmlFor="dataVencimento">Vencimento da Credencial</Label>
+            <Input id="dataVencimento" type="date" value={dataVencimento} onChange={e => setDataVencimento(e.target.value)} />
           </div>
 
           {itemType === 'employee' && (
@@ -167,3 +167,5 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
     </Dialog>
   );
 }
+
+    
