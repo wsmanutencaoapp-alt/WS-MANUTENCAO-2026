@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -74,9 +73,12 @@ export function useCollection<T = any>(
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
-        // When a real-time update comes in, invalidate the query
-        // to trigger a refetch, or update the cache directly.
-        queryClient.invalidateQueries({ queryKey });
+        const results: WithDocId<T>[] = [];
+        snapshot.forEach(doc => {
+            results.push({ ...(doc.data() as T), docId: doc.id });
+        });
+        // Directly update the query cache instead of invalidating
+        queryClient.setQueryData(queryKey, results);
       },
       (err: FirestoreError) => {
         const path = memoizedTargetRefOrQuery.type === 'collection'
@@ -86,7 +88,11 @@ export function useCollection<T = any>(
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
   }, [memoizedTargetRefOrQuery, queryClient, queryKey, enabled]);
 
   if (memoizedTargetRefOrQuery && !(memoizedTargetRefOrQuery as any).__memo) {
