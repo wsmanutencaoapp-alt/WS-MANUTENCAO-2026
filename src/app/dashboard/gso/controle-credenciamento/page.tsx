@@ -220,6 +220,26 @@ const TemporariosTab = () => {
 };
 
 
+// =====================================================================
+// Portaria Tab Component
+// =====================================================================
+const PortariaTab = () => {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Controle da Portaria</CardTitle>
+                <CardDescription>Gerencie as credenciais para a equipe da portaria.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-col items-center justify-center gap-4 py-8 h-64 border-2 border-dashed rounded-lg">
+                    <HardHat className="h-16 w-16 text-muted-foreground"/>
+                    <p className="text-muted-foreground">Esta funcionalidade está em construção.</p>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 // =====================================================================
 // Veículos Tab Component
@@ -338,10 +358,11 @@ export default function ControleCredenciamentoPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Controle de Credenciamento</h1>
       <Tabs defaultValue="funcionarios" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="funcionarios"><Users className="mr-2 h-4 w-4"/> Funcionários</TabsTrigger>
             <TabsTrigger value="veiculos"><Car className="mr-2 h-4 w-4"/> Veículos</TabsTrigger>
             <TabsTrigger value="temporarios"><HardHat className="mr-2 h-4 w-4"/> Temporários</TabsTrigger>
+            <TabsTrigger value="portaria">Portaria</TabsTrigger>
             <TabsTrigger value="ex-funcionarios"><Users className="mr-2 h-4 w-4"/> Ex-Funcionários</TabsTrigger>
         </TabsList>
         <TabsContent value="funcionarios">
@@ -352,6 +373,9 @@ export default function ControleCredenciamentoPage() {
         </TabsContent>
          <TabsContent value="temporarios">
             <TemporariosTab />
+        </TabsContent>
+        <TabsContent value="portaria">
+            <PortariaTab />
         </TabsContent>
         <TabsContent value="ex-funcionarios">
             <ExFuncionariosTab />
