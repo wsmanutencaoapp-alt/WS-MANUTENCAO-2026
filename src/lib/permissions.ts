@@ -143,6 +143,7 @@ export const permissionStructure = [
         actions: ['view'],
         submodules: [
           { id: 'gso_controle_credenciamento', label: 'Controle de Credenciamento', path: '/dashboard/gso/controle-credenciamento', actions: ['view', 'create', 'update', 'delete'] },
+          { id: 'gso_controle_casos', label: 'Controle de Casos', path: '/dashboard/gso/controle-de-casos', actions: ['view', 'create', 'update', 'delete'] },
         ]
     },
     {

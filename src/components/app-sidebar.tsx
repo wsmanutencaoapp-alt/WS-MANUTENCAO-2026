@@ -156,6 +156,7 @@ const allNavItems: NavItem[] = [
     permission: 'gso',
     subItems: [
       { href: '/dashboard/gso/controle-credenciamento', icon: Users, label: 'Controle de Credenciamento', permission: 'gso_controle_credenciamento' },
+      { href: '/dashboard/gso/controle-de-casos', icon: Briefcase, label: 'Controle de Casos', permission: 'gso_controle_casos' },
     ]
   },
   {
