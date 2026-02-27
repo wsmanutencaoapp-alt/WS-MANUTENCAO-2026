@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
-import type { Employee, Vehicle } from '@/lib/types';
+import { collection, query, orderBy, where, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import type { Employee, Vehicle, TemporaryEmployee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -11,10 +11,32 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Edit, Users, Car, HardHat } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { Loader2, Search, Edit, Users, Car, HardHat, PlusCircle, Trash2 } from 'lucide-react';
+import { format, differenceInDays, parse, isValid } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import EditCredenciamentoDialog from '@/components/EditCredenciamentoDialog';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 // =====================================================================
 // Helper function for credential status
@@ -203,19 +225,220 @@ const ExFuncionariosTab = () => {
 // Temporários Tab Component
 // =====================================================================
 const TemporariosTab = () => {
+    const firestore = useFirestore();
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+    const [searchTerm, setSearchTerm] = useState('');
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [editingTemp, setEditingTemp] = useState<WithDocId<TemporaryEmployee> | null>(null);
+    const [formData, setFormData] = useState<Partial<TemporaryEmployee>>({});
+    const [isSaving, setIsSaving] = useState(false);
+
+    const tempEmployeesQuery = useMemoFirebase(() => (
+        firestore ? query(collection(firestore, 'temporary_employees'), orderBy('name')) : null
+    ), [firestore]);
+
+    const { data: tempEmployees, isLoading, error } = useCollection<WithDocId<TemporaryEmployee>>(tempEmployeesQuery, {
+        queryKey: ['temporary_employees']
+    });
+
+    const filteredTempEmployees = useMemo(() => {
+        if (!tempEmployees) return [];
+        if (!searchTerm) return tempEmployees;
+        const lowercasedTerm = searchTerm.toLowerCase();
+        return tempEmployees.filter(e => 
+            e.name.toLowerCase().includes(lowercasedTerm) ||
+            (e.id && e.id.toLowerCase().includes(lowercasedTerm)) ||
+            (e.company && e.company.toLowerCase().includes(lowercasedTerm))
+        );
+    }, [tempEmployees, searchTerm]);
+
+    const handleOpenDialog = (temp: WithDocId<TemporaryEmployee> | null) => {
+        if (temp) {
+            setEditingTemp(temp);
+            setFormData(temp);
+        } else {
+            setEditingTemp(null);
+            setFormData({
+                id: '',
+                name: '',
+                company: '',
+                status: 'Ativo',
+                base: '',
+                cargo: '',
+                acesso: '',
+                credencialVencimento: '',
+                coleteNumero: ''
+            });
+        }
+        setDialogOpen(true);
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setFormData(prev => ({ ...prev, [id]: value }));
+    };
+
+    const handleSelectChange = (value: 'Ativo' | 'Inativo') => {
+        setFormData(prev => ({...prev, status: value}));
+    };
+
+    const handleSave = async () => {
+        if (!firestore) return;
+        if (!formData.id || !formData.name || !formData.company) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Matrícula, Nome e Empresa são obrigatórios.' });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const dataToSave: Partial<TemporaryEmployee> = { ...formData };
+            if (dataToSave.credencialVencimento) {
+                 const vencimentoDate = parse(dataToSave.credencialVencimento, 'yyyy-MM-dd', new Date());
+                 if (!isValid(vencimentoDate)) {
+                    toast({ variant: 'destructive', title: 'Erro', description: 'Formato de data de vencimento inválido. Use AAAA-MM-DD.' });
+                    setIsSaving(false);
+                    return;
+                 }
+                 dataToSave.credencialVencimento = vencimentoDate.toISOString();
+            }
+
+            if (editingTemp) {
+                const docRef = doc(firestore, 'temporary_employees', editingTemp.docId);
+                await updateDoc(docRef, dataToSave);
+                toast({ title: 'Sucesso', description: 'Dados do temporário atualizados.' });
+            } else {
+                const docRef = doc(firestore, 'temporary_employees', formData.id);
+                await setDoc(docRef, dataToSave);
+                toast({ title: 'Sucesso', description: 'Funcionário temporário cadastrado.' });
+            }
+            queryClient.invalidateQueries({ queryKey: ['temporary_employees'] });
+            setDialogOpen(false);
+        } catch (err: any) {
+            console.error("Error saving temporary employee:", err);
+            toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar os dados.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const handleDelete = async (tempId: string) => {
+        if (!firestore) return;
+        try {
+            await deleteDoc(doc(firestore, 'temporary_employees', tempId));
+            toast({ title: 'Sucesso', description: 'Funcionário temporário excluído.'});
+            queryClient.invalidateQueries({ queryKey: ['temporary_employees'] });
+        } catch (err) {
+             toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir.'});
+        }
+    };
+    
     return (
+      <>
         <Card>
             <CardHeader>
-                <CardTitle>Controle de Temporários</CardTitle>
-                <CardDescription>Gerencie as credenciais para funcionários temporários e terceirizados.</CardDescription>
+                <CardTitle>Controle de Temporários e Terceirizados</CardTitle>
+                <CardDescription>Gerencie as credenciais para funcionários que não possuem acesso ao sistema.</CardDescription>
+                <div className="flex justify-between items-center pt-4">
+                     <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Pesquisar por nome, matrícula, empresa..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full rounded-lg bg-background pl-8 md:w-[300px]"
+                        />
+                    </div>
+                    <Button onClick={() => handleOpenDialog(null)}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Temporário
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
-                <div className="flex flex-col items-center justify-center gap-4 py-8 h-64 border-2 border-dashed rounded-lg">
-                    <HardHat className="h-16 w-16 text-muted-foreground"/>
-                    <p className="text-muted-foreground">Esta funcionalidade está em construção.</p>
-                </div>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Matrícula</TableHead>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Empresa</TableHead>
+                            <TableHead>Base</TableHead>
+                            <TableHead>Venc. Credencial</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading && <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
+                        {error && <TableRow><TableCell colSpan={7} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
+                        {!isLoading && filteredTempEmployees.map(temp => {
+                            const status = getCredentialStatus(temp.credencialVencimento);
+                            return (
+                                <TableRow key={temp.docId}>
+                                    <TableCell className="font-mono">{temp.id}</TableCell>
+                                    <TableCell className="font-medium">{temp.name}</TableCell>
+                                    <TableCell>{temp.company}</TableCell>
+                                    <TableCell>{temp.base || '-'}</TableCell>
+                                    <TableCell>{temp.credencialVencimento ? format(new Date(temp.credencialVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
+                                    <TableCell><Badge variant={status.variant}>{status.text}</Badge></TableCell>
+                                    <TableCell className="text-right space-x-2">
+                                        <Button variant="outline" size="icon" onClick={() => handleOpenDialog(temp)}><Edit className="h-4 w-4" /></Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild><Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                                    <AlertDialogDescription>Tem certeza que deseja excluir o registro de <span className="font-bold">{temp.name}</span>?</AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDelete(temp.docId)}>Sim, Excluir</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{editingTemp ? 'Editar' : 'Adicionar'} Funcionário Temporário</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="id">Matrícula / ID</Label>
+                        <Input id="id" value={formData.id || ''} onChange={handleInputChange} disabled={!!editingTemp} />
+                    </div>
+                    <div className="space-y-1.5"><Label htmlFor="name">Nome Completo</Label><Input id="name" value={formData.name || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="company">Empresa</Label><Input id="company" value={formData.company || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="base">Base</Label><Input id="base" value={formData.base || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="cargo">Cargo</Label><Input id="cargo" value={formData.cargo || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="acesso">Acesso</Label><Input id="acesso" value={formData.acesso || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="credencialVencimento">Venc. Credencial</Label><Input id="credencialVencimento" type="date" value={formData.credencialVencimento ? format(new Date(formData.credencialVencimento), 'yyyy-MM-dd') : ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="coleteNumero">Nº Colete</Label><Input id="coleteNumero" value={formData.coleteNumero || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="status">Status</Label>
+                        <Select onValueChange={handleSelectChange} value={formData.status}>
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Ativo">Ativo</SelectItem>
+                                <SelectItem value="Inativo">Inativo</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>Cancelar</Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Salvar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      </>
     );
 };
 
@@ -348,7 +571,7 @@ export default function ControleCredenciamentoPage() {
         if(dialogState.itemType === 'employee') {
             queryClient.invalidateQueries({ queryKey: ['active_employees_for_credenciamento'] });
             queryClient.invalidateQueries({ queryKey: ['inactive_employees_for_credenciamento'] });
-        } else {
+        } else if (dialogState.itemType === 'vehicle') {
             queryClient.invalidateQueries({ queryKey: ['all_vehicles_for_credenciamento'] });
         }
         handleCloseDialog();
