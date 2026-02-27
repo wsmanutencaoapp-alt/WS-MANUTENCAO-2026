@@ -1170,6 +1170,10 @@
         "coleteNumero": {
           "type": "string",
           "description": "O número do colete de identificação do funcionário."
+        },
+        "acesso": {
+          "type": "string",
+          "description": "Nível de acesso interno para controle da empresa (ex: Nível 1, Geral)."
         }
       },
       "required": [

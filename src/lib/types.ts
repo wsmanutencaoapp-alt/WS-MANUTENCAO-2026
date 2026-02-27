@@ -237,6 +237,7 @@ export type Employee = {
   email: string;
   phone?: string | null;
   accessLevel: 'Admin' | 'Técnico' | string;
+  acesso?: string;
   photoURL?: string | null;
   permissions?: Permissions;
   status: 'Ativo' | 'Pendente' | 'Inativo';

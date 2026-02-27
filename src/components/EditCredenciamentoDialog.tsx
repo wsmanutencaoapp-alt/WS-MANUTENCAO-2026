@@ -39,7 +39,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
   const [cargo, setCargo] = useState('');
   const [credencialVencimento, setCredencialVencimento] = useState('');
   const [coleteNumero, setColeteNumero] = useState('');
-  const [accessLevel, setAccessLevel] = useState('');
+  const [acesso, setAcesso] = useState('');
 
   useEffect(() => {
     if (item && isOpen) {
@@ -50,7 +50,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
         const employeeItem = item as Employee;
         setCargo(employeeItem.cargo || '');
         setColeteNumero(employeeItem.coleteNumero || '');
-        setAccessLevel(employeeItem.accessLevel || 'Técnico');
+        setAcesso(employeeItem.acesso || '');
       }
     }
   }, [item, isOpen, itemType]);
@@ -76,7 +76,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
     const collectionName = itemType === 'employee' ? 'employees' : 'vehicles';
 
     if (itemType === 'employee') {
-      dataToUpdate = { ...dataToUpdate, cargo, coleteNumero, accessLevel };
+      dataToUpdate = { ...dataToUpdate, cargo, coleteNumero, acesso };
     }
 
     try {
@@ -120,18 +120,10 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
                 <Label htmlFor="cargo">Cargo</Label>
                 <Input id="cargo" value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Ex: Mecânico de Manutenção" />
               </div>
-               <div className="space-y-1.5">
-                    <Label htmlFor="accessLevel">Nível de Acesso</Label>
-                    <Select value={accessLevel} onValueChange={setAccessLevel}>
-                        <SelectTrigger id="accessLevel">
-                            <SelectValue placeholder="Selecione o nível..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Técnico">Técnico</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="acesso">Acesso (Controle Interno)</Label>
+                <Input id="acesso" value={acesso} onChange={e => setAcesso(e.target.value)} placeholder="Ex: Nível 1, Geral, etc." />
+              </div>
             </>
           )}
 

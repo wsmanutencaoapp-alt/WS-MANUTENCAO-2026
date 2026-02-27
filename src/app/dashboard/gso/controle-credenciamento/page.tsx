@@ -104,7 +104,7 @@ const FuncionariosAtivosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>)
                   <TableCell className="font-mono">{employee.id}</TableCell>
                   <TableCell className="font-medium">{employee.firstName} {employee.lastName}</TableCell>
                   <TableCell>{employee.base || '-'}</TableCell>
-                  <TableCell><Badge variant="outline">{employee.accessLevel}</Badge></TableCell>
+                  <TableCell>{employee.acesso || '-'}</TableCell>
                   <TableCell>{employee.cargo || '-'}</TableCell>
                   <TableCell>{employee.credencialVencimento ? format(new Date(employee.credencialVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
                   <TableCell><Badge variant={status.variant}>{status.text}</Badge></TableCell>
