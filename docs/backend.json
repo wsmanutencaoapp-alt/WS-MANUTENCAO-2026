@@ -1791,6 +1791,10 @@
           "type": "boolean",
           "description": "Flag indicating if it triggers access level change."
         },
+        "accessLevelGranted": {
+          "type": "string",
+          "description": "The name of the new access level or permission granted upon completion."
+        },
         "accessChangeDate": {
           "type": "string",
           "format": "date",

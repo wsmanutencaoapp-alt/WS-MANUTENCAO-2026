@@ -78,6 +78,7 @@ const formSchema = z.object({
   sgsoDate: z.date().optional(),
   avsecDate: z.date().optional(),
   triggersAccessChange: z.boolean().default(false),
+  accessLevelGranted: z.string().optional(),
   accessChangeDate: z.date().optional(),
 });
 
@@ -109,6 +110,7 @@ const CadastroTreinamentosPage = () => {
       isSgso: false,
       isAvsec: false,
       triggersAccessChange: false,
+      accessLevelGranted: '',
     },
   });
 
@@ -244,7 +246,7 @@ const CadastroTreinamentosPage = () => {
         </CardContent>
       </Card>
       
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} modal={false}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingTraining ? 'Editar Treinamento' : 'Adicionar Novo Treinamento'}</DialogTitle>
@@ -268,7 +270,7 @@ const CadastroTreinamentosPage = () => {
                 {watchIsSgso && (
                   <FormField control={form.control} name="sgsoDate" render={({ field }) => (
                       <FormItem className="flex flex-col animate-in fade-in-50"><FormLabel>Data SGSO</FormLabel>
-                        <Popover><PopoverTrigger asChild><FormControl>
+                        <Popover modal={false}><PopoverTrigger asChild><FormControl>
                             <Button variant={"outline"} className="pl-3 text-left font-normal">
                                 {field.value ? format(field.value, "PPP") : <span>Escolha a data</span>}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -285,7 +287,7 @@ const CadastroTreinamentosPage = () => {
                 {watchIsAvsec && (
                   <FormField control={form.control} name="avsecDate" render={({ field }) => (
                       <FormItem className="flex flex-col animate-in fade-in-50"><FormLabel>Data AVSEC</FormLabel>
-                        <Popover><PopoverTrigger asChild><FormControl>
+                        <Popover modal={false}><PopoverTrigger asChild><FormControl>
                             <Button variant={"outline"} className="pl-3 text-left font-normal">
                                 {field.value ? format(field.value, "PPP") : <span>Escolha a data</span>}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -302,17 +304,26 @@ const CadastroTreinamentosPage = () => {
                   <FormItem className="flex flex-row items-center justify-between"><FormLabel>Muda Nível de Acesso/Permissão?</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>
                 )}/>
                 {watchTriggersAccessChange && (
-                   <FormField control={form.control} name="accessChangeDate" render={({ field }) => (
-                      <FormItem className="flex flex-col animate-in fade-in-50"><FormLabel>Data para Alteração</FormLabel>
-                        <Popover><PopoverTrigger asChild><FormControl>
-                            <Button variant={"outline"} className="pl-3 text-left font-normal">
-                                {field.value ? format(field.value, "PPP") : <span>Escolha a data</span>}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                        </FormControl></PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
-                      <FormMessage /></FormItem>
-                  )}/>
+                   <div className="space-y-4 animate-in fade-in-50">
+                    <FormField control={form.control} name="accessLevelGranted" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Nível de Acesso Concedido</FormLabel>
+                            <FormControl><Input {...field} placeholder="Ex: Acesso Geral, Nível 2" /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}/>
+                    <FormField control={form.control} name="accessChangeDate" render={({ field }) => (
+                        <FormItem className="flex flex-col"><FormLabel>Data para Alteração</FormLabel>
+                            <Popover modal={false}><PopoverTrigger asChild><FormControl>
+                                <Button variant={"outline"} className="pl-3 text-left font-normal">
+                                    {field.value ? format(field.value, "PPP") : <span>Escolha a data</span>}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                            </FormControl></PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
+                        <FormMessage /></FormItem>
+                    )}/>
+                   </div>
                 )}
                </div>
 

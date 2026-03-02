@@ -212,6 +212,7 @@ export type Permissions = {
   cadastros_funcionarios?: boolean;
   cadastros_enderecos?: boolean;
   cadastros_centro_custo?: boolean;
+  cadastros_treinamentos?: boolean;
   engenharia?: boolean;
   engenharia_aprovacoes?: boolean;
   engenharia_projetos?: boolean;
@@ -451,6 +452,7 @@ export type Training = {
   sgsoDate?: string; // date
   avsecDate?: string; // date
   triggersAccessChange?: boolean;
+  accessLevelGranted?: string;
   accessChangeDate?: string; // date
 };
     
