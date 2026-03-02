@@ -1174,6 +1174,15 @@
         "acesso": {
           "type": "string",
           "description": "Nível de acesso interno para controle da empresa (ex: Nível 1, Geral)."
+        },
+        "dataDevolucao": {
+          "type": "string",
+          "format": "date",
+          "description": "A data em que a credencial do funcionário foi devolvida."
+        },
+        "motivoBaixa": {
+          "type": "string",
+          "description": "O motivo da baixa do funcionário."
         }
       },
       "required": [
@@ -1892,10 +1901,7 @@
       },
       {
         "path": "/gate_personnel/{personnelId}",
-        "definition": {
-          "schema": { "$ref": "#/entities/GatePersonnel" },
-          "description": "Stores gatehouse personnel information for credentialing purposes."
-        }
+        "definition": { "schema": { "$ref": "#/entities/GatePersonnel" }, "description": "Stores gatehouse personnel information for credentialing purposes." }
       },
       {
         "path": "/expenses/{expenseId}",

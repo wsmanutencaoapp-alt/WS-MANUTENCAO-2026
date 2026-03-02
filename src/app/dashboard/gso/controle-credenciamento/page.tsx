@@ -201,17 +201,16 @@ const ExFuncionariosTab = () => {
                             <TableHead>Acesso</TableHead>
                             <TableHead>Cargo</TableHead>
                             <TableHead>Vencimento</TableHead>
-                            <TableHead>Status Credencial</TableHead>
                             <TableHead>Colete</TableHead>
                             <TableHead>Data Devolução</TableHead>
+                            <TableHead>Observação</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoading && <TableRow><TableCell colSpan={9} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
-                        {error && <TableRow><TableCell colSpan={9} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
-                        {!isLoading && filteredEmployees.length === 0 && <TableRow><TableCell colSpan={9} className="text-center h-24">Nenhum ex-funcionário encontrado.</TableCell></TableRow>}
+                        {isLoading && <TableRow><TableCell colSpan={10} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
+                        {error && <TableRow><TableCell colSpan={10} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
+                        {!isLoading && filteredEmployees.length === 0 && <TableRow><TableCell colSpan={10} className="text-center h-24">Nenhum ex-funcionário encontrado.</TableCell></TableRow>}
                         {!isLoading && filteredEmployees.map(employee => {
-                            const credStatus = getCredentialStatus(employee.dataVencimento);
                             return (
                                 <TableRow key={employee.docId}>
                                     <TableCell className="font-mono">{employee.id}</TableCell>
@@ -220,9 +219,9 @@ const ExFuncionariosTab = () => {
                                     <TableCell>{employee.acesso || '-'}</TableCell>
                                     <TableCell>{employee.cargo || '-'}</TableCell>
                                     <TableCell>{employee.dataVencimento ? format(new Date(employee.dataVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
-                                    <TableCell><Badge variant={credStatus.variant}>{credStatus.text}</Badge></TableCell>
                                     <TableCell>{employee.coleteNumero || '-'}</TableCell>
                                     <TableCell>{employee.dataDevolucao ? format(new Date(employee.dataDevolucao), 'dd/MM/yyyy') : '-'}</TableCell>
+                                    <TableCell className="max-w-[200px] truncate">{employee.motivoBaixa || '-'}</TableCell>
                                 </TableRow>
                             );
                         })}

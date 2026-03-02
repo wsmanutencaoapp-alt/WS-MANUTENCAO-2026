@@ -246,6 +246,7 @@ export type Employee = {
   dataVencimento?: string; // date
   dataDevolucao?: string; // date
   coleteNumero?: string;
+  motivoBaixa?: string;
 };
 
 export type TemporaryEmployee = {

@@ -20,6 +20,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Loader2, CalendarIcon } from 'lucide-react';
 import { parse, isValid, format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from './ui/textarea';
 
 interface EditCredenciamentoDialogProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
   // Dismissal dialog state
   const [isDismissalDialogOpen, setIsDismissalDialogOpen] = useState(false);
   const [dataDevolucao, setDataDevolucao] = useState('');
+  const [motivoBaixa, setMotivoBaixa] = useState('');
 
   useEffect(() => {
     if (item && isOpen) {
@@ -112,6 +114,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
 
   const handleOpenDismissalDialog = () => {
     setDataDevolucao(format(new Date(), 'yyyy-MM-dd')); // Pre-fill with today's date
+    setMotivoBaixa(''); // Clear reason on open
     setIsDismissalDialogOpen(true);
   };
 
@@ -133,6 +136,7 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
         await updateDoc(itemRef, {
             status: 'Inativo',
             dataDevolucao: devDate.toISOString(),
+            motivoBaixa: motivoBaixa,
         });
         toast({ title: 'Sucesso!', description: 'Baixa de funcionário registrada. O status foi alterado para Inativo.' });
         setIsDismissalDialogOpen(false);
@@ -220,17 +224,28 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
             <DialogHeader>
                 <DialogTitle>Confirmar Baixa de Funcionário</DialogTitle>
                 <DialogDescription>
-                    Informe a data de devolução da credencial para alterar o status de {getTitle()} para "Inativo".
+                    Informe a data de devolução da credencial e um motivo (opcional) para alterar o status de {getTitle()} para "Inativo".
                 </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-                <Label htmlFor="dataDevolucao">Data Devolução Credencial</Label>
-                <Input
-                    id="dataDevolucao"
-                    type="date"
-                    value={dataDevolucao}
-                    onChange={e => setDataDevolucao(e.target.value)}
-                />
+            <div className="py-4 space-y-4">
+                <div className="space-y-1.5">
+                    <Label htmlFor="dataDevolucao">Data Devolução Credencial</Label>
+                    <Input
+                        id="dataDevolucao"
+                        type="date"
+                        value={dataDevolucao}
+                        onChange={e => setDataDevolucao(e.target.value)}
+                    />
+                </div>
+                <div className="space-y-1.5">
+                    <Label htmlFor="motivoBaixa">Motivo / Observação</Label>
+                    <Textarea 
+                        id="motivoBaixa"
+                        value={motivoBaixa}
+                        onChange={e => setMotivoBaixa(e.target.value)}
+                        placeholder="Descreva o motivo da baixa (opcional)"
+                    />
+                </div>
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDismissalDialogOpen(false)}>Cancelar</Button>
