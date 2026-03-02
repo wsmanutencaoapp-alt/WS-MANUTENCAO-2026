@@ -61,7 +61,11 @@ export function useDoc<T = any>(
   const queryClient = useQueryClient();
   const { enabled = true } = options;
 
-  const queryKey = options.queryKey || (memoizedDocRef ? [memoizedDocRef.path] : []);
+  const path = useMemo(() => memoizedDocRef?.path, [memoizedDocRef]);
+
+  const queryKey = useMemo(() => {
+    return options.queryKey || (path ? [path] : []);
+  }, [options.queryKey, path]);
 
   const { data, isLoading, error } = useQuery<WithDocId<T> | null, Error>({
       queryKey: queryKey,

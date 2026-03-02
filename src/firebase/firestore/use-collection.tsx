@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Query,
   onSnapshot,
@@ -50,7 +50,15 @@ export function useCollection<T = any>(
 ): UseCollectionResult<T> {
   const queryClient = useQueryClient();
   const { enabled = true, ...restOptions } = options;
-  const queryKey = restOptions.queryKey || (memoizedTargetRefOrQuery ? [(memoizedTargetRefOrQuery as any)._query?.path.toString()] : []);
+
+  const path = useMemo(() => 
+    memoizedTargetRefOrQuery ? (memoizedTargetRefOrQuery as any)._query?.path.toString() : undefined, 
+    [memoizedTargetRefOrQuery]
+  );
+  
+  const queryKey = useMemo(() => {
+    return restOptions.queryKey || (path ? [path] : []);
+  }, [restOptions.queryKey, path]);
 
   const { data, isLoading, error } = useQuery<WithDocId<T>[], Error>({
     queryKey,
@@ -81,10 +89,10 @@ export function useCollection<T = any>(
         queryClient.setQueryData(queryKey, results);
       },
       (err: FirestoreError) => {
-        const path = memoizedTargetRefOrQuery.type === 'collection'
+        const errorPath = memoizedTargetRefOrQuery.type === 'collection'
             ? (memoizedTargetRefOrQuery as CollectionReference).path
             : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
-        console.error(`Error in useCollection snapshot listener for path: ${path}`, err);
+        console.error(`Error in useCollection snapshot listener for path: ${errorPath}`, err);
       }
     );
 
