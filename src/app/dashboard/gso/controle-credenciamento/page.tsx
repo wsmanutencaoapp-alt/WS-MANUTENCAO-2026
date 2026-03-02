@@ -198,19 +198,21 @@ const ExFuncionariosTab = () => {
                             <TableHead>Matrícula</TableHead>
                             <TableHead>Nome</TableHead>
                             <TableHead>Cargo</TableHead>
-                             <TableHead>Status</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Data Devolução</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoading && <TableRow><TableCell colSpan={4} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
-                        {error && <TableRow><TableCell colSpan={4} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
-                        {!isLoading && filteredEmployees.length === 0 && <TableRow><TableCell colSpan={4} className="text-center h-24">Nenhum ex-funcionário encontrado.</TableCell></TableRow>}
+                        {isLoading && <TableRow><TableCell colSpan={5} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
+                        {error && <TableRow><TableCell colSpan={5} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
+                        {!isLoading && filteredEmployees.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">Nenhum ex-funcionário encontrado.</TableCell></TableRow>}
                         {!isLoading && filteredEmployees.map(employee => (
                             <TableRow key={employee.docId}>
                                 <TableCell className="font-mono">{employee.id}</TableCell>
                                 <TableCell className="font-medium">{employee.firstName} {employee.lastName}</TableCell>
                                 <TableCell>{employee.cargo || '-'}</TableCell>
                                 <TableCell><Badge variant="destructive">{employee.status}</Badge></TableCell>
+                                <TableCell>{employee.dataDevolucao ? format(new Date(employee.dataDevolucao), 'dd/MM/yyyy') : '-'}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

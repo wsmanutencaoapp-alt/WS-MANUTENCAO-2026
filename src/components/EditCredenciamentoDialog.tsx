@@ -34,13 +34,17 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
 
-  // Form state
+  // Main form state
   const [matricula, setMatricula] = useState('');
   const [base, setBase] = useState('');
   const [cargo, setCargo] = useState('');
   const [dataVencimento, setDataVencimento] = useState('');
   const [coleteNumero, setColeteNumero] = useState('');
   const [acesso, setAcesso] = useState('');
+  
+  // Dismissal dialog state
+  const [isDismissalDialogOpen, setIsDismissalDialogOpen] = useState(false);
+  const [dataDevolucao, setDataDevolucao] = useState('');
 
   useEffect(() => {
     if (item && isOpen) {
@@ -106,8 +110,44 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
       return `${(item as Vehicle).prefixo} - ${(item as Vehicle).placa}`;
   }
 
+  const handleOpenDismissalDialog = () => {
+    setDataDevolucao(format(new Date(), 'yyyy-MM-dd')); // Pre-fill with today's date
+    setIsDismissalDialogOpen(true);
+  };
+
+  const handleConfirmDismissal = async () => {
+    if (!firestore || !item) return;
+    if (!dataDevolucao) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'A data de devolução é obrigatória.' });
+        return;
+    }
+    const devDate = parse(dataDevolucao, 'yyyy-MM-dd', new Date());
+    if (!isValid(devDate)) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Data de devolução inválida.' });
+        return;
+    }
+
+    setIsSaving(true);
+    try {
+        const itemRef = doc(firestore, 'employees', item.docId);
+        await updateDoc(itemRef, {
+            status: 'Inativo',
+            dataDevolucao: devDate.toISOString(),
+        });
+        toast({ title: 'Sucesso!', description: 'Baixa de funcionário registrada. O status foi alterado para Inativo.' });
+        setIsDismissalDialogOpen(false);
+        onSuccess(); // This will close the main dialog and refetch data.
+    } catch (err) {
+        console.error("Erro ao dar baixa no funcionário:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível registrar a baixa.' });
+    } finally {
+        setIsSaving(false);
+    }
+};
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <>
+    <Dialog open={isOpen && !isDismissalDialogOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Editar Credenciamento</DialogTitle>
@@ -156,16 +196,51 @@ export default function EditCredenciamentoDialog({ isOpen, onClose, onSuccess, i
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar
-          </Button>
+        <DialogFooter className="sm:justify-between">
+            <div>
+                {itemType === 'employee' && (
+                    <Button variant="destructive" onClick={handleOpenDismissalDialog} disabled={isSaving}>
+                        Baixa de Funcionário
+                    </Button>
+                )}
+            </div>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancelar</Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar
+                </Button>
+            </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={isDismissalDialogOpen} onOpenChange={setIsDismissalDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Confirmar Baixa de Funcionário</DialogTitle>
+                <DialogDescription>
+                    Informe a data de devolução da credencial para alterar o status de {getTitle()} para "Inativo".
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <Label htmlFor="dataDevolucao">Data Devolução Credencial</Label>
+                <Input
+                    id="dataDevolucao"
+                    type="date"
+                    value={dataDevolucao}
+                    onChange={e => setDataDevolucao(e.target.value)}
+                />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDismissalDialogOpen(false)}>Cancelar</Button>
+                <Button variant="destructive" onClick={handleConfirmDismissal} disabled={isSaving}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirmar Baixa
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }
-
-    

@@ -244,6 +244,7 @@ export type Employee = {
   base?: string;
   cargo?: string;
   dataVencimento?: string; // date
+  dataDevolucao?: string; // date
   coleteNumero?: string;
 };
 
