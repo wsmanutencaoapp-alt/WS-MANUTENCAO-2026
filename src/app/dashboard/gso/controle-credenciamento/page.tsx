@@ -180,7 +180,7 @@ const ExFuncionariosTab = () => {
         <Card>
             <CardHeader>
                 <CardTitle>Ex-Funcionários</CardTitle>
-                <CardDescription>Lista de funcionários com status "Inativo".</CardDescription>
+                <CardDescription>Lista de funcionários com status "Inativo" e o último estado de suas credenciais.</CardDescription>
                 <div className="relative pt-4">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -197,24 +197,35 @@ const ExFuncionariosTab = () => {
                         <TableRow>
                             <TableHead>Matrícula</TableHead>
                             <TableHead>Nome</TableHead>
+                            <TableHead>Base</TableHead>
+                            <TableHead>Acesso</TableHead>
                             <TableHead>Cargo</TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead>Vencimento</TableHead>
+                            <TableHead>Status Credencial</TableHead>
+                            <TableHead>Colete</TableHead>
                             <TableHead>Data Devolução</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoading && <TableRow><TableCell colSpan={5} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
-                        {error && <TableRow><TableCell colSpan={5} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
-                        {!isLoading && filteredEmployees.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">Nenhum ex-funcionário encontrado.</TableCell></TableRow>}
-                        {!isLoading && filteredEmployees.map(employee => (
-                            <TableRow key={employee.docId}>
-                                <TableCell className="font-mono">{employee.id}</TableCell>
-                                <TableCell className="font-medium">{employee.firstName} {employee.lastName}</TableCell>
-                                <TableCell>{employee.cargo || '-'}</TableCell>
-                                <TableCell><Badge variant="destructive">{employee.status}</Badge></TableCell>
-                                <TableCell>{employee.dataDevolucao ? format(new Date(employee.dataDevolucao), 'dd/MM/yyyy') : '-'}</TableCell>
-                            </TableRow>
-                        ))}
+                        {isLoading && <TableRow><TableCell colSpan={9} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
+                        {error && <TableRow><TableCell colSpan={9} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
+                        {!isLoading && filteredEmployees.length === 0 && <TableRow><TableCell colSpan={9} className="text-center h-24">Nenhum ex-funcionário encontrado.</TableCell></TableRow>}
+                        {!isLoading && filteredEmployees.map(employee => {
+                            const credStatus = getCredentialStatus(employee.dataVencimento);
+                            return (
+                                <TableRow key={employee.docId}>
+                                    <TableCell className="font-mono">{employee.id}</TableCell>
+                                    <TableCell className="font-medium">{employee.firstName} {employee.lastName}</TableCell>
+                                    <TableCell>{employee.base || '-'}</TableCell>
+                                    <TableCell>{employee.acesso || '-'}</TableCell>
+                                    <TableCell>{employee.cargo || '-'}</TableCell>
+                                    <TableCell>{employee.dataVencimento ? format(new Date(employee.dataVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
+                                    <TableCell><Badge variant={credStatus.variant}>{credStatus.text}</Badge></TableCell>
+                                    <TableCell>{employee.coleteNumero || '-'}</TableCell>
+                                    <TableCell>{employee.dataDevolucao ? format(new Date(employee.dataDevolucao), 'dd/MM/yyyy') : '-'}</TableCell>
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </CardContent>
