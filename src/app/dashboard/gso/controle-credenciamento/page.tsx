@@ -367,6 +367,10 @@ const TemporariosTab = () => {
                         <TableRow>
                             <TableHead>Nome</TableHead>
                             <TableHead>Empresa</TableHead>
+                            <TableHead>Serviço</TableHead>
+                            <TableHead>Base</TableHead>
+                            <TableHead>Acesso</TableHead>
+                            <TableHead>Nº Colete</TableHead>
                             <TableHead>Solicitação</TableHead>
                             <TableHead>Vencimento</TableHead>
                             <TableHead>Devolução</TableHead>
@@ -375,14 +379,18 @@ const TemporariosTab = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoading && <TableRow><TableCell colSpan={7} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
-                        {error && <TableRow><TableCell colSpan={7} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
+                        {isLoading && <TableRow><TableCell colSpan={11} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
+                        {error && <TableRow><TableCell colSpan={11} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
                         {!isLoading && filteredTempEmployees.map(temp => {
                             const status = getCredentialStatus(temp.dataVencimento);
                             return (
                                 <TableRow key={temp.docId}>
                                     <TableCell className="font-medium">{temp.name}</TableCell>
                                     <TableCell>{temp.company}</TableCell>
+                                    <TableCell>{temp.servico || '-'}</TableCell>
+                                    <TableCell>{temp.base || '-'}</TableCell>
+                                    <TableCell>{temp.acesso || '-'}</TableCell>
+                                    <TableCell>{temp.coleteNumero || '-'}</TableCell>
                                     <TableCell>{temp.dataSolicitacao ? format(new Date(temp.dataSolicitacao), 'dd/MM/yyyy') : '-'}</TableCell>
                                     <TableCell>{temp.dataVencimento ? format(new Date(temp.dataVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
                                     <TableCell>{temp.dataDevolucao ? format(new Date(temp.dataDevolucao), 'dd/MM/yyyy') : '-'}</TableCell>
@@ -623,5 +631,3 @@ export default function ControleCredenciamentoPage() {
     </div>
   );
 }
-
-    
