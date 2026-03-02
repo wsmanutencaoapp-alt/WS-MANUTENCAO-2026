@@ -440,6 +440,19 @@ export type MaintenanceRecord = {
   notes: string;
   cost?: number;
 };
+
+export type Training = {
+  id?: string;
+  name: string;
+  application: string;
+  validityPeriod: number; // in months
+  isSgso?: boolean;
+  isAvsec?: boolean;
+  sgsoDate?: string; // date
+  avsecDate?: string; // date
+  triggersAccessChange?: boolean;
+  accessChangeDate?: string; // date
+};
     
 
     

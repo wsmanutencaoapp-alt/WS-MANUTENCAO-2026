@@ -134,7 +134,7 @@ service cloud.firestore {
     match /temporary_employees/{tempEmployeeId} {
       allow read, write: if isAuthenticated();
     }
-    
+
     match /gate_personnel/{personnelId} {
       allow read, write: if isAuthenticated();
     }
@@ -194,6 +194,11 @@ service cloud.firestore {
 
     match /counters/{counterId} {
         allow read, write: if isAuthenticated();
+    }
+    
+    match /trainings/{trainingId} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_treinamentos_create') || hasPermission('cadastros_treinamentos_update') || hasPermission('cadastros_treinamentos_delete');
     }
   }
 }

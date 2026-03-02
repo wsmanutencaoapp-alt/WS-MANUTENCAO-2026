@@ -57,6 +57,7 @@ export const permissionStructure = [
             { id: 'cadastros_funcionarios', label: 'Funcionários', path: '/dashboard/cadastros/funcionarios', actions: ['view', 'create', 'update', 'delete'] },
             { id: 'cadastros_enderecos', label: 'Endereços', path: '/dashboard/cadastros/enderecos', actions: ['view', 'create', 'delete'] },
             { id: 'cadastros_centro_custo', label: 'Centro de Custo', path: '/dashboard/cadastros/centro-de-custo', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'cadastros_treinamentos', label: 'Treinamentos', path: '/dashboard/cadastros/treinamentos', actions: ['view', 'create', 'update', 'delete'] },
         ]
     },
     {

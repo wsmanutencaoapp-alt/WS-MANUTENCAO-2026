@@ -37,6 +37,7 @@ import {
   Receipt,
   ExternalLink,
   Paintbrush,
+  ClipboardList,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -92,6 +93,7 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/cadastros/funcionarios', label: 'Funcionários', permission: 'cadastros_funcionarios', icon: Users },
         { href: '/dashboard/cadastros/enderecos', label: 'Endereços', permission: 'cadastros_enderecos' },
         { href: '/dashboard/cadastros/centro-de-custo', label: 'Centro de Custo', permission: 'cadastros_centro_custo' },
+        { href: '/dashboard/cadastros/treinamentos', label: 'Treinamentos', permission: 'cadastros_treinamentos', icon: ClipboardList },
     ]
   },
   { 

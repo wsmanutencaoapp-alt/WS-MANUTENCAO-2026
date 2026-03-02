@@ -1746,6 +1746,62 @@
           "description": "URL for the login screen background image."
         }
       }
+    },
+    "Training": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Training",
+      "type": "object",
+      "description": "Represents a training course and its properties.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Training entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the training."
+        },
+        "application": {
+          "type": "string",
+          "description": "Description of the training's application."
+        },
+        "validityPeriod": {
+          "type": "number",
+          "description": "Validity period in months."
+        },
+        "isSgso": {
+          "type": "boolean",
+          "description": "Flag indicating if it's an SGSO training."
+        },
+        "isAvsec": {
+          "type": "boolean",
+          "description": "Flag indicating if it's an AVSEC training."
+        },
+        "sgsoDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Date related to SGSO."
+        },
+        "avsecDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Date related to AVSEC."
+        },
+        "triggersAccessChange": {
+          "type": "boolean",
+          "description": "Flag indicating if it triggers access level change."
+        },
+        "accessChangeDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Date for access level change."
+        }
+      },
+      "required": [
+        "name",
+        "application",
+        "validityPeriod"
+      ]
     }
   },
   "auth": {
@@ -1982,6 +2038,15 @@
             "$ref": "#/entities/AppAppearance"
           },
           "description": "Stores application-wide configuration documents, like appearance settings."
+        }
+      },
+      {
+        "path": "/trainings/{trainingId}",
+        "definition": {
+          "schema": {
+            "$ref": "#/entities/Training"
+          },
+          "description": "Stores training course definitions."
         }
       }
     ]
