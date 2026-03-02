@@ -130,6 +130,10 @@ service cloud.firestore {
         allow create: if isAuthenticated();
       }
     }
+
+    match /temporary_employees/{tempEmployeeId} {
+      allow read, write: if isAuthenticated();
+    }
     
     match /expenses/{expenseId} {
       allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
