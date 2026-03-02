@@ -1254,6 +1254,49 @@
         "status"
       ]
     },
+    "GatePersonnel": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Gate Personnel",
+      "type": "object",
+      "description": "Represents a gatehouse or security staff member who does not have system access but requires credentialing.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the gate personnel."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the person."
+        },
+        "position": {
+          "type": "string",
+          "description": "The person's job title or position."
+        },
+        "company": {
+          "type": "string",
+          "description": "Company the person works for."
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The expiration date of the credential."
+        },
+        "accessLevel": {
+          "type": "string",
+          "description": "Internal access level for company control (e.g., Nível 1, Geral)."
+        },
+        "vestNumber": {
+          "type": "string",
+          "description": "The identification vest number."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Ativo", "Inativo"],
+          "description": "The current status of the credential."
+        }
+      },
+      "required": ["name", "company", "position", "status"]
+    },
     "Despesa": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Despesa",
@@ -1848,6 +1891,13 @@
         }
       },
       {
+        "path": "/gate_personnel/{personnelId}",
+        "definition": {
+          "schema": { "$ref": "#/entities/GatePersonnel" },
+          "description": "Stores gatehouse personnel information for credentialing purposes."
+        }
+      },
+      {
         "path": "/expenses/{expenseId}",
         "definition": {
           "schema": {
@@ -1931,5 +1981,3 @@
     ]
   }
 }
-
-    

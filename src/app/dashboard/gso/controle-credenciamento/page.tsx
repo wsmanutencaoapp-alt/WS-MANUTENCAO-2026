@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, where, doc, updateDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
-import type { Employee, Vehicle, TemporaryEmployee } from '@/lib/types';
+import type { Employee, Vehicle, TemporaryEmployee, GatePersonnel } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -463,19 +463,215 @@ const TemporariosTab = () => {
 // Portaria Tab Component
 // =====================================================================
 const PortariaTab = () => {
+    const firestore = useFirestore();
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+    const [searchTerm, setSearchTerm] = useState('');
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [editingPersonnel, setEditingPersonnel] = useState<WithDocId<GatePersonnel> | null>(null);
+    const [formData, setFormData] = useState<Partial<GatePersonnel>>({});
+    const [isSaving, setIsSaving] = useState(false);
+
+    const personnelQuery = useMemoFirebase(() => (
+        firestore ? query(collection(firestore, 'gate_personnel'), orderBy('name')) : null
+    ), [firestore]);
+
+    const { data: personnel, isLoading, error } = useCollection<WithDocId<GatePersonnel>>(personnelQuery, {
+        queryKey: ['gate_personnel']
+    });
+
+    const filteredPersonnel = useMemo(() => {
+        if (!personnel) return [];
+        if (!searchTerm) return personnel;
+        const lowercasedTerm = searchTerm.toLowerCase();
+        return personnel.filter(p => 
+            p.name.toLowerCase().includes(lowercasedTerm) ||
+            (p.company && p.company.toLowerCase().includes(lowercasedTerm)) ||
+            (p.position && p.position.toLowerCase().includes(lowercasedTerm))
+        );
+    }, [personnel, searchTerm]);
+
+    const handleOpenDialog = (p: WithDocId<GatePersonnel> | null) => {
+        if (p) {
+            setEditingPersonnel(p);
+            setFormData({
+                ...p,
+                dueDate: p.dueDate ? format(new Date(p.dueDate), 'yyyy-MM-dd') : '',
+            });
+        } else {
+            setEditingPersonnel(null);
+            setFormData({
+                name: '', company: '', position: '', dueDate: '', accessLevel: '', vestNumber: '', status: 'Ativo'
+            });
+        }
+        setDialogOpen(true);
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setFormData(prev => ({ ...prev, [id]: value }));
+    };
+
+    const handleSelectChange = (value: 'Ativo' | 'Inativo') => {
+        setFormData(prev => ({...prev, status: value}));
+    };
+
+    const handleSave = async () => {
+        if (!firestore) return;
+        if (!formData.name || !formData.company || !formData.position) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Nome, Empresa e Cargo são obrigatórios.' });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const dataToSave: Partial<GatePersonnel> = {
+                name: formData.name,
+                company: formData.company,
+                position: formData.position,
+                status: formData.status,
+                accessLevel: formData.accessLevel,
+                vestNumber: formData.vestNumber,
+            };
+
+            if (formData.dueDate) {
+                const parsed = parse(formData.dueDate, 'yyyy-MM-dd', new Date());
+                if (isValid(parsed)) dataToSave.dueDate = parsed.toISOString();
+            }
+
+            if (editingPersonnel) {
+                const docRef = doc(firestore, 'gate_personnel', editingPersonnel.docId);
+                await updateDoc(docRef, dataToSave);
+                toast({ title: 'Sucesso', description: 'Dados do pessoal da portaria atualizados.' });
+            } else {
+                await addDoc(collection(firestore, 'gate_personnel'), dataToSave);
+                toast({ title: 'Sucesso', description: 'Novo pessoal da portaria cadastrado.' });
+            }
+            queryClient.invalidateQueries({ queryKey: ['gate_personnel'] });
+            setDialogOpen(false);
+        } catch (err: any) {
+            console.error("Error saving gate personnel:", err);
+            toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar os dados.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const handleDelete = async (personnelId: string) => {
+        if (!firestore) return;
+        try {
+            await deleteDoc(doc(firestore, 'gate_personnel', personnelId));
+            toast({ title: 'Sucesso', description: 'Registro excluído.'});
+            queryClient.invalidateQueries({ queryKey: ['gate_personnel'] });
+        } catch (err) {
+             toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir.'});
+        }
+    };
+    
     return (
+      <>
         <Card>
             <CardHeader>
                 <CardTitle>Controle da Portaria</CardTitle>
                 <CardDescription>Gerencie as credenciais para a equipe da portaria.</CardDescription>
+                <div className="flex justify-between items-center pt-4">
+                     <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Pesquisar por nome, empresa ou cargo..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full rounded-lg bg-background pl-8 md:w-[300px]"
+                        />
+                    </div>
+                    <Button onClick={() => handleOpenDialog(null)}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Pessoal
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
-                <div className="flex flex-col items-center justify-center gap-4 py-8 h-64 border-2 border-dashed rounded-lg">
-                    <HardHat className="h-16 w-16 text-muted-foreground"/>
-                    <p className="text-muted-foreground">Esta funcionalidade está em construção.</p>
-                </div>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Empresa</TableHead>
+                            <TableHead>Cargo</TableHead>
+                            <TableHead>Acesso</TableHead>
+                            <TableHead>Nº Colete</TableHead>
+                            <TableHead>Vencimento</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading && <TableRow><TableCell colSpan={8} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
+                        {error && <TableRow><TableCell colSpan={8} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
+                        {!isLoading && filteredPersonnel.length === 0 && <TableRow><TableCell colSpan={8} className="text-center h-24">Nenhum registro encontrado.</TableCell></TableRow>}
+                        {!isLoading && filteredPersonnel.map(p => {
+                            const status = getCredentialStatus(p.dueDate);
+                            return (
+                                <TableRow key={p.docId}>
+                                    <TableCell className="font-medium">{p.name}</TableCell>
+                                    <TableCell>{p.company}</TableCell>
+                                    <TableCell>{p.position}</TableCell>
+                                    <TableCell>{p.accessLevel || '-'}</TableCell>
+                                    <TableCell>{p.vestNumber || '-'}</TableCell>
+                                    <TableCell>{p.dueDate ? format(new Date(p.dueDate), 'dd/MM/yyyy') : '-'}</TableCell>
+                                    <TableCell><Badge variant={status.variant}>{status.text}</Badge></TableCell>
+                                    <TableCell className="text-right space-x-2">
+                                        <Button variant="outline" size="icon" onClick={() => handleOpenDialog(p)}><Edit className="h-4 w-4" /></Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild><Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                                    <AlertDialogDescription>Tem certeza que deseja excluir o registro de <span className="font-bold">{p.name}</span>?</AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDelete(p.docId)}>Sim, Excluir</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{editingPersonnel ? 'Editar' : 'Adicionar'} Pessoal da Portaria</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
+                    <div className="space-y-1.5"><Label htmlFor="name">Nome Completo</Label><Input id="name" value={formData.name || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="company">Empresa</Label><Input id="company" value={formData.company || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="position">Cargo</Label><Input id="position" value={formData.position || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="accessLevel">Acesso</Label><Input id="accessLevel" value={formData.accessLevel || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="vestNumber">Nº Colete</Label><Input id="vestNumber" value={formData.vestNumber || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="dueDate">Vencimento</Label><Input id="dueDate" type="date" value={formData.dueDate || ''} onChange={handleInputChange}/></div>
+                    <div className="space-y-1.5"><Label htmlFor="status">Status</Label>
+                        <Select onValueChange={handleSelectChange} value={formData.status}>
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Ativo">Ativo</SelectItem>
+                                <SelectItem value="Inativo">Inativo</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>Cancelar</Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Salvar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      </>
     );
 };
 

@@ -262,6 +262,17 @@ export type TemporaryEmployee = {
   status: 'Ativo' | 'Inativo';
 };
 
+export type GatePersonnel = {
+  id?: string;
+  name: string;
+  position: string;
+  company: string;
+  dueDate?: string; // date
+  accessLevel?: string;
+  vestNumber?: string;
+  status: 'Ativo' | 'Inativo';
+};
+
 
 export type Despesa = {
   id?: string;
