@@ -132,17 +132,11 @@ service cloud.firestore {
     }
 
     match /temporary_employees/{tempEmployeeId} {
-      allow read: if hasPermission('gso_controle_credenciamento_view');
-      allow create: if hasPermission('gso_controle_credenciamento_create');
-      allow update: if hasPermission('gso_controle_credenciamento_update');
-      allow delete: if hasPermission('gso_controle_credenciamento_delete');
+      allow read, create, update, delete: if isAuthenticated();
     }
 
     match /gate_personnel/{personnelId} {
-      allow read: if hasPermission('gso_controle_credenciamento_view');
-      allow create: if hasPermission('gso_controle_credenciamento_create');
-      allow update: if hasPermission('gso_controle_credenciamento_update');
-      allow delete: if hasPermission('gso_controle_credenciamento_delete');
+      allow read, create, update, delete: if isAuthenticated();
     }
     
     match /expenses/{expenseId} {
@@ -189,7 +183,7 @@ service cloud.firestore {
         
         match /items/{itemId} {
             allow read: if isAuthenticated();
-            allow write: if hasPermission('compras_controle_update') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
+            allow write: if hasPermission('compras_requisicao_create') || hasPermission('compras_controle_update') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
         }
     }
     
