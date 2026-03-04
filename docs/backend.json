@@ -1777,16 +1777,6 @@
           "type": "boolean",
           "description": "Flag indicating if it's an AVSEC training."
         },
-        "sgsoDate": {
-          "type": "string",
-          "format": "date",
-          "description": "Date related to SGSO."
-        },
-        "avsecDate": {
-          "type": "string",
-          "format": "date",
-          "description": "Date related to AVSEC."
-        },
         "triggersAccessChange": {
           "type": "boolean",
           "description": "Flag indicating if it triggers access level change."
@@ -1794,11 +1784,6 @@
         "accessLevelGranted": {
           "type": "string",
           "description": "The name of the new access level or permission granted upon completion."
-        },
-        "accessChangeDate": {
-          "type": "string",
-          "format": "date",
-          "description": "Date for access level change."
         }
       },
       "required": [
@@ -2105,4 +2090,3 @@
     ]
   }
 }
-

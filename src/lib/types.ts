@@ -449,11 +449,8 @@ export type Training = {
   validityPeriod: number; // in months
   isSgso?: boolean;
   isAvsec?: boolean;
-  sgsoDate?: string; // date
-  avsecDate?: string; // date
   triggersAccessChange?: boolean;
   accessLevelGranted?: string;
-  accessChangeDate?: string; // date
 };
 
 export type EmployeeTraining = {

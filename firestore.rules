@@ -188,7 +188,7 @@ service cloud.firestore {
         
         match /items/{itemId} {
             allow read: if isAuthenticated();
-            allow write: if hasPermission('compras_requisicao_create') || hasPermission('compras_controle_update') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
+            allow write: if hasPermission('compras_controle_update') || hasPermission('compras_requisicao_create') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
         }
     }
     

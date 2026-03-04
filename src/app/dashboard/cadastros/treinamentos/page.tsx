@@ -52,22 +52,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Trash2, CalendarIcon } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
 
 const formSchema = z.object({
   name: z.string().min(1, "O nome do treinamento é obrigatório."),
@@ -75,11 +71,8 @@ const formSchema = z.object({
   validityPeriod: z.coerce.number().min(0, "O prazo deve ser 0 ou maior."),
   isSgso: z.boolean().default(false),
   isAvsec: z.boolean().default(false),
-  sgsoDate: z.date().optional(),
-  avsecDate: z.date().optional(),
   triggersAccessChange: z.boolean().default(false),
   accessLevelGranted: z.string().optional(),
-  accessChangeDate: z.date().optional(),
 });
 
 
@@ -114,19 +107,12 @@ const CadastroTreinamentosPage = () => {
     },
   });
 
-  const watchIsSgso = form.watch('isSgso');
-  const watchIsAvsec = form.watch('isAvsec');
   const watchTriggersAccessChange = form.watch('triggersAccessChange');
 
   const handleOpenDialog = (training: WithDocId<Training> | null) => {
     if (training) {
       setEditingTraining(training);
-      form.reset({
-        ...training,
-        sgsoDate: training.sgsoDate ? new Date(training.sgsoDate) : undefined,
-        avsecDate: training.avsecDate ? new Date(training.avsecDate) : undefined,
-        accessChangeDate: training.accessChangeDate ? new Date(training.accessChangeDate) : undefined,
-      });
+      form.reset(training);
     } else {
       setEditingTraining(null);
       form.reset();
@@ -137,20 +123,13 @@ const CadastroTreinamentosPage = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!firestore) return;
 
-    const dataToSave = {
-      ...values,
-      sgsoDate: values.sgsoDate?.toISOString(),
-      avsecDate: values.avsecDate?.toISOString(),
-      accessChangeDate: values.accessChangeDate?.toISOString(),
-    };
-
     try {
         if (editingTraining) {
             const docRef = doc(firestore, 'trainings', editingTraining.docId);
-            await updateDoc(docRef, dataToSave);
+            await updateDoc(docRef, values);
             toast({ title: 'Sucesso!', description: 'Treinamento atualizado.' });
         } else {
-            await addDoc(collection(firestore, 'trainings'), dataToSave);
+            await addDoc(collection(firestore, 'trainings'), values);
             toast({ title: 'Sucesso!', description: 'Novo treinamento cadastrado.' });
         }
 
@@ -267,36 +246,10 @@ const CadastroTreinamentosPage = () => {
                 <FormField control={form.control} name="isSgso" render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between"><FormLabel>É um treinamento SGSO?</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>
                 )}/>
-                {watchIsSgso && (
-                  <FormField control={form.control} name="sgsoDate" render={({ field }) => (
-                      <FormItem className="flex flex-col animate-in fade-in-50"><FormLabel>Data SGSO</FormLabel>
-                        <Popover modal={false}><PopoverTrigger asChild><FormControl>
-                            <Button variant={"outline"} className="pl-3 text-left font-normal">
-                                {field.value ? format(field.value, "PPP") : <span>Escolha a data</span>}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                        </FormControl></PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
-                      <FormMessage /></FormItem>
-                  )}/>
-                )}
 
                 <FormField control={form.control} name="isAvsec" render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between"><FormLabel>É um treinamento AVSEC?</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>
                 )}/>
-                {watchIsAvsec && (
-                  <FormField control={form.control} name="avsecDate" render={({ field }) => (
-                      <FormItem className="flex flex-col animate-in fade-in-50"><FormLabel>Data AVSEC</FormLabel>
-                        <Popover modal={false}><PopoverTrigger asChild><FormControl>
-                            <Button variant={"outline"} className="pl-3 text-left font-normal">
-                                {field.value ? format(field.value, "PPP") : <span>Escolha a data</span>}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                        </FormControl></PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
-                      <FormMessage /></FormItem>
-                  )}/>
-                )}
               </div>
 
                <div className="space-y-4 rounded-md border p-4">
@@ -311,17 +264,6 @@ const CadastroTreinamentosPage = () => {
                             <FormControl><Input {...field} placeholder="Ex: Acesso Geral, Nível 2" /></FormControl>
                             <FormMessage />
                         </FormItem>
-                    )}/>
-                    <FormField control={form.control} name="accessChangeDate" render={({ field }) => (
-                        <FormItem className="flex flex-col"><FormLabel>Data para Alteração</FormLabel>
-                            <Popover modal={false}><PopoverTrigger asChild><FormControl>
-                                <Button variant={"outline"} className="pl-3 text-left font-normal">
-                                    {field.value ? format(field.value, "PPP") : <span>Escolha a data</span>}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                            </FormControl></PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
-                        <FormMessage /></FormItem>
                     )}/>
                    </div>
                 )}
