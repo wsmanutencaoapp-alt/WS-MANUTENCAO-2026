@@ -53,12 +53,12 @@ service cloud.firestore {
 
       match /maintenance_plans/{planId} {
         allow read: if isAuthenticated();
-        allow write: if hasPermission('manutencao');
+        allow write: if hasPermission('manutencao_veiculos_update');
       }
 
       match /maintenance_records/{recordId} {
         allow read: if isAuthenticated();
-        allow write: if hasPermission('manutencao');
+        allow write: if hasPermission('manutencao_veiculos_update');
       }
     }
     
@@ -132,11 +132,17 @@ service cloud.firestore {
     }
 
     match /temporary_employees/{tempEmployeeId} {
-      allow read, write: if isAuthenticated();
+      allow read: if hasPermission('gso_controle_credenciamento_view');
+      allow create: if hasPermission('gso_controle_credenciamento_create');
+      allow update: if hasPermission('gso_controle_credenciamento_update');
+      allow delete: if hasPermission('gso_controle_credenciamento_delete');
     }
 
     match /gate_personnel/{personnelId} {
-      allow read, write: if isAuthenticated();
+      allow read: if hasPermission('gso_controle_credenciamento_view');
+      allow create: if hasPermission('gso_controle_credenciamento_create');
+      allow update: if hasPermission('gso_controle_credenciamento_update');
+      allow delete: if hasPermission('gso_controle_credenciamento_delete');
     }
     
     match /expenses/{expenseId} {
