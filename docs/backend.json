@@ -1806,6 +1806,46 @@
         "application",
         "validityPeriod"
       ]
+    },
+    "EmployeeTraining": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Employee Training Record",
+      "type": "object",
+      "description": "Records a training completed by an employee.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "employeeId": {
+          "type": "string"
+        },
+        "trainingId": {
+          "type": "string"
+        },
+        "trainingName": {
+          "type": "string",
+          "description": "Denormalized training name for display."
+        },
+        "completionDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "expiryDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "certificateUrl": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "employeeId",
+        "trainingId",
+        "trainingName",
+        "completionDate",
+        "expiryDate"
+      ]
     }
   },
   "auth": {
@@ -2052,7 +2092,17 @@
           },
           "description": "Stores training course definitions."
         }
+      },
+      {
+        "path": "/employees/{employeeId}/trainings/{trainingRecordId}",
+        "definition": {
+          "schema": {
+            "$ref": "#/entities/EmployeeTraining"
+          },
+          "description": "Stores training records for a specific employee."
+        }
       }
     ]
   }
 }
+

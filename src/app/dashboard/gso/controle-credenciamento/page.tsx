@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Edit, Users, Car, HardHat, PlusCircle, Trash2 } from 'lucide-react';
+import { Loader2, Search, Edit, Users, Car, HardHat, PlusCircle, Trash2, ClipboardList } from 'lucide-react';
 import { format, differenceInDays, parse, isValid } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import EditCredenciamentoDialog from '@/components/EditCredenciamentoDialog';
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import EmployeeTrainingsDialog from '@/components/EmployeeTrainingsDialog';
 
 
 // =====================================================================
@@ -59,7 +60,7 @@ const getCredentialStatus = (dueDate: string | undefined): { text: string; varia
 // =====================================================================
 // Funcionários Ativos Tab Component
 // =====================================================================
-const FuncionariosAtivosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>) => void }) => {
+const FuncionariosAtivosTab = ({ onEdit, onManageTrainings }: { onEdit: (item: WithDocId<Employee>) => void, onManageTrainings: (item: WithDocId<Employee>) => void }) => {
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -131,8 +132,11 @@ const FuncionariosAtivosTab = ({ onEdit }: { onEdit: (item: WithDocId<Employee>)
                   <TableCell>{employee.dataVencimento ? format(new Date(employee.dataVencimento), 'dd/MM/yyyy') : '-'}</TableCell>
                   <TableCell><Badge variant={status.variant}>{status.text}</Badge></TableCell>
                   <TableCell>{employee.coleteNumero || '-'}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="icon" onClick={() => onEdit(employee)}>
+                  <TableCell className="text-right space-x-1">
+                    <Button variant="outline" size="icon" title="Gerenciar Treinamentos" onClick={() => onManageTrainings(employee)}>
+                        <ClipboardList className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" title="Editar Credencial" onClick={() => onEdit(employee)}>
                       <Edit className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -393,6 +397,7 @@ const TemporariosTab = () => {
                     <TableBody>
                         {isLoading && <TableRow><TableCell colSpan={11} className="text-center h-24"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>}
                         {error && <TableRow><TableCell colSpan={11} className="text-center h-24 text-destructive">{error.message}</TableCell></TableRow>}
+                        {!isLoading && filteredTempEmployees.length === 0 && <TableRow><TableCell colSpan={11} className="text-center h-24">Nenhum registro encontrado.</TableCell></TableRow>}
                         {!isLoading && filteredTempEmployees.map(temp => {
                             const status = getCredentialStatus(temp.dataVencimento);
                             return (
@@ -781,10 +786,19 @@ export default function ControleCredenciamentoPage() {
         itemType: 'employee' | 'vehicle' | null;
     }>({ isOpen: false, item: null, itemType: null });
     
+    const [trainingsDialogState, setTrainingsDialogState] = useState<{
+        isOpen: boolean;
+        employee: WithDocId<Employee> | null;
+    }>({ isOpen: false, employee: null });
+
     const queryClient = useQueryClient();
 
     const handleOpenDialog = (item: WithDocId<Employee> | WithDocId<Vehicle>, type: 'employee' | 'vehicle') => {
         setDialogState({ isOpen: true, item, itemType: type });
+    };
+    
+    const handleOpenTrainingsDialog = (employee: WithDocId<Employee>) => {
+        setTrainingsDialogState({ isOpen: true, employee });
     };
 
     const handleCloseDialog = () => {
@@ -813,7 +827,7 @@ export default function ControleCredenciamentoPage() {
             <TabsTrigger value="ex-funcionarios"><Users className="mr-2 h-4 w-4"/> Ex-Funcionários</TabsTrigger>
         </TabsList>
         <TabsContent value="funcionarios">
-            <FuncionariosAtivosTab onEdit={(item) => handleOpenDialog(item, 'employee')} />
+            <FuncionariosAtivosTab onEdit={(item) => handleOpenDialog(item, 'employee')} onManageTrainings={handleOpenTrainingsDialog} />
         </TabsContent>
         <TabsContent value="veiculos">
             <VeiculosTab onEdit={(item) => handleOpenDialog(item, 'vehicle')} />
@@ -836,6 +850,14 @@ export default function ControleCredenciamentoPage() {
         item={dialogState.item}
         itemType={dialogState.itemType}
       />
+
+      {trainingsDialogState.isOpen && (
+        <EmployeeTrainingsDialog
+          isOpen={trainingsDialogState.isOpen}
+          onClose={() => setTrainingsDialogState({ isOpen: false, employee: null })}
+          employee={trainingsDialogState.employee}
+        />
+      )}
     </div>
   );
 }

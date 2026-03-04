@@ -129,6 +129,11 @@ service cloud.firestore {
         allow read, update, delete: if isOwner(employeeId);
         allow create: if isAuthenticated();
       }
+
+      match /trainings/{trainingRecordId} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('gso_controle_credenciamento_update');
+      }
     }
 
     match /temporary_employees/{tempEmployeeId} {

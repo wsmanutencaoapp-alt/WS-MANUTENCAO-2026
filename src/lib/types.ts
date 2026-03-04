@@ -455,6 +455,16 @@ export type Training = {
   accessLevelGranted?: string;
   accessChangeDate?: string; // date
 };
+
+export type EmployeeTraining = {
+  id?: string;
+  employeeId: string;
+  trainingId: string;
+  trainingName: string;
+  completionDate: string; // ISO Date
+  expiryDate: string; // ISO Date
+  certificateUrl?: string;
+};
     
 
     
