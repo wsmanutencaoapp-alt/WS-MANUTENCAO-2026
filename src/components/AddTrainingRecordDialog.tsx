@@ -15,12 +15,10 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Calendar } from './ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CalendarIcon, Upload } from 'lucide-react';
-import { format, addMonths } from 'date-fns';
+import { Loader2, Upload } from 'lucide-react';
+import { addMonths, parse, isValid } from 'date-fns';
 import type { Employee, Training, EmployeeTraining } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 
@@ -39,7 +37,7 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
 
   const [isSaving, setIsSaving] = useState(false);
   const [selectedTrainingId, setSelectedTrainingId] = useState('');
-  const [completionDate, setCompletionDate] = useState<Date | undefined>();
+  const [completionDate, setCompletionDate] = useState<string>(''); // yyyy-MM-dd format
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
 
   const trainingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'trainings')) : null), [firestore]);
@@ -50,7 +48,7 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
 
   const resetForm = () => {
     setSelectedTrainingId('');
-    setCompletionDate(undefined);
+    setCompletionDate('');
     setCertificateFile(null);
     if(fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -73,6 +71,12 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
       return;
     }
 
+    const completionDateObj = parse(completionDate, 'yyyy-MM-dd', new Date());
+    if (!isValid(completionDateObj)) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Data de conclusão inválida.' });
+      return;
+    }
+
     setIsSaving(true);
     try {
       let certificateUrl = '';
@@ -82,13 +86,13 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
         certificateUrl = await getDownloadURL(certRef);
       }
       
-      const expiryDate = addMonths(completionDate, selectedTraining.validityPeriod);
+      const expiryDate = addMonths(completionDateObj, selectedTraining.validityPeriod);
       
       const newRecord: Omit<EmployeeTraining, 'id'> = {
           employeeId: employee.docId,
           trainingId: selectedTraining.docId,
           trainingName: selectedTraining.name,
-          completionDate: completionDate.toISOString(),
+          completionDate: completionDateObj.toISOString(),
           expiryDate: expiryDate.toISOString(),
           certificateUrl: certificateUrl || undefined,
       };
@@ -133,18 +137,14 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
           </div>
 
           <div className="space-y-1.5">
-            <Label>Data de Conclusão</Label>
-            <Popover>
-                <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {completionDate ? format(completionDate, 'PPP') : <span>Escolha a data</span>}
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={completionDate} onSelect={setCompletionDate} initialFocus />
-                </PopoverContent>
-            </Popover>
+            <Label htmlFor="completionDate">Data de Conclusão</Label>
+            <Input
+              id="completionDate"
+              type="date"
+              value={completionDate}
+              onChange={(e) => setCompletionDate(e.target.value)}
+              className="w-full"
+            />
           </div>
 
           <div className="space-y-1.5">
