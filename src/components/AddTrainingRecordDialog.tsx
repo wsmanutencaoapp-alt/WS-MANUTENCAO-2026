@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useFirestore, useStorage, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, addDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -18,7 +18,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload } from 'lucide-react';
-import { addMonths, parse, isValid } from 'date-fns';
+import { addMonths, parse, isValid, format } from 'date-fns';
 import type { Employee, Training, EmployeeTraining } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 
@@ -38,6 +38,7 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
   const [isSaving, setIsSaving] = useState(false);
   const [selectedTrainingId, setSelectedTrainingId] = useState('');
   const [completionDate, setCompletionDate] = useState<string>(''); // yyyy-MM-dd format
+  const [expiryDate, setExpiryDate] = useState<string>(''); // yyyy-MM-dd format
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
 
   const trainingsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'trainings')) : null), [firestore]);
@@ -45,10 +46,29 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
       queryKey: ['allTrainingsForSelection'],
       enabled: isOpen,
   });
+  
+  const selectedTraining = useMemo(() => {
+    if (!selectedTrainingId || !allTrainings) return null;
+    return allTrainings.find(t => t.docId === selectedTrainingId);
+  }, [selectedTrainingId, allTrainings]);
+
+  // Effect to auto-calculate expiry date
+  useEffect(() => {
+    if (selectedTraining && completionDate) {
+      const completionDateObj = parse(completionDate, 'yyyy-MM-dd', new Date());
+      if (isValid(completionDateObj)) {
+        const calculatedExpiryDate = addMonths(completionDateObj, selectedTraining.validityPeriod);
+        setExpiryDate(format(calculatedExpiryDate, 'yyyy-MM-dd'));
+      }
+    } else {
+        setExpiryDate('');
+    }
+  }, [selectedTraining, completionDate]);
 
   const resetForm = () => {
     setSelectedTrainingId('');
     setCompletionDate('');
+    setExpiryDate('');
     setCertificateFile(null);
     if(fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -60,12 +80,11 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
 
   const handleSave = async () => {
     if (!firestore || !storage) return;
-    if (!selectedTrainingId || !completionDate) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Treinamento e data de conclusão são obrigatórios.' });
+    if (!selectedTrainingId || !completionDate || !expiryDate) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Treinamento, data de conclusão e data de validade são obrigatórios.' });
       return;
     }
 
-    const selectedTraining = allTrainings?.find(t => t.docId === selectedTrainingId);
     if (!selectedTraining) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Treinamento selecionado não encontrado.' });
       return;
@@ -74,6 +93,12 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
     const completionDateObj = parse(completionDate, 'yyyy-MM-dd', new Date());
     if (!isValid(completionDateObj)) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Data de conclusão inválida.' });
+      return;
+    }
+    
+    const expiryDateObj = parse(expiryDate, 'yyyy-MM-dd', new Date());
+    if (!isValid(expiryDateObj)) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Data de validade inválida.' });
       return;
     }
 
@@ -86,14 +111,12 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
         certificateUrl = await getDownloadURL(certRef);
       }
       
-      const expiryDate = addMonths(completionDateObj, selectedTraining.validityPeriod);
-      
       const newRecord: Omit<EmployeeTraining, 'id'> = {
           employeeId: employee.docId,
           trainingId: selectedTraining.docId,
           trainingName: selectedTraining.name,
           completionDate: completionDateObj.toISOString(),
-          expiryDate: expiryDate.toISOString(),
+          expiryDate: expiryDateObj.toISOString(),
           certificateUrl: certificateUrl || undefined,
       };
 
@@ -117,7 +140,7 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
         <DialogHeader>
           <DialogTitle>Adicionar Registro de Treinamento</DialogTitle>
           <DialogDescription>
-            Selecione o treinamento e a data de conclusão para {employee.firstName}.
+            Selecione o treinamento e preencha as datas para {employee.firstName}. A data de validade será calculada automaticamente.
           </DialogDescription>
         </DialogHeader>
 
@@ -130,22 +153,35 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
                 </SelectTrigger>
                 <SelectContent>
                     {allTrainings?.map(t => (
-                        <SelectItem key={t.docId} value={t.docId}>{t.name}</SelectItem>
+                        <SelectItem key={t.docId} value={t.docId}>{t.name} ({t.validityPeriod} meses)</SelectItem>
                     ))}
                 </SelectContent>
             </Select>
           </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="completionDate">Data de Conclusão</Label>
-            <Input
-              id="completionDate"
-              type="date"
-              value={completionDate}
-              onChange={(e) => setCompletionDate(e.target.value)}
-              className="w-full"
-            />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="completionDate">Data de Conclusão</Label>
+              <Input
+                id="completionDate"
+                type="date"
+                value={completionDate}
+                onChange={(e) => setCompletionDate(e.target.value)}
+                className="w-full"
+              />
+            </div>
+             <div className="space-y-1.5">
+              <Label htmlFor="expiryDate">Data de Validade</Label>
+              <Input
+                id="expiryDate"
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                className="w-full"
+              />
+            </div>
           </div>
+
 
           <div className="space-y-1.5">
             <Label>Certificado (Opcional)</Label>
@@ -161,7 +197,7 @@ export default function AddTrainingRecordDialog({ isOpen, onClose, onSuccess, em
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={isSaving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={isSaving || !selectedTrainingId || !completionDate}>
+          <Button onClick={handleSave} disabled={isSaving || !selectedTrainingId || !completionDate || !expiryDate}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Salvar Registro
           </Button>
