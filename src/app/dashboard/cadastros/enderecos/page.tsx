@@ -132,41 +132,37 @@ const CadastroEnderecosPage = () => {
       }
       
       try {
-        const allAddressesSnapshot = await getDocs(collection(firestore, 'addresses'));
+        const q = query(
+            collection(firestore, 'addresses'),
+            where('unidade', '==', activeUnidade.toUpperCase()),
+            where('setor', '==', setor),
+            where('rua', '==', `R${rua.padStart(2, '0')}`),
+            where('movel', '==', `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`),
+            where('nivel', '==', `N${nivel.padStart(2, '0')}`)
+        );
+        const querySnapshot = await getDocs(q);
         
-        const targetUnidade = activeUnidade.toUpperCase();
-        const targetSetor = setor;
-        const targetRua = `R${rua.padStart(2, '0')}`;
-        const targetMovel = `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`;
-        const targetNivel = `N${nivel.padStart(2, '0')}`;
-
         let lastNumber = 0;
-        allAddressesSnapshot.forEach(doc => {
-            const data = doc.data();
-            if (
-                data.unidade === targetUnidade &&
-                data.setor === targetSetor &&
-                data.rua === targetRua &&
-                data.movel === targetMovel &&
-                data.nivel === targetNivel &&
-                data.detalhe && data.detalhe.startsWith('-D')
-            ) {
-                const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
-                if (!isNaN(currentNumber) && currentNumber > lastNumber) {
-                    lastNumber = currentNumber;
-                }
+        querySnapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.detalhe && data.detalhe.startsWith('-D')) {
+            const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
+            if (!isNaN(currentNumber) && currentNumber > lastNumber) {
+              lastNumber = currentNumber;
             }
+          }
         });
         
         const nextNumber = lastNumber + 1;
         setStartDetalheNum(nextNumber);
       } catch (e) {
-        console.error("Error fetching addresses to determine next detail number:", e);
-        setStartDetalheNum(1); // Fallback to 1 if query fails
+        console.error("Erro ao buscar endereços para determinar próximo detalhe:", e);
+        toast({ variant: 'destructive', title: 'Erro de Índice', description: 'Ocorreu um erro ao buscar os endereços. Pode ser necessário criar um índice no Firestore. Verifique o console para mais detalhes.' });
+        setStartDetalheNum(1); // Fallback
       }
     };
     generateNextDetalhe();
-  }, [useDetalhe, formState, firestore]);
+  }, [useDetalhe, formState, firestore, toast]);
   
   const generatedCode = useMemo(() => {
     const activeUnidade = formState.unidade === 'OUTRA' ? formState.unidadeOutro : formState.unidade;
@@ -253,25 +249,20 @@ const CadastroEnderecosPage = () => {
 
         let currentStartDetalheNum = startDetalheNum;
         if (currentStartDetalheNum === null) {
-            try {
-                const allAddressesSnapshot = await getDocs(collection(firestore, 'addresses'));
-                const targetUnidade = activeUnidade.toUpperCase();
-                const targetSetor = setor;
-                const targetRua = `R${rua.padStart(2, '0')}`;
-                const targetMovel = `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`;
-                const targetNivel = `N${nivel.padStart(2, '0')}`;
-
+             try {
+                const q = query(
+                    collection(firestore, 'addresses'),
+                    where('unidade', '==', activeUnidade.toUpperCase()),
+                    where('setor', '==', setor),
+                    where('rua', '==', `R${rua.padStart(2, '0')}`),
+                    where('movel', '==', `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`),
+                    where('nivel', '==', `N${nivel.padStart(2, '0')}`)
+                );
+                const querySnapshot = await getDocs(q);
                 let lastNumber = 0;
-                allAddressesSnapshot.forEach(doc => {
+                querySnapshot.forEach(doc => {
                     const data = doc.data();
-                    if (
-                        data.unidade === targetUnidade &&
-                        data.setor === targetSetor &&
-                        data.rua === targetRua &&
-                        data.movel === targetMovel &&
-                        data.nivel === targetNivel &&
-                        data.detalhe && data.detalhe.startsWith('-D')
-                    ) {
+                    if (data.detalhe && data.detalhe.startsWith('-D')) {
                         const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
                         if (!isNaN(currentNumber) && currentNumber > lastNumber) {
                             lastNumber = currentNumber;
@@ -281,7 +272,9 @@ const CadastroEnderecosPage = () => {
                 currentStartDetalheNum = lastNumber + 1;
             } catch (e) {
                 console.error("Error in fallback address fetch:", e);
-                currentStartDetalheNum = 1; // Default to 1 on error
+                toast({ variant: 'destructive', title: 'Erro de Índice', description: 'Ocorreu um erro ao buscar os endereços para o contador. Pode ser necessário criar um índice no Firestore. Verifique o console.' });
+                setIsSaving(false);
+                return;
             }
         }
   
