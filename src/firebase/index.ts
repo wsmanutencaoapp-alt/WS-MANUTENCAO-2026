@@ -6,6 +6,8 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, setDoc, doc, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
+let persistenceEnabled = false; // Add this guard flag
+
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
   if (!getApps().length) {
@@ -35,17 +37,22 @@ export function initializeFirebase() {
 
 export function getSdks(firebaseApp: FirebaseApp) {
   const firestore = getFirestore(firebaseApp);
-  try {
-    enableIndexedDbPersistence(firestore)
-      .catch((err) => {
-        if (err.code == 'failed-precondition') {
-          console.warn('Firestore persistence could not be enabled: multiple tabs open, persistence can only be enabled in one tab at a time.');
-        } else if (err.code == 'unimplemented') {
-          console.warn('Firestore persistence could not be enabled: the current browser does not support all of the features required.');
-        }
-      });
-  } catch (e) {
-      console.error("Error enabling Firestore persistence:", e)
+  if (!persistenceEnabled) {
+    try {
+      enableIndexedDbPersistence(firestore)
+        .then(() => {
+          persistenceEnabled = true;
+        })
+        .catch((err) => {
+          if (err.code == 'failed-precondition') {
+            console.warn('Firestore persistence could not be enabled: multiple tabs open, persistence can only be enabled in one tab at a time.');
+          } else if (err.code == 'unimplemented') {
+            console.warn('Firestore persistence could not be enabled: the current browser does not support all of the features required.');
+          }
+        });
+    } catch (e) {
+        console.error("Error enabling Firestore persistence:", e)
+    }
   }
 
   return {

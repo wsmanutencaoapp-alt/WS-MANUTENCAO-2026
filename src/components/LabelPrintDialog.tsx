@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Printer, FileText } from 'lucide-react';
 import { useFirestore, useStorage } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL, getString } from 'firebase/storage';
+import { ref as storageRef, uploadString, getDownloadURL, getBytes } from 'firebase/storage';
 import JsBarcode from 'jsbarcode';
 import type { Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
@@ -114,7 +114,8 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
                     const url = new URL(tool.label_url);
                     const path = decodeURIComponent(url.pathname.split('/o/')[1].split('?')[0]);
                     const labelRef = storageRef(storage, path);
-                    svgContent = await getString(labelRef);
+                    const bytes = await getBytes(labelRef);
+                    svgContent = new TextDecoder().decode(bytes);
                 } catch(fetchError) {
                     console.warn(`Could not fetch existing label for ${tool.codigo}. Generating a new one.`, fetchError);
                     svgContent = generateLabelSvgLocally(tool); // Fallback to generating

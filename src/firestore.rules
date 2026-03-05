@@ -29,6 +29,10 @@ service cloud.firestore {
     function isOwner(userId) {
         return request.auth.uid == userId;
     }
+
+    match /{path=**}/stock/{stockId} {
+        allow read: if isAuthenticated();
+    }
     
     match /app_config/{configId} {
       allow read: if true;
@@ -53,12 +57,12 @@ service cloud.firestore {
 
       match /maintenance_plans/{planId} {
         allow read: if isAuthenticated();
-        allow write: if hasPermission('manutencao');
+        allow write: if hasPermission('manutencao_veiculos_update');
       }
 
       match /maintenance_records/{recordId} {
         allow read: if isAuthenticated();
-        allow write: if hasPermission('manutencao');
+        allow write: if hasPermission('manutencao_veiculos_update');
       }
     }
     
@@ -129,11 +133,19 @@ service cloud.firestore {
         allow read, update, delete: if isOwner(employeeId);
         allow create: if isAuthenticated();
       }
+
+      match /trainings/{trainingRecordId} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('gso_controle_credenciamento_update');
+      }
     }
 
     match /temporary_employees/{tempEmployeeId} {
-      allow read: if hasPermission('gso_controle_credenciamento_view');
-      allow write: if hasPermission('gso_controle_credenciamento_create') || hasPermission('gso_controle_credenciamento_update') || hasPermission('gso_controle_credenciamento_delete');
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    match /gate_personnel/{personnelId} {
+      allow read, create, update, delete: if isAuthenticated();
     }
     
     match /expenses/{expenseId} {
@@ -180,7 +192,7 @@ service cloud.firestore {
         
         match /items/{itemId} {
             allow read: if isAuthenticated();
-            allow write: if hasPermission('compras_controle_update') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
+            allow write: if hasPermission('compras_controle_update') || hasPermission('compras_requisicao_create') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
         }
     }
     
@@ -191,6 +203,11 @@ service cloud.firestore {
 
     match /counters/{counterId} {
         allow read, write: if isAuthenticated();
+    }
+    
+    match /trainings/{trainingId} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_treinamentos_create') || hasPermission('cadastros_treinamentos_update') || hasPermission('cadastros_treinamentos_delete');
     }
   }
 }
