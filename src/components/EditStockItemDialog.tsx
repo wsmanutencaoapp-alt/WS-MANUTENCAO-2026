@@ -63,7 +63,8 @@ export default function EditStockItemDialog({ isOpen, onClose, stockItem, onSucc
     if (showAllAddresses) {
         return query(baseQuery);
     }
-    return query(baseQuery, where('setor', '==', '02')); // Suprimentos
+    // Suprimentos sector is '02'
+    return query(baseQuery, where('setor', '==', '02'));
   }, [firestore, isOpen, showAllAddresses]);
 
   const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, { 
@@ -74,7 +75,7 @@ export default function EditStockItemDialog({ isOpen, onClose, stockItem, onSucc
   useEffect(() => {
     if (stockItem) {
       setLoteFornecedor(stockItem.loteFornecedor || '');
-      setValidade(stockItem.dataValidade ? format(parse(stockItem.dataValidade, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), 'yyyy-MM-dd') : '');
+      setValidade(stockItem.dataValidade ? format(new Date(stockItem.dataValidade), 'yyyy-MM-dd') : '');
       setLocalizacao(stockItem.localizacao || '');
       setDocumentoFile(null);
     }
@@ -155,7 +156,7 @@ export default function EditStockItemDialog({ isOpen, onClose, stockItem, onSucc
   if (!stockItem) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Editar Lote de Suprimento</DialogTitle>
