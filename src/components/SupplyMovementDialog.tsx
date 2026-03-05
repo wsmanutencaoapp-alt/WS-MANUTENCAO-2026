@@ -29,14 +29,16 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CalendarIcon, ChevronsUpDown, Upload, FileText } from 'lucide-react';
+import { Loader2, CalendarIcon, ChevronsUpDown, Upload, FileText, Check } from 'lucide-react';
 import type { Supply, SupplyStock, SupplyMovement, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { cn } from '@/lib/utils';
 import { format, parse, isValid } from 'date-fns';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useQueryClient } from '@tanstack/react-query';
-import ItemSelectorDialog from './ItemSelectorDialog';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+
 
 type EnrichedStockItem = WithDocId<SupplyStock> & {
     supplyInfo: WithDocId<Supply>;
@@ -73,7 +75,9 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
   const [documentoFile, setDocumentoFile] = useState<File | null>(null);
   
   // UI state
-  const [selectorOpen, setSelectorOpen] = useState<'supply' | 'address' | 'stock' | null>(null);
+  const [isSupplyPopoverOpen, setIsSupplyPopoverOpen] = useState(false);
+  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+  const [isStockPopoverOpen, setIsStockPopoverOpen] = useState(false);
   
   // Data Fetching
   const allSuppliesQuery = useMemoFirebase(() => (
@@ -327,10 +331,42 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
               {!preselectedSupply ? (
                    <div className="space-y-1.5">
                       <Label>Item de Suprimento <span className="text-destructive">*</span></Label>
-                      <Button variant="outline" className="w-full justify-between font-normal" onClick={() => setSelectorOpen('supply')} disabled={isLoadingSupplies}>
-                        {isLoadingSupplies ? <Loader2 className="h-4 w-4 animate-spin"/> : selectedSupply ? `${selectedSupply.codigo} - ${selectedSupply.descricao}` : "Selecione um item..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
+                       <Popover open={isSupplyPopoverOpen} onOpenChange={setIsSupplyPopoverOpen}>
+                        <PopoverTrigger asChild>
+                           <Button variant="outline" className="w-full justify-between font-normal" disabled={isLoadingSupplies}>
+                            {isLoadingSupplies ? <Loader2 className="h-4 w-4 animate-spin"/> : selectedSupply ? `${selectedSupply.codigo} - ${selectedSupply.descricao}` : "Selecione um item..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                             <Command>
+                                <CommandInput placeholder="Pesquisar item..." />
+                                <CommandList>
+                                    <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
+                                    <CommandGroup>
+                                        {allSupplies?.map((item) => (
+                                            <CommandItem
+                                                key={item.docId}
+                                                value={`${item.codigo} ${item.descricao}`}
+                                                onSelect={() => {
+                                                    setSelectedSupply(item);
+                                                    setLocalizacao(item.localizacaoPadrao || '');
+                                                    setSelectedStockId(null);
+                                                    setIsSupplyPopoverOpen(false);
+                                                }}
+                                            >
+                                                <Check className={cn("mr-2 h-4 w-4", selectedSupply?.docId === item.docId ? "opacity-100" : "opacity-0")} />
+                                                <div className="flex flex-col items-start">
+                                                    <p>{item.codigo} - {item.descricao}</p>
+                                                    <p className="text-xs text-muted-foreground">{item.partNumber}</p>
+                                                </div>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                      </Popover>
                    </div>
               ) : (
                   <div className="p-3 rounded-md bg-muted/50 border">
@@ -363,10 +399,30 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                               </div>
                               <div className="space-y-1.5">
                                   <Label>Localização <span className="text-destructive">*</span></Label>
-                                  <Button variant="outline" className="w-full justify-between font-normal" onClick={() => setSelectorOpen('address')} disabled={isLoadingAddresses}>
-                                    {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : localizacao || "Selecione..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
+                                   <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                                    <PopoverTrigger asChild>
+                                      <Button variant="outline" className="w-full justify-between font-normal" disabled={isLoadingAddresses}>
+                                        {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : localizacao || "Selecione..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                         <Command>
+                                            <CommandInput placeholder="Pesquisar endereço..." />
+                                            <CommandList>
+                                                <CommandEmpty>Nenhum endereço encontrado.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {addresses?.map((item) => (
+                                                        <CommandItem key={item.docId} value={item.codigoCompleto} onSelect={() => {setLocalizacao(item.codigoCompleto); setIsAddressPopoverOpen(false);}}>
+                                                            <Check className={cn("mr-2 h-4 w-4", localizacao === item.codigoCompleto ? "opacity-100" : "opacity-0")} />
+                                                            {item.codigoCompleto}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                  </Popover>
                               </div>
                                <div className="space-y-1.5">
                                   <Label htmlFor="unitCost">Custo Unitário (R$)</Label>
@@ -403,10 +459,33 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
                            <>
                               <div className="space-y-1.5">
                                   <Label>Lote de Saída <span className="text-destructive">*</span></Label>
-                                  <Button variant="outline" className="w-full justify-between font-normal" onClick={() => setSelectorOpen('stock')} disabled={isLoadingStock}>
-                                    {isLoadingStock ? <Loader2 className="h-4 w-4 animate-spin"/> : selectedStockItem ? `${selectedStockItem.loteInterno} (Qtd: ${selectedSupply.fatorConversao ? `${selectedStockItem.pesoLiquido} ${selectedSupply.unidadeSecundaria}` : selectedStockItem.quantidade})` : "Selecione um lote..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
+                                  <Popover open={isStockPopoverOpen} onOpenChange={setIsStockPopoverOpen}>
+                                    <PopoverTrigger asChild>
+                                      <Button variant="outline" className="w-full justify-between font-normal" disabled={isLoadingStock}>
+                                        {isLoadingStock ? <Loader2 className="h-4 w-4 animate-spin"/> : selectedStockItem ? `${selectedStockItem.loteInterno} (Qtd: ${selectedSupply.fatorConversao ? `${selectedStockItem.pesoLiquido} ${selectedSupply.unidadeSecundaria}` : selectedStockItem.quantidade})` : "Selecione um lote..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                       <Command>
+                                            <CommandInput placeholder="Pesquisar lote..." />
+                                            <CommandList>
+                                                <CommandEmpty>Nenhum lote disponível.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {availableStock?.map((item) => (
+                                                        <CommandItem key={item.docId} value={item.loteInterno} onSelect={() => { setSelectedStockId(item.docId); setIsStockPopoverOpen(false); }}>
+                                                            <Check className={cn("mr-2 h-4 w-4", selectedStockId === item.docId ? "opacity-100" : "opacity-0")} />
+                                                             <div className="flex flex-col items-start">
+                                                                <p>Lote: {item.loteInterno} (Qtd: {selectedSupply?.fatorConversao ? `${item.pesoLiquido} ${selectedSupply.unidadeSecundaria}`: item.quantidade})</p>
+                                                                <p className="text-xs text-muted-foreground">Local: {item.localizacao} - Validade: {item.dataValidade ? format(new Date(item.dataValidade), 'dd/MM/yy') : 'N/A'}</p>
+                                                            </div>
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                  </Popover>
                               </div>
                               <div className="space-y-1.5">
                                   <Label htmlFor="destination">Destino <span className="text-destructive">*</span></Label>
@@ -427,65 +506,6 @@ export default function SupplyMovementDialog({ isOpen, onClose, onSuccess, type,
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <ItemSelectorDialog
-        isOpen={selectorOpen === 'supply'}
-        onClose={() => setSelectorOpen(null)}
-        items={allSupplies || []}
-        onSelect={(item) => {
-          setSelectedSupply(item);
-          setLocalizacao(item.localizacaoPadrao || '');
-          setSelectedStockId(null);
-        }}
-        filterFunction={(items, term) => 
-            items.filter(item => 
-                item.codigo.toLowerCase().includes(term.toLowerCase()) || 
-                item.descricao.toLowerCase().includes(term.toLowerCase())
-            )
-        }
-        renderItem={(item) => (
-            <div className="flex flex-col items-start">
-                <p>{item.codigo} - {item.descricao}</p>
-                <p className="text-xs text-muted-foreground">{item.partNumber}</p>
-            </div>
-        )}
-        title="Selecionar Item de Suprimento"
-        description="Pesquise e selecione o item para a movimentação."
-        isLoading={isLoadingSupplies}
-      />
-      
-      <ItemSelectorDialog
-        isOpen={selectorOpen === 'address'}
-        onClose={() => setSelectorOpen(null)}
-        items={addresses || []}
-        onSelect={(item) => setLocalizacao(item.codigoCompleto)}
-        filterFunction={(items, term) => 
-            items.filter(item => item.codigoCompleto.toLowerCase().includes(term.toLowerCase()))
-        }
-        renderItem={(item) => <p>{item.codigoCompleto}</p>}
-        title="Selecionar Endereço"
-        description="Pesquise e selecione o endereço de destino no estoque."
-        isLoading={isLoadingAddresses}
-      />
-
-       <ItemSelectorDialog
-        isOpen={selectorOpen === 'stock'}
-        onClose={() => setSelectorOpen(null)}
-        items={availableStock || []}
-        onSelect={(item) => setSelectedStockId(item.docId)}
-        filterFunction={(items, term) => 
-            items.filter(item => item.loteInterno.toLowerCase().includes(term.toLowerCase()))
-        }
-        renderItem={(item) => (
-            <div className="flex flex-col items-start">
-                <p>Lote: {item.loteInterno} (Qtd: {selectedSupply?.fatorConversao ? `${item.pesoLiquido} ${selectedSupply.unidadeSecundaria}`: item.quantidade})</p>
-                <p className="text-xs text-muted-foreground">Local: {item.localizacao} - Validade: {item.dataValidade ? format(new Date(item.dataValidade), 'dd/MM/yy') : 'N/A'}</p>
-            </div>
-        )}
-        title="Selecionar Lote de Saída"
-        description={`Selecione um dos lotes disponíveis para ${selectedSupply?.descricao}.`}
-        isLoading={isLoadingStock}
-      />
     </>
   );
 }
