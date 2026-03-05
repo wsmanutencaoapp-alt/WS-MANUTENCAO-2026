@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collectionGroup, query, where, doc, updateDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
-import type { SupplyStock, Tool, Address } from '@/lib/types';
+import type { SupplyStock, Tool, Address, Supply } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -153,6 +153,13 @@ export default function ReceivingStockTable() {
     
     const [selectedItem, setSelectedItem] = useState<ReceivingItem | null>(null);
 
+    // Fetch all master supply data once for enrichment.
+    const { data: allSupplies, isLoading: isLoadingAllSupplies } = useCollection<WithDocId<Supply>>(
+      useMemoFirebase(() => (firestore ? query(collection(firestore, 'supplies')) : null), [firestore]),
+      { queryKey: ['allSuppliesForReceivingEnrichment'] }
+    );
+    
+    // Fetch only the supply stock items in receiving status
     const supplyStockQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collectionGroup(firestore, 'stock'), where('status', '==', 'Em Recebimento'));
@@ -161,6 +168,7 @@ export default function ReceivingStockTable() {
         queryKey: ['receivingStockSupplies']
     });
 
+    // Fetch only the tools in receiving status
     const toolsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'tools'), where('status', '==', 'Em Recebimento'));
@@ -169,52 +177,30 @@ export default function ReceivingStockTable() {
         queryKey: ['receivingStockTools']
     });
 
-    const [enrichedSupplies, setEnrichedSupplies] = useState<ReceivingItem[]>([]);
-    useEffect(() => {
-        if (!receivingSupplies || !firestore) {
-            setEnrichedSupplies([]);
-            return;
-        }
+    // Use useMemo for efficient, client-side enrichment
+    const enrichedSupplies = useMemo(() => {
+        if (!receivingSupplies || !allSupplies) return [];
+        const supplyMap = new Map(allSupplies.map(s => [s.docId, s]));
 
-        const enrich = async () => {
-            if (receivingSupplies.length === 0) {
-              setEnrichedSupplies([]);
-              return;
-            }
-            const supplyIds = [...new Set(receivingSupplies.map(s => s.path.split('/')[1]))];
-            if (supplyIds.length === 0) {
-                setEnrichedSupplies([]);
-                return;
-            }
-
-            const suppliesRef = collection(firestore, 'supplies');
-            const q = query(suppliesRef, where('__name__', 'in', supplyIds));
-            const supplyDocs = await getDocs(q);
-            const supplyMap = new Map(supplyDocs.docs.map(d => [d.id, d.data() as Supply]));
-
-            const enriched = receivingSupplies.map(stockItem => {
-                const supplyId = stockItem.path.split('/')[1];
-                const supplyData = supplyMap.get(supplyId);
-                return {
-                    ...stockItem,
-                    itemType: 'supply' as const,
-                    descricao: supplyData?.descricao || 'N/A',
-                    codigo: supplyData?.codigo || 'N/A',
-                    imageUrl: supplyData?.imageUrl,
-                    supplyId: supplyId,
-                };
-            });
-            setEnrichedSupplies(enriched);
-        };
-        
-        enrich();
-    }, [receivingSupplies, firestore]);
+        return receivingSupplies.map(stockItem => {
+            const supplyId = stockItem.path.split('/')[1];
+            const supplyData = supplyMap.get(supplyId);
+            return {
+                ...stockItem,
+                itemType: 'supply' as const,
+                descricao: supplyData?.descricao || 'N/A',
+                codigo: supplyData?.codigo || 'N/A',
+                imageUrl: supplyData?.imageUrl,
+                supplyId: supplyId,
+            };
+        });
+    }, [receivingSupplies, allSupplies]);
     
     const allReceivingItems: ReceivingItem[] = useMemo(() => {
         const toolsWithType: ReceivingItem[] = receivingTools?.map(t => ({...t, itemType: 'tool' as const})) || [];
         return [...enrichedSupplies, ...toolsWithType].sort((a,b) => {
-            const dateA = new Date((a as any).dataEntrada || 0).getTime();
-            const dateB = new Date((b as any).dataEntrada || 0).getTime();
+            const dateA = new Date((a as any).dataEntrada || a.createdAt || 0).getTime();
+            const dateB = new Date((b as any).dataEntrada || b.createdAt || 0).getTime();
             return dateB - dateA;
         });
     }, [enrichedSupplies, receivingTools]);
@@ -226,7 +212,7 @@ export default function ReceivingStockTable() {
         setSelectedItem(null);
     }
     
-    const isLoading = isLoadingSupplies || isLoadingTools;
+    const isLoading = isLoadingSupplies || isLoadingTools || isLoadingAllSupplies;
 
     return (
         <>

@@ -33,6 +33,7 @@ service cloud.firestore {
     // This rule specifically allows collectionGroup queries on 'stock'
     match /{path=**}/stock/{stockId} {
         allow read: if isAuthenticated();
+        allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update') || hasPermission('compras_controle_update');
     }
     
     match /app_config/{configId} {
@@ -89,24 +90,24 @@ service cloud.firestore {
       match /stock/{stockId} {
         // Read is handled by collectionGroup rule.
         // This rule is for direct writes.
-        allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update');
+        allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update') || hasPermission('compras_controle_update');
       }
     }
     
     match /supply_movements/{movementId} {
       allow read: if hasPermission('suprimentos_movimentacao_view');
-      allow create: if hasPermission('suprimentos_movimentacao_create');
+      allow create: if hasPermission('suprimentos_movimentacao_create') || hasPermission('compras_controle_update');
     }
 
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      allow create: if hasPermission('cadastros_ferramentas_create');
+      allow create: if hasPermission('cadastros_ferramentas_create') || hasPermission('compras_controle_update');
       allow update: if hasPermission('cadastros_ferramentas_update') || hasPermission('ferramentaria_lista_update');
       allow delete: if hasPermission('cadastros_ferramentas_delete');
       
       match /calibration_history/{calibrationId} {
         allow read: if hasPermission('calibracao_view');
-        allow create, update, delete: if hasPermission('calibracao_create') || hasPermission('calibracao_update') || hasPermission('calibracao_delete');
+        allow create, update, delete: if hasPermission('calibracao_create') || hasPermission('calibracao_update') || hasPermission('calibracao_delete') || hasPermission('compras_controle_update');
       }
     }
     
