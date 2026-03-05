@@ -28,14 +28,20 @@ type ReceivingItem = (WithDocId<SupplyStock> | WithDocId<Tool>) & {
     loteInterno?: string,
     dataEntrada?: string,
     imageUrl?: string,
+    supplyId?: string, // Added for enrichment
 };
 
 
 export default function ReceivingStockTable() {
     const firestore = useFirestore();
     const queryClient = useQueryClient();
+    const { toast } = useToast();
     
     const [selectedItem, setSelectedItem] = useState<ReceivingItem | null>(null);
+
+    // State for manually fetched supplies
+    const [neededSupplies, setNeededSupplies] = useState<Map<string, WithDocId<Supply>> | null>(null);
+    const [isLoadingNeededSupplies, setIsLoadingNeededSupplies] = useState(true);
 
     // Fetch only the supply stock items in receiving status
     const supplyStockQuery = useMemoFirebase(() => {
@@ -55,31 +61,52 @@ export default function ReceivingStockTable() {
         queryKey: ['receivingStockTools']
     });
     
-    // NEW: get supply IDs from receivingSupplies
+    // Get unique supply IDs from receivingSupplies
     const supplyIdsInReceiving = useMemo(() => {
         if (!receivingSupplies) return [];
         return [...new Set(receivingSupplies.map(item => item.path.split('/')[1]))];
     }, [receivingSupplies]);
+    
+    // Stable key for the effect dependency
+    const supplyIdsKey = supplyIdsInReceiving.join(',');
 
-    // NEW: Fetch only the needed supplies
-    const neededSuppliesQuery = useMemoFirebase(() => {
-        if (!firestore || supplyIdsInReceiving.length === 0) return null;
-        return query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIdsInReceiving));
-    }, [firestore, supplyIdsInReceiving]);
-    const { data: neededSupplies, isLoading: isLoadingNeededSupplies } = useCollection<WithDocId<Supply>>(neededSuppliesQuery, {
-        queryKey: ['neededSuppliesForReceiving', supplyIdsInReceiving.join(',')],
-        enabled: supplyIdsInReceiving.length > 0,
-    });
+    // Fetch the necessary supply master data manually when the IDs change
+    useEffect(() => {
+        if (!firestore || supplyIdsInReceiving.length === 0) {
+            setNeededSupplies(new Map());
+            setIsLoadingNeededSupplies(false);
+            return;
+        }
+
+        const fetchNeededSupplies = async () => {
+            setIsLoadingNeededSupplies(true);
+            try {
+                const neededSuppliesQuery = query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIdsInReceiving));
+                const snapshot = await getDocs(neededSuppliesQuery);
+                const suppliesMap = new Map<string, WithDocId<Supply>>();
+                snapshot.docs.forEach(d => suppliesMap.set(d.id, { ...d.data() as Supply, docId: d.id }));
+                setNeededSupplies(suppliesMap);
+            } catch (e) {
+                console.error("Error fetching needed supplies:", e);
+                toast({ variant: 'destructive', title: 'Erro de Dados', description: 'Não foi possível carregar os detalhes dos suprimentos.' });
+                setNeededSupplies(new Map());
+            } finally {
+                setIsLoadingNeededSupplies(false);
+            }
+        };
+
+        fetchNeededSupplies();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [firestore, supplyIdsKey, toast]);
 
 
     // Use useMemo for efficient, client-side enrichment
     const enrichedSupplies = useMemo(() => {
         if (!receivingSupplies || !neededSupplies) return [];
-        const supplyMap = new Map(neededSupplies.map(s => [s.docId, s]));
-
+        
         return receivingSupplies.map(stockItem => {
             const supplyId = stockItem.path.split('/')[1];
-            const supplyData = supplyMap.get(supplyId);
+            const supplyData = neededSupplies.get(supplyId);
             return {
                 ...stockItem,
                 itemType: 'supply' as const,
