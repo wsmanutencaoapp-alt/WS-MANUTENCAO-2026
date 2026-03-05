@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collectionGroup, query, where, doc, updateDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
+import { collectionGroup, query, where, doc, updateDoc, writeBatch, collection, getDocs, documentId } from 'firebase/firestore';
 import type { SupplyStock, Tool, Address, Supply } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -153,12 +153,6 @@ export default function ReceivingStockTable() {
     
     const [selectedItem, setSelectedItem] = useState<ReceivingItem | null>(null);
 
-    // Fetch all master supply data once for enrichment.
-    const { data: allSupplies, isLoading: isLoadingAllSupplies } = useCollection<WithDocId<Supply>>(
-      useMemoFirebase(() => (firestore ? query(collection(firestore, 'supplies')) : null), [firestore]),
-      { queryKey: ['allSuppliesForReceivingEnrichment'] }
-    );
-    
     // Fetch only the supply stock items in receiving status
     const supplyStockQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -176,11 +170,28 @@ export default function ReceivingStockTable() {
     const { data: receivingTools, isLoading: isLoadingTools, error: toolsError } = useCollection<WithDocId<Tool>>(toolsQuery, {
         queryKey: ['receivingStockTools']
     });
+    
+    // NEW: get supply IDs from receivingSupplies
+    const supplyIdsInReceiving = useMemo(() => {
+        if (!receivingSupplies) return [];
+        return [...new Set(receivingSupplies.map(item => item.path.split('/')[1]))];
+    }, [receivingSupplies]);
+
+    // NEW: Fetch only the needed supplies
+    const neededSuppliesQuery = useMemoFirebase(() => {
+        if (!firestore || supplyIdsInReceiving.length === 0) return null;
+        return query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIdsInReceiving));
+    }, [firestore, supplyIdsInReceiving]);
+    const { data: neededSupplies, isLoading: isLoadingNeededSupplies } = useCollection<WithDocId<Supply>>(neededSuppliesQuery, {
+        queryKey: ['neededSuppliesForReceiving', supplyIdsInReceiving.join(',')],
+        enabled: supplyIdsInReceiving.length > 0,
+    });
+
 
     // Use useMemo for efficient, client-side enrichment
     const enrichedSupplies = useMemo(() => {
-        if (!receivingSupplies || !allSupplies) return [];
-        const supplyMap = new Map(allSupplies.map(s => [s.docId, s]));
+        if (!receivingSupplies || !neededSupplies) return [];
+        const supplyMap = new Map(neededSupplies.map(s => [s.docId, s]));
 
         return receivingSupplies.map(stockItem => {
             const supplyId = stockItem.path.split('/')[1];
@@ -194,7 +205,7 @@ export default function ReceivingStockTable() {
                 supplyId: supplyId,
             };
         });
-    }, [receivingSupplies, allSupplies]);
+    }, [receivingSupplies, neededSupplies]);
     
     const allReceivingItems: ReceivingItem[] = useMemo(() => {
         const toolsWithType: ReceivingItem[] = receivingTools?.map(t => ({...t, itemType: 'tool' as const})) || [];
@@ -212,7 +223,7 @@ export default function ReceivingStockTable() {
         setSelectedItem(null);
     }
     
-    const isLoading = isLoadingSupplies || isLoadingTools || isLoadingAllSupplies;
+    const isLoading = isLoadingSupplies || isLoadingTools || isLoadingNeededSupplies;
 
     return (
         <>
