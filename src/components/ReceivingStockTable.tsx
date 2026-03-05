@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 type ReceivingItem = (WithDocId<SupplyStock> | WithDocId<Tool>) & { 
     itemType: 'supply' | 'tool',
