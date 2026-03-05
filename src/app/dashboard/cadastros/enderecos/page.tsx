@@ -101,6 +101,22 @@ const CadastroEnderecosPage = () => {
     if (!addresses) return [];
     return [...new Set(addresses.map(addr => addr.unidade))].sort();
   }, [addresses]);
+  
+  const uniqueSectores = useMemo(() => {
+    if (!addresses) return [];
+    const sectorMap: { [key: string]: string } = {
+        '01': 'Ferramentaria',
+        '02': 'Suprimentos',
+        '03': 'Administrativo',
+        '04': 'Financeiro',
+        '05': 'Engenharia',
+    };
+    const sectors = new Set(addresses.map(addr => addr.setor));
+    return Array.from(sectors).map(code => ({
+        code,
+        label: `${code} - ${sectorMap[code] || 'Desconhecido'}`
+    })).sort((a,b) => a.code.localeCompare(b.code));
+  }, [addresses]);
 
 
   const filteredAddresses = useMemo(() => {
@@ -122,8 +138,13 @@ const CadastroEnderecosPage = () => {
     if (searchTerm) {
       const lowercasedTerm = searchTerm.toLowerCase();
       tempAddresses = tempAddresses.filter(address => 
-          address.codigoCompleto.toLowerCase().includes(lowercasedTerm) ||
-          address.unidade.toLowerCase().includes(lowercasedTerm)
+          (address.codigoCompleto && address.codigoCompleto.toLowerCase().includes(lowercasedTerm)) ||
+          (address.unidade && address.unidade.toLowerCase().includes(lowercasedTerm)) ||
+          (address.setor && address.setor.toLowerCase().includes(lowercasedTerm)) ||
+          (address.rua && address.rua.toLowerCase().includes(lowercasedTerm)) ||
+          (address.movel && address.movel.toLowerCase().includes(lowercasedTerm)) ||
+          (address.nivel && address.nivel.toLowerCase().includes(lowercasedTerm)) ||
+          (address.detalhe && address.detalhe.toLowerCase().includes(lowercasedTerm))
       );
     }
     
@@ -543,7 +564,7 @@ const CadastroEnderecosPage = () => {
                <div className="relative">
                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                    <Input
-                       placeholder="Pesquisar por código..."
+                       placeholder="Pesquisar por código, setor, rua..."
                        value={searchTerm}
                        onChange={(e) => setSearchTerm(e.target.value)}
                        className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -566,11 +587,9 @@ const CadastroEnderecosPage = () => {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="todos">Todos os Setores</SelectItem>
-                        <SelectItem value="01">01 - Ferramentaria</SelectItem>
-                        <SelectItem value="02">02 - Suprimentos</SelectItem>
-                        <SelectItem value="03">03 - Administrativo</SelectItem>
-                        <SelectItem value="04">04 - Financeiro</SelectItem>
-                        <SelectItem value="05">05 - Engenharia</SelectItem>
+                         {uniqueSectores.map(sector => (
+                           <SelectItem key={sector.code} value={sector.code}>{sector.label}</SelectItem>
+                        ))}
                     </SelectContent>
                 </Select>
             </div>
@@ -588,8 +607,9 @@ const CadastroEnderecosPage = () => {
                 </TableHeader>
                 <TableBody>
                     {isLoading && <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                    {!isLoading && filteredAddresses?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum endereço encontrado.</TableCell></TableRow>}
-                    {!isLoading && filteredAddresses?.map(address => (
+                    {error && <TableRow><TableCell colSpan={5} className="text-center text-destructive">{error.message}</TableCell></TableRow>}
+                    {!isLoading && !error && filteredAddresses?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum endereço encontrado.</TableCell></TableRow>}
+                    {!isLoading && !error && filteredAddresses?.map(address => (
                         <TableRow key={address.docId}>
                             <TableCell className="font-mono">{address.codigoCompleto}</TableCell>
                             <TableCell>{address.unidade}</TableCell>
@@ -655,7 +675,7 @@ const CadastroEnderecosPage = () => {
                         <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 box-border text-center border">
                            <img src="/logo.png" alt="Logo" className="h-3 object-contain mt-2 mb-2" />
                            <p className="leading-tight font-black text-black mt-5 mb-3" style={{ fontSize: '32px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
-                               ${address.codigoCompleto}
+                               {address.codigoCompleto}
                            </p>
                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[60px] h-[60px] mt-5" />
                        </div>
@@ -663,7 +683,7 @@ const CadastroEnderecosPage = () => {
                         <div key={address.docId} className="bg-white w-[452px] h-[87px] grid grid-cols-[auto_1fr_auto] gap-8 items-center p-2 border">
                             <img src="/logo.png" alt="Logo" className="h-[40px] w-auto object-contain" />
                             <p className="text-2xl font-black text-black text-center" style={{ color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
-                                ${address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
+                                {address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
                             </p>
                             <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[80px] h-[80px]" />
                         </div>
