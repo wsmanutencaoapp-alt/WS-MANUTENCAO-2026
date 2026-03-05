@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -85,6 +84,7 @@ const CadastroEnderecosPage = () => {
   const [addressesToPrint, setAddressesToPrint] = useState<WithDocId<Address>[]>([]);
   const [printSize, setPrintSize] = useState<'120mm x 23mm' | '100mm x 60mm'>('120mm x 23mm');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sectorFilter, setSectorFilter] = useState('todos');
 
 
   const addressesQuery = useMemoFirebase(
@@ -98,13 +98,25 @@ const CadastroEnderecosPage = () => {
 
   const filteredAddresses = useMemo(() => {
     if (!addresses) return [];
-    if (!searchTerm) return addresses;
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return addresses.filter(address => 
-        address.codigoCompleto.toLowerCase().includes(lowercasedTerm) ||
-        address.unidade.toLowerCase().includes(lowercasedTerm)
-    );
-  }, [addresses, searchTerm]);
+
+    let tempAddresses = addresses;
+
+    // Apply sector filter
+    if (sectorFilter !== 'todos') {
+      tempAddresses = tempAddresses.filter(address => address.setor === sectorFilter);
+    }
+
+    // Apply search term filter
+    if (searchTerm) {
+      const lowercasedTerm = searchTerm.toLowerCase();
+      tempAddresses = tempAddresses.filter(address => 
+          address.codigoCompleto.toLowerCase().includes(lowercasedTerm) ||
+          address.unidade.toLowerCase().includes(lowercasedTerm)
+      );
+    }
+    
+    return tempAddresses;
+  }, [addresses, searchTerm, sectorFilter]);
 
 
   const predefinedStates = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'], []);
@@ -507,14 +519,29 @@ const CadastroEnderecosPage = () => {
         <CardHeader>
             <CardTitle>Endereços Cadastrados</CardTitle>
             <CardDescription>Visualize e gerencie os endereços existentes.</CardDescription>
-            <div className="relative pt-4">
-               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-               <Input
-                   placeholder="Pesquisar por código ou unidade..."
-                   value={searchTerm}
-                   onChange={(e) => setSearchTerm(e.target.value)}
-                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-               />
+            <div className="flex items-center gap-4 pt-4">
+               <div className="relative">
+                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                   <Input
+                       placeholder="Pesquisar por código ou unidade..."
+                       value={searchTerm}
+                       onChange={(e) => setSearchTerm(e.target.value)}
+                       className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                   />
+               </div>
+                <Select value={sectorFilter} onValueChange={setSectorFilter}>
+                    <SelectTrigger className="w-[220px]">
+                        <SelectValue placeholder="Filtrar por setor..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="todos">Todos os Setores</SelectItem>
+                        <SelectItem value="01">01 - Ferramentaria</SelectItem>
+                        <SelectItem value="02">02 - Suprimentos</SelectItem>
+                        <SelectItem value="03">03 - Administrativo</SelectItem>
+                        <SelectItem value="04">04 - Financeiro</SelectItem>
+                        <SelectItem value="05">05 - Engenharia</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
         </CardHeader>
         <CardContent>
@@ -627,5 +654,3 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
-
-    
