@@ -184,16 +184,32 @@ export default function ApprovalDetailsDialog({ requisition, isOpen, onClose }: 
                                 <p className="font-bold">{item.details.descricao}</p>
                                 <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
                                 <p className="text-xs text-muted-foreground">Qtd: {item.quantity} {item.details.unidadeMedida}</p>
-                                {item.attachmentUrl && (
-                                    <Button asChild variant="link" size="sm" className="p-0 h-auto text-xs">
-                                        <a href={item.attachmentUrl} target="_blank" rel="noopener noreferrer">
-                                            <FileText className="mr-1 h-3 w-3" /> Ver Anexo do Item
-                                        </a>
-                                    </Button>
-                                )}
                             </div>
                         </CardHeader>
                         <CardContent className="p-4">
+                           {(item.notes || item.referenceLink || item.attachmentUrl) && (
+                                <div className="mb-4">
+                                    <h4 className="font-semibold text-sm mb-2">Detalhes Adicionais do Item</h4>
+                                    <div className="text-xs space-y-2 rounded-md border bg-muted/10 p-3">
+                                        {item.notes && <p><strong className="text-muted-foreground">Obs:</strong> {item.notes}</p>}
+                                        {item.referenceLink && (
+                                            <div className="flex items-center gap-2">
+                                                <strong className="text-muted-foreground">Ref:</strong>
+                                                <a href={item.referenceLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">
+                                                    {item.referenceLink}
+                                                </a>
+                                            </div>
+                                        )}
+                                        {item.attachmentUrl && (
+                                            <Button asChild variant="link" size="sm" className="p-0 h-auto text-xs">
+                                                <a href={item.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                                                    <FileText className="mr-1 h-3 w-3" /> Ver Anexo do Item
+                                                </a>
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                           <h4 className="font-semibold text-sm mb-2">Cotações</h4>
                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {!item.quotations || item.quotations.length === 0 ? (

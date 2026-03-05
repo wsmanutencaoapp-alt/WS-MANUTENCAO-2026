@@ -386,6 +386,7 @@ export type PurchaseRequisitionItem = {
     status: 'Pendente' | 'Em Cotação' | 'Cotado' | 'Recebido' | 'Cancelado';
     notes?: string;
     attachmentUrl?: string;
+    referenceLink?: string;
     quotations?: Quotation[];
     selectedQuotationIndex?: number;
 };

@@ -38,6 +38,7 @@ type CartItem = RequisitionableItem & {
     requisitionQuantity: number;
     estimatedPrice?: number;
     notes?: string;
+    referenceLink?: string;
     attachmentFile?: File | null;
 };
 
@@ -80,6 +81,7 @@ const RequisicaoCompraPage = () => {
         requisitionQuantity: 1, 
         estimatedPrice: item.valor_estimado || 0, 
         notes: '', 
+        referenceLink: '',
         attachmentFile: null 
     }]);
   };
@@ -155,6 +157,7 @@ const RequisicaoCompraPage = () => {
                 estimatedPrice: item.estimatedPrice || 0,
                 status: 'Pendente',
                 notes: item.notes,
+                referenceLink: item.referenceLink,
                 attachmentUrl: attachmentUrl,
             };
             batch.set(itemRef, itemData);
@@ -335,6 +338,12 @@ const RequisicaoCompraPage = () => {
                                                 placeholder="Observação (opcional)"
                                                 value={item.notes || ''}
                                                 onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                            <Input
+                                                placeholder="Link de Referência (opcional)"
+                                                value={item.referenceLink || ''}
+                                                onChange={(e) => updateCartItem(item.docId, 'referenceLink', e.target.value)}
                                                 className="h-8 text-sm"
                                             />
                                             <Button asChild variant="outline" size="sm" className="w-full h-8 text-sm">

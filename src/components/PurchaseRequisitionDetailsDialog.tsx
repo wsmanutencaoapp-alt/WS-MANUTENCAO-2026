@@ -11,11 +11,18 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import { Loader2, ShoppingBag, User, Calendar, Briefcase, Info } from 'lucide-react';
+import { Loader2, ShoppingBag, User, Calendar, Briefcase, Info, FileText } from 'lucide-react';
 import type { PurchaseRequisition, PurchaseRequisitionItem, Supply, Tool, CostCenter } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import QuotationDialog from './QuotationDialog';
@@ -161,8 +168,8 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
     if (!priority) return 'secondary';
     switch(priority) {
         case 'Normal': return 'secondary';
-        case 'Urgente': return 'warning';
-        case 'Muito Urgente': return 'destructive';
+        case 'Média': return 'warning';
+        case 'Urgente': return 'destructive';
         default: return 'secondary';
     }
   }
@@ -220,35 +227,59 @@ export default function PurchaseRequisitionDetailsDialog({ requisition: initialR
               {enrichedItems.map(item => {
                   const quotationCount = (item.quotations || []).filter(q => q?.totalValue > 0).length;
                   return (
-                      <div key={item.docId} className="flex items-start gap-4 rounded-lg border p-3">
-                          {!isPurchaseOrder && !isRequesterView && (
-                              <Checkbox 
-                                id={`select-item-${item.docId}`}
-                                checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
-                                onCheckedChange={() => handleItemSelection(item)}
-                                disabled={item.status !== 'Pendente' && item.status !== 'Em Cotação'}
-                                className="mt-1"
+                      <Card key={item.docId} className="overflow-hidden">
+                          <CardHeader className="flex flex-row items-start gap-4 bg-muted/30 p-3">
+                              {!isPurchaseOrder && !isRequesterView && (
+                                  <Checkbox 
+                                    id={`select-item-${item.docId}`}
+                                    checked={selectedItemsForQuotation.some(i => i.docId === item.docId)}
+                                    onCheckedChange={() => handleItemSelection(item)}
+                                    disabled={item.status !== 'Pendente' && item.status !== 'Em Cotação'}
+                                    className="mt-1"
+                                  />
+                              )}
+                              <Image
+                                  src={item.details.imageUrl || 'https://picsum.photos/seed/item/48/48'}
+                                  alt={item.details.descricao || 'Item'}
+                                  width={48}
+                                  height={48}
+                                  className="aspect-square rounded-md object-cover"
                               />
+                              <div className="flex-1 text-sm">
+                                  <p className="font-bold">{item.details.descricao}</p>
+                                  <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
+                                  <Badge variant={item.status === 'Pendente' ? 'default' : item.status === 'Em Cotação' ? 'warning' : 'success'}>
+                                    {item.status}
+                                  </Badge>
+                              </div>
+                              <div className="text-right">
+                                  <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
+                                  {!isRequesterView && <Badge variant="outline">Cotações: {quotationCount}/3</Badge>}
+                              </div>
+                          </CardHeader>
+                          {(item.notes || item.referenceLink || item.attachmentUrl) && (
+                            <CardContent className="p-3">
+                                <div className="text-xs space-y-2 rounded-md border bg-background p-2">
+                                    {item.notes && <p><strong className="text-muted-foreground">Obs:</strong> {item.notes}</p>}
+                                    {item.referenceLink && (
+                                        <div className="flex items-center gap-2">
+                                            <strong className="text-muted-foreground">Ref:</strong>
+                                            <a href={item.referenceLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">
+                                                {item.referenceLink}
+                                            </a>
+                                        </div>
+                                    )}
+                                    {item.attachmentUrl && (
+                                        <Button asChild variant="link" size="sm" className="p-0 h-auto text-xs">
+                                            <a href={item.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                                                <FileText className="mr-1 h-3 w-3" /> Ver Anexo do Item
+                                            </a>
+                                        </Button>
+                                    )}
+                                </div>
+                            </CardContent>
                           )}
-                          <Image
-                              src={item.details.imageUrl || 'https://picsum.photos/seed/item/64/64'}
-                              alt={item.details.descricao || 'Item'}
-                              width={48}
-                              height={48}
-                              className="aspect-square rounded-md object-cover"
-                          />
-                          <div className="flex-1 text-sm">
-                              <p className="font-bold">{item.details.descricao}</p>
-                              <p className="font-mono text-xs text-muted-foreground">{item.details.codigo}</p>
-                              <Badge variant={item.status === 'Pendente' ? 'default' : item.status === 'Em Cotação' ? 'warning' : 'success'}>
-                                {item.status}
-                              </Badge>
-                          </div>
-                          <div className="text-right">
-                              <p className="font-bold text-lg">{item.quantity} {item.details.unidadeMedida}</p>
-                              {!isRequesterView && <Badge variant="outline">Cotações: {quotationCount}/3</Badge>}
-                          </div>
-                      </div>
+                      </Card>
                   )
                 })}
           </div>

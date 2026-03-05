@@ -31,6 +31,7 @@ type CartItem = RequisitionableItem & {
     estimatedPrice?: number;
     notes?: string;
     attachmentUrl?: string;
+    referenceLink?: string;
     existingItemId?: string; // ID of the item in the subcollection
     attachmentFile?: File | null;
 };
@@ -89,6 +90,7 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
                         estimatedPrice: itemData.estimatedPrice,
                         notes: itemData.notes,
                         attachmentUrl: itemData.attachmentUrl,
+                        referenceLink: itemData.referenceLink,
                         existingItemId: itemDoc.id,
                         attachmentFile: null,
                     });
@@ -163,6 +165,7 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
                 estimatedPrice: item.estimatedPrice || 0,
                 status: 'Pendente',
                 notes: item.notes,
+                referenceLink: item.referenceLink,
                 attachmentUrl: attachmentUrl,
             };
             batch.set(itemRef, itemData, { merge: true }); // Use merge to be safe
@@ -248,6 +251,12 @@ export default function ReviewRequisitionDialog({ requisition, isOpen, onClose, 
                                                     value={item.notes || ''}
                                                     onChange={(e) => updateCartItem(item.docId, 'notes', e.target.value)}
                                                     className="h-16 text-sm"
+                                                />
+                                                <Input
+                                                    placeholder="Link de Referência (opcional)"
+                                                    value={item.referenceLink || ''}
+                                                    onChange={(e) => updateCartItem(item.docId, 'referenceLink', e.target.value)}
+                                                    className="h-8 text-sm"
                                                 />
                                                 <div className='flex gap-2 items-center'>
                                                     <Button asChild variant="outline" size="sm" className="flex-1 h-8 text-sm">

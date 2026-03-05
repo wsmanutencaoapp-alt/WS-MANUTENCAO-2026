@@ -1082,6 +1082,11 @@
           "type": "string",
           "format": "uri"
         },
+        "referenceLink": {
+          "type": "string",
+          "format": "uri",
+          "description": "An optional URL for reference (e.g., to a supplier's product page)."
+        },
         "quotations": {
           "type": "array",
           "description": "Stores the 3 quotations for this specific item.",
