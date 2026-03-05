@@ -1,15 +1,18 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
-import { FirebaseClientProvider } from '@/firebase';
-import { InitializeCounter } from '@/components/initialize-counter';
-import { Providers } from '@/lib/providers';
-import { ThemeProvider } from '@/components/theme-toggle';
+import { ClientProviders } from './client-providers';
+
 
 export const metadata: Metadata = {
   title: 'APP WS',
   description: 'Sistema de gerenciamento de manutenção de aeronaves inspirado no SAP',
+  manifest: '/manifest.json',
 };
+
+export const viewport: Viewport = {
+  themeColor: '#FFFFFF',
+};
+
 
 export default function RootLayout({
   children,
@@ -25,18 +28,11 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rubik+Glitch&display=swap"
           rel="stylesheet"
         />
-        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-body antialiased">
-        <ThemeProvider>
-          <Providers>
-            <FirebaseClientProvider>
-              <InitializeCounter />
-              {children}
-            </FirebaseClientProvider>
-          </Providers>
-        </ThemeProvider>
-        <Toaster />
+        <ClientProviders>
+          {children}
+        </ClientProviders>
       </body>
     </html>
   );

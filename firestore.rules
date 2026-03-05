@@ -29,6 +29,11 @@ service cloud.firestore {
     function isOwner(userId) {
         return request.auth.uid == userId;
     }
+
+    // This rule specifically allows collectionGroup queries on 'stock'
+    match /{path=**}/stock/{stockId} {
+        allow read: if isAuthenticated();
+    }
     
     match /app_config/{configId} {
       allow read: if true;
@@ -82,8 +87,8 @@ service cloud.firestore {
       allow delete: if hasPermission('cadastros_suprimentos_delete');
       
       match /stock/{stockId} {
-        allow read: if isAuthenticated();
-        // Allow stock writes if user can create movements or edit master data
+        // Read is handled by collectionGroup rule.
+        // This rule is for direct writes.
         allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update');
       }
     }

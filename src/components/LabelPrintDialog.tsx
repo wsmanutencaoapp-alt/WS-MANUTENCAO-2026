@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Printer, FileText } from 'lucide-react';
 import { useFirestore, useStorage } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL, getBytes } from 'firebase/storage';
+import { ref as storageRef, uploadString, getDownloadURL, getBlob } from 'firebase/storage';
 import JsBarcode from 'jsbarcode';
 import type { Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
@@ -104,18 +104,11 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           if (!tool.docId || !tool.codigo) continue;
 
           try {
-            // REPRINT LOGIC: If a label_url exists, try to fetch it.
-            // Otherwise, generate a new one.
             let svgContent: string;
             if (tool.label_url) {
                 try {
-                    // Firebase Storage URLs from getDownloadURL contain the object path.
-                    // We need to extract the path to use with storageRef.
-                    const url = new URL(tool.label_url);
-                    const path = decodeURIComponent(url.pathname.split('/o/')[1].split('?')[0]);
-                    const labelRef = storageRef(storage, path);
-                    const bytes = await getBytes(labelRef);
-                    svgContent = new TextDecoder().decode(bytes);
+                    const blob = await getBlob(storageRef(storage, tool.label_url));
+                    svgContent = await blob.text();
                 } catch(fetchError) {
                     console.warn(`Could not fetch existing label for ${tool.codigo}. Generating a new one.`, fetchError);
                     svgContent = generateLabelSvgLocally(tool); // Fallback to generating
