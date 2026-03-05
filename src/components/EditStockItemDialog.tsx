@@ -13,11 +13,11 @@ import {
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useStorage } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import type { Supply, SupplyStock } from '@/lib/types';
+import { useFirestore, useStorage, useCollection, useMemoFirebase } from '@/firebase';
+import { doc, updateDoc, collection, query, where } from 'firebase/firestore';
+import type { Supply, SupplyStock, Address } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { Loader2, FileText, Upload } from 'lucide-react';
+import { Loader2, FileText, Upload, ChevronsUpDown, Check } from 'lucide-react';
 import {
     ref as storageRef,
     uploadBytes,
@@ -25,6 +25,11 @@ import {
     deleteObject,
 } from 'firebase/storage';
 import { parse, isValid, format } from 'date-fns';
+import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
+import { Command, CommandInput, CommandEmpty, CommandGroup, CommandList, CommandItem } from './ui/command';
+import { cn } from '@/lib/utils';
+import { Switch } from './ui/switch';
+
 
 type EnrichedStockItem = WithDocId<SupplyStock> & {
     supplyInfo: WithDocId<Supply>;
@@ -47,14 +52,33 @@ export default function EditStockItemDialog({ isOpen, onClose, stockItem, onSucc
   const [loteFornecedor, setLoteFornecedor] = useState('');
   const [validade, setValidade] = useState('');
   const [documentoFile, setDocumentoFile] = useState<File | null>(null);
+  const [localizacao, setLocalizacao] = useState('');
+
+  const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
+
+  const addressesQuery = useMemoFirebase(() => {
+    if (!firestore || !isOpen) return null;
+    const baseQuery = collection(firestore, 'addresses');
+    if (showAllAddresses) {
+        return query(baseQuery);
+    }
+    return query(baseQuery, where('setor', '==', '02')); // Suprimentos
+  }, [firestore, isOpen, showAllAddresses]);
+
+  const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, { 
+      queryKey: ['addresses_suprimentos', showAllAddresses],
+      enabled: isOpen,
+  });
 
   useEffect(() => {
     if (stockItem) {
       setLoteFornecedor(stockItem.loteFornecedor || '');
       setValidade(stockItem.dataValidade ? format(parse(stockItem.dataValidade, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), 'yyyy-MM-dd') : '');
+      setLocalizacao(stockItem.localizacao || '');
       setDocumentoFile(null);
     }
-  }, [stockItem]);
+  }, [stockItem, isOpen]);
 
   const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -65,6 +89,11 @@ export default function EditStockItemDialog({ isOpen, onClose, stockItem, onSucc
   
   const handleSaveChanges = async () => {
     if (!firestore || !storage || !stockItem) return;
+    
+    if (!localizacao) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'A localização é obrigatória.' });
+        return;
+    }
 
     let validadeDate: Date | null = null;
     if (stockItem.supplyInfo.exigeValidade) {
@@ -86,7 +115,6 @@ export default function EditStockItemDialog({ isOpen, onClose, stockItem, onSucc
         let newDocumentoUrl = stockItem.documentoUrl;
 
         if (documentoFile) {
-            // Delete old document if it exists
             if (stockItem.documentoUrl) {
                 try {
                     const oldDocRef = storageRef(storage, stockItem.documentoUrl);
@@ -95,7 +123,6 @@ export default function EditStockItemDialog({ isOpen, onClose, stockItem, onSucc
                     if (e.code !== 'storage/object-not-found') throw e;
                 }
             }
-            // Upload new document
             const newDocRef = storageRef(storage, `supply_documents/${stockItem.supplyInfo.docId}/${stockItem.docId}/${documentoFile.name}`);
             await uploadBytes(newDocRef, documentoFile);
             newDocumentoUrl = await getDownloadURL(newDocRef);
@@ -104,6 +131,7 @@ export default function EditStockItemDialog({ isOpen, onClose, stockItem, onSucc
         const dataToUpdate: Partial<SupplyStock> = {
             loteFornecedor: loteFornecedor,
             documentoUrl: newDocumentoUrl,
+            localizacao: localizacao,
         };
         if (validadeDate) {
             dataToUpdate.dataValidade = validadeDate.toISOString();
@@ -148,6 +176,40 @@ export default function EditStockItemDialog({ isOpen, onClose, stockItem, onSucc
                     <Input id="validade-edit" type="date" value={validade} onChange={(e) => setValidade(e.target.value)} />
                 </div>
             )}
+            
+            <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                    <Label htmlFor="localizacao-edit">Localização <span className="text-destructive">*</span></Label>
+                    <div className="flex items-center space-x-2">
+                        <Switch id="show-all-addresses-edit-stock" checked={showAllAddresses} onCheckedChange={setShowAllAddresses} />
+                        <Label htmlFor="show-all-addresses-edit-stock" className="text-xs font-normal">Ver todos</Label>
+                    </div>
+                </div>
+                <Popover open={isAddressPopoverOpen} onOpenChange={setIsAddressPopoverOpen}>
+                    <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={isLoadingAddresses}>
+                        {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : localizacao || "Selecione um endereço..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command>
+                            <CommandInput placeholder="Pesquisar endereço..." />
+                            <CommandList>
+                                <CommandEmpty>Nenhum endereço disponível.</CommandEmpty>
+                                <CommandGroup>
+                                    {addresses?.map((addr) => (
+                                        <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(currentValue) => { setLocalizacao(currentValue === localizacao ? '' : currentValue); setIsAddressPopoverOpen(false); }}>
+                                            <Check className={cn("mr-2 h-4 w-4", localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />
+                                            {addr.codigoCompleto}
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
+            </div>
             
              <div className="space-y-1.5">
                 <Label>Documento do Lote (FISPQ, Certificado, etc.)</Label>
