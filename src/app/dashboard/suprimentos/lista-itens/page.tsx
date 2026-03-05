@@ -2,7 +2,15 @@
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, getDocs, deleteDoc } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  orderBy,
+  doc,
+  deleteDoc,
+  collectionGroup,
+  onSnapshot,
+} from 'firebase/firestore';
 import type { Supply, SupplyStock, Employee } from '@/lib/types';
 import {
   Table,
@@ -112,36 +120,48 @@ const SuprimentosPage = () => {
   const [enrichedStock, setEnrichedStock] = useState<EnrichedStockItem[]>([]);
   const [isStockLoading, setIsStockLoading] = useState(true);
 
-  // 2. Fetch all stock items from all supplies and enrich them
+  // 2. Fetch all stock items from all supplies using a collectionGroup query
   useEffect(() => {
-    if (!supplies || !firestore) return;
-
-    const fetchAllStock = async () => {
-        setIsStockLoading(true);
-        const allStockItems: EnrichedStockItem[] = [];
-        const supplyMap = new Map(supplies.map(s => [s.docId, s]));
-
-        for (const supply of supplies) {
-            const stockCollectionRef = collection(firestore, 'supplies', supply.docId, 'stock');
-            const stockSnapshot = await getDocs(stockCollectionRef);
-            
-            stockSnapshot.forEach(doc => {
-                 const stockData = { ...doc.data() as SupplyStock, docId: doc.id };
-                 const supplyInfo = supplyMap.get(supply.docId);
-                 if (supplyInfo) {
-                     allStockItems.push({
-                         ...stockData,
-                         supplyInfo: supplyInfo
-                     });
-                 }
-            });
+    if (!supplies || !firestore) {
+        if (!isLoadingSupplies) {
+            setIsStockLoading(false);
+            setEnrichedStock([]);
         }
+        return;
+    }
+
+    setIsStockLoading(true);
+    const supplyMap = new Map(supplies.map(s => [s.docId, s]));
+    
+    // Use a collectionGroup query for real-time updates on all stock items
+    const stockQuery = query(collectionGroup(firestore, 'stock'));
+    
+    const unsubscribe = onSnapshot(stockQuery, (snapshot) => {
+        const allStockItems: EnrichedStockItem[] = [];
+        snapshot.forEach(doc => {
+            const stockData = { docId: doc.id, ...doc.data() } as WithDocId<SupplyStock>;
+            const supplyId = doc.ref.parent.parent?.id; // supplies/{supplyId}/stock/{stockId}
+            
+            if (supplyId) {
+                const supplyInfo = supplyMap.get(supplyId);
+                if (supplyInfo) {
+                    allStockItems.push({
+                        ...stockData,
+                        supplyInfo
+                    });
+                }
+            }
+        });
         setEnrichedStock(allStockItems);
         setIsStockLoading(false);
-    };
+    }, (err) => {
+        console.error("Error fetching stock collection group:", err);
+        toast({ variant: 'destructive', title: 'Erro ao carregar estoque', description: 'Não foi possível buscar os itens de estoque. Verifique suas permissões de acesso.'});
+        setIsStockLoading(false);
+    });
 
-    fetchAllStock();
-  }, [supplies, firestore, queryClient]);
+    return () => unsubscribe(); // Cleanup listener on component unmount
+  }, [supplies, firestore, toast, isLoadingSupplies]);
   
 
   const filteredStock = useMemo(() => {
@@ -198,8 +218,7 @@ const SuprimentosPage = () => {
         const stockDocRef = doc(firestore, 'supplies', item.supplyInfo.docId, 'stock', item.docId);
         await deleteDoc(stockDocRef);
         toast({ title: 'Sucesso!', description: 'Lote de suprimento excluído.' });
-        // Instead of refetching everything, we can just remove the item from the local state for a faster UI update.
-        setEnrichedStock(prev => prev.filter(stock => stock.docId !== item.docId));
+        // The onSnapshot listener will automatically update the UI
     } catch (err) {
         console.error("Erro ao excluir lote:", err);
         toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível excluir o lote.' });
