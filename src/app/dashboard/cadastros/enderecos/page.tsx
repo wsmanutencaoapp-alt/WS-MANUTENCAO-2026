@@ -131,32 +131,39 @@ const CadastroEnderecosPage = () => {
         return;
       }
       
-      const q = query(
-        collection(firestore, 'addresses'), 
-        where('unidade', '==', activeUnidade.toUpperCase()),
-        where('setor', '==', setor),
-        where('rua', '==', `R${rua.padStart(2, '0')}`),
-        where('movel', '==', `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`),
-        where('nivel', '==', `N${nivel.padStart(2, '0')}`)
-      );
+      try {
+        const allAddressesSnapshot = await getDocs(collection(firestore, 'addresses'));
+        
+        const targetUnidade = activeUnidade.toUpperCase();
+        const targetSetor = setor;
+        const targetRua = `R${rua.padStart(2, '0')}`;
+        const targetMovel = `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`;
+        const targetNivel = `N${nivel.padStart(2, '0')}`;
 
-      const querySnapshot = await getDocs(q);
-      let lastNumber = 0;
-      
-      if (!querySnapshot.empty) {
-          querySnapshot.forEach(doc => {
-              const data = doc.data();
-              if (data.detalhe && data.detalhe.startsWith('-D')) {
-                  const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
-                  if (!isNaN(currentNumber) && currentNumber > lastNumber) {
-                      lastNumber = currentNumber;
-                  }
-              }
-          });
+        let lastNumber = 0;
+        allAddressesSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (
+                data.unidade === targetUnidade &&
+                data.setor === targetSetor &&
+                data.rua === targetRua &&
+                data.movel === targetMovel &&
+                data.nivel === targetNivel &&
+                data.detalhe && data.detalhe.startsWith('-D')
+            ) {
+                const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
+                if (!isNaN(currentNumber) && currentNumber > lastNumber) {
+                    lastNumber = currentNumber;
+                }
+            }
+        });
+        
+        const nextNumber = lastNumber + 1;
+        setStartDetalheNum(nextNumber);
+      } catch (e) {
+        console.error("Error fetching addresses to determine next detail number:", e);
+        setStartDetalheNum(1); // Fallback to 1 if query fails
       }
-      
-      const nextNumber = lastNumber + 1;
-      setStartDetalheNum(nextNumber);
     };
     generateNextDetalhe();
   }, [useDetalhe, formState, firestore]);
@@ -246,28 +253,36 @@ const CadastroEnderecosPage = () => {
 
         let currentStartDetalheNum = startDetalheNum;
         if (currentStartDetalheNum === null) {
-          const q = query(
-            collection(firestore, 'addresses'), 
-            where('unidade', '==', activeUnidade.toUpperCase()),
-            where('setor', '==', setor),
-            where('rua', '==', `R${rua.padStart(2, '0')}`),
-            where('movel', '==', `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`),
-            where('nivel', '==', `N${nivel.padStart(2, '0')}`)
-          );
-          const querySnapshot = await getDocs(q);
-          let lastNumber = 0;
-          if(!querySnapshot.empty) {
-              querySnapshot.forEach(doc => {
-                  const data = doc.data();
-                  if (data.detalhe && data.detalhe.startsWith('-D')) {
-                    const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
-                    if (!isNaN(currentNumber) && currentNumber > lastNumber) {
-                        lastNumber = currentNumber;
+            try {
+                const allAddressesSnapshot = await getDocs(collection(firestore, 'addresses'));
+                const targetUnidade = activeUnidade.toUpperCase();
+                const targetSetor = setor;
+                const targetRua = `R${rua.padStart(2, '0')}`;
+                const targetMovel = `${movel.charAt(0).toUpperCase()}${movel.substring(1).padStart(2, '0')}`;
+                const targetNivel = `N${nivel.padStart(2, '0')}`;
+
+                let lastNumber = 0;
+                allAddressesSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (
+                        data.unidade === targetUnidade &&
+                        data.setor === targetSetor &&
+                        data.rua === targetRua &&
+                        data.movel === targetMovel &&
+                        data.nivel === targetNivel &&
+                        data.detalhe && data.detalhe.startsWith('-D')
+                    ) {
+                        const currentNumber = parseInt(data.detalhe.replace('-D', ''), 10);
+                        if (!isNaN(currentNumber) && currentNumber > lastNumber) {
+                            lastNumber = currentNumber;
+                        }
                     }
-                  }
-              });
-          }
-          currentStartDetalheNum = lastNumber + 1;
+                });
+                currentStartDetalheNum = lastNumber + 1;
+            } catch (e) {
+                console.error("Error in fallback address fetch:", e);
+                currentStartDetalheNum = 1; // Default to 1 on error
+            }
         }
   
         for (let i = 0; i < numQuantity; i++) {
@@ -624,7 +639,7 @@ const CadastroEnderecosPage = () => {
                         <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 box-border text-center border">
                            <img src="/logo.png" alt="Logo" className="h-3 object-contain mt-2 mb-2" />
                            <p className="leading-tight font-black text-black mt-5 mb-3" style={{ fontSize: '32px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
-                               {address.codigoCompleto}
+                               ${address.codigoCompleto}
                            </p>
                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[60px] h-[60px] mt-5" />
                        </div>
@@ -632,7 +647,7 @@ const CadastroEnderecosPage = () => {
                         <div key={address.docId} className="bg-white w-[452px] h-[87px] grid grid-cols-[auto_1fr_auto] gap-8 items-center p-2 border">
                             <img src="/logo.png" alt="Logo" className="h-[40px] w-auto object-contain" />
                             <p className="text-2xl font-black text-black text-center" style={{ color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
-                                {address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
+                                ${address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
                             </p>
                             <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[80px] h-[80px]" />
                         </div>
@@ -654,3 +669,4 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
+    
