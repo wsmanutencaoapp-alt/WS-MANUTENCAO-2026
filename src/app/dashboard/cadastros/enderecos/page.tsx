@@ -85,6 +85,7 @@ const CadastroEnderecosPage = () => {
   const [printSize, setPrintSize] = useState<'120mm x 23mm' | '100mm x 60mm'>('120mm x 23mm');
   const [searchTerm, setSearchTerm] = useState('');
   const [sectorFilter, setSectorFilter] = useState('todos');
+  const [unidadeFilter, setUnidadeFilter] = useState('todas');
 
 
   const addressesQuery = useMemoFirebase(
@@ -95,11 +96,22 @@ const CadastroEnderecosPage = () => {
   const { data: addresses, isLoading, error } = useCollection<WithDocId<Address>>(addressesQuery, {
       queryKey: ['addresses']
   });
+  
+  const uniqueUnidades = useMemo(() => {
+    if (!addresses) return [];
+    return [...new Set(addresses.map(addr => addr.unidade))].sort();
+  }, [addresses]);
+
 
   const filteredAddresses = useMemo(() => {
     if (!addresses) return [];
 
     let tempAddresses = addresses;
+
+    // Apply unidade filter
+    if (unidadeFilter !== 'todas') {
+      tempAddresses = tempAddresses.filter(address => address.unidade === unidadeFilter);
+    }
 
     // Apply sector filter
     if (sectorFilter !== 'todos') {
@@ -116,7 +128,7 @@ const CadastroEnderecosPage = () => {
     }
     
     return tempAddresses;
-  }, [addresses, searchTerm, sectorFilter]);
+  }, [addresses, searchTerm, sectorFilter, unidadeFilter]);
 
 
   const predefinedStates = useMemo(() => ['PR', 'SP', 'SC', 'BA', 'RO', 'CE', 'DF', 'MG', 'RJ', 'AM', 'MT'], []);
@@ -527,16 +539,27 @@ const CadastroEnderecosPage = () => {
         <CardHeader>
             <CardTitle>Endereços Cadastrados</CardTitle>
             <CardDescription>Visualize e gerencie os endereços existentes.</CardDescription>
-            <div className="flex items-center gap-4 pt-4">
+            <div className="flex flex-wrap items-center gap-4 pt-4">
                <div className="relative">
                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                    <Input
-                       placeholder="Pesquisar por código ou unidade..."
+                       placeholder="Pesquisar por código..."
                        value={searchTerm}
                        onChange={(e) => setSearchTerm(e.target.value)}
                        className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
                    />
                </div>
+                <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filtrar por unidade..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="todas">Todas as Unidades</SelectItem>
+                        {uniqueUnidades.map(unidade => (
+                           <SelectItem key={unidade} value={unidade}>{unidade}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
                 <Select value={sectorFilter} onValueChange={setSectorFilter}>
                     <SelectTrigger className="w-[220px]">
                         <SelectValue placeholder="Filtrar por setor..." />
