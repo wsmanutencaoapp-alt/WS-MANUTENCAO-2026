@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -42,6 +43,7 @@ import { cn } from '@/lib/utils';
 import ReceiveItemsDialog from '@/components/ReceiveItemsDialog';
 import { RequisitionItemWithDetails } from '@/components/PurchaseRequisitionDetailsDialog';
 import { sendPurchaseOrderToSupplier } from '@/lib/email';
+import ReceivingStockTable from '@/components/ReceivingStockTable';
 
 
 const getStatusVariant = (status: PurchaseRequisition['status']) => {
@@ -164,6 +166,8 @@ const ControleComprasPage = () => {
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
     queryClient.invalidateQueries({ queryKey: ['myPurchaseRequisitions'] });
+    queryClient.invalidateQueries({ queryKey: ['receivingStockTools'] });
+    queryClient.invalidateQueries({ queryKey: ['receivingStockSupplies'] });
   };
   
   const handleDeleteRequisition = async (requisitionId: string, type: 'SC' | 'OC') => {
@@ -267,9 +271,10 @@ const ControleComprasPage = () => {
         <h1 className="text-2xl font-bold">Controle de Compras</h1>
         
         <Tabs defaultValue="requisicoes">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="requisicoes">Requisições para Cotação</TabsTrigger>
                 <TabsTrigger value="ordens">Ordens de Compra</TabsTrigger>
+                <TabsTrigger value="recebimento">Estoque de Recebimento</TabsTrigger>
             </TabsList>
             <TabsContent value="requisicoes">
                 <Card>
@@ -489,6 +494,9 @@ const ControleComprasPage = () => {
                        </Table>
                     </CardContent>
                 </Card>
+            </TabsContent>
+            <TabsContent value="recebimento">
+                <ReceivingStockTable />
             </TabsContent>
         </Tabs>
       </div>

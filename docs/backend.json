@@ -494,7 +494,8 @@
           "enum": [
             "Disponível",
             "Reservado",
-            "Bloqueado"
+            "Bloqueado",
+            "Em Recebimento"
           ],
           "description": "The current status of this specific stock."
         },
@@ -684,7 +685,8 @@
             "Em Conserto",
             "Refugo",
             "Com Avaria",
-            "Liberado Condicional"
+            "Liberado Condicional",
+            "Em Recebimento"
           ]
         },
         "status_inicial": {

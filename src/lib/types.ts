@@ -84,7 +84,7 @@ export type SupplyStock = {
     dataEntrada: string; // ISO date string
     dataValidade?: string; // ISO date string
     custoUnitario?: number;
-    status: 'Disponível' | 'Reservado' | 'Bloqueado';
+    status: 'Disponível' | 'Reservado' | 'Bloqueado' | 'Em Recebimento';
     documentoUrl?: string; // URL do documento específico do lote (FISPQ, Certificado)
 };
 
@@ -120,7 +120,7 @@ export type Tool = {
   doc_engenharia_url?: string;
   doc_seguranca_url?: string;
   patrimonio?: string;
-  status: 'Disponível' | 'Em Empréstimo' | 'Em Aferição' | 'Em Manutenção' | 'Vencido' | 'Bloqueado' | 'Inoperante' | 'Pendente' | 'Em Kit' | 'Em Conserto' | 'Refugo' | 'Com Avaria' | 'Liberado Condicional';
+  status: 'Disponível' | 'Em Empréstimo' | 'Em Aferição' | 'Em Manutenção' | 'Vencido' | 'Bloqueado' | 'Inoperante' | 'Pendente' | 'Em Kit' | 'Em Conserto' | 'Refugo' | 'Com Avaria' | 'Liberado Condicional' | 'Em Recebimento';
   status_inicial?: 'Ativo' | 'Bloqueado';
   data_vencimento?: string; // date
   data_referencia?: string; // date

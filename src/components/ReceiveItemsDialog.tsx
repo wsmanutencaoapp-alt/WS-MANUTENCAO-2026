@@ -40,13 +40,13 @@ interface ReceiveItemsDialogProps {
 
 interface ItemReceiveDetails {
   quantity: number;
-  // Supply fields
+  // Supply fields are now optional
   localizacao?: string;
   custoUnitario?: number;
   loteFornecedor?: string;
   dataValidade?: string;
   documentoFile?: File | null;
-  // Tool fields
+  // Tool fields are now optional
   marca?: string;
   patrimonio?: string;
   data_referencia?: string;
@@ -70,18 +70,7 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
   const [itemDetails, setItemDetails] = useState<Record<string, Partial<ItemReceiveDetails>>>({});
   const [isSaving, setIsSaving] = useState(false);
   
-  const [activeAddressPopover, setActiveAddressPopover] = useState<string | null>(null);
-  const [activeCalDatePopover, setActiveCalDatePopover] = useState<string | null>(null);
-  const [activeDueDatePopover, setActiveDueDatePopover] = useState<string | null>(null);
-  const [showAllAddresses, setShowAllAddresses] = useState(false);
-
-  const addressesQuery = useMemoFirebase(() => (
-      firestore ? query(collection(firestore, 'addresses')) : null
-  ), [firestore]);
-  const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, { 
-      queryKey: ['all_addresses_for_receive'],
-      enabled: isOpen,
-  });
+  // No changes to UI state management needed
 
   useEffect(() => {
     if (!isOpen || !firestore || !purchaseOrder) return;
@@ -117,7 +106,6 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
             const remaining = item.quantity - (item.receivedQuantity || 0);
             initialDetails[item.docId] = {
                 quantity: remaining > 0 ? remaining : 0,
-                localizacao: (item.details as Supply)?.localizacaoPadrao || '',
             };
         });
         setItemDetails(initialDetails);
@@ -225,7 +213,6 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                 });
 
                 if (item.itemType === 'supply') {
-                    if (!details.localizacao) throw new Error(`Localização não definida para ${item.details.descricao}`);
                     let validadeDate: Date | null = null;
                     if ((item.details as Supply).exigeValidade) {
                         if (!details.dataValidade) throw new Error(`Data de validade obrigatória para ${item.details.descricao}`);
@@ -252,11 +239,13 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
 
                     const stockData: Omit<SupplyStock, 'id'> = {
                         loteInterno, loteFornecedor: details.loteFornecedor || '',
-                        quantidade: receivedQty, localizacao: details.localizacao,
+                        quantidade: receivedQty, 
+                        localizacao: 'RECEBIMENTO', // <<< CHANGE HERE
                         dataEntrada: new Date().toISOString(),
                         dataValidade: validadeDate ? validadeDate.toISOString() : undefined,
                         custoUnitario: details.custoUnitario || 0,
-                        status: 'Disponível', documentoUrl: docUrl,
+                        status: 'Em Recebimento', // <<< CHANGE HERE
+                        documentoUrl: docUrl,
                         pesoLiquido: (item.details as Supply).fatorConversao ? (item.details as Supply).fatorConversao! * receivedQty : undefined,
                     };
 
@@ -272,10 +261,10 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                         origin: `OC: ${purchaseOrder.protocol} / NF-e: ${nfNumber}`
                     };
                     batch.set(doc(collection(firestore, 'supply_movements')), movementData);
+
                 } else if (item.itemType === 'tool') {
                     const modelTool = item.details as WithDocId<Tool>;
                     const { tipo, familia, classificacao } = modelTool;
-                    if (!details?.localizacao) throw new Error(`Localização é obrigatória para a nova ferramenta ${modelTool.descricao}.`);
                     
                     const isCalibratable = ['C', 'L', 'V'].includes(classificacao);
                     if (isCalibratable && (!details.data_referencia || !details.data_vencimento || !details.certificateFile)) {
@@ -300,13 +289,13 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
 
                     for (const sequencial of seqNumbers) {
                         const newToolRef = doc(collection(firestore, 'tools'));
-                        const { docId, sequencial: modelSeq, ...baseData } = modelTool; // Exclude model specific fields
+                        const { docId, sequencial: modelSeq, ...baseData } = modelTool; 
                         const newToolData: Omit<Tool, 'id'> = {
                             ...baseData,
                             codigo: `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`,
                             sequencial: sequencial,
-                            status: 'Disponível',
-                            enderecamento: details.localizacao,
+                            status: 'Em Recebimento', // <<< CHANGE HERE
+                            enderecamento: 'RECEBIMENTO', // <<< CHANGE HERE
                             marca: details.marca || modelTool.marca,
                             patrimonio: details.patrimonio || '',
                             data_referencia: details.data_referencia,
@@ -361,7 +350,7 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
             console.error("Falha ao enviar e-mail de notificação de recebimento:", emailError);
         }
         
-        toast({ title: "Sucesso!", description: "Recebimento registrado com sucesso. O estoque foi atualizado." });
+        toast({ title: "Sucesso!", description: "Recebimento registrado com sucesso. Os itens estão no estoque de recebimento." });
         onSuccess();
         resetAndClose();
 
@@ -379,7 +368,7 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
             <DialogHeader>
                 <DialogTitle>Registrar Recebimento de Itens</DialogTitle>
                 <DialogDescription>
-                    Confirme as quantidades recebidas para a OC <span className="font-bold">{purchaseOrder.protocol}</span> e anexe a NF-e.
+                    Confirme as quantidades recebidas para a OC <span className="font-bold">{purchaseOrder.protocol}</span> e anexe a NF-e. Os itens serão movidos para a área de recebimento para posterior armazenamento.
                 </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 max-h-[70vh] py-4 pr-2">
@@ -437,21 +426,6 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                                     <AccordionContent className="p-4 bg-muted/50 rounded-b-md">
                                         {isSupply && (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in-50">
-                                                <div className="space-y-1.5"><Label>Localização <span className="text-destructive">*</span></Label>
-                                                    <Popover open={activeAddressPopover === item.docId} onOpenChange={(open) => setActiveAddressPopover(open ? item.docId : null)}>
-                                                    <PopoverTrigger asChild>
-                                                    <Button variant="outline" className="w-full justify-between font-normal bg-background" disabled={isLoadingAddresses}>
-                                                        {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : itemDetails[item.docId]?.localizacao || "Selecione..."}
-                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                    </Button></PopoverTrigger>
-                                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Pesquisar..." /><CommandList><CommandEmpty>Nenhum endereço.</CommandEmpty><CommandGroup>
-                                                        {addresses?.map(addr => (
-                                                        <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => {handleDetailChange(item.docId, 'localizacao', val); setActiveAddressPopover(null);}}>
-                                                            <Check className={cn("mr-2 h-4 w-4", itemDetails[item.docId]?.localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />{addr.codigoCompleto}
-                                                        </CommandItem>
-                                                        ))}
-                                                    </CommandGroup></CommandList></Command></PopoverContent></Popover>
-                                                </div>
                                                 <div className="space-y-1.5"><Label>Custo Unitário (R$)</Label><Input type="number" value={itemDetails[item.docId]?.custoUnitario || ''} onChange={(e) => handleDetailChange(item.docId, 'custoUnitario', e.target.value)} /></div>
                                                 <div className="space-y-1.5"><Label>Lote do Fornecedor</Label><Input value={itemDetails[item.docId]?.loteFornecedor || ''} onChange={(e) => handleDetailChange(item.docId, 'loteFornecedor', e.target.value)} /></div>
                                                 {(item.details as Supply).exigeValidade && <div className="space-y-1.5"><Label>Data de Validade <span className="text-destructive">*</span></Label><Input type="date" value={itemDetails[item.docId]?.dataValidade || ''} onChange={(e) => handleDetailChange(item.docId, 'dataValidade', e.target.value)} /></div>}
@@ -468,42 +442,15 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                                         )}
                                         {isTool && (
                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in-50">
-                                                <div className="space-y-1.5 col-span-2">
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <Label>Endereço de Armazenamento <span className="text-destructive">*</span></Label>
-                                                        <div className="flex items-center space-x-2">
-                                                            <Switch id={`show-all-addr-tool-${item.docId}`} checked={showAllAddresses} onCheckedChange={setShowAllAddresses} />
-                                                            <Label htmlFor={`show-all-addr-tool-${item.docId}`} className="text-xs font-normal">Ver todos</Label>
-                                                        </div>
-                                                    </div>
-                                                    <Popover open={activeAddressPopover === item.docId} onOpenChange={(open) => setActiveAddressPopover(open ? item.docId : null)}><PopoverTrigger asChild>
-                                                    <Button variant="outline" className="w-full justify-between font-normal bg-background" disabled={isLoadingAddresses}>
-                                                        {isLoadingAddresses ? <Loader2 className="h-4 w-4 animate-spin"/> : itemDetails[item.docId]?.localizacao || "Selecione..."}
-                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                    </Button></PopoverTrigger>
-                                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Pesquisar..." /><CommandList><CommandEmpty>Nenhum endereço.</CommandEmpty><CommandGroup>
-                                                        {(showAllAddresses ? addresses : addresses?.filter(a => a.setor === '01'))?.map(addr => (
-                                                        <CommandItem key={addr.docId} value={addr.codigoCompleto} onSelect={(val) => {handleDetailChange(item.docId, 'localizacao', val); setActiveAddressPopover(null);}}>
-                                                            <Check className={cn("mr-2 h-4 w-4", itemDetails[item.docId]?.localizacao === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />{addr.codigoCompleto}
-                                                        </CommandItem>
-                                                        ))}
-                                                    </CommandGroup></CommandList></Command></PopoverContent></Popover>
-                                                </div>
                                                 <div className="space-y-1.5"><Label>Marca</Label><Input value={itemDetails[item.docId]?.marca || ''} onChange={(e) => handleDetailChange(item.docId, 'marca', e.target.value)} /></div>
                                                 <div className="space-y-1.5"><Label>Nº Patrimônio</Label><Input value={itemDetails[item.docId]?.patrimonio || ''} onChange={(e) => handleDetailChange(item.docId, 'patrimonio', e.target.value)} /></div>
                                                 {isCalibratable && (
                                                     <>
                                                         <div className="space-y-1.5"><Label>Data de Referência <span className="text-destructive">*</span></Label>
-                                                           <Popover open={activeCalDatePopover === item.docId} onOpenChange={(open) => setActiveCalDatePopover(open ? item.docId : null)}>
-                                                               <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal bg-background"><CalendarIcon className="mr-2 h-4 w-4" />{itemDetails[item.docId]?.data_referencia ? format(new Date(itemDetails[item.docId]!.data_referencia!), 'dd/MM/yyyy') : <span>Escolha a data</span>}</Button></PopoverTrigger>
-                                                               <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={itemDetails[item.docId]?.data_referencia ? new Date(itemDetails[item.docId]!.data_referencia!) : undefined} onSelect={(day) => {if(day) handleDetailChange(item.docId, 'data_referencia', day.toISOString()); setActiveCalDatePopover(null);}} initialFocus /></PopoverContent>
-                                                           </Popover>
+                                                           <Input type="date" value={itemDetails[item.docId]?.data_referencia ? format(new Date(itemDetails[item.docId]!.data_referencia!), 'yyyy-MM-dd') : ''} onChange={(e) => handleDetailChange(item.docId, 'data_referencia', e.target.value)} />
                                                         </div>
                                                         <div className="space-y-1.5"><Label>Data de Vencimento <span className="text-destructive">*</span></Label>
-                                                          <Popover open={activeDueDatePopover === item.docId} onOpenChange={(open) => setActiveDueDatePopover(open ? item.docId : null)}>
-                                                               <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal bg-background"><CalendarIcon className="mr-2 h-4 w-4" />{itemDetails[item.docId]?.data_vencimento ? format(new Date(itemDetails[item.docId]!.data_vencimento!), 'dd/MM/yyyy') : <span>Escolha a data</span>}</Button></PopoverTrigger>
-                                                               <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={itemDetails[item.docId]?.data_vencimento ? new Date(itemDetails[item.docId]!.data_vencimento!) : undefined} onSelect={(day) => {if(day) handleDetailChange(item.docId, 'data_vencimento', day.toISOString()); setActiveDueDatePopover(null);}} initialFocus /></PopoverContent>
-                                                           </Popover>
+                                                           <Input type="date" value={itemDetails[item.docId]?.data_vencimento ? format(new Date(itemDetails[item.docId]!.data_vencimento!), 'yyyy-MM-dd') : ''} onChange={(e) => handleDetailChange(item.docId, 'data_vencimento', e.target.value)} />
                                                         </div>
                                                         <div className="space-y-1.5 col-span-2"><Label>Certificado <span className="text-destructive">*</span></Label>
                                                             <Button asChild variant="outline" className="w-full bg-background"><label className="cursor-pointer flex items-center">
