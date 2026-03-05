@@ -1,0 +1,21 @@
+{
+  "name": "APP WS",
+  "short_name": "APP WS",
+  "description": "Sistema de gerenciamento de manutenção de aeronaves.",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#09090B"
+}
