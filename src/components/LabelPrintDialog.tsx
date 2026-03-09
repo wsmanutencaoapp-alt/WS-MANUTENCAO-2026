@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Printer, FileText } from 'lucide-react';
 import { useFirestore, useStorage } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL, getBlob } from 'firebase/storage';
+import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import JsBarcode from 'jsbarcode';
 import type { Tool } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
@@ -104,18 +104,9 @@ export default function LabelPrintDialog({ tools, isOpen, onClose }: LabelPrintD
           if (!tool.docId || !tool.codigo) continue;
 
           try {
-            let svgContent: string;
-            if (tool.label_url) {
-                try {
-                    const blob = await getBlob(storageRef(storage, tool.label_url));
-                    svgContent = await blob.text();
-                } catch(fetchError) {
-                    console.warn(`Could not fetch existing label for ${tool.codigo}. Generating a new one.`, fetchError);
-                    svgContent = generateLabelSvgLocally(tool); // Fallback to generating
-                }
-            } else {
-                 svgContent = generateLabelSvgLocally(tool);
-            }
+            // ALWAYS generate the SVG locally to avoid CORS issues with getBlob.
+            // This also ensures the label always reflects the latest tool data.
+            const svgContent = generateLabelSvgLocally(tool);
 
             // Always save/update the label in storage to ensure it's current
             const svgRef = storageRef(storage, `tool-labels/${tool.docId}.svg`);
