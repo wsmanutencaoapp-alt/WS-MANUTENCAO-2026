@@ -47,6 +47,14 @@ import { RequisitionItemWithDetails } from './PurchaseRequisitionDetailsDialog';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { sendPurchaseOrderEmail } from '@/lib/email';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import { Switch } from './ui/switch';
 
 
 interface QuotationDialogProps {
@@ -61,6 +69,8 @@ type QuotationFormState = {
   supplierId: string;
   supplierName: string;
   totalValue: number | string;
+  currency: 'BRL' | 'USD';
+  isImported: boolean;
   deliveryTime: number | string;
   paymentTerms: string;
   attachmentUrl?: string;
@@ -71,6 +81,8 @@ const emptyQuotation: QuotationFormState = {
   supplierId: '',
   supplierName: '',
   totalValue: '',
+  currency: 'BRL',
+  isImported: false,
   deliveryTime: '',
   paymentTerms: '',
   attachmentFile: null,
@@ -103,6 +115,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
             supplierId: q.supplierId, supplierName: q.supplierName,
             totalValue: q.totalValue, deliveryTime: q.deliveryTime,
             paymentTerms: q.paymentTerms, attachmentUrl: q.attachmentUrl,
+            currency: q.currency || 'BRL',
+            isImported: q.isImported || false,
             attachmentFile: null,
         }));
         setSavedQuotations(initialQuotes);
@@ -165,6 +179,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
           }
           finalQuotations.push({
             supplierId: q.supplierId, supplierName: q.supplierName, totalValue: Number(q.totalValue),
+            currency: q.currency,
+            isImported: q.isImported,
             deliveryTime: Number(q.deliveryTime), paymentTerms: q.paymentTerms, attachmentUrl: attachmentUrl
           });
       }
@@ -262,6 +278,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                   supplierId: q.supplierId,
                   supplierName: q.supplierName,
                   totalValue: Number(q.totalValue),
+                  currency: q.currency,
+                  isImported: q.isImported,
                   deliveryTime: Number(q.deliveryTime),
                   paymentTerms: q.paymentTerms,
                   attachmentUrl: q.attachmentUrl || ''
@@ -419,10 +437,32 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                          </div>
-                         <div className="grid grid-cols-2 gap-4">
-                             <div className="space-y-1.5"><Label>Valor Total (R$)</Label><Input type="number" value={newQuotation.totalValue} onChange={(e) => handleNewQuotationChange('totalValue', e.target.value)} className="bg-background"/></div>
-                             <div className="space-y-1.5"><Label>Prazo (dias)</Label><Input type="number" value={newQuotation.deliveryTime} onChange={(e) => handleNewQuotationChange('deliveryTime', e.target.value)} className="bg-background"/></div>
-                         </div>
+                         <div className="grid grid-cols-[2fr,1fr] gap-2">
+                            <div className="space-y-1.5">
+                                <Label>Valor Total</Label>
+                                <Input type="number" value={newQuotation.totalValue} onChange={(e) => handleNewQuotationChange('totalValue', e.target.value)} className="bg-background"/>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Moeda</Label>
+                                <Select value={newQuotation.currency} onValueChange={(value) => handleNewQuotationChange('currency', value as 'BRL' | 'USD')}>
+                                    <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="BRL">BRL (R$)</SelectItem>
+                                        <SelectItem value="USD">USD ($)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 items-center">
+                            <div className="space-y-1.5">
+                                <Label>Prazo (dias)</Label>
+                                <Input type="number" value={newQuotation.deliveryTime} onChange={(e) => handleNewQuotationChange('deliveryTime', e.target.value)} className="bg-background"/>
+                            </div>
+                            <div className="flex items-center space-x-2 pt-6">
+                                <Switch id="isImported" checked={newQuotation.isImported} onCheckedChange={(checked) => handleNewQuotationChange('isImported', checked)} />
+                                <Label htmlFor="isImported">Importado</Label>
+                            </div>
+                        </div>
                           <div className="space-y-1.5"><Label>Cond. Pagamento</Label><Input value={newQuotation.paymentTerms} onChange={(e) => handleNewQuotationChange('paymentTerms', e.target.value)} placeholder="Ex: 30/60/90" className="bg-background"/></div>
                           <div className="space-y-1.5"><Label>Anexo</Label>
                               <Button asChild variant="outline" size="sm" className="w-full bg-background">
@@ -448,8 +488,8 @@ export default function QuotationDialog({ isOpen, onClose, onSuccess, requisitio
                                     <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1" onClick={() => removeQuotation(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                                   </div>
                                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                                      <div><Label className="text-muted-foreground">Valor:</Label> <p>{Number(q.totalValue).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</p></div>
-                                      <div><Label className="text-muted-foreground">Prazo:</Label> <p>{q.deliveryTime} dias</p></div>
+                                      <div><Label className="text-muted-foreground">Valor:</Label> <p>{Number(q.totalValue).toLocaleString('pt-BR', {style: 'currency', currency: q.currency || 'BRL'})}</p></div>
+                                      <div><Label className="text-muted-foreground">Prazo:</Label> <p>{q.deliveryTime} dias {q.isImported && <Badge variant="outline" className="ml-1">Importado</Badge>}</p></div>
                                       <div className="col-span-2"><Label className="text-muted-foreground">Pagamento:</Label> <p>{q.paymentTerms}</p></div>
                                   </div>
                                    <div className="flex justify-between items-center pt-2">

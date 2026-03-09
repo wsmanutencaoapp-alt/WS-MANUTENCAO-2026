@@ -220,8 +220,8 @@ export default function ApprovalDetailsDialog({ requisition, isOpen, onClose }: 
                                             {item.selectedQuotationIndex === index && <p className="text-xs font-bold text-primary flex items-center gap-1 mb-1"><Crown className="h-3 w-3"/> COTAÇÃO VENCEDORA</p>}
                                             <p className="font-bold text-sm truncate">{quote.supplierName}</p>
                                             <div className="space-y-1 mt-2 text-xs">
-                                                <p><span className="font-semibold">Valor:</span> {quote.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                                <p><span className="font-semibold">Prazo:</span> {quote.deliveryTime} dias</p>
+                                                <p><span className="font-semibold">Valor:</span> {quote.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: quote.currency || 'BRL' })}</p>
+                                                <p><span className="font-semibold">Prazo:</span> {quote.deliveryTime} dias {quote.isImported && <Badge variant="outline" className="ml-1">Importado</Badge>}</p>
                                                 <p><span className="font-semibold">Pagto:</span> {quote.paymentTerms}</p>
                                                 {quote.attachmentUrl && (
                                                      <Button asChild variant="link" size="sm" className="p-0 h-auto text-xs">

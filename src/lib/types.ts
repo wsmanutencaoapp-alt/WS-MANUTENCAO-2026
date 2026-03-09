@@ -332,6 +332,8 @@ export type Quotation = {
   supplierId: string;
   supplierName: string;
   totalValue: number;
+  currency?: 'BRL' | 'USD';
+  isImported?: boolean;
   deliveryTime: number; // in days
   paymentTerms: string;
   attachmentUrl?: string;
