@@ -1,17 +1,19 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, PlusCircle } from 'lucide-react';
 import type { Supplier } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
@@ -106,6 +108,14 @@ export default function SupplierSelectorDialog({
             </div>
           </ScrollArea>
         </div>
+        <DialogFooter>
+            <Button variant="outline" asChild>
+                <Link href="/dashboard/cadastros/fornecedores" target="_blank">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Cadastrar Novo Fornecedor
+                </Link>
+            </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
