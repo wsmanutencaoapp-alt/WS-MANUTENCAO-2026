@@ -290,18 +290,30 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                     for (const sequencial of seqNumbers) {
                         const newToolRef = doc(collection(firestore, 'tools'));
                         const { docId, sequencial: modelSeq, ...baseData } = modelTool; 
-                        const newToolData: Omit<Tool, 'id'> = {
+                        
+                        const newToolData: Partial<Tool> = {
                             ...baseData,
                             codigo: `${tipo}-${familia}-${classificacao}-${sequencial.toString().padStart(4, '0')}`,
                             sequencial: sequencial,
-                            status: 'Em Recebimento', // <<< CHANGE HERE
-                            enderecamento: 'RECEBIMENTO', // <<< CHANGE HERE
+                            status: 'Em Recebimento',
+                            enderecamento: 'RECEBIMENTO',
                             marca: details.marca || modelTool.marca || '',
                             patrimonio: details.patrimonio || '',
-                            data_referencia: details.data_referencia,
-                            data_vencimento: details.data_vencimento,
-                            documento_anexo_url: certificateUrl || undefined,
                         };
+
+                        if (isCalibratable && details.data_referencia) {
+                           newToolData.data_referencia = new Date(details.data_referencia).toISOString();
+                        }
+                        if (isCalibratable && details.data_vencimento) {
+                           newToolData.data_vencimento = new Date(details.data_vencimento).toISOString();
+                        }
+                        if (isCalibratable && certificateUrl) {
+                           newToolData.documento_anexo_url = certificateUrl;
+                        }
+
+                        // Remove undefined properties before setting
+                        Object.keys(newToolData).forEach(key => (newToolData as any)[key] === undefined && delete (newToolData as any)[key]);
+
                         batch.set(newToolRef, newToolData);
 
                         if (isCalibratable && certificateUrl && details.data_referencia && details.data_vencimento) {
