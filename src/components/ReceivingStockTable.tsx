@@ -43,14 +43,20 @@ export default function ReceivingStockTable() {
     const [neededSupplies, setNeededSupplies] = useState<Map<string, WithDocId<Supply>> | null>(null);
     const [isLoadingNeededSupplies, setIsLoadingNeededSupplies] = useState(true);
 
-    // Fetch only the supply stock items in receiving status
-    const supplyStockQuery = useMemoFirebase(() => {
+    // Fetch all supply stock items and filter client-side to avoid index requirement
+    const allSupplyStockQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        return query(collectionGroup(firestore, 'stock'), where('status', '==', 'Em Recebimento'));
+        return query(collectionGroup(firestore, 'stock'));
     }, [firestore]);
-    const { data: receivingSupplies, isLoading: isLoadingSupplies, error: suppliesError } = useCollection<WithDocId<SupplyStock>>(supplyStockQuery, {
-        queryKey: ['receivingStockSupplies']
+    
+    const { data: allStock, isLoading: isLoadingAllStock, error: allStockError } = useCollection<WithDocId<SupplyStock>>(allSupplyStockQuery, {
+        queryKey: ['allSupplyStockForReceiving']
     });
+
+    const receivingSupplies = useMemo(() => {
+        if (!allStock) return [];
+        return allStock.filter(item => item.status === 'Em Recebimento');
+    }, [allStock]);
 
     // Fetch only the tools in receiving status
     const toolsQuery = useMemoFirebase(() => {
@@ -131,10 +137,12 @@ export default function ReceivingStockTable() {
         queryClient.invalidateQueries({ queryKey: ['receivingStockSupplies'] });
         queryClient.invalidateQueries({ queryKey: ['receivingStockTools'] });
         queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] }); // Invalidate main stock list
+        queryClient.invalidateQueries({ queryKey: ['allSupplyStockForReceiving'] }); // Invalidate the new broader query
         setSelectedItem(null);
     }
     
-    const isLoading = isLoadingSupplies || isLoadingTools || isLoadingNeededSupplies;
+    const isLoading = isLoadingAllStock || isLoadingTools || isLoadingNeededSupplies;
+    const error = allStockError || toolsError;
 
     return (
         <>
