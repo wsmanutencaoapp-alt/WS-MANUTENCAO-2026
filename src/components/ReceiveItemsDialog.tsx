@@ -296,7 +296,7 @@ export default function ReceiveItemsDialog({ isOpen, onClose, purchaseOrder, onS
                             sequencial: sequencial,
                             status: 'Em Recebimento', // <<< CHANGE HERE
                             enderecamento: 'RECEBIMENTO', // <<< CHANGE HERE
-                            marca: details.marca || modelTool.marca,
+                            marca: details.marca || modelTool.marca || '',
                             patrimonio: details.patrimonio || '',
                             data_referencia: details.data_referencia,
                             data_vencimento: details.data_vencimento,
