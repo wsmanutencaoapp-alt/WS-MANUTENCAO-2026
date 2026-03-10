@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -28,7 +27,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit, AlertCircle, Truck, Send } from 'lucide-react';
+import { Loader2, Search, ShoppingBag, Eye, XCircle, FileText, Trash2, Edit, AlertCircle, Truck, Send, History } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -84,6 +83,7 @@ const ControleComprasPage = () => {
   
   const [searchTermSC, setSearchTermSC] = useState('');
   const [searchTermOC, setSearchTermOC] = useState('');
+  const [searchTermHistory, setSearchTermHistory] = useState('');
   const [selectedRequisition, setSelectedRequisition] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [requisitionToReview, setRequisitionToReview] = useState<WithDocId<PurchaseRequisition> | null>(null);
   const [itemToReceive, setItemToReceive] = useState<WithDocId<PurchaseRequisition> | null>(null);
@@ -115,6 +115,20 @@ const ControleComprasPage = () => {
   }, [firestore]);
   const { data: ocRequisitions, isLoading: isLoadingOCs, error: ocError } = useCollection<WithDocId<PurchaseRequisition>>(ocQuery, {
       queryKey: [ocQueryKey]
+  });
+
+  // Query for History
+  const historyQueryKey = 'allCompletedPurchaseDocs';
+  const historyQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(
+      collection(firestore, 'purchase_requisitions'), 
+      where('status', 'in', ['Recebimento Concluído', 'Totalmente Atendida', 'Cancelada', 'Concluída']),
+      orderBy('createdAt', 'desc')
+    );
+  }, [firestore]);
+  const { data: historyDocs, isLoading: isLoadingHistory, error: historyError } = useCollection<WithDocId<PurchaseRequisition>>(historyQuery, {
+      queryKey: [historyQueryKey]
   });
   
   const priorityOrder = {
@@ -158,12 +172,25 @@ const ControleComprasPage = () => {
     );
   }, [ocRequisitions, searchTermOC]);
 
+  const filteredHistory = useMemo(() => {
+    if (!historyDocs) return [];
+    if (!searchTermHistory) return historyDocs;
+    const lowercasedTerm = searchTermHistory.toLowerCase();
+    return historyDocs.filter(doc => 
+      (doc.protocol && doc.protocol.toLowerCase().includes(lowercasedTerm)) ||
+      (doc.supplierName && doc.supplierName.toLowerCase().includes(lowercasedTerm)) ||
+      (doc.requesterName && doc.requesterName.toLowerCase().includes(lowercasedTerm)) ||
+      (doc.originalRequisitionProtocol && doc.originalRequisitionProtocol.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [historyDocs, searchTermHistory]);
+
   const handleSuccess = () => {
     setRequisitionToReview(null);
     setSelectedRequisition(null);
     setItemToReceive(null);
     queryClient.invalidateQueries({ queryKey: [scQueryKey] });
     queryClient.invalidateQueries({ queryKey: [ocQueryKey] });
+    queryClient.invalidateQueries({ queryKey: [historyQueryKey] });
     queryClient.invalidateQueries({ queryKey: ['pendingPurchaseRequisitions'] });
     queryClient.invalidateQueries({ queryKey: ['myPurchaseRequisitions'] });
     queryClient.invalidateQueries({ queryKey: ['receivingStockTools'] });
@@ -262,7 +289,7 @@ const ControleComprasPage = () => {
   };
 
 
-  const isLoading = isLoadingSCs || isLoadingOCs || isEmployeeLoading;
+  const isLoading = isLoadingSCs || isLoadingOCs || isEmployeeLoading || isLoadingHistory;
 
   return (
     <>
@@ -271,10 +298,11 @@ const ControleComprasPage = () => {
         <h1 className="text-2xl font-bold">Controle de Compras</h1>
         
         <Tabs defaultValue="requisicoes">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="requisicoes">Requisições para Cotação</TabsTrigger>
                 <TabsTrigger value="ordens">Ordens de Compra</TabsTrigger>
                 <TabsTrigger value="recebimento">Estoque de Recebimento</TabsTrigger>
+                <TabsTrigger value="historico"><History className="mr-2 h-4 w-4"/>Histórico</TabsTrigger>
             </TabsList>
             <TabsContent value="requisicoes">
                 <Card>
@@ -305,16 +333,16 @@ const ControleComprasPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoading && (
+                        {isLoadingSCs && (
                         <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                         )}
                         {scError && (
                         <TableRow><TableCell colSpan={5} className="h-24 text-center text-destructive">{scError.message}</TableCell></TableRow>
                         )}
-                        {!isLoading && sortedAndFilteredSCs.length === 0 && (
+                        {!isLoadingSCs && sortedAndFilteredSCs.length === 0 && (
                         <TableRow><TableCell colSpan={5} className="h-24 text-center">Nenhuma requisição aprovada ou em cotação encontrada.</TableCell></TableRow>
                         )}
-                        {!isLoading && sortedAndFilteredSCs.map(req => (
+                        {!isLoadingSCs && sortedAndFilteredSCs.map(req => (
                         <TableRow key={req.docId} className={cn(req.status === 'Em Revisão' && 'bg-yellow-50 dark:bg-yellow-900/20')}>
                             <TableCell className="font-mono">{req.protocol}</TableCell>
                             <TableCell><Badge variant={getPriorityVariant(req.priority)}>{req.priority}</Badge></TableCell>
@@ -402,16 +430,16 @@ const ControleComprasPage = () => {
                                 </TableRow>
                             </TableHeader>
                              <TableBody>
-                                {isLoading && (
+                                {isLoadingOCs && (
                                 <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                                 )}
                                 {ocError && (
                                 <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{ocError.message}</TableCell></TableRow>
                                 )}
-                                {!isLoading && filteredOCs.length === 0 && (
+                                {!isLoadingOCs && filteredOCs.length === 0 && (
                                     <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhuma Ordem de Compra encontrada.</TableCell></TableRow>
                                 )}
-                                 {!isLoading && filteredOCs.map(oc => {
+                                 {!isLoadingOCs && filteredOCs.map(oc => {
                                   const showReason = (oc.status === 'Em Revisão Comprador') && oc.rejectionReason;
                                   return (
                                     <TableRow key={oc.docId}>
@@ -497,6 +525,63 @@ const ControleComprasPage = () => {
             </TabsContent>
             <TabsContent value="recebimento">
                 <ReceivingStockTable />
+            </TabsContent>
+            <TabsContent value="historico">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Histórico de Documentos de Compra</CardTitle>
+                        <CardDescription>Consulte requisições e ordens de compra que foram concluídas ou canceladas.</CardDescription>
+                        <div className="relative pt-4">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Pesquisar por protocolo, fornecedor, solicitante..."
+                                value={searchTermHistory}
+                                onChange={(e) => setSearchTermHistory(e.target.value)}
+                                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                            />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Protocolo</TableHead>
+                                    <TableHead>Tipo</TableHead>
+                                    <TableHead>Solicitante/Fornecedor</TableHead>
+                                    <TableHead>Data Criação</TableHead>
+                                    <TableHead>Status Final</TableHead>
+                                    <TableHead className="text-right">Ações</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoadingHistory && (
+                                    <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                                )}
+                                {historyError && (
+                                    <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{historyError.message}</TableCell></TableRow>
+                                )}
+                                {!isLoadingHistory && filteredHistory.length === 0 && (
+                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhum documento encontrado no histórico.</TableCell></TableRow>
+                                )}
+                                {!isLoadingHistory && filteredHistory.map(doc => (
+                                    <TableRow key={doc.docId}>
+                                        <TableCell className="font-mono">{doc.protocol}</TableCell>
+                                        <TableCell><Badge variant={doc.type === 'Ordem de Compra' ? 'default' : 'secondary'}>{doc.type}</Badge></TableCell>
+                                        <TableCell>{doc.type === 'Ordem de Compra' ? doc.supplierName : doc.requesterName}</TableCell>
+                                        <TableCell>{format(new Date(doc.createdAt), 'dd/MM/yyyy')}</TableCell>
+                                        <TableCell><Badge variant={getStatusVariant(doc.status)}>{doc.status}</Badge></TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="outline" size="sm" onClick={() => setSelectedRequisition(doc)}>
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                Detalhes
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
             </TabsContent>
         </Tabs>
       </div>
