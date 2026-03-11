@@ -96,7 +96,7 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Criar Nova Atividade</DialogTitle>
