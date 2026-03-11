@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -38,6 +39,7 @@ import {
   ExternalLink,
   Paintbrush,
   ClipboardList,
+  Activity,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -56,6 +58,12 @@ const allNavItems: NavItem[] = [
     icon: LayoutDashboard, 
     label: 'Dashboard',
     permission: 'dashboard',
+  },
+  { 
+    href: '/dashboard/gestao-atividades',
+    icon: Activity,
+    label: 'Gestão de Atividades',
+    permission: 'gestao_atividades'
   },
   { 
     href: '/dashboard/suprimentos', 
@@ -346,3 +354,5 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+    

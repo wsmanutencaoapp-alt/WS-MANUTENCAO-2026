@@ -84,6 +84,13 @@ export const permissionStructure = [
         ]
     },
     {
+        id: 'comercial',
+        label: 'Comercial',
+        path: '/dashboard/comercial',
+        isModule: true,
+        actions: ['view'],
+    },
+    {
         id: 'financeiro',
         label: 'Financeiro',
         path: '/dashboard/financeiro',
@@ -102,6 +109,41 @@ export const permissionStructure = [
         actions: ['view'],
         submodules: [
             { id: 'contabilidade_classificacao', label: 'Classificação Contábil', path: '/dashboard/contabilidade/classificacao', actions: ['view', 'update'] },
+        ]
+    },
+    {
+        id: 'qualidade',
+        label: 'Qualidade',
+        path: '/dashboard/qualidade',
+        isModule: true,
+        actions: ['view'],
+    },
+    {
+        id: 'gso',
+        label: 'GSO',
+        path: '/dashboard/gso',
+        isModule: true,
+        actions: ['view'],
+        submodules: [
+          { id: 'gso_controle_credenciamento', label: 'Controle de Credenciamento', path: '/dashboard/gso/controle-credenciamento', actions: ['view', 'create', 'update', 'delete'] },
+          { id: 'gso_controle_casos', label: 'Controle de Casos', path: '/dashboard/gso/controle-de-casos', actions: ['view', 'create', 'update', 'delete'] },
+        ]
+    },
+    {
+        id: 'planejamento',
+        label: 'Planejamento',
+        path: '/dashboard/planejamento',
+        isModule: true,
+        actions: ['view'],
+    },
+    {
+        id: 'manutencao',
+        label: 'Manutenção',
+        path: '/dashboard/manutencao',
+        isModule: true,
+        actions: ['view'],
+        submodules: [
+            { id: 'manutencao_veiculos', label: 'Manutenção de Veículos', path: '/dashboard/manutencao/veiculos', actions: ['view', 'create', 'update', 'delete'] },
         ]
     },
     {
@@ -127,25 +169,11 @@ export const permissionStructure = [
         ],
     },
     {
-        id: 'manutencao',
-        label: 'Manutenção',
-        path: '/dashboard/manutencao',
+        id: 'gestao_atividades',
+        label: 'Gestão de Atividades',
+        path: '/dashboard/gestao-atividades',
         isModule: true,
-        actions: ['view'],
-        submodules: [
-            { id: 'manutencao_veiculos', label: 'Manutenção de Veículos', path: '/dashboard/manutencao/veiculos', actions: ['view', 'create', 'update', 'delete'] },
-        ]
-    },
-    {
-        id: 'gso',
-        label: 'GSO',
-        path: '/dashboard/gso',
-        isModule: true,
-        actions: ['view'],
-        submodules: [
-          { id: 'gso_controle_credenciamento', label: 'Controle de Credenciamento', path: '/dashboard/gso/controle-credenciamento', actions: ['view', 'create', 'update', 'delete'] },
-          { id: 'gso_controle_casos', label: 'Controle de Casos', path: '/dashboard/gso/controle-de-casos', actions: ['view', 'create', 'update', 'delete'] },
-        ]
+        actions: ['view', 'create', 'update', 'delete'],
     },
     {
         id: 'userManagement',
@@ -204,3 +232,5 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
 
     return null;
 };
+
+    

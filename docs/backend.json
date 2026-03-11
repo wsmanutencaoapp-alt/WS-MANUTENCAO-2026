@@ -1838,6 +1838,49 @@
         "completionDate",
         "expiryDate"
       ]
+    },
+    "ActivityLog": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Activity Log",
+        "type": "object",
+        "description": "A single log entry for an activity's history.",
+        "properties": {
+            "timestamp": { "type": "string", "format": "date-time" },
+            "userId": { "type": "string" },
+            "userName": { "type": "string" },
+            "action": { "type": "string" },
+            "details": { "type": "string" }
+        },
+        "required": ["timestamp", "userId", "userName", "action"]
+    },
+    "Activity": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Activity",
+        "type": "object",
+        "description": "Represents a single task or activity to be performed.",
+        "properties": {
+            "id": { "type": "string" },
+            "title": { "type": "string" },
+            "description": { "type": "string" },
+            "status": {
+                "type": "string",
+                "enum": ["Pendente", "Em Andamento", "Concluída", "Recusada", "Aguardando Validação"]
+            },
+            "requesterId": { "type": "string" },
+            "requesterName": { "type": "string" },
+            "assigneeId": { "type": "string" },
+            "assigneeName": { "type": "string" },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "dueDate": { "type": "string", "format": "date" },
+            "refusalJustification": { "type": "string" },
+            "validationNotes": { "type": "string" },
+            "isEffective": { "type": "boolean" },
+            "history": {
+                "type": "array",
+                "items": { "$ref": "#/entities/ActivityLog" }
+            }
+        },
+        "required": ["title", "status", "requesterId", "assigneeId", "createdAt"]
     }
   },
   "auth": {
@@ -2093,7 +2136,16 @@
           },
           "description": "Stores training records for a specific employee."
         }
+      },
+      {
+        "path": "/activities/{activityId}",
+        "definition": {
+          "schema": { "$ref": "#/entities/Activity" },
+          "description": "Stores tasks and activities for users."
+        }
       }
     ]
   }
 }
+
+    

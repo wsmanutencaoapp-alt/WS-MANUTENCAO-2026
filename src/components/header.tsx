@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -37,6 +38,7 @@ import {
   ExternalLink,
   Paintbrush,
   ClipboardList,
+  Activity,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -70,6 +72,12 @@ const allNavItems: NavItem[] = [
     icon: LayoutDashboard, 
     label: 'Dashboard',
     permission: 'dashboard',
+  },
+  { 
+    href: '/dashboard/gestao-atividades',
+    icon: Activity,
+    label: 'Gestão de Atividades',
+    permission: 'gestao_atividades'
   },
   { 
     href: '/dashboard/suprimentos', 
@@ -391,3 +399,5 @@ export function Header() {
     </header>
   );
 }
+
+    

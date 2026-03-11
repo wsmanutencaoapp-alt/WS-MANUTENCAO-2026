@@ -162,6 +162,13 @@ service cloud.firestore {
       allow write: if (isAuthenticated() && (isOwner(resource.data.requesterId) || hasPermission('ferramentaria_movimentacao_create')));
     }
     
+    match /activities/{activityId} {
+        allow read: if hasPermission('gestao_atividades_view');
+        allow create: if hasPermission('gestao_atividades_create');
+        allow update: if hasPermission('gestao_atividades_update') || isOwner(resource.data.assigneeId) || isOwner(resource.data.requesterId);
+        allow delete: if hasPermission('gestao_atividades_delete');
+    }
+
     match /budgets/{budgetId} {
       allow read: if isAuthenticated();
       allow create: if hasPermission('financeiro_budget_create');
@@ -213,3 +220,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
