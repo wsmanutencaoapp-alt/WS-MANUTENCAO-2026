@@ -1190,6 +1190,11 @@
         "motivoBaixa": {
           "type": "string",
           "description": "O motivo da baixa do funcionário."
+        },
+        "birthDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Data de nascimento do funcionário."
         }
       },
       "required": [
@@ -2183,3 +2188,5 @@
     ]
   }
 }
+
+    

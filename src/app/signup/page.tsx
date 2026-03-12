@@ -96,6 +96,8 @@ export default function SignUpPage() {
         phone: '',
         accessLevel: accessLevel,
         status: status,
+        birthDate: null,
+        motivoBaixa: '',
       };
       
       await setDoc(userDocRef, userData);
@@ -237,3 +239,5 @@ export default function SignUpPage() {
      </div>
   );
 }
+
+    

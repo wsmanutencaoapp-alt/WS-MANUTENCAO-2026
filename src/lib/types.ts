@@ -250,6 +250,7 @@ export type Employee = {
   dataDevolucao?: string; // date
   coleteNumero?: string;
   motivoBaixa?: string;
+  birthDate?: string;
 };
 
 export type TemporaryEmployee = {
@@ -501,6 +502,8 @@ export type CorporateCommunication = {
   eventDate?: string; // ISO date string
   createdAt: string; // ISO date string
 };
+    
+
     
 
     

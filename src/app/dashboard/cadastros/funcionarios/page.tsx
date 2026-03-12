@@ -23,7 +23,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ShieldCheck, Loader2, PlusCircle, User, Search } from 'lucide-react';
+import { ShieldCheck, Loader2, PlusCircle, User, Search, Edit } from 'lucide-react';
 import type { Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +35,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import EditFuncionarioDialog from '@/components/EditFuncionarioDialog';
 
 const formSchema = z.object({
   firstName: z.string().min(1, 'O nome é obrigatório'),
@@ -57,6 +58,7 @@ export default function CadastroFuncionariosPage() {
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingEmployee, setEditingEmployee] = useState<WithDocId<Employee> | null>(null);
 
   const employeesQueryKey = ['employees'];
   const employeesCollectionRef = useMemoFirebase(
@@ -117,6 +119,8 @@ export default function CadastroFuncionariosPage() {
         phone: '',
         accessLevel: 'Técnico', // Default access level
         status: 'Ativo',
+        birthDate: null,
+        motivoBaixa: '',
       };
       
       await setDoc(userDocRef, userData);
@@ -141,7 +145,7 @@ export default function CadastroFuncionariosPage() {
             errorMessage = 'A senha é muito fraca.';
             break;
           default:
-            errorMessage = error.message || 'Falha ao criar conta.';
+            errorMessage = 'Falha ao criar conta.';
         }
       }
       toast({ variant: 'destructive', title: 'Ops! Algo deu errado.', description: errorMessage });
@@ -161,6 +165,7 @@ export default function CadastroFuncionariosPage() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Cadastro de Funcionários</h1>
@@ -194,6 +199,7 @@ export default function CadastroFuncionariosPage() {
                 <TableHead>Nível de Acesso</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Matrícula</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -212,6 +218,7 @@ export default function CadastroFuncionariosPage() {
                         <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
                         <TableCell><Skeleton className="h-6 w-[80px] rounded-full" /></TableCell>
                         <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[60px]" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
                     </TableRow>
                 ))
               )}
@@ -234,6 +241,11 @@ export default function CadastroFuncionariosPage() {
                     </TableCell>
                     <TableCell>{getStatusBadge(employee.status)}</TableCell>
                     <TableCell className="hidden md:table-cell font-mono">{employee.id}</TableCell>
+                    <TableCell className="text-right">
+                        <Button variant="outline" size="icon" onClick={() => setEditingEmployee(employee)}>
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                    </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -277,5 +289,17 @@ export default function CadastroFuncionariosPage() {
         </DialogContent>
       </Dialog>
     </div>
+    <EditFuncionarioDialog
+      isOpen={!!editingEmployee}
+      onClose={() => setEditingEmployee(null)}
+      employee={editingEmployee}
+      onSuccess={() => {
+        queryClient.invalidateQueries({ queryKey: employeesQueryKey });
+        setEditingEmployee(null);
+      }}
+    />
+    </>
   );
 }
+
+    
