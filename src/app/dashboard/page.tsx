@@ -1,9 +1,64 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Newspaper, CalendarDays, Gift, Shield, Megaphone } from 'lucide-react';
+import { useMemo } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import type { CorporateCommunication } from '@/lib/types';
+import type { WithDocId } from '@/firebase/firestore/use-collection';
+import { format, parseISO } from 'date-fns';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Newspaper, CalendarDays, Shield, Megaphone, Gift, Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Helper component for a single communication item
+const CommunicationItem = ({ title, content, date }: { title: string; content: string; date?: string }) => (
+  <div className="space-y-1">
+    <p className="font-semibold">{title}</p>
+    <p className="text-sm text-muted-foreground">{content}</p>
+    {date && <p className="text-xs text-blue-600 font-medium mt-1">Data do Evento: {date}</p>}
+  </div>
+);
+
+// Helper component for loading state
+const LoadingCardContent = () => (
+  <CardContent className="flex-1">
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-8 w-full" />
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-8 w-full" />
+      </div>
+    </div>
+  </CardContent>
+);
 
 export default function HomePage() {
+  const firestore = useFirestore();
+  const communicationsQuery = useMemoFirebase(
+    () => firestore ? query(collection(firestore, 'communications'), orderBy('createdAt', 'desc')) : null,
+    [firestore]
+  );
+  const { data: communications, isLoading } = useCollection<WithDocId<CorporateCommunication>>(communicationsQuery);
+
+  const groupedCommunications = useMemo(() => {
+    const groups: { [key in 'Avisos' | 'Eventos' | 'Seguranca' | 'RH']: WithDocId<CorporateCommunication>[] } = {
+      Avisos: [],
+      Eventos: [],
+      Seguranca: [],
+      RH: [],
+    };
+    communications?.forEach(item => {
+      const category = item.category as keyof typeof groups;
+      if (groups[category]) {
+        groups[category].push(item);
+      }
+    });
+    return groups;
+  }, [communications]);
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <header className="text-center my-8">
@@ -17,18 +72,17 @@ export default function HomePage() {
             <CardTitle className="text-lg font-medium">Últimos Avisos</CardTitle>
             <Newspaper className="h-6 w-6 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="flex-1">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="font-semibold">Atualização da Política de Férias</p>
-                <p className="text-sm text-muted-foreground">O período para solicitação de férias para o final do ano foi estendido. Consulte o novo prazo no portal do RH.</p>
+          {isLoading ? <LoadingCardContent /> : (
+            <CardContent className="flex-1">
+              <div className="space-y-4">
+                {groupedCommunications.Avisos.length > 0 ? (
+                  groupedCommunications.Avisos.map(item => (
+                    <CommunicationItem key={item.docId} title={item.title} content={item.content} />
+                  ))
+                ) : <p className="text-sm text-muted-foreground text-center py-4">Nenhum aviso no momento.</p>}
               </div>
-              <div className="space-y-1">
-                <p className="font-semibold">Manutenção Programada do Sistema</p>
-                <p className="text-sm text-muted-foreground">Haverá uma janela de manutenção no sistema de requisições neste sábado das 22:00 às 23:00.</p>
-              </div>
-            </div>
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
 
         <Card className="flex flex-col">
@@ -36,18 +90,22 @@ export default function HomePage() {
             <CardTitle className="text-lg font-medium">Próximos Eventos</CardTitle>
             <CalendarDays className="h-6 w-6 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="flex-1">
-             <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="font-semibold">Festa de Fim de Ano</p>
-                <p className="text-sm text-muted-foreground">Data: 15 de Dezembro. Local: Salão de Festas Principal. Traje: Esporte Fino.</p>
+          {isLoading ? <LoadingCardContent /> : (
+            <CardContent className="flex-1">
+               <div className="space-y-4">
+                 {groupedCommunications.Eventos.length > 0 ? (
+                    groupedCommunications.Eventos.map(item => (
+                      <CommunicationItem
+                        key={item.docId}
+                        title={item.title}
+                        content={item.content}
+                        date={item.eventDate ? format(parseISO(item.eventDate), 'dd/MM/yyyy') : undefined}
+                      />
+                    ))
+                 ) : <p className="text-sm text-muted-foreground text-center py-4">Nenhum evento agendado.</p>}
               </div>
-              <div className="space-y-1">
-                <p className="font-semibold">Treinamento de Segurança</p>
-                <p className="text-sm text-muted-foreground">Data: 20 de Novembro. Local: Auditório. Presença obrigatória para a equipe de manutenção.</p>
-              </div>
-            </div>
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
 
         <Card className="flex flex-col">
@@ -69,18 +127,17 @@ export default function HomePage() {
             <CardTitle className="text-lg font-medium">Publicações de Segurança (SGSO)</CardTitle>
             <Shield className="h-6 w-6 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="flex-1">
-            <div className="space-y-4">
-                <div className="space-y-1">
-                    <p className="font-semibold">Relatório de Segurança 2024-Q3</p>
-                    <p className="text-sm text-muted-foreground">O relatório trimestral de segurança já está disponível para consulta no portal da Qualidade.</p>
-                </div>
-                 <div className="space-y-1">
-                    <p className="font-semibold">Alerta: Uso de EPIs</p>
-                    <p className="text-sm text-muted-foreground">Reforçamos a obrigatoriedade do uso de todos os Equipamentos de Proteção Individual nas áreas designadas.</p>
-                </div>
-            </div>
-          </CardContent>
+           {isLoading ? <LoadingCardContent /> : (
+            <CardContent className="flex-1">
+              <div className="space-y-4">
+                 {groupedCommunications.Seguranca.length > 0 ? (
+                    groupedCommunications.Seguranca.map(item => (
+                      <CommunicationItem key={item.docId} title={item.title} content={item.content} />
+                    ))
+                 ) : <p className="text-sm text-muted-foreground text-center py-4">Nenhuma publicação de segurança.</p>}
+              </div>
+            </CardContent>
+          )}
         </Card>
 
         <Card className="flex flex-col">
@@ -88,14 +145,17 @@ export default function HomePage() {
             <CardTitle className="text-lg font-medium">Comunicados do RH</CardTitle>
             <Megaphone className="h-6 w-6 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="flex-1">
-            <div className="space-y-4">
-                <div className="space-y-1">
-                    <p className="font-semibold">Pesquisa de Clima Organizacional</p>
-                    <p className="text-sm text-muted-foreground">Sua participação é fundamental! Responda à pesquisa até o dia 30.</p>
-                </div>
-            </div>
-          </CardContent>
+          {isLoading ? <LoadingCardContent /> : (
+            <CardContent className="flex-1">
+                <div className="space-y-4">
+                 {groupedCommunications.RH.length > 0 ? (
+                    groupedCommunications.RH.map(item => (
+                      <CommunicationItem key={item.docId} title={item.title} content={item.content} />
+                    ))
+                 ) : <p className="text-sm text-muted-foreground text-center py-4">Nenhum comunicado do RH.</p>}
+              </div>
+            </CardContent>
+          )}
         </Card>
       </div>
     </div>
