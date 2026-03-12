@@ -83,14 +83,28 @@ const GestaoAtividadesPage = () => {
         if (activeColumnId !== overColumnId) {
             setColumns(prev => {
                 const newColumns = new Map(prev);
-                const activeActivities = newColumns.get(activeColumnId)!.activities;
-                const overActivities = newColumns.get(overColumnId)!.activities;
+                const activeActivities = newColumns.get(activeColumnId)?.activities;
+                const overActivities = newColumns.get(overColumnId)?.activities;
                 
-                const activeIndex = activeActivities.findIndex(a => a.docId === active.id);
+                if (!activeActivities || !overActivities) {
+                    return prev;
+                }
+                
+                const activeIndex = activeActivities.findIndex(a => a && a.docId === active.id);
+                if (activeIndex === -1) {
+                    return prev; // Item not found, do nothing
+                }
+
                 const [movedActivity] = activeActivities.splice(activeIndex, 1);
                 
-                const overIndex = over.id in prev ? overActivities.findIndex(a => a.docId === over.id) : overActivities.length;
-                overActivities.splice(overIndex, 0, movedActivity);
+                const overIndex = overActivities.findIndex(a => a && a.docId === over.id);
+
+                if (overIndex !== -1) {
+                    overActivities.splice(overIndex, 0, movedActivity);
+                } else {
+                    // Dropping on column, not a specific item
+                    overActivities.push(movedActivity);
+                }
 
                 return newColumns;
             });
@@ -100,30 +114,31 @@ const GestaoAtividadesPage = () => {
     const handleDragEnd = async (event: DragEndEvent) => {
         setActiveActivity(null);
         const { active, over } = event;
-        if (!over || active.id === over.id) return;
+        if (!over) return;
         
-        const originalColumnId = active.data.current?.sortable.containerId as ActivityStatus;
-        const newColumnId = over.data.current?.sortable.containerId as ActivityStatus || over.id as ActivityStatus;
+        const activeColumnId = active.data.current?.sortable.containerId as ActivityStatus;
+        const overColumnId = over.data.current?.sortable.containerId as ActivityStatus || over.id as ActivityStatus;
         const activityId = active.id as string;
     
-        if (originalColumnId !== newColumnId) {
+        if (activeColumnId !== overColumnId && columnsOrder.includes(overColumnId)) {
             if (!firestore) return;
             const activityRef = doc(firestore, 'activities', activityId);
             try {
-                await updateDoc(activityRef, { status: newColumnId });
+                await updateDoc(activityRef, { status: overColumnId });
             } catch (err) {
                 console.error("Failed to update activity status:", err);
                 // Revert state on failure if needed
             }
-        } else {
+        } else if (activeColumnId === overColumnId) {
              // Reordering within the same column
-            const items = columns.get(originalColumnId)!.activities;
-            const oldIndex = items.findIndex(item => item.docId === active.id);
-            const newIndex = items.findIndex(item => item.docId === over.id);
+            const items = columns.get(activeColumnId)?.activities;
+            if (!items) return; // Guard clause
+            const oldIndex = items.findIndex(item => item && item.docId === active.id);
+            const newIndex = items.findIndex(item => item && item.docId === over.id);
             
-            if (oldIndex !== newIndex) {
+            if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
                 const newItems = arrayMove(items, oldIndex, newIndex);
-                setColumns(prev => new Map(prev).set(originalColumnId, { ...prev.get(originalColumnId)!, activities: newItems }));
+                setColumns(prev => new Map(prev).set(activeColumnId, { ...prev.get(activeColumnId)!, activities: newItems }));
             }
         }
     };
