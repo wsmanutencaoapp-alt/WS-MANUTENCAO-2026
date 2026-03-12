@@ -47,6 +47,7 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
   const { user: currentUser } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = useState(false);
 
   const { data: employees, isLoading: isLoadingEmployees } = useCollection<WithDocId<Employee>>(
     useMemoFirebase(() => firestore ? collection(firestore, 'employees') : null, [firestore])
@@ -117,7 +118,7 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
                     control={form.control}
                     name="assigneeId"
                     render={({ field }) => (
-                        <Popover>
+                        <Popover open={isAssigneePopoverOpen} onOpenChange={setIsAssigneePopoverOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={isLoadingEmployees}>
                                     {field.value ? employees?.find(e => e.docId === field.value)?.firstName + ' ' + employees?.find(e => e.docId === field.value)?.lastName : "Selecione um colaborador..."}
@@ -131,7 +132,14 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
                                         <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
                                         <CommandGroup>
                                             {employees?.map(employee => (
-                                                <CommandItem key={employee.docId} value={employee.docId} onSelect={() => field.onChange(employee.docId)}>
+                                                <CommandItem 
+                                                    key={employee.docId} 
+                                                    value={`${employee.firstName} ${employee.lastName}`} 
+                                                    onSelect={() => {
+                                                        field.onChange(employee.docId);
+                                                        setIsAssigneePopoverOpen(false);
+                                                    }}
+                                                >
                                                     <Check className={cn("mr-2 h-4 w-4", field.value === employee.docId ? "opacity-100" : "opacity-0")} />
                                                     {employee.firstName} {employee.lastName}
                                                 </CommandItem>
