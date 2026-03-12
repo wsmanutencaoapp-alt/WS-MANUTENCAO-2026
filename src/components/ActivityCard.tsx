@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { useUser, useDoc, useMemoFirebase, useFirestore } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
+import { Badge } from './ui/badge';
 
 interface ActivityCardProps {
     activity: WithDocId<Activity>;
@@ -50,6 +51,16 @@ export default function ActivityCard({ activity, isOverlay, onClick }: ActivityC
         'Urgente': 'border-l-destructive',
     };
 
+    const getPriorityVariant = (priority?: Activity['priority']): 'default' | 'destructive' | 'attention' => {
+        switch (priority) {
+            case 'Urgente': return 'destructive';
+            case 'Média': return 'attention';
+            case 'Normal':
+            default:
+                return 'default';
+        }
+    }
+
     return (
         <Card
             ref={setNodeRef}
@@ -67,6 +78,7 @@ export default function ActivityCard({ activity, isOverlay, onClick }: ActivityC
             <p className="font-semibold text-base mb-2">{activity.title}</p>
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Badge variant={getPriorityVariant(activity.priority)}>{activity.priority}</Badge>
                     <Clock className="h-4 w-4" />
                     <span>{formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true, locale: ptBR })}</span>
                 </div>
