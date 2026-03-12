@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandGroup, CommandItem, CommandList } from './ui/command';
@@ -30,7 +29,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { FormControl } from './ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 
 interface CreateActivityDialogProps {
   isOpen: boolean;
@@ -105,108 +104,129 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
         <DialogHeader>
           <DialogTitle>Criar Nova Atividade</DialogTitle>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-                <Label htmlFor="title">Título <span className="text-destructive">*</span></Label>
-                <Input id="title" {...form.register('title')} />
-                {form.formState.errors.title && <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>}
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="description">Descrição</Label>
-                <Textarea id="description" {...form.register('description')} />
-            </div>
-             <div className="space-y-2">
-                <Label>Responsável <span className="text-destructive">*</span></Label>
-                <Controller
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Título <span className="text-destructive">*</span></FormLabel>
+                            <FormControl><Input {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Descrição</FormLabel>
+                            <FormControl><Textarea {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
                     control={form.control}
                     name="assigneeId"
                     render={({ field }) => (
-                        <Popover open={isAssigneePopoverOpen} onOpenChange={setIsAssigneePopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={isLoadingEmployees}>
-                                    {field.value ? employees?.find(e => e.docId === field.value)?.firstName + ' ' + employees?.find(e => e.docId === field.value)?.lastName : "Selecione um colaborador..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Buscar colaborador..." />
-                                    <CommandList>
-                                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
-                                        <CommandGroup>
-                                            {employees?.map(employee => (
-                                                <CommandItem 
-                                                    key={employee.docId} 
-                                                    value={`${employee.firstName} ${employee.lastName}`} 
-                                                    onSelect={() => {
-                                                        field.onChange(employee.docId);
-                                                        setIsAssigneePopoverOpen(false);
-                                                    }}
-                                                >
-                                                    <Check className={cn("mr-2 h-4 w-4", field.value === employee.docId ? "opacity-100" : "opacity-0")} />
-                                                    {employee.firstName} {employee.lastName}
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
+                        <FormItem className="flex flex-col">
+                            <FormLabel>Responsável <span className="text-destructive">*</span></FormLabel>
+                            <Popover open={isAssigneePopoverOpen} onOpenChange={setIsAssigneePopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <FormControl>
+                                        <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={isLoadingEmployees}>
+                                            {field.value ? employees?.find(e => e.docId === field.value)?.firstName + ' ' + employees?.find(e => e.docId === field.value)?.lastName : "Selecione um colaborador..."}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="Buscar por nome..." />
+                                        <CommandList>
+                                            <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                                            <CommandGroup>
+                                                {employees?.map(employee => (
+                                                    <CommandItem 
+                                                        key={employee.docId} 
+                                                        value={`${employee.firstName} ${employee.lastName}`} 
+                                                        onSelect={() => {
+                                                            field.onChange(employee.docId);
+                                                            setIsAssigneePopoverOpen(false);
+                                                        }}
+                                                    >
+                                                        <Check className={cn("mr-2 h-4 w-4", field.value === employee.docId ? "opacity-100" : "opacity-0")} />
+                                                        {employee.firstName} {employee.lastName}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                        </FormItem>
                     )}
                 />
-                 {form.formState.errors.assigneeId && <p className="text-sm text-destructive">{form.formState.errors.assigneeId.message}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                  <Label>Prioridade</Label>
-                  <Controller
-                      control={form.control}
-                      name="priority"
-                      render={({ field }) => (
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                  <SelectTrigger>
-                                      <SelectValue placeholder="Defina a prioridade" />
-                                  </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                  <SelectItem value="Normal">Normal</SelectItem>
-                                  <SelectItem value="Média">Média</SelectItem>
-                                  <SelectItem value="Urgente">Urgente</SelectItem>
-                              </SelectContent>
-                          </Select>
-                      )}
-                  />
-              </div>
-              <div className="space-y-2">
-                  <Label>Prazo (Opcional)</Label>
-                  <Controller
-                      control={form.control}
-                      name="dueDate"
-                      render={({ field }) => (
-                          <Popover>
-                              <PopoverTrigger asChild>
-                                  <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                      <CalendarIcon className="mr-2 h-4 w-4" />
-                                      {field.value ? format(field.value, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
-                                  </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                  <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                              </PopoverContent>
-                          </Popover>
-                      )}
-                  />
-              </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-                <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Criar Atividade
-                </Button>
-            </DialogFooter>
-        </form>
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="priority"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Prioridade</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Defina a prioridade" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="Normal">Normal</SelectItem>
+                                        <SelectItem value="Média">Média</SelectItem>
+                                        <SelectItem value="Urgente">Urgente</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="dueDate"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                                <FormLabel>Prazo (Opcional)</FormLabel>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <FormControl>
+                                            <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {field.value ? format(field.value, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
+                                            </Button>
+                                        </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
+                    <Button type="submit" disabled={form.formState.isSubmitting}>
+                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Criar Atividade
+                    </Button>
+                </DialogFooter>
+            </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
