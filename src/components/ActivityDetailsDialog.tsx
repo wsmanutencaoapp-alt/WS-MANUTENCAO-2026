@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import type { Activity } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
@@ -34,7 +34,7 @@ interface ActivityDetailsDialogProps {
   currentUser: User | null;
 }
 
-export default function ActivityDetailsDialog({ isOpen, onClose, activity, currentUser }: ActivityDetailsDialogProps) {
+export default function ActivityDetailsDialog({ isOpen, onClose, activity: initialActivity, currentUser }: ActivityDetailsDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -43,6 +43,15 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity, curre
   const [justification, setJustification] = useState('');
   const [progressNote, setProgressNote] = useState('');
   const [dueDate, setDueDate] = useState('');
+
+  // Use useDoc to get real-time updates for the selected activity
+  const activityDocRef = useMemoFirebase(() => (
+    firestore && initialActivity?.docId ? doc(firestore, 'activities', initialActivity.docId) : null
+  ), [firestore, initialActivity?.docId]);
+
+  const { data: activity, isLoading: isLoadingActivity } = useDoc<WithDocId<Activity>>(activityDocRef, {
+    enabled: !!initialActivity?.docId && isOpen,
+  });
 
   useEffect(() => {
     if (activity) {
@@ -72,8 +81,8 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity, curre
         });
 
         toast({ title: 'Sucesso', description: 'Progresso adicionado à atividade.' });
-        queryClient.invalidateQueries({ queryKey: ['activities'] });
         setProgressNote(''); // Clear the textarea
+        // No need to invalidate queries, useDoc handles real-time updates
     } catch (err) {
         console.error(err);
         toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível adicionar a nota de progresso.' });
@@ -143,6 +152,7 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity, curre
 
         await updateDoc(activityRef, updateData);
         toast({ title: 'Sucesso!', description: 'Status da atividade atualizado.' });
+        // Invalidate the main query to update the Kanban board columns
         queryClient.invalidateQueries({ queryKey: ['activities'] });
         onClose();
     } catch(err) {
@@ -160,11 +170,15 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity, curre
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>{activity?.title}</DialogTitle>
+          <DialogTitle>{activity?.title || <Loader2 className="h-5 w-5 animate-spin" />}</DialogTitle>
           <DialogDescription>
             Atribuída a <span className='font-medium'>{activity?.assigneeName}</span> por <span className='font-medium'>{activity?.requesterName}</span>.
           </DialogDescription>
         </DialogHeader>
+        
+        {isLoadingActivity && !activity ? (
+            <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+        ) : (
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 py-4">
             <p className="text-sm whitespace-pre-wrap">{activity?.description || 'Nenhuma descrição fornecida.'}</p>
             <div className="flex justify-between items-center text-sm">
@@ -226,28 +240,33 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity, curre
 
             <div>
                 <h4 className="font-semibold mb-2">Histórico</h4>
-                <ScrollArea className="h-40 border rounded-md p-2">
+                <ScrollArea className="h-56 border rounded-md p-2">
                     <div className="space-y-3">
-                    {activity?.history?.slice().reverse().map((log, i) => (
-                        <React.Fragment key={i}>
-                            <div className="text-xs text-muted-foreground">
-                                <div className="flex justify-between items-center">
-                                    <span className="font-semibold">{log.userName}</span>
-                                    <span className="text-muted-foreground/80">{format(new Date(log.timestamp), 'dd/MM HH:mm', { locale: ptBR })}</span>
+                    {activity?.history && activity.history.length > 0 ? (
+                        activity.history.slice().reverse().map((log, i) => (
+                            <React.Fragment key={i}>
+                                <div className="text-xs text-muted-foreground">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold">{log.userName}</span>
+                                        <span className="text-muted-foreground/80">{format(new Date(log.timestamp), 'dd/MM HH:mm', { locale: ptBR })}</span>
+                                    </div>
+                                    <div className="flex items-start gap-2 mt-1">
+                                        <Badge variant="outline" className="text-xs whitespace-nowrap">{log.action}</Badge>
+                                        <p className="flex-1 whitespace-pre-wrap">{log.details}</p>
+                                    </div>
                                 </div>
-                                <div className="flex items-start gap-2 mt-1">
-                                    <Badge variant="outline" className="text-xs whitespace-nowrap">{log.action}</Badge>
-                                    <p className="flex-1 whitespace-pre-wrap">{log.details}</p>
-                                </div>
-                            </div>
-                            {i < activity.history.length - 1 && <Separator />}
-                        </React.Fragment>
-                    ))}
+                                {i < activity.history.length - 1 && <Separator />}
+                            </React.Fragment>
+                        ))
+                    ) : (
+                        <p className="text-center text-xs text-muted-foreground py-4">Nenhum histórico para esta atividade.</p>
+                    )}
                     </div>
                 </ScrollArea>
             </div>
-
         </div>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Fechar</Button>
         </DialogFooter>
