@@ -83,6 +83,16 @@ export const permissionStructure = [
           { id: 'engenharia_projetos', label: 'Projetos', path: '/dashboard/engenharia/projetos', actions: ['view', 'create', 'update', 'delete'] },
         ]
     },
+     {
+        id: 'recursos_humanos',
+        label: 'Recursos Humanos',
+        path: '/dashboard/recursos-humanos',
+        isModule: true,
+        actions: ['view'],
+        submodules: [
+            { id: 'recursos_humanos_mural', label: 'Gerenciar Mural', path: '/dashboard/recursos-humanos/mural', actions: ['view', 'create', 'update', 'delete'] },
+        ]
+    },
     {
         id: 'comercial',
         label: 'Comercial',
@@ -232,5 +242,3 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
 
     return null;
 };
-
-    

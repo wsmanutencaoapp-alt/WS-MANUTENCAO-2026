@@ -226,6 +226,8 @@ export type Permissions = {
   ferramentaria_kits?: boolean;
   ferramentaria_historico?: boolean;
   configurador_disparo_email?: boolean;
+  recursos_humanos?: boolean;
+  recursos_humanos_mural?: boolean;
   [key: string]: boolean | undefined;
 };
 
@@ -464,6 +466,40 @@ export type EmployeeTraining = {
   completionDate: string; // ISO Date
   expiryDate: string; // ISO Date
   certificateUrl?: string;
+};
+
+export type ActivityLog = {
+    timestamp: string; // ISO date string
+    userId: string;
+    userName: string;
+    action: string;
+    details: string;
+};
+
+export type Activity = {
+    id?: string;
+    title: string;
+    description: string;
+    status: 'Pendente' | 'Em Andamento' | 'Concluída' | 'Recusada' | 'Aguardando Validação';
+    requesterId: string;
+    requesterName: string;
+    assigneeId: string;
+    assigneeName: string;
+    createdAt: string; // ISO date string
+    dueDate?: string; // ISO date string
+    refusalJustification?: string;
+    validationNotes?: string;
+    isEffective?: boolean;
+    history?: ActivityLog[];
+};
+
+export type CorporateCommunication = {
+  id?: string;
+  title: string;
+  content: string;
+  category: 'Avisos' | 'Eventos' | 'Seguranca' | 'RH';
+  eventDate?: string; // ISO date string
+  createdAt: string; // ISO date string
 };
     
 

@@ -218,7 +218,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_treinamentos_create') || hasPermission('cadastros_treinamentos_update') || hasPermission('cadastros_treinamentos_delete');
     }
+
+    match /communications/{communicationId} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('recursos_humanos_mural_create') || hasPermission('recursos_humanos_mural_update') || hasPermission('recursos_humanos_mural_delete');
+    }
   }
 }
-
-    

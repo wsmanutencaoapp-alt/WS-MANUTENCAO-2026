@@ -40,6 +40,7 @@ import {
   ClipboardList,
   Activity,
   Home,
+  Megaphone,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -144,6 +145,15 @@ const allNavItems: NavItem[] = [
     subItems: [
       { href: '/dashboard/engenharia/aprovacoes', label: 'Aprovações', permission: 'engenharia_aprovacoes' },
       { href: '/dashboard/engenharia/projetos', label: 'Projetos', permission: 'engenharia_projetos' },
+    ]
+  },
+   { 
+    href: '/dashboard/recursos-humanos', 
+    icon: Megaphone, 
+    label: 'Recursos Humanos',
+    permission: 'recursos_humanos',
+    subItems: [
+        { href: '/dashboard/recursos-humanos/mural', label: 'Gerenciar Mural', permission: 'recursos_humanos_mural' },
     ]
   },
   { 
@@ -400,5 +410,3 @@ export function Header() {
     </header>
   );
 }
-
-    

@@ -1881,6 +1881,33 @@
             }
         },
         "required": ["title", "status", "requesterId", "assigneeId", "createdAt"]
+    },
+    "CorporateCommunication": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Corporate Communication",
+      "type": "object",
+      "description": "Represents an internal company announcement, event, or publication.",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string", "description": "The title of the communication." },
+        "content": { "type": "string", "description": "The main body/content of the communication." },
+        "category": {
+          "type": "string",
+          "enum": ["Avisos", "Eventos", "Seguranca", "RH"],
+          "description": "The category of the communication."
+        },
+        "eventDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time of the event, if applicable."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the communication was created."
+        }
+      },
+      "required": ["title", "content", "category", "createdAt"]
     }
   },
   "auth": {
@@ -2143,9 +2170,16 @@
           "schema": { "$ref": "#/entities/Activity" },
           "description": "Stores tasks and activities for users."
         }
+      },
+      {
+        "path": "/communications/{communicationId}",
+        "definition": {
+          "schema": {
+            "$ref": "#/entities/CorporateCommunication"
+          },
+          "description": "Stores internal corporate communications like announcements, events, etc."
+        }
       }
     ]
   }
 }
-
-    
