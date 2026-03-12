@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import type { Activity } from '@/lib/types';
@@ -142,7 +142,7 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity, curre
 
 
         await updateDoc(activityRef, updateData);
-        toast({ title: 'Sucesso', description: 'Status da atividade atualizado.' });
+        toast({ title: 'Sucesso!', description: 'Status da atividade atualizado.' });
         queryClient.invalidateQueries({ queryKey: ['activities'] });
         onClose();
     } catch(err) {
