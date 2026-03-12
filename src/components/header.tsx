@@ -39,6 +39,7 @@ import {
   Paintbrush,
   ClipboardList,
   Activity,
+  Home,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -69,6 +70,12 @@ import Notifications from './Notifications';
 const allNavItems: NavItem[] = [
   { 
     href: '/dashboard', 
+    icon: Home, 
+    label: 'Home',
+    permission: 'dashboard', // Re-using dashboard permission for simplicity
+  },
+   { 
+    href: '/dashboard/comercial', // New path for the old dashboard
     icon: LayoutDashboard, 
     label: 'Dashboard',
     permission: 'dashboard',
@@ -138,12 +145,6 @@ const allNavItems: NavItem[] = [
       { href: '/dashboard/engenharia/aprovacoes', label: 'Aprovações', permission: 'engenharia_aprovacoes' },
       { href: '/dashboard/engenharia/projetos', label: 'Projetos', permission: 'engenharia_projetos' },
     ]
-  },
-  {
-    href: '/dashboard/comercial',
-    icon: DollarSign,
-    label: 'Comercial',
-    permission: 'comercial',
   },
   { 
     href: '/dashboard/financeiro', 

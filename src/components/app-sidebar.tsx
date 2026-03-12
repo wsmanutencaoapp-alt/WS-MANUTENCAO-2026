@@ -40,6 +40,7 @@ import {
   Paintbrush,
   ClipboardList,
   Activity,
+  Home,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -55,6 +56,12 @@ import { Input } from '@/components/ui/input';
 const allNavItems: NavItem[] = [
   { 
     href: '/dashboard', 
+    icon: Home, 
+    label: 'Home',
+    permission: 'dashboard', // Re-using dashboard permission for simplicity
+  },
+  { 
+    href: '/dashboard/comercial', // New path for the old dashboard
     icon: LayoutDashboard, 
     label: 'Dashboard',
     permission: 'dashboard',
@@ -125,12 +132,6 @@ const allNavItems: NavItem[] = [
       { href: '/dashboard/engenharia/projetos', label: 'Projetos', permission: 'engenharia_projetos' },
     ]
   },
-  {
-    href: '/dashboard/comercial',
-    icon: DollarSign,
-    label: 'Comercial',
-    permission: 'comercial',
-  },
   { 
     href: '/dashboard/financeiro', 
     icon: Wallet, 
@@ -142,7 +143,7 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/financeiro/budget', label: 'Budget', permission: 'financeiro_budget' },
     ]
   },
-  { 
+   { 
     href: '/dashboard/contabilidade', 
     icon: Landmark, 
     label: 'Fiscal/Contábil',
@@ -184,7 +185,7 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/manutencao/veiculos', label: 'Manutenção de Veículos', permission: 'manutencao_veiculos' },
     ]
   },
-  {
+   {
     href: '/dashboard/portaria',
     icon: DoorOpen,
     label: 'Portaria',
