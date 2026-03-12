@@ -16,16 +16,23 @@ interface KanbanColumnProps {
 export default function KanbanColumn({ column, onCardClick }: KanbanColumnProps) {
     const { setNodeRef } = useDroppable({ id: column.id });
 
+    // Filter out potential undefined or null values to prevent crashes.
+    const validActivities = column.activities.filter(Boolean);
+
     return (
         <div ref={setNodeRef} className="w-80 flex-shrink-0">
             <div className="bg-muted rounded-lg h-full flex flex-col">
                 <div className="p-3 border-b">
-                    <h3 className="font-semibold text-lg">{column.title} ({column.activities.length})</h3>
+                    <h3 className="font-semibold text-lg">{column.title} ({validActivities.length})</h3>
                 </div>
                 <ScrollArea className="flex-1">
-                    <SortableContext id={column.id} items={column.activities.map(a => a.docId)} strategy={verticalListSortingStrategy}>
+                    <SortableContext 
+                        id={column.id} 
+                        items={validActivities.map(a => a.docId)} 
+                        strategy={verticalListSortingStrategy}
+                    >
                         <div className="p-2 space-y-2">
-                            {column.activities.map(activity => (
+                            {validActivities.map(activity => (
                                 <ActivityCard key={activity.docId} activity={activity} onClick={() => onCardClick(activity)} />
                             ))}
                         </div>
