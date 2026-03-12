@@ -2,10 +2,10 @@
 
 import { useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
-import type { CorporateCommunication } from '@/lib/types';
+import { collection, query, orderBy, where } from 'firebase/firestore';
+import type { CorporateCommunication, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, getMonth, getDate } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Newspaper, CalendarDays, Shield, Megaphone, Gift, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,7 +41,34 @@ export default function HomePage() {
     () => firestore ? query(collection(firestore, 'communications'), orderBy('createdAt', 'desc')) : null,
     [firestore]
   );
-  const { data: communications, isLoading } = useCollection<WithDocId<CorporateCommunication>>(communicationsQuery);
+  const { data: communications, isLoading: isLoadingCommunications } = useCollection<WithDocId<CorporateCommunication>>(communicationsQuery);
+
+  const employeesQuery = useMemoFirebase(
+    () => firestore ? query(collection(firestore, 'employees'), where('status', '==', 'Ativo')) : null,
+    [firestore]
+  );
+  const { data: employees, isLoading: isLoadingEmployees } = useCollection<WithDocId<Employee>>(employeesQuery);
+
+  const monthlyBirthdays = useMemo(() => {
+    if (!employees) return [];
+    
+    const currentMonth = getMonth(new Date());
+    
+    return employees
+      .filter(employee => {
+        if (!employee.birthDate) return false;
+        // The date is stored as 'yyyy-MM-dd' or ISO string, which Date constructor handles
+        const birthMonth = getMonth(new Date(employee.birthDate));
+        return birthMonth === currentMonth;
+      })
+      .map(employee => ({
+        name: `${employee.firstName} ${employee.lastName}`,
+        day: getDate(new Date(employee.birthDate)),
+      }))
+      .sort((a, b) => a.day - b.day);
+
+  }, [employees]);
+
 
   const groupedCommunications = useMemo(() => {
     const groups: { [key in 'Avisos' | 'Eventos' | 'Seguranca' | 'RH']: WithDocId<CorporateCommunication>[] } = {
@@ -58,6 +85,8 @@ export default function HomePage() {
     });
     return groups;
   }, [communications]);
+  
+  const isLoading = isLoadingCommunications || isLoadingEmployees;
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -113,13 +142,19 @@ export default function HomePage() {
             <CardTitle className="text-lg font-medium">Aniversariantes do Mês</CardTitle>
             <Gift className="h-6 w-6 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="flex-1">
-             <ul className="space-y-2 text-sm">
-                <li>João da Silva - Dia 05</li>
-                <li>Maria Oliveira - Dia 12</li>
-                <li>Carlos Pereira - Dia 21</li>
-             </ul>
-          </CardContent>
+           {isLoadingEmployees ? <LoadingCardContent /> : (
+            <CardContent className="flex-1">
+              {monthlyBirthdays.length > 0 ? (
+                <ul className="space-y-2 text-sm">
+                  {monthlyBirthdays.map(b => (
+                    <li key={b.name}>{b.name} - Dia {String(b.day).padStart(2, '0')}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhum aniversariante este mês.</p>
+              )}
+            </CardContent>
+          )}
         </Card>
         
         <Card className="lg:col-span-2 flex flex-col">
