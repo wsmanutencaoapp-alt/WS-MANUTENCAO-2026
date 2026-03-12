@@ -21,10 +21,11 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, XCircle, Milestone, Check, RefreshCcw } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Milestone, Check, RefreshCcw, MessageSquarePlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
+import { Separator } from './ui/separator';
 
 interface ActivityDetailsDialogProps {
   isOpen: boolean;
@@ -40,14 +41,46 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity, curre
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [justification, setJustification] = useState('');
+  const [progressNote, setProgressNote] = useState('');
   const [dueDate, setDueDate] = useState('');
 
   useEffect(() => {
     if (activity) {
         setJustification('');
+        setProgressNote('');
         setDueDate(activity.dueDate ? format(new Date(activity.dueDate), 'yyyy-MM-dd') : '');
     }
   }, [activity]);
+
+  const handleLogProgress = async () => {
+    if (!firestore || !activity || !currentUser || !progressNote) return;
+
+    setIsProcessing(true);
+    const activityRef = doc(firestore, 'activities', activity.docId);
+
+    try {
+        const historyEntry = {
+            action: 'Progresso',
+            userId: currentUser.uid,
+            userName: currentUser.displayName || currentUser.email,
+            timestamp: new Date().toISOString(),
+            details: progressNote
+        };
+
+        await updateDoc(activityRef, {
+            history: arrayUnion(historyEntry)
+        });
+
+        toast({ title: 'Sucesso', description: 'Progresso adicionado à atividade.' });
+        queryClient.invalidateQueries({ queryKey: ['activities'] });
+        setProgressNote(''); // Clear the textarea
+    } catch (err) {
+        console.error(err);
+        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível adicionar a nota de progresso.' });
+    } finally {
+        setIsProcessing(false);
+    }
+  };
 
   const handleAction = async (action: 'accept' | 'reject' | 'complete' | 'validate_ok' | 'validate_nok') => {
     if (!firestore || !activity || !currentUser) return;
@@ -158,7 +191,22 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity, curre
                 </div>
             )}
             {isAssignee && activity?.status === 'Em Andamento' && (
-                 <Button className="w-full" onClick={() => handleAction('complete')} disabled={isProcessing}><Milestone className="mr-2"/> Marcar como Concluída</Button>
+                 <div className="p-4 border rounded-lg space-y-4 bg-muted/50">
+                    <h4 className="font-semibold">Acompanhamento da Execução</h4>
+                    <div className="space-y-2">
+                        <Label htmlFor="progressNote">Adicionar nota de progresso</Label>
+                        <Textarea id="progressNote" value={progressNote} onChange={(e) => setProgressNote(e.target.value)} placeholder="Ex: Contatei o fornecedor X, aguardando resposta." />
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                        <Button variant="secondary" onClick={handleLogProgress} disabled={isProcessing || !progressNote}>
+                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <MessageSquarePlus className="mr-2"/>}
+                             Adicionar Progresso
+                        </Button>
+                        <Button className="" onClick={() => handleAction('complete')} disabled={isProcessing}>
+                            <Milestone className="mr-2"/> Marcar como Concluída
+                        </Button>
+                    </div>
+                </div>
             )}
 
              {/* Actions for Requester */}
@@ -179,12 +227,23 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity, curre
             <div>
                 <h4 className="font-semibold mb-2">Histórico</h4>
                 <ScrollArea className="h-40 border rounded-md p-2">
+                    <div className="space-y-3">
                     {activity?.history?.slice().reverse().map((log, i) => (
-                        <div key={i} className="text-xs text-muted-foreground mb-2">
-                            <p><span className="font-semibold">{log.userName}</span> ({format(new Date(log.timestamp), 'dd/MM HH:mm', { locale: ptBR })})</p>
-                            <p>{log.details}</p>
-                        </div>
+                        <React.Fragment key={i}>
+                            <div className="text-xs text-muted-foreground">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-semibold">{log.userName}</span>
+                                    <span className="text-muted-foreground/80">{format(new Date(log.timestamp), 'dd/MM HH:mm', { locale: ptBR })}</span>
+                                </div>
+                                <div className="flex items-start gap-2 mt-1">
+                                    <Badge variant="outline" className="text-xs whitespace-nowrap">{log.action}</Badge>
+                                    <p className="flex-1 whitespace-pre-wrap">{log.details}</p>
+                                </div>
+                            </div>
+                            {i < activity.history.length - 1 && <Separator />}
+                        </React.Fragment>
                     ))}
+                    </div>
                 </ScrollArea>
             </div>
 
