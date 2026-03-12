@@ -44,6 +44,12 @@ export default function ActivityCard({ activity, isOverlay, onClick }: ActivityC
 
     const getInitials = (name?: string) => name ? name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
 
+    const priorityStyles = {
+        'Normal': 'border-l-blue-500',
+        'Média': 'border-l-orange-500',
+        'Urgente': 'border-l-destructive',
+    };
+
     return (
         <Card
             ref={setNodeRef}
@@ -52,7 +58,8 @@ export default function ActivityCard({ activity, isOverlay, onClick }: ActivityC
             {...listeners}
             onClick={onClick}
             className={cn(
-                "p-3 cursor-grab hover:shadow-md",
+                "p-3 cursor-grab hover:shadow-md border-l-4",
+                priorityStyles[activity.priority] || 'border-l-transparent',
                 isDragging && "opacity-50 ring-2 ring-primary",
                 isOverlay && "ring-2 ring-primary shadow-lg"
             )}

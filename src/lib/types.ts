@@ -481,6 +481,7 @@ export type Activity = {
     id?: string;
     title: string;
     description: string;
+    priority: 'Normal' | 'Média' | 'Urgente';
     status: 'Pendente' | 'Em Andamento' | 'Concluída' | 'Recusada' | 'Aguardando Validação';
     requesterId: string;
     requesterName: string;

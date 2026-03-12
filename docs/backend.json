@@ -1867,6 +1867,10 @@
             "id": { "type": "string" },
             "title": { "type": "string" },
             "description": { "type": "string" },
+            "priority": {
+              "type": "string",
+              "enum": ["Normal", "Média", "Urgente"]
+            },
             "status": {
                 "type": "string",
                 "enum": ["Pendente", "Em Andamento", "Concluída", "Recusada", "Aguardando Validação"]
@@ -1885,7 +1889,7 @@
                 "items": { "$ref": "#/entities/ActivityLog" }
             }
         },
-        "required": ["title", "status", "requesterId", "assigneeId", "createdAt"]
+        "required": ["title", "status", "requesterId", "assigneeId", "createdAt", "priority"]
     },
     "CorporateCommunication": {
       "$schema": "http://json-schema.org/draft-07/schema#",

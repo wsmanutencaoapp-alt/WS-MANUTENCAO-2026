@@ -29,6 +29,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { FormControl } from './ui/form';
 
 interface CreateActivityDialogProps {
   isOpen: boolean;
@@ -39,6 +41,7 @@ const formSchema = z.object({
   title: z.string().min(1, "O título é obrigatório."),
   description: z.string().optional(),
   assigneeId: z.string().min(1, "É necessário designar um responsável."),
+  priority: z.enum(['Normal', 'Média', 'Urgente']).default('Normal'),
   dueDate: z.date().optional(),
 });
 
@@ -55,7 +58,7 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { title: '', description: '', assigneeId: '' },
+    defaultValues: { title: '', description: '', assigneeId: '', priority: 'Normal' },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -153,25 +156,48 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
                 />
                  {form.formState.errors.assigneeId && <p className="text-sm text-destructive">{form.formState.errors.assigneeId.message}</p>}
             </div>
-            <div className="space-y-2">
-                <Label>Prazo (Opcional)</Label>
-                <Controller
-                    control={form.control}
-                    name="dueDate"
-                    render={({ field }) => (
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {field.value ? format(field.value, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                            </PopoverContent>
-                        </Popover>
-                    )}
-                />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                  <Label>Prioridade</Label>
+                  <Controller
+                      control={form.control}
+                      name="priority"
+                      render={({ field }) => (
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                  <SelectTrigger>
+                                      <SelectValue placeholder="Defina a prioridade" />
+                                  </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                  <SelectItem value="Normal">Normal</SelectItem>
+                                  <SelectItem value="Média">Média</SelectItem>
+                                  <SelectItem value="Urgente">Urgente</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      )}
+                  />
+              </div>
+              <div className="space-y-2">
+                  <Label>Prazo (Opcional)</Label>
+                  <Controller
+                      control={form.control}
+                      name="dueDate"
+                      render={({ field }) => (
+                          <Popover>
+                              <PopoverTrigger asChild>
+                                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {field.value ? format(field.value, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
+                                  </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                  <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                              </PopoverContent>
+                          </Popover>
+                      )}
+                  />
+              </div>
             </div>
             <DialogFooter>
                 <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>

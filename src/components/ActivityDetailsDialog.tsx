@@ -34,6 +34,16 @@ interface ActivityDetailsDialogProps {
   currentUser: User | null;
 }
 
+const getPriorityVariant = (priority?: Activity['priority']): 'destructive' | 'attention' | 'secondary' => {
+    switch (priority) {
+        case 'Urgente': return 'destructive';
+        case 'Média': return 'attention';
+        case 'Normal':
+        default:
+            return 'secondary';
+    }
+}
+
 export default function ActivityDetailsDialog({ isOpen, onClose, activity: initialActivity, currentUser }: ActivityDetailsDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -182,7 +192,10 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity: initi
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 py-4">
             <p className="text-sm whitespace-pre-wrap">{activity?.description || 'Nenhuma descrição fornecida.'}</p>
             <div className="flex justify-between items-center text-sm">
-                <Badge>{activity?.status}</Badge>
+                <div className="flex items-center gap-2">
+                    <Badge>{activity?.status}</Badge>
+                    {activity?.priority && <Badge variant={getPriorityVariant(activity.priority)}>{activity.priority}</Badge>}
+                </div>
                 {activity?.dueDate && <span>Prazo: {format(new Date(activity.dueDate), 'dd/MM/yyyy')}</span>}
             </div>
 
