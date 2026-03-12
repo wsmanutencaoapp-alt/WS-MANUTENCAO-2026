@@ -369,9 +369,10 @@
             "CT",
             "CG",
             "CP",
-            "PA"
+            "PA",
+            "ST"
           ],
-          "description": "The family/category of the supply item."
+          "description": "A família/categoria do item de suprimento (MP: Matéria-Prima, CT: Consumível Técnico, CG: Consumível Geral, CP: Componente, PA: Produto Acabado, ST: Serviços Terceiros)."
         },
         "exigeLote": {
           "type": "boolean",
@@ -842,6 +843,13 @@
         },
         "totalValue": {
           "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["BRL", "USD"]
+        },
+        "isImported": {
+          "type": "boolean"
         },
         "deliveryTime": {
           "type": "number",

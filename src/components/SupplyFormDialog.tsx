@@ -60,11 +60,12 @@ const familyCodes: Record<Supply['familia'], string> = {
   CG: '30',
   CT: '40',
   CP: '50',
+  ST: '60',
 };
 
 const formSchema = z.object({
   // Aba 1: Identificação
-  familia: z.enum(['MP', 'CT', 'CG', 'CP', 'PA']),
+  familia: z.enum(['MP', 'CT', 'CG', 'CP', 'PA', 'ST']),
   descricao: z.string().min(3, { message: "A descrição é obrigatória." }),
   partNumber: z.string(),
   unidadeMedida: z.enum(['UN', 'KG', 'MT', 'LT', 'CX']),
@@ -94,7 +95,7 @@ const formSchema = z.object({
   ),
 
 }).refine(data => {
-    if (data.familia !== 'CG') {
+    if (!['CG', 'ST'].includes(data.familia)) {
         return data.partNumber.length > 0;
     }
     return true;
@@ -206,9 +207,11 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
         form.setValue('exigeLote', true);
         form.setValue('exigeSerialNumber', false);
         break;
+      case 'ST':
       case 'CG':
         form.setValue('exigeLote', false);
         form.setValue('exigeSerialNumber', false);
+        form.setValue('exigeValidade', false);
         break;
       default:
         if (!supply) {
@@ -316,9 +319,9 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
   };
   
   const isLoteDisabled = useMemo(() => ['MP', 'PA', 'CP', 'CT'].includes(familia), [familia]);
-  const isSerialDisabled = useMemo(() => ['MP', 'CG', 'CT'].includes(familia), [familia]);
+  const isSerialDisabled = useMemo(() => ['MP', 'CG', 'CT', 'ST'].includes(familia), [familia]);
   const isSerialMandatory = useMemo(() => ['PA', 'CP'].includes(familia), [familia]);
-  const isPartNumberRequired = useMemo(() => familia !== 'CG', [familia]);
+  const isPartNumberRequired = useMemo(() => !['CG', 'ST'].includes(familia), [familia]);
 
   return (
     <Dialog open={isOpen} onOpenChange={resetFormAndClose} modal={false}>
@@ -357,6 +360,7 @@ export default function SupplyFormDialog({ isOpen, onClose, onSuccess, supply }:
                               <SelectItem value="CG">CG - Consumível Geral</SelectItem>
                               <SelectItem value="CP">CP - Componente</SelectItem>
                               <SelectItem value="PA">PA - Produto Acabado</SelectItem>
+                              <SelectItem value="ST">ST - Serviços Terceiros</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
