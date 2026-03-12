@@ -1871,6 +1871,11 @@
               "type": "string",
               "enum": ["Normal", "Média", "Urgente"]
             },
+            "sector": {
+              "type": "string",
+              "description": "The sector the activity belongs to.",
+              "enum": ["Ferramentaria", "Suprimentos", "Engenharia", "Manutenção", "TI", "Qualidade", "GSO", "Administrativo", "Financeiro", "Outro"]
+            },
             "status": {
                 "type": "string",
                 "enum": ["Pendente", "Em Andamento", "Concluída", "Recusada", "Aguardando Validação"]
@@ -1889,7 +1894,7 @@
                 "items": { "$ref": "#/entities/ActivityLog" }
             }
         },
-        "required": ["title", "status", "requesterId", "assigneeId", "createdAt", "priority"]
+        "required": ["title", "status", "requesterId", "assigneeId", "createdAt", "priority", "sector"]
     },
     "CorporateCommunication": {
       "$schema": "http://json-schema.org/draft-07/schema#",

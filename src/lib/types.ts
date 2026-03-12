@@ -482,6 +482,7 @@ export type Activity = {
     title: string;
     description: string;
     priority: 'Normal' | 'Média' | 'Urgente';
+    sector: 'Ferramentaria' | 'Suprimentos' | 'Engenharia' | 'Manutenção' | 'TI' | 'Qualidade' | 'GSO' | 'Administrativo' | 'Financeiro' | 'Outro';
     status: 'Pendente' | 'Em Andamento' | 'Concluída' | 'Recusada' | 'Aguardando Validação';
     requesterId: string;
     requesterName: string;

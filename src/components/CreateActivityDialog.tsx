@@ -36,10 +36,13 @@ interface CreateActivityDialogProps {
   onClose: () => void;
 }
 
+const sectors = ['Ferramentaria', 'Suprimentos', 'Engenharia', 'Manutenção', 'TI', 'Qualidade', 'GSO', 'Administrativo', 'Financeiro', 'Outro'] as const;
+
 const formSchema = z.object({
   title: z.string().min(1, "O título é obrigatório."),
   description: z.string().optional(),
   assigneeId: z.string().min(1, "É necessário designar um responsável."),
+  sector: z.enum(sectors),
   priority: z.enum(['Normal', 'Média', 'Urgente']).default('Normal'),
   dueDate: z.date().optional(),
 });
@@ -57,7 +60,7 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { title: '', description: '', assigneeId: '', priority: 'Normal' },
+    defaultValues: { title: '', description: '', assigneeId: '', priority: 'Normal', sector: 'Administrativo' },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -128,6 +131,28 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
                         </FormItem>
                     )}
                 />
+                 <FormField
+                    control={form.control}
+                    name="sector"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Setor</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecione um setor" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {sectors.map(sector => (
+                                        <SelectItem key={sector} value={sector}>{sector}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
                 <FormField
                     control={form.control}
                     name="assigneeId"
@@ -154,7 +179,7 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
                                                         key={employee.docId} 
                                                         value={`${employee.firstName} ${employee.lastName}`} 
                                                         onSelect={() => {
-                                                            field.onChange(employee.docId);
+                                                            form.setValue('assigneeId', employee.docId);
                                                             setIsAssigneePopoverOpen(false);
                                                         }}
                                                     >
