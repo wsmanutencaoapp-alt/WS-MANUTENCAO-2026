@@ -33,12 +33,29 @@ import {
   DialogFooter,
   DialogDescription
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Search, ClipboardList, Trash2, UserPlus, Plane, Users, Clock, Inbox } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Search, ClipboardList, Trash2, UserPlus, Plane, Users, Clock, Inbox, LogOut, User } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -88,6 +105,8 @@ const FichaAtendimentoPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAtendimento, setEditingAtendimento] = useState<WithDocId<AtendimentoGSO> | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [exitDialogState, setExitDialogState] = useState<{isOpen: boolean, atendimento: WithDocId<AtendimentoGSO> | null}>({isOpen: false, atendimento: null});
+
 
   const atendimentosQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'atendimentos_gso'), orderBy('createdAt', 'desc')) : null),
@@ -112,20 +131,23 @@ const FichaAtendimentoPage = () => {
   const { atendimentosAtivos, atendimentosHistorico } = useMemo(() => {
     if (!atendimentos) return { atendimentosAtivos: [], atendimentosHistorico: [] };
     
-    let filtered = atendimentos;
-    if (searchTerm) {
-        const lowerTerm = searchTerm.toLowerCase();
-        filtered = atendimentos.filter(a =>
-            a.prefixo.toLowerCase().includes(lowerTerm) ||
-            a.modeloAeronave.toLowerCase().includes(lowerTerm) ||
-            a.responsavelName.toLowerCase().includes(lowerTerm)
-        );
+    const ativos = atendimentos.filter(a => !a.saidaData);
+    const historico = atendimentos.filter(a => !!a.saidaData);
+
+    if (!searchTerm) {
+        return { atendimentosAtivos: ativos, atendimentosHistorico: historico };
     }
     
-    const ativos = filtered.filter(a => !a.saidaData);
-    const historico = filtered.filter(a => !!a.saidaData);
-
-    return { atendimentosAtivos: ativos, atendimentosHistorico: historico };
+    const lowerTerm = searchTerm.toLowerCase();
+    const filterFn = (a: WithDocId<AtendimentoGSO>) => 
+        a.prefixo.toLowerCase().includes(lowerTerm) ||
+        a.modeloAeronave.toLowerCase().includes(lowerTerm) ||
+        a.responsavelName.toLowerCase().includes(lowerTerm);
+        
+    return { 
+        atendimentosAtivos: ativos.filter(filterFn), 
+        atendimentosHistorico: historico.filter(filterFn) 
+    };
   }, [atendimentos, searchTerm]);
 
   const handleOpenDialog = (atendimento: WithDocId<AtendimentoGSO> | null = null) => {
@@ -157,10 +179,10 @@ const FichaAtendimentoPage = () => {
     if (!firestore || !user) return;
 
     try {
+      const { saidaData, ...restValues } = values;
       const dataToSave: Omit<AtendimentoGSO, 'id' | 'history'> = {
-        ...values,
+        ...restValues,
         chegadaData: new Date(values.chegadaData).toISOString(),
-        saidaData: values.saidaData ? new Date(values.saidaData).toISOString() : undefined,
         tripulantesCount: values.tripulacao?.length || 0,
         passageirosCount: values.passageiros?.length || 0,
         responsavelId: user.uid,
@@ -185,7 +207,24 @@ const FichaAtendimentoPage = () => {
       toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar a ficha.' });
     }
   };
-  
+
+  const handleConfirmSaida = async () => {
+    if (!firestore || !exitDialogState.atendimento) return;
+    
+    const docRef = doc(firestore, 'atendimentos_gso', exitDialogState.atendimento.docId);
+    try {
+        await updateDoc(docRef, {
+            saidaData: new Date().toISOString(),
+        });
+        toast({ title: 'Sucesso', description: `Saída da aeronave ${exitDialogState.atendimento.prefixo} registrada.` });
+        queryClient.invalidateQueries({ queryKey });
+    } catch(err) {
+        console.error("Erro ao registrar saída:", err);
+        toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível registrar a saída.' });
+    } finally {
+        setExitDialogState({ isOpen: false, atendimento: null });
+    }
+  };
 
   return (
     <>
@@ -238,15 +277,43 @@ const FichaAtendimentoPage = () => {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-3 text-sm flex-1">
-                                    <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-muted-foreground" /> <span><span className="font-semibold">Chegada:</span> {format(new Date(atd.chegadaData), 'dd/MM/yy HH:mm')}</span></div>
-                                    <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> <span><span className="font-semibold">Ocupação:</span> {atd.tripulacao?.length || 0} Trip. / {atd.passageiros?.length || 0} Pax</span></div>
-                                    <div className="flex items-center gap-2"><Plane className="h-4 w-4 text-muted-foreground" /> <span><span className="font-semibold">Voo:</span> {atd.tipoVoo}</span></div>
-                                     {atd.destinoFinal && <div className="flex items-center gap-2"><Plane className="h-4 w-4 text-muted-foreground" /> <span><span className="font-semibold">Destino:</span> {atd.destinoFinal}</span></div>}
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                        <div className="flex items-start gap-2"><Plane className="h-4 w-4 mt-0.5 text-muted-foreground" /> <span><span className="font-semibold">Voo:</span><br/>{atd.tipoVoo}</span></div>
+                                        <div className="flex items-start gap-2"><Clock className="h-4 w-4 mt-0.5 text-muted-foreground" /> <span><span className="font-semibold">Chegada:</span><br/>{format(new Date(atd.chegadaData), 'dd/MM/yy HH:mm')}</span></div>
+                                        <div className="flex items-start gap-2 col-span-2"><Users className="h-4 w-4 mt-0.5 text-muted-foreground" /> <span><span className="font-semibold">Ocupação:</span><br/>{atd.tripulacao?.length || 0} Trip. / {atd.passageiros?.length || 0} Pax</span></div>
+                                        <div className="flex items-start gap-2"><Plane className="h-4 w-4 mt-0.5 text-muted-foreground" /> <span><span className="font-semibold">Origem:</span><br/>{atd.origem || 'N/A'}</span></div>
+                                        <div className="flex items-start gap-2"><Plane className="h-4 w-4 mt-0.5 text-muted-foreground" /> <span><span className="font-semibold">Destino:</span><br/>{atd.destinoFinal || 'N/A'}</span></div>
+                                    </div>
+                                    <Accordion type="multiple" className="w-full">
+                                        {(atd.tripulacao && atd.tripulacao.length > 0) && (
+                                            <AccordionItem value="tripulacao">
+                                                <AccordionTrigger className="text-xs font-semibold py-2">Ver Tripulação ({atd.tripulacao.length})</AccordionTrigger>
+                                                <AccordionContent className="space-y-2">
+                                                    {atd.tripulacao.map((p, i) => <div key={i} className="text-xs p-2 bg-muted/50 rounded-md"><p className="font-semibold">{p.nome}</p><p>Doc: {p.documento}</p>{p.observacao && <p>Obs: {p.observacao}</p>}</div>)}
+                                                </AccordionContent>
+                                            </AccordionItem>
+                                        )}
+                                        {(atd.passageiros && atd.passageiros.length > 0) && (
+                                            <AccordionItem value="passageiros">
+                                                <AccordionTrigger className="text-xs font-semibold py-2">Ver Passageiros ({atd.passageiros.length})</AccordionTrigger>
+                                                <AccordionContent className="space-y-2">
+                                                     {atd.passageiros.map((p, i) => <div key={i} className="text-xs p-2 bg-muted/50 rounded-md"><p className="font-semibold">{p.nome}</p><p>Doc: {p.documento}</p>{p.observacao && <p>Obs: {p.observacao}</p>}</div>)}
+                                                </AccordionContent>
+                                            </AccordionItem>
+                                        )}
+                                    </Accordion>
+                                    {atd.observacaoFinal && <div className="pt-2"><p className="font-semibold text-xs">Observação Final:</p><p className="text-xs p-2 bg-muted/50 rounded-md">{atd.observacaoFinal}</p></div>}
                                 </CardContent>
-                                <CardFooter>
+                                <CardFooter className="flex gap-2">
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="secondary" size="sm" className="w-full" onClick={() => setExitDialogState({isOpen: true, atendimento: atd})}>
+                                            <LogOut className="mr-2 h-4 w-4"/>
+                                            Registrar Saída
+                                        </Button>
+                                    </AlertDialogTrigger>
                                     <Button variant="default" size="sm" className="w-full" onClick={() => handleOpenDialog(atd)}>
                                         <Edit className="mr-2 h-4 w-4"/>
-                                        Ver / Editar Ficha
+                                        Ver / Editar
                                     </Button>
                                 </CardFooter>
                             </Card>
@@ -332,7 +399,6 @@ const FichaAtendimentoPage = () => {
                         <FormField control={form.control} name="chegadaData" render={({ field }) => ( <FormItem><FormLabel>Data/Hora Chegada</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem> )}/>
                         <FormField control={form.control} name="escala" render={({ field }) => ( <FormItem><FormLabel>Escala</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
                         <FormField control={form.control} name="destinoFinal" render={({ field }) => ( <FormItem><FormLabel>Destino Final</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                        <FormField control={form.control} name="saidaData" render={({ field }) => ( <FormItem><FormLabel>Data/Hora Saída</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem> )}/>
                      </div>
                   </div>
 
@@ -390,6 +456,21 @@ const FichaAtendimentoPage = () => {
           </Form>
         </DialogContent>
       </Dialog>
+      
+       <AlertDialog open={exitDialogState.isOpen} onOpenChange={() => setExitDialogState({isOpen: false, atendimento: null})}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Saída</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja registrar a saída da aeronave <span className="font-bold">{exitDialogState.atendimento?.prefixo}</span> agora?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Não</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSaida}>Sim, Registrar Saída</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
