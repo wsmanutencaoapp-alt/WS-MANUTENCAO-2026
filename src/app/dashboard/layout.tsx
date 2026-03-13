@@ -1,3 +1,4 @@
+
 'use client';
 import type { ReactNode } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
@@ -60,7 +61,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setIsAuthorized(true);
       } else {
         setIsAuthorized(false);
-        router.push('/dashboard'); // Redirect to home if not authorized
+        router.push('/dashboard/home'); // Redirect to home if not authorized
       }
     } else if (user && !employeeData) {
         // This case can happen if the employee doc is not yet created or fails to load

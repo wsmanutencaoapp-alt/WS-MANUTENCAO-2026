@@ -101,13 +101,6 @@ export const permissionStructure = [
         ]
     },
     {
-        id: 'comercial',
-        label: 'Comercial',
-        path: '/dashboard/comercial',
-        isModule: true,
-        actions: ['view'],
-    },
-    {
         id: 'financeiro',
         label: 'Financeiro',
         path: '/dashboard/financeiro',
@@ -215,7 +208,7 @@ export const allPermissionIDs = permissionStructure.flatMap(module => {
 
 export const getRequiredPermissionForPath = (path: string): string | null => {
     if (path.startsWith('/retirada-veiculo') || path.startsWith('/anexo-comprovante')) return null; // Public page
-    if (path === '/dashboard' || path === '/dashboard/') return 'home_view';
+    if (path === '/dashboard/home') return 'home_view';
     if (path.startsWith('/dashboard/overview')) return 'dashboard_overview_view';
     if (path === '/dashboard/settings') return null; // All users can see their own settings
     if (path === '/dashboard/financeiro/despesas-individuais') return null;

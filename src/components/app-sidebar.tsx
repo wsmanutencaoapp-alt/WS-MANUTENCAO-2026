@@ -223,13 +223,21 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/configurador/personalizar', icon: Paintbrush, label: 'Personalizar Aparência', permission: 'configurador_personalizar' }
     ]
   },
-  { 
-    href: '/dashboard/settings', 
-    icon: Settings, 
-    label: 'Seu Perfil' 
-  },
 ];
 
+const allBottomNavItems: NavItem[] = [
+    { 
+        href: '/dashboard/selfie', 
+        icon: Camera, 
+        label: 'Self (Público)',
+        // No permission needed for the main item
+        subItems: [
+            // These sub-items also don't need permissions as they lead to public-facing functionalities
+            { href: '/retirada-veiculo', label: 'Retirada de Veículo', icon: Car },
+            { href: '/anexo-comprovante', label: 'Anexo de Comprovante', icon: Receipt },
+        ]
+    },
+];
 
 const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permissions'] | undefined, isAdmin: boolean): NavItem[] => {
   if (!permissions && !isAdmin) return [];
@@ -357,3 +365,5 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+```)
