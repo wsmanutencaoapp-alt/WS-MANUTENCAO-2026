@@ -403,5 +403,3 @@ export function Header() {
     </header>
   );
 }
-
-```)
