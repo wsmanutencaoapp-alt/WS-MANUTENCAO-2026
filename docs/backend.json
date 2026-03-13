@@ -1930,6 +1930,35 @@
         }
       },
       "required": ["title", "content", "category", "createdAt"]
+    },
+    "AtendimentoGSO": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Ficha de Atendimento GSO",
+      "type": "object",
+      "description": "Registra uma ocorrência ou atendimento de segurança operacional.",
+      "properties": {
+        "id": { "type": "string" },
+        "dataOcorrencia": { "type": "string", "format": "date-time" },
+        "localOcorrencia": { "type": "string" },
+        "tipoAtendimento": {
+          "type": "string",
+          "enum": ["Primeiros Socorros", "Incidente de Segurança", "Acidente de Trabalho", "Quase Acidente", "Outro"]
+        },
+        "pessoasEnvolvidas": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "descricaoOcorrencia": { "type": "string" },
+        "medidasIniciais": { "type": "string" },
+        "responsavelAtendimentoId": { "type": "string" },
+        "responsavelAtendimentoName": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["Aberto", "Em Análise", "Concluído"]
+        },
+        "relatorioAnexoUrl": { "type": "string", "format": "uri" }
+      },
+      "required": ["dataOcorrencia", "localOcorrencia", "tipoAtendimento", "descricaoOcorrencia", "responsavelAtendimentoId", "responsavelAtendimentoName", "status"]
     }
   },
   "auth": {
@@ -2197,6 +2226,15 @@
             "$ref": "#/entities/CorporateCommunication"
           },
           "description": "Stores internal corporate communications like announcements, events, etc."
+        }
+      },
+      {
+        "path": "/atendimentos_gso/{atendimentoId}",
+        "definition": {
+          "schema": {
+            "$ref": "#/entities/AtendimentoGSO"
+          },
+          "description": "Armazena as fichas de atendimento de Segurança Operacional (GSO)."
         }
       }
     ]

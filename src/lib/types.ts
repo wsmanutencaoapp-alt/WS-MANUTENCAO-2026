@@ -48,7 +48,7 @@ export type Supply = {
   descricao: string;
   partNumber: string;
   unidadeMedida: 'UN' | 'KG' | 'MT' | 'LT' | 'CX';
-  familia: 'MP' | 'CT' | 'CG' | 'CP' | 'PA';
+  familia: 'MP' | 'CT' | 'CG' | 'CP' | 'PA' | 'ST';
   
   // Rastreabilidade
   exigeLote: boolean;
@@ -505,6 +505,19 @@ export type CorporateCommunication = {
   createdAt: string; // ISO date string
 };
     
+export type AtendimentoGSO = {
+  id?: string;
+  dataOcorrencia: string; // ISO date string
+  localOcorrencia: string;
+  tipoAtendimento: 'Primeiros Socorros' | 'Incidente de Segurança' | 'Acidente de Trabalho' | 'Quase Acidente' | 'Outro';
+  pessoasEnvolvidas: string[];
+  descricaoOcorrencia: string;
+  medidasIniciais: string;
+  responsavelAtendimentoId: string;
+  responsavelAtendimentoName: string;
+  status: 'Aberto' | 'Em Análise' | 'Concluído';
+  relatorioAnexoUrl?: string;
+};
 
     
 

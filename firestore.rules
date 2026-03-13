@@ -223,5 +223,12 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if hasPermission('recursos_humanos_mural_create') || hasPermission('recursos_humanos_mural_update') || hasPermission('recursos_humanos_mural_delete');
     }
+
+    match /atendimentos_gso/{atendimentoId} {
+      allow read: if hasPermission('gso_ficha_atendimento_view');
+      allow create: if hasPermission('gso_ficha_atendimento_create');
+      allow update: if hasPermission('gso_ficha_atendimento_update');
+      allow delete: if hasPermission('gso_ficha_atendimento_delete');
+    }
   }
 }
