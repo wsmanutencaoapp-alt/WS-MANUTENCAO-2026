@@ -2,14 +2,30 @@
 
 import CorporateMural from '@/components/CorporateMural';
 import BirthdaysCard from '@/components/BirthdaysCard';
-import { useUser } from '@/firebase';
+import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import type { Employee } from '@/lib/types';
+import { doc } from 'firebase/firestore';
+
 
 export default function DashboardHomePage() {
   const { user } = useUser();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: employeeData } = useDoc<Employee>(userDocRef);
 
   const getFirstName = () => {
-    if (!user?.displayName) return '';
-    return user.displayName.split(' ')[0];
+    if (employeeData?.firstName) {
+        return employeeData.firstName;
+    }
+    // Fallback just in case, though the primary source should be Firestore.
+    if (user?.displayName) {
+        return user.displayName.split(' ')[0];
+    }
+    return '';
   }
 
   return (
