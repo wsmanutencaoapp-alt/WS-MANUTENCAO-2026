@@ -22,6 +22,7 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
+  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,11 +38,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Search, ClipboardList, Trash2, UserPlus, Plane, Users } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Search, ClipboardList, Trash2, UserPlus, Plane, Users, Clock, Inbox } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+
 
 const tripulanteSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
@@ -105,15 +109,23 @@ const FichaAtendimentoPage = () => {
     name: 'passageiros'
   });
 
-  const filteredAtendimentos = useMemo(() => {
-    if (!atendimentos) return [];
-    if (!searchTerm) return atendimentos;
-    const lowerTerm = searchTerm.toLowerCase();
-    return atendimentos.filter(a =>
-      a.prefixo.toLowerCase().includes(lowerTerm) ||
-      a.modeloAeronave.toLowerCase().includes(lowerTerm) ||
-      a.responsavelName.toLowerCase().includes(lowerTerm)
-    );
+  const { atendimentosAtivos, atendimentosHistorico } = useMemo(() => {
+    if (!atendimentos) return { atendimentosAtivos: [], atendimentosHistorico: [] };
+    
+    let filtered = atendimentos;
+    if (searchTerm) {
+        const lowerTerm = searchTerm.toLowerCase();
+        filtered = atendimentos.filter(a =>
+            a.prefixo.toLowerCase().includes(lowerTerm) ||
+            a.modeloAeronave.toLowerCase().includes(lowerTerm) ||
+            a.responsavelName.toLowerCase().includes(lowerTerm)
+        );
+    }
+    
+    const ativos = filtered.filter(a => !a.saidaData);
+    const historico = filtered.filter(a => !!a.saidaData);
+
+    return { atendimentosAtivos: ativos, atendimentosHistorico: historico };
   }, [atendimentos, searchTerm]);
 
   const handleOpenDialog = (atendimento: WithDocId<AtendimentoGSO> | null = null) => {
@@ -189,63 +201,108 @@ const FichaAtendimentoPage = () => {
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Histórico de Atendimentos</CardTitle>
-            <CardDescription>
-              Visualize todos os registros de atendimento a aeronaves.
-            </CardDescription>
-            <div className="relative pt-4">
+        <Tabs defaultValue="em_atendimento">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="em_atendimento">Em Atendimento ({isLoading ? '...' : atendimentosAtivos.length})</TabsTrigger>
+                <TabsTrigger value="historico">Histórico</TabsTrigger>
+            </TabsList>
+             <div className="relative pt-4">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Pesquisar por prefixo, modelo..."
+                placeholder="Pesquisar por prefixo, modelo, responsável..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full rounded-lg bg-background pl-8 md:w-[300px]"
               />
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Aeronave</TableHead>
-                  <TableHead>Chegada</TableHead>
-                  <TableHead>Saída</TableHead>
-                  <TableHead>Tipo de Voo</TableHead>
-                  <TableHead>Responsável</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+            <TabsContent value="em_atendimento" className="mt-4">
+                {isLoading && <Loader2 className="mx-auto my-8 h-8 w-8 animate-spin" />}
+                {!isLoading && atendimentosAtivos.length === 0 && (
+                     <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center h-96">
+                        <Inbox className="h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-4 text-lg font-semibold">Nenhuma aeronave em atendimento</h3>
+                        <p className="mt-2 text-sm text-muted-foreground">Quando um novo atendimento for registrado, ele aparecerá aqui.</p>
+                    </div>
                 )}
-                {error && <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{error.message}</TableCell></TableRow>}
-                {!isLoading && filteredAtendimentos.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhum atendimento registrado.</TableCell></TableRow>
-                )}
-                {!isLoading && filteredAtendimentos.map(atd => (
-                  <TableRow key={atd.docId}>
-                    <TableCell>
-                      <div className="font-medium">{atd.prefixo}</div>
-                      <div className="text-sm text-muted-foreground">{atd.modeloAeronave}</div>
-                    </TableCell>
-                    <TableCell>{format(new Date(atd.chegadaData), 'dd/MM/yy HH:mm')}</TableCell>
-                    <TableCell>{atd.saidaData ? format(new Date(atd.saidaData), 'dd/MM/yy HH:mm') : '-'}</TableCell>
-                    <TableCell>{atd.tipoVoo}</TableCell>
-                    <TableCell>{atd.responsavelName}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleOpenDialog(atd)}>
-                        <Edit className="mr-2 h-4 w-4" /> Ver / Editar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                 {!isLoading && atendimentosAtivos.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {atendimentosAtivos.map(atd => (
+                            <Card key={atd.docId} className="flex flex-col">
+                                <CardHeader>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <CardTitle className="text-xl">{atd.prefixo}</CardTitle>
+                                            <CardDescription>{atd.modeloAeronave}</CardDescription>
+                                        </div>
+                                        <Badge variant="secondary">{atd.hangar}</Badge>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-3 text-sm flex-1">
+                                    <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-muted-foreground" /> <span><span className="font-semibold">Chegada:</span> {format(new Date(atd.chegadaData), 'dd/MM/yy HH:mm')}</span></div>
+                                    <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> <span><span className="font-semibold">Ocupação:</span> {atd.tripulacao?.length || 0} Trip. / {atd.passageiros?.length || 0} Pax</span></div>
+                                    <div className="flex items-center gap-2"><Plane className="h-4 w-4 text-muted-foreground" /> <span><span className="font-semibold">Voo:</span> {atd.tipoVoo}</span></div>
+                                     {atd.destinoFinal && <div className="flex items-center gap-2"><Plane className="h-4 w-4 text-muted-foreground" /> <span><span className="font-semibold">Destino:</span> {atd.destinoFinal}</span></div>}
+                                </CardContent>
+                                <CardFooter>
+                                    <Button variant="default" size="sm" className="w-full" onClick={() => handleOpenDialog(atd)}>
+                                        <Edit className="mr-2 h-4 w-4"/>
+                                        Ver / Editar Ficha
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                        ))}
+                    </div>
+                 )}
+            </TabsContent>
+             <TabsContent value="historico" className="mt-4">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Histórico de Atendimentos</CardTitle>
+                        <CardDescription>Visualize todos os registros de atendimentos finalizados.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead>Aeronave</TableHead>
+                            <TableHead>Chegada</TableHead>
+                            <TableHead>Saída</TableHead>
+                            <TableHead>Tipo de Voo</TableHead>
+                            <TableHead>Responsável</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading && (
+                            <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                            )}
+                            {error && <TableRow><TableCell colSpan={6} className="h-24 text-center text-destructive">{error.message}</TableCell></TableRow>}
+                            {!isLoading && atendimentosHistorico.length === 0 && (
+                            <TableRow><TableCell colSpan={6} className="h-24 text-center">Nenhum atendimento no histórico.</TableCell></TableRow>
+                            )}
+                            {!isLoading && atendimentosHistorico.map(atd => (
+                            <TableRow key={atd.docId}>
+                                <TableCell>
+                                <div className="font-medium">{atd.prefixo}</div>
+                                <div className="text-sm text-muted-foreground">{atd.modeloAeronave}</div>
+                                </TableCell>
+                                <TableCell>{format(new Date(atd.chegadaData), 'dd/MM/yy HH:mm')}</TableCell>
+                                <TableCell>{atd.saidaData ? format(new Date(atd.saidaData), 'dd/MM/yy HH:mm') : '-'}</TableCell>
+                                <TableCell>{atd.tipoVoo}</TableCell>
+                                <TableCell>{atd.responsavelName}</TableCell>
+                                <TableCell className="text-right">
+                                <Button variant="outline" size="sm" onClick={() => handleOpenDialog(atd)}>
+                                    <Edit className="mr-2 h-4 w-4" /> Ver Detalhes
+                                </Button>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </CardContent>
+                    </Card>
+             </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
