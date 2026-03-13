@@ -55,7 +55,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Search, ClipboardList, Trash2, UserPlus, Plane, Users, Clock, Inbox, LogOut, User } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Search, ClipboardList, Trash2, UserPlus, Plane, Users, Clock, Inbox, LogOut } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -305,12 +305,10 @@ const FichaAtendimentoPage = () => {
                                     {atd.observacaoFinal && <div className="pt-2"><p className="font-semibold text-xs">Observação Final:</p><p className="text-xs p-2 bg-muted/50 rounded-md">{atd.observacaoFinal}</p></div>}
                                 </CardContent>
                                 <CardFooter className="flex gap-2">
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="secondary" size="sm" className="w-full" onClick={() => setExitDialogState({isOpen: true, atendimento: atd})}>
-                                            <LogOut className="mr-2 h-4 w-4"/>
-                                            Registrar Saída
-                                        </Button>
-                                    </AlertDialogTrigger>
+                                    <Button variant="secondary" size="sm" className="w-full" onClick={() => setExitDialogState({isOpen: true, atendimento: atd})}>
+                                        <LogOut className="mr-2 h-4 w-4"/>
+                                        Registrar Saída
+                                    </Button>
                                     <Button variant="default" size="sm" className="w-full" onClick={() => handleOpenDialog(atd)}>
                                         <Edit className="mr-2 h-4 w-4"/>
                                         Ver / Editar
