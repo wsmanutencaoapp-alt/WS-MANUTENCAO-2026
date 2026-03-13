@@ -192,6 +192,7 @@ const allNavItems: NavItem[] = [
     subItems: [
       { href: '/dashboard/gso/controle-credenciamento', icon: Users, label: 'Controle de Credenciamento', permission: 'gso_controle_credenciamento' },
       { href: '/dashboard/gso/controle-de-casos', icon: Briefcase, label: 'Controle de Casos', permission: 'gso_controle_casos' },
+      { href: '/dashboard/gso/ficha-atendimento', icon: ClipboardList, label: 'Ficha de Atendimento', permission: 'gso_ficha_atendimento' },
     ]
   },
   {
@@ -217,15 +218,6 @@ const allNavItems: NavItem[] = [
     subItems: [
       { href: '/dashboard/portaria/controle-veiculos', label: 'Controle de Veículos', permission: 'portaria_controle_veiculos' },
       { href: '/dashboard/portaria/controle-pessoas', label: 'Controle de Pessoas', permission: 'portaria_controle_pessoas' },
-    ]
-  },
-  {
-    href: '/retirada-veiculo',
-    icon: Camera,
-    label: 'Self (Público)',
-    subItems: [
-        { href: '/retirada-veiculo', label: 'Retirada de Veículo', icon: Car },
-        { href: '/anexo-comprovante', label: 'Anexo de Comprovante', icon: Receipt },
     ]
   },
   { 

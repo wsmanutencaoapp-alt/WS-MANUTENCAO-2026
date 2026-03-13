@@ -178,6 +178,7 @@ const allNavItems: NavItem[] = [
     subItems: [
       { href: '/dashboard/gso/controle-credenciamento', icon: Users, label: 'Controle de Credenciamento', permission: 'gso_controle_credenciamento' },
       { href: '/dashboard/gso/controle-de-casos', icon: Briefcase, label: 'Controle de Casos', permission: 'gso_controle_casos' },
+      { href: '/dashboard/gso/ficha-atendimento', icon: ClipboardList, label: 'Ficha de Atendimento', permission: 'gso_ficha_atendimento' },
     ]
   },
   {
@@ -205,39 +206,39 @@ const allNavItems: NavItem[] = [
       { href: '/dashboard/portaria/controle-pessoas', label: 'Controle de Pessoas', permission: 'portaria_controle_pessoas' },
     ]
   },
-   {
-    href: '/retirada-veiculo',
-    icon: Camera,
-    label: 'Self (Público)',
+  { 
+    href: '/dashboard/user-management', 
+    icon: Users, 
+    label: 'Permissões',
+    permission: 'userManagement',
+  },
+  { 
+    href: '/dashboard/configurador', 
+    icon: SlidersHorizontal, 
+    label: 'Configurador',
+    permission: 'configurador',
     subItems: [
-        { href: '/retirada-veiculo', label: 'Retirada de Veículo', icon: Car },
-        { href: '/anexo-comprovante', label: 'Anexo de Comprovante', icon: Receipt },
+        { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação', permission: 'configurador_alcada' },
+        { href: '/dashboard/configurador/disparo-email', label: 'Disparo de E-mail', permission: 'configurador_disparo_email' },
+        { href: '/dashboard/configurador/personalizar', icon: Paintbrush, label: 'Personalizar Aparência', permission: 'configurador_personalizar' }
     ]
+  },
+  { 
+    href: '/dashboard/settings', 
+    icon: Settings, 
+    label: 'Seu Perfil' 
   },
 ];
 
-const allBottomNavItems: NavItem[] = [
-    { href: '/dashboard/user-management', icon: Users, label: 'Permissões', permission: 'userManagement' },
-    { 
-        href: '/dashboard/configurador', 
-        icon: SlidersHorizontal, 
-        label: 'Configurador',
-        permission: 'configurador',
-        subItems: [
-            { href: '/dashboard/configurador/alcada-aprovacao', label: 'Alçada de Aprovação', permission: 'configurador_alcada' },
-            { href: '/dashboard/configurador/disparo-email', label: 'Disparo de E-mail', permission: 'configurador_disparo_email' },
-            { href: '/dashboard/configurador/personalizar', icon: Paintbrush, label: 'Personalizar Aparência', permission: 'configurador_personalizar' }
-        ]
-    },
-]
 
 const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permissions'] | undefined, isAdmin: boolean): NavItem[] => {
   if (!permissions && !isAdmin) return [];
 
   return items.reduce((acc, item) => {
-    const hasPermission = isAdmin || !item.permission || (permissions?.[`${item.permission}_view`]);
+    // A user has view permission if they are an admin, the item has no specific permission, or they have the specific view permission.
+    const hasViewPermission = isAdmin || !item.permission || (permissions?.[`${item.permission}_view`]);
 
-    if (hasPermission) {
+    if (hasViewPermission) {
       if (item.subItems) {
         const permittedSubItems = item.subItems.filter(subItem => 
           isAdmin || !subItem.permission || (permissions?.[`${subItem.permission}_view`])

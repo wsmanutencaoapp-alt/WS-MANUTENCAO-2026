@@ -144,6 +144,7 @@ export const permissionStructure = [
         submodules: [
           { id: 'gso_controle_credenciamento', label: 'Controle de Credenciamento', path: '/dashboard/gso/controle-credenciamento', actions: ['view', 'create', 'update', 'delete'] },
           { id: 'gso_controle_casos', label: 'Controle de Casos', path: '/dashboard/gso/controle-de-casos', actions: ['view', 'create', 'update', 'delete'] },
+          { id: 'gso_ficha_atendimento', label: 'Ficha de Atendimento', path: '/dashboard/gso/ficha-atendimento', actions: ['view', 'create', 'update', 'delete'] },
         ]
     },
     {
@@ -173,17 +174,6 @@ export const permissionStructure = [
             { id: 'portaria_controle_veiculos', label: 'Controle de Veículos', path: '/dashboard/portaria/controle-veiculos', actions: ['view', 'create', 'update', 'delete'] },
             { id: 'portaria_controle_pessoas', label: 'Controle de Pessoas', path: '/dashboard/portaria/controle-pessoas', actions: ['view', 'create', 'update'] },
         ]
-    },
-    {
-        id: 'self',
-        label: 'Self (Público)',
-        path: '/retirada-veiculo',
-        isModule: true,
-        actions: ['view'],
-        submodules: [
-            { id: 'self_retirada', label: 'Retirada de Veículo', path: '/retirada-veiculo', actions: ['view'] },
-            { id: 'self_comprovante', label: 'Anexo de Comprovante', path: '/anexo-comprovante', actions: ['view'] },
-        ],
     },
     {
         id: 'gestao_atividades',
