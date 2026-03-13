@@ -505,20 +505,40 @@ export type CorporateCommunication = {
   createdAt: string; // ISO date string
 };
     
-export type AtendimentoGSO = {
-  id?: string;
-  dataOcorrencia: string; // ISO date string
-  localOcorrencia: string;
-  tipoAtendimento: 'Primeiros Socorros' | 'Incidente de Segurança' | 'Acidente de Trabalho' | 'Quase Acidente' | 'Outro';
-  pessoasEnvolvidas: string[];
-  descricaoOcorrencia: string;
-  medidasIniciais: string;
-  responsavelAtendimentoId: string;
-  responsavelAtendimentoName: string;
-  status: 'Aberto' | 'Em Análise' | 'Concluído';
-  relatorioAnexoUrl?: string;
+export type Tripulante = {
+  nome: string;
+  documento: string;
+  observacao?: string;
 };
 
+export type Passageiro = {
+  nome: string;
+  documento: string;
+  observacao?: string;
+};
+
+export type AtendimentoGSO = {
+  id?: string;
+  modeloAeronave: string;
+  prefixo: string;
+  tipoVoo: 'TAXI AEREO' | 'AVIACAO GERAL';
+  hangar: 'INTERNO' | 'EXTERNO';
+  chegadaData: string; // ISO String
+  tripulantesCount?: number;
+  passageirosCount?: number;
+  origem?: string;
+  saidaData?: string; // ISO String
+  escala?: string;
+  destinoFinal?: string;
+  tripulacao?: Tripulante[];
+  passageiros?: Passageiro[];
+  observacaoFinal?: string;
+  responsavelId: string;
+  responsavelName: string;
+  createdAt: string; // ISO String
+  history?: ActivityLog[];
+};
     
 
     
+

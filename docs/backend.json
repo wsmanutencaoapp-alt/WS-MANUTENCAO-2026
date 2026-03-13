@@ -1933,32 +1933,56 @@
     },
     "AtendimentoGSO": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Ficha de Atendimento GSO",
+      "title": "Ficha de Atendimento de Aeronave",
       "type": "object",
-      "description": "Registra uma ocorrência ou atendimento de segurança operacional.",
+      "description": "Registra o atendimento completo a uma aeronave, incluindo dados do voo, tripulação e passageiros.",
       "properties": {
         "id": { "type": "string" },
-        "dataOcorrencia": { "type": "string", "format": "date-time" },
-        "localOcorrencia": { "type": "string" },
-        "tipoAtendimento": {
-          "type": "string",
-          "enum": ["Primeiros Socorros", "Incidente de Segurança", "Acidente de Trabalho", "Quase Acidente", "Outro"]
-        },
-        "pessoasEnvolvidas": {
+        "modeloAeronave": { "type": "string" },
+        "prefixo": { "type": "string" },
+        "tipoVoo": { "type": "string", "enum": ["TAXI AEREO", "AVIACAO GERAL"] },
+        "hangar": { "type": "string", "enum": ["INTERNO", "EXTERNO"] },
+        "chegadaData": { "type": "string", "format": "date-time" },
+        "tripulantesCount": { "type": "number" },
+        "passageirosCount": { "type": "number" },
+        "origem": { "type": "string" },
+        "saidaData": { "type": "string", "format": "date-time" },
+        "escala": { "type": "string" },
+        "destinoFinal": { "type": "string" },
+        "tripulacao": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "object",
+            "properties": {
+              "nome": { "type": "string" },
+              "documento": { "type": "string" },
+              "observacao": { "type": "string" }
+            },
+            "required": ["nome", "documento"]
+          }
         },
-        "descricaoOcorrencia": { "type": "string" },
-        "medidasIniciais": { "type": "string" },
-        "responsavelAtendimentoId": { "type": "string" },
-        "responsavelAtendimentoName": { "type": "string" },
-        "status": {
-          "type": "string",
-          "enum": ["Aberto", "Em Análise", "Concluído"]
+        "passageiros": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "nome": { "type": "string" },
+              "documento": { "type": "string" },
+              "observacao": { "type": "string" }
+            },
+            "required": ["nome", "documento"]
+          }
         },
-        "relatorioAnexoUrl": { "type": "string", "format": "uri" }
+        "observacaoFinal": { "type": "string" },
+        "responsavelId": { "type": "string" },
+        "responsavelName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "history": {
+          "type": "array",
+          "items": { "$ref": "#/entities/ActivityLog" }
+        }
       },
-      "required": ["dataOcorrencia", "localOcorrencia", "tipoAtendimento", "descricaoOcorrencia", "responsavelAtendimentoId", "responsavelAtendimentoName", "status"]
+      "required": ["modeloAeronave", "prefixo", "tipoVoo", "chegadaData", "responsavelId", "responsavelName", "createdAt"]
     }
   },
   "auth": {
@@ -2234,7 +2258,7 @@
           "schema": {
             "$ref": "#/entities/AtendimentoGSO"
           },
-          "description": "Armazena as fichas de atendimento de Segurança Operacional (GSO)."
+          "description": "Armazena as fichas de atendimento a aeronaves."
         }
       }
     ]
