@@ -70,15 +70,16 @@ import Notifications from './Notifications';
 
 const allNavItems: NavItem[] = [
   { 
-    href: '/home', 
+    href: '/dashboard', 
     icon: Home, 
     label: 'Home',
+    permission: 'home',
   },
-   { 
-    href: '/dashboard',
+  { 
+    href: '/dashboard/overview',
     icon: LayoutDashboard, 
     label: 'Dashboard',
-    permission: 'dashboard',
+    permission: 'dashboard_overview',
   },
   { 
     href: '/dashboard/gestao-atividades',
@@ -294,14 +295,11 @@ export function Header() {
   const navItems = useMemo(() => {
     if (!employeeData) return [];
     
-    // Separate public items from permission-based items
-    const publicItems = allNavItems.filter(item => !item.permission);
     const permissionItems = allNavItems.filter(item => item.permission);
 
     const permittedItems = filterItemsByPermissions(permissionItems, employeeData.permissions, isAdmin);
     
-    // Combine and return
-    return [...permittedItems, ...publicItems];
+    return permittedItems;
 
   }, [employeeData, isAdmin]);
 

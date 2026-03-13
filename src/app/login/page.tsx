@@ -90,9 +90,9 @@ function LoginForm() {
 
       toast({
         title: 'Sucesso!',
-        description: 'Login realizado com sucesso. Redirecionando para o painel...',
+        description: 'Login realizado com sucesso. Redirecionando...',
       });
-      router.push('/dashboard');
+      router.push('/dashboard'); // Redirect to the main authenticated page, which is now home
     } catch (error: any) {
       // Use a generic error message for all login failures
       toast({

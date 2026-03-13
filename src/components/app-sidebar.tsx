@@ -56,15 +56,16 @@ import { Input } from '@/components/ui/input';
 
 const allNavItems: NavItem[] = [
   { 
-    href: '/home', 
+    href: '/dashboard', 
     icon: Home, 
     label: 'Home',
+    permission: 'home',
   },
   { 
-    href: '/dashboard',
+    href: '/dashboard/overview',
     icon: LayoutDashboard, 
     label: 'Dashboard',
-    permission: 'dashboard',
+    permission: 'dashboard_overview',
   },
   { 
     href: '/dashboard/gestao-atividades',
@@ -234,7 +235,6 @@ const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permi
   if (!permissions && !isAdmin) return [];
 
   return items.reduce((acc, item) => {
-    // For public items with no permission property, always show them.
     const hasPermission = isAdmin || !item.permission || (permissions?.[`${item.permission}_view`]);
 
     if (hasPermission) {
@@ -243,9 +243,6 @@ const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permi
           isAdmin || !subItem.permission || (permissions?.[`${subItem.permission}_view`])
         );
         
-        // If the main item itself is a link, keep it even if subItems are filtered, 
-        // but if it's just a category, only keep it if it has children.
-        // For this app, parents with subItems are categories.
         if (permittedSubItems.length > 0) {
           acc.push({ ...item, subItems: permittedSubItems });
         }
@@ -306,14 +303,11 @@ export function AppSidebar() {
   const navItems = useMemo(() => {
     if (!employeeData) return [];
     
-    // Separate public items from permission-based items
-    const publicItems = allNavItems.filter(item => !item.permission);
     const permissionItems = allNavItems.filter(item => item.permission);
 
     const permittedItems = filterItemsByPermissions(permissionItems, employeeData.permissions, isAdmin);
     
-    // Combine and then filter by search
-    return filterNavItemsBySearch([...permittedItems, ...publicItems], searchTerm);
+    return filterNavItemsBySearch(permittedItems, searchTerm);
 
   }, [employeeData, isAdmin, searchTerm]);
 

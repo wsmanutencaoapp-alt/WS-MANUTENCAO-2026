@@ -12,9 +12,16 @@ export const actionLabels: Record<PermissionAction, string> = {
 // This new structure drives the permission dialog UI and navigation.
 export const permissionStructure = [
     {
-        id: 'dashboard',
-        label: 'Dashboard',
+        id: 'home',
+        label: 'Home',
         path: '/dashboard',
+        isModule: true,
+        actions: ['view'],
+    },
+    {
+        id: 'dashboard_overview',
+        label: 'Dashboard (Overview)',
+        path: '/dashboard/overview',
         isModule: true,
         actions: ['view'],
     },
@@ -218,7 +225,8 @@ export const allPermissionIDs = permissionStructure.flatMap(module => {
 
 export const getRequiredPermissionForPath = (path: string): string | null => {
     if (path.startsWith('/retirada-veiculo') || path.startsWith('/anexo-comprovante')) return null; // Public page
-    if (path === '/dashboard' || path === '/dashboard/') return 'dashboard_view';
+    if (path === '/dashboard' || path === '/dashboard/') return 'home_view';
+    if (path.startsWith('/dashboard/overview')) return 'dashboard_overview_view';
     if (path === '/dashboard/settings') return null; // All users can see their own settings
     if (path === '/dashboard/financeiro/despesas-individuais') return null;
 

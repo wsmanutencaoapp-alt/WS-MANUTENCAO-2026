@@ -2188,10 +2188,7 @@
       },
       {
         "path": "/activities/{activityId}",
-        "definition": {
-          "schema": { "$ref": "#/entities/Activity" },
-          "description": "Stores tasks and activities for users."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Activity" }, "description": "Stores tasks and activities for users." }
       },
       {
         "path": "/communications/{communicationId}",
