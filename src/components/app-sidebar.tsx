@@ -56,13 +56,12 @@ import { Input } from '@/components/ui/input';
 
 const allNavItems: NavItem[] = [
   { 
-    href: '/dashboard', 
+    href: '/home', 
     icon: Home, 
     label: 'Home',
-    permission: 'dashboard', // Re-using dashboard permission for simplicity
   },
   { 
-    href: '/dashboard/comercial', // New path for the old dashboard
+    href: '/dashboard',
     icon: LayoutDashboard, 
     label: 'Dashboard',
     permission: 'dashboard',

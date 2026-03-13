@@ -1,197 +1,121 @@
 'use client';
 
-import { useMemo } from 'react';
+import { ReorderSuggestions } from '@/components/reorder-suggestions';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
-import type { CorporateCommunication, Employee } from '@/lib/types';
-import type { WithDocId } from '@/firebase/firestore/use-collection';
-import { format, parseISO, getMonth, getDate } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Newspaper, CalendarDays, Shield, Megaphone, Gift, Loader2 } from 'lucide-react';
+import { collection, query, where } from 'firebase/firestore';
+import { Wrench, Box, Activity } from 'lucide-react';
+import type { Tool, Supply } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Helper component for a single communication item
-const CommunicationItem = ({ title, content, date }: { title: string; content: string; date?: string }) => (
-  <div className="space-y-1">
-    <p className="font-semibold">{title}</p>
-    <p className="text-sm text-muted-foreground">{content}</p>
-    {date && <p className="text-xs text-blue-600 font-medium mt-1">Data do Evento: {date}</p>}
-  </div>
-);
-
-// Helper component for loading state
-const LoadingCardContent = () => (
-  <CardContent className="flex-1">
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-8 w-full" />
-      </div>
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-1/2" />
-        <Skeleton className="h-8 w-full" />
-      </div>
-    </div>
-  </CardContent>
-);
-
-export default function HomePage() {
+export default function DashboardPage() {
   const firestore = useFirestore();
-  const communicationsQuery = useMemoFirebase(
-    () => firestore ? query(collection(firestore, 'communications'), orderBy('createdAt', 'desc')) : null,
+
+  const toolsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'tools'), where('sequencial', '>', 0)) : null),
     [firestore]
   );
-  const { data: communications, isLoading: isLoadingCommunications } = useCollection<WithDocId<CorporateCommunication>>(communicationsQuery);
+  const { data: tools, isLoading: isLoadingTools, error: toolsError } = useCollection<Tool>(toolsQuery);
 
-  const employeesQuery = useMemoFirebase(
-    () => firestore ? query(collection(firestore, 'employees'), where('status', '==', 'Ativo')) : null,
+  const suppliesQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'supplies') : null),
     [firestore]
   );
-  const { data: employees, isLoading: isLoadingEmployees } = useCollection<WithDocId<Employee>>(employeesQuery);
+  const { data: supplies, isLoading: isLoadingSupplies, error: suppliesError } = useCollection<Supply>(suppliesQuery);
 
-  const monthlyBirthdays = useMemo(() => {
-    if (!employees) return [];
-    
-    const currentMonth = getMonth(new Date());
-    
-    return employees
-      .filter(employee => {
-        if (!employee.birthDate) return false;
-        // The date is stored as 'yyyy-MM-dd' or ISO string, which Date constructor handles
-        const birthMonth = getMonth(new Date(employee.birthDate));
-        return birthMonth === currentMonth;
-      })
-      .map(employee => ({
-        name: `${employee.firstName} ${employee.lastName}`,
-        day: getDate(new Date(employee.birthDate)),
-      }))
-      .sort((a, b) => a.day - b.day);
+  const activeLoansQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Em Empréstimo')) : null),
+    [firestore]
+  );
+  const { data: loanedTools, isLoading: isLoadingLoans, error: loansError } = useCollection<Tool>(activeLoansQuery);
 
-  }, [employees]);
+  const overdueToolsQuery = useMemoFirebase(
+      () => (firestore ? query(collection(firestore, 'tools'), where('status', '==', 'Vencido')) : null),
+      [firestore]
+  );
+  const { data: overdueTools, isLoading: isLoadingOverdue, error: overdueError } = useCollection<Tool>(overdueToolsQuery);
 
-
-  const groupedCommunications = useMemo(() => {
-    const groups: { [key in 'Avisos' | 'Eventos' | 'Seguranca' | 'RH']: WithDocId<CorporateCommunication>[] } = {
-      Avisos: [],
-      Eventos: [],
-      Seguranca: [],
-      RH: [],
-    };
-    communications?.forEach(item => {
-      const category = item.category as keyof typeof groups;
-      if (groups[category]) {
-        groups[category].push(item);
-      }
-    });
-    return groups;
-  }, [communications]);
-  
-  const isLoading = isLoadingCommunications || isLoadingEmployees;
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <header className="text-center my-8">
-        <h1 className="text-4xl font-bold tracking-tight">Bem-vindo ao Portal Interno</h1>
-        <p className="text-muted-foreground mt-2 text-lg">Suas informações centralizadas em um só lugar.</p>
-      </header>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium">Últimos Avisos</CardTitle>
-            <Newspaper className="h-6 w-6 text-muted-foreground" />
-          </CardHeader>
-          {isLoading ? <LoadingCardContent /> : (
-            <CardContent className="flex-1">
-              <div className="space-y-4">
-                {groupedCommunications.Avisos.length > 0 ? (
-                  groupedCommunications.Avisos.map(item => (
-                    <CommunicationItem key={item.docId} title={item.title} content={item.content} />
-                  ))
-                ) : <p className="text-sm text-muted-foreground text-center py-4">Nenhum aviso no momento.</p>}
-              </div>
-            </CardContent>
+    <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            Total de Ferramentas
+          </CardTitle>
+          <Wrench className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          {isLoadingTools ? (
+            <Skeleton className="h-8 w-1/2" />
+          ) : toolsError ? (
+            <div className="text-sm font-bold text-muted-foreground">N/A</div>
+          ) : (
+            <div className="text-2xl font-bold">{tools?.length || 0}</div>
           )}
-        </Card>
-
-        <Card className="flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium">Próximos Eventos</CardTitle>
-            <CalendarDays className="h-6 w-6 text-muted-foreground" />
-          </CardHeader>
-          {isLoading ? <LoadingCardContent /> : (
-            <CardContent className="flex-1">
-               <div className="space-y-4">
-                 {groupedCommunications.Eventos.length > 0 ? (
-                    groupedCommunications.Eventos.map(item => (
-                      <CommunicationItem
-                        key={item.docId}
-                        title={item.title}
-                        content={item.content}
-                        date={item.eventDate ? format(parseISO(item.eventDate), 'dd/MM/yyyy') : undefined}
-                      />
-                    ))
-                 ) : <p className="text-sm text-muted-foreground text-center py-4">Nenhum evento agendado.</p>}
-              </div>
-            </CardContent>
+          <p className="text-xs text-muted-foreground">
+            Total de ferramentas no inventário
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            Itens de Suprimento
+          </CardTitle>
+          <Box className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+           {isLoadingSupplies ? (
+            <Skeleton className="h-8 w-1/2" />
+          ) : suppliesError ? (
+            <div className="text-sm font-bold text-muted-foreground">N/A</div>
+          ) : (
+             <div className="text-2xl font-bold">{supplies?.length || 0}</div>
           )}
-        </Card>
-
-        <Card className="flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium">Aniversariantes do Mês</CardTitle>
-            <Gift className="h-6 w-6 text-muted-foreground" />
-          </CardHeader>
-           {isLoadingEmployees ? <LoadingCardContent /> : (
-            <CardContent className="flex-1">
-              {monthlyBirthdays.length > 0 ? (
-                <ul className="space-y-2 text-sm">
-                  {monthlyBirthdays.map(b => (
-                    <li key={b.name}>{b.name} - Dia {String(b.day).padStart(2, '0')}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">Nenhum aniversariante este mês.</p>
-              )}
-            </CardContent>
+          <p className="text-xs text-muted-foreground">
+            Tipos de suprimentos cadastrados
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Empréstimos Ativos</CardTitle>
+          <Activity className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+           {isLoadingLoans ? (
+            <Skeleton className="h-8 w-1/2" />
+          ) : loansError ? (
+            <div className="text-sm font-bold text-muted-foreground">N/A</div>
+          ) : (
+            <div className="text-2xl font-bold">{loanedTools?.length || 0}</div>
           )}
-        </Card>
-        
-        <Card className="lg:col-span-2 flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium">Publicações de Segurança (SGSO)</CardTitle>
-            <Shield className="h-6 w-6 text-muted-foreground" />
-          </CardHeader>
-           {isLoading ? <LoadingCardContent /> : (
-            <CardContent className="flex-1">
-              <div className="space-y-4">
-                 {groupedCommunications.Seguranca.length > 0 ? (
-                    groupedCommunications.Seguranca.map(item => (
-                      <CommunicationItem key={item.docId} title={item.title} content={item.content} />
-                    ))
-                 ) : <p className="text-sm text-muted-foreground text-center py-4">Nenhuma publicação de segurança.</p>}
-              </div>
-            </CardContent>
+          <p className="text-xs text-muted-foreground">
+            Ferramentas emprestadas no momento
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Aferições Vencidas</CardTitle>
+          <Activity className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+           {isLoadingOverdue ? (
+            <Skeleton className="h-8 w-1/2" />
+          ) : overdueError ? (
+             <div className="text-sm font-bold text-muted-foreground">N/A</div>
+          ) : (
+             <div className="text-2xl font-bold text-destructive">{overdueTools?.length || 0}</div>
           )}
-        </Card>
-
-        <Card className="flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium">Comunicados do RH</CardTitle>
-            <Megaphone className="h-6 w-6 text-muted-foreground" />
-          </CardHeader>
-          {isLoading ? <LoadingCardContent /> : (
-            <CardContent className="flex-1">
-                <div className="space-y-4">
-                 {groupedCommunications.RH.length > 0 ? (
-                    groupedCommunications.RH.map(item => (
-                      <CommunicationItem key={item.docId} title={item.title} content={item.content} />
-                    ))
-                 ) : <p className="text-sm text-muted-foreground text-center py-4">Nenhum comunicado do RH.</p>}
-              </div>
-            </CardContent>
-          )}
-        </Card>
+          <p className="text-xs text-muted-foreground">
+            Ferramentas com calibração vencida
+          </p>
+        </CardContent>
+      </Card>
+      <div className="col-span-1 lg:col-span-4">
+        <ReorderSuggestions />
       </div>
     </div>
   );

@@ -60,7 +60,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setIsAuthorized(true);
       } else {
         setIsAuthorized(false);
-        router.push('/dashboard');
+        router.push('/home'); // Redirect to public home if not authorized
       }
     } else if (user && !employeeData) {
         // This case can happen if the employee doc is not yet created or fails to load
