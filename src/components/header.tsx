@@ -294,13 +294,8 @@ export function Header() {
 
   const navItems = useMemo(() => {
     if (!employeeData) return [];
-    
-    const permissionItems = allNavItems.filter(item => item.permission);
-
-    const permittedItems = filterItemsByPermissions(permissionItems, employeeData.permissions, isAdmin);
-    
+    const permittedItems = filterItemsByPermissions(allNavItems, employeeData.permissions, isAdmin);
     return permittedItems;
-
   }, [employeeData, isAdmin]);
 
 
