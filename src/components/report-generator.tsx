@@ -1,8 +1,6 @@
-
 'use client';
 
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
+import { useState } from 'react';
 import { getSupplyUsageReport } from '@/app/actions';
 import { Button } from './ui/button';
 import { Calendar } from './ui/calendar';
@@ -20,8 +18,7 @@ const initialState = {
   success: false,
 };
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <Button type="submit" className="w-full" disabled={pending}>
       {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -31,12 +28,31 @@ function SubmitButton() {
 }
 
 export function ReportGenerator() {
-  const [state, formAction] = useActionState(getSupplyUsageReport, initialState);
+  const [state, setState] = useState(initialState);
+  const [pending, setPending] = useState(false);
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPending(true);
+    const formData = new FormData(event.currentTarget);
+    // Manually set dates if they are selected
+    if (startDate) {
+        formData.set('startDate', format(startDate, 'yyyy-MM-dd'));
+    }
+    if (endDate) {
+        formData.set('endDate', format(endDate, 'yyyy-MM-dd'));
+    }
+    const result = await getSupplyUsageReport(null, formData);
+    setState(result);
+    setPending(false);
+  };
 
   return (
     <div className="grid gap-6">
       <Card>
-        <form action={formAction}>
+        <form onSubmit={handleSubmit}>
           <CardHeader>
             <CardTitle>Gerar Relatório de Uso de Suprimentos</CardTitle>
             <CardDescription>Selecione um período e uma categoria para gerar um novo relatório.</CardDescription>
@@ -44,52 +60,42 @@ export function ReportGenerator() {
           <CardContent className="grid gap-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="startDate">Data de Início</Label>
+                <Label>Data de Início</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" id="startDate" name="startDate" >
+                    <Button variant="outline" className="justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      <span>Escolha uma data</span>
+                      {startDate ? format(startDate, 'PPP') : <span>Escolha uma data</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <Calendar
                       mode="single"
+                      selected={startDate}
+                      onSelect={setStartDate}
                       initialFocus
-                      onSelect={(day) => {
-                        const input = document.getElementById('startDate-input') as HTMLInputElement;
-                        if (input && day) input.value = format(day, 'yyyy-MM-dd');
-                        const button = document.querySelector('#startDate span');
-                        if (button && day) button.textContent = format(day, 'PPP');
-                      }}
                     />
                   </PopoverContent>
                 </Popover>
-                <input type="hidden" id="startDate-input" name="startDate" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="endDate">Data de Fim</Label>
-                <Popover>
+                <Label>Data de Fim</Label>
+                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" id="endDate" name="endDate">
+                    <Button variant="outline" className="justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      <span>Escolha uma data</span>
+                      {endDate ? format(endDate, 'PPP') : <span>Escolha uma data</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
-                     <Calendar
+                    <Calendar
                       mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
                       initialFocus
-                      onSelect={(day) => {
-                        const input = document.getElementById('endDate-input') as HTMLInputElement;
-                        if (input && day) input.value = format(day, 'yyyy-MM-dd');
-                        const button = document.querySelector('#endDate span');
-                        if (button && day) button.textContent = format(day, 'PPP');
-                      }}
                     />
                   </PopoverContent>
                 </Popover>
-                 <input type="hidden" id="endDate-input" name="endDate" />
               </div>
             </div>
             <div className="grid gap-2">
@@ -108,17 +114,17 @@ export function ReportGenerator() {
             </div>
           </CardContent>
           <CardFooter>
-            <SubmitButton />
+            <SubmitButton pending={pending} />
           </CardFooter>
         </form>
       </Card>
-      {state.report && (
+      {state.success && state.report && (
         <Card>
           <CardHeader>
             <CardTitle>Relatório Gerado</CardTitle>
           </CardHeader>
           <CardContent>
-            <Textarea readOnly value={state.report} className="h-64 resize-none" />
+            <Textarea readOnly value={state.report} className="h-64 resize-none bg-muted/50" />
           </CardContent>
         </Card>
       )}
