@@ -12,12 +12,14 @@ import { CalendarIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Textarea } from './ui/textarea';
 
+// This is the initial state for our component's state management
 const initialState = {
   report: '',
   error: '',
   success: false,
 };
 
+// We define the submit button as a separate component to show a loading state
 function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <Button type="submit" className="w-full" disabled={pending}>
@@ -27,16 +29,19 @@ function SubmitButton({ pending }: { pending: boolean }) {
   );
 }
 
+// The main component, rewritten to use standard useState and async/await
 export function ReportGenerator() {
   const [state, setState] = useState(initialState);
   const [pending, setPending] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
 
+  // The form submission handler
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setPending(true);
+    setPending(true); // Start loading state
     const formData = new FormData(event.currentTarget);
+    
     // Manually set dates if they are selected
     if (startDate) {
         formData.set('startDate', format(startDate, 'yyyy-MM-dd'));
@@ -44,9 +49,12 @@ export function ReportGenerator() {
     if (endDate) {
         formData.set('endDate', format(endDate, 'yyyy-MM-dd'));
     }
+    
+    // Call the server action and update the state with the result
     const result = await getSupplyUsageReport(null, formData);
     setState(result);
-    setPending(false);
+    
+    setPending(false); // End loading state
   };
 
   return (
