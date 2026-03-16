@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
 import type { Activity } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import type { User } from 'firebase/auth';
@@ -14,6 +14,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
@@ -21,7 +32,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, XCircle, Milestone, Check, RefreshCcw, MessageSquarePlus } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Milestone, Check, RefreshCcw, MessageSquarePlus, Trash2, Archive } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
@@ -70,6 +81,11 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity: initi
         setDueDate(activity.dueDate ? format(new Date(activity.dueDate), 'yyyy-MM-dd') : '');
     }
   }, [activity]);
+  
+  const handleInvalidateQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['activities'] });
+    queryClient.invalidateQueries({ queryKey: ['archivedActivities'] });
+  };
 
   const handleLogProgress = async () => {
     if (!firestore || !activity || !currentUser || !progressNote) return;
@@ -101,7 +117,7 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity: initi
     }
   };
 
-  const handleAction = async (action: 'accept' | 'reject' | 'complete' | 'validate_ok' | 'validate_nok') => {
+  const handleAction = async (action: 'accept' | 'reject' | 'complete' | 'validate_ok' | 'validate_nok' | 'archive' | 'delete') => {
     if (!firestore || !activity || !currentUser) return;
 
     if (action === 'reject' && !justification) {
@@ -117,31 +133,50 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity: initi
     const activityRef = doc(firestore, 'activities', activity.docId);
     let newStatus: Activity['status'] | undefined;
     let details = '';
+    let successMessage = '';
 
-    switch(action) {
-        case 'accept': 
-            newStatus = 'Em Andamento'; 
-            details = `Atividade aceita. Prazo definido para ${format(new Date(dueDate), 'dd/MM/yyyy')}.`;
-            break;
-        case 'reject': 
-            newStatus = 'Recusada';
-            details = `Atividade recusada. Motivo: ${justification}`;
-            break;
-        case 'complete': 
-            newStatus = 'Aguardando Validação';
-            details = `Atividade marcada como concluída pelo responsável.`;
-            break;
-        case 'validate_ok': 
-            newStatus = 'Concluída';
-            details = `Atividade validada como eficaz pelo solicitante.`;
-            break;
-        case 'validate_nok': 
-            newStatus = 'Pendente';
-            details = `Atividade devolvida para reexecução. Motivo: ${justification}`;
-            break;
-    }
-    
     try {
+        if(action === 'delete') {
+            await deleteDoc(activityRef);
+            toast({ title: 'Sucesso', description: 'Atividade excluída permanentemente.' });
+            handleInvalidateQueries();
+            onClose();
+            return;
+        }
+
+        switch(action) {
+            case 'accept': 
+                newStatus = 'Em Andamento'; 
+                details = `Atividade aceita. Prazo definido para ${format(new Date(dueDate), 'dd/MM/yyyy')}.`;
+                successMessage = 'Atividade iniciada.';
+                break;
+            case 'reject': 
+                newStatus = 'Recusada';
+                details = `Atividade recusada. Motivo: ${justification}`;
+                successMessage = 'Atividade recusada.';
+                break;
+            case 'complete': 
+                newStatus = 'Aguardando Validação';
+                details = `Atividade marcada como concluída pelo responsável.`;
+                successMessage = 'Atividade enviada para validação.';
+                break;
+            case 'validate_ok': 
+                newStatus = 'Concluída';
+                details = `Atividade validada como eficaz pelo solicitante.`;
+                successMessage = 'Atividade concluída com sucesso.';
+                break;
+            case 'validate_nok': 
+                newStatus = 'Pendente';
+                details = `Atividade devolvida para reexecução. Motivo: ${justification}`;
+                successMessage = 'Atividade devolvida para reexecução.';
+                break;
+            case 'archive':
+                newStatus = 'Arquivada';
+                details = 'Atividade arquivada pelo usuário.';
+                successMessage = 'Atividade movida para o arquivo.';
+                break;
+        }
+        
         const historyEntry = {
             action: action,
             userId: currentUser.uid,
@@ -159,11 +194,9 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity: initi
         if(action === 'reject' || action === 'validate_nok') updateData.refusalJustification = justification;
         if(action === 'validate_ok') updateData.isEffective = true;
 
-
         await updateDoc(activityRef, updateData);
-        toast({ title: 'Sucesso!', description: 'Status da atividade atualizado.' });
-        // Invalidate the main query to update the Kanban board columns
-        queryClient.invalidateQueries({ queryKey: ['activities'] });
+        toast({ title: 'Sucesso!', description: successMessage });
+        handleInvalidateQueries();
         onClose();
     } catch(err) {
         console.error(err);
@@ -175,6 +208,7 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity: initi
 
   const isAssignee = currentUser?.uid === activity?.assigneeId;
   const isRequester = currentUser?.uid === activity?.requesterId;
+  const isAdmin = false; // Add your admin check logic here if needed
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -281,7 +315,40 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity: initi
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Fechar</Button>
+             <div className="flex justify-between w-full">
+                <div>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="icon" title="Excluir Atividade" disabled={isProcessing}>
+                                <Trash2 />
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Esta ação não pode ser desfeita. Isso excluirá permanentemente a atividade e todo o seu histórico.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleAction('delete')} disabled={isProcessing}>
+                                    {isProcessing ? <Loader2 className="animate-spin" /> : "Confirmar Exclusão"}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+                <div className="flex gap-2">
+                    {activity?.status === 'Concluída' && (
+                        <Button variant="secondary" onClick={() => handleAction('archive')} disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Archive className="mr-2"/>}
+                            Arquivar
+                        </Button>
+                    )}
+                    <Button variant="outline" onClick={onClose}>Fechar</Button>
+                </div>
+            </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

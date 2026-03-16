@@ -26,8 +26,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { Archive } from 'lucide-react';
 
-export type ActivityStatus = 'Pendente' | 'Em Andamento' | 'Aguardando Validação' | 'Concluída' | 'Recusada';
+export type ActivityStatus = 'Pendente' | 'Em Andamento' | 'Aguardando Validação' | 'Concluída' | 'Recusada' | 'Arquivada';
 export type Column = { id: ActivityStatus; title: string; activities: WithDocId<Activity>[] };
 
 const columnsOrder: ActivityStatus[] = ['Pendente', 'Em Andamento', 'Aguardando Validação', 'Concluída'];
@@ -88,7 +90,9 @@ const GestaoAtividadesPage = () => {
             const requesterMatch = !selectedRequester || activity.requesterId === selectedRequester;
             const assigneeMatch = !selectedAssignee || activity.assigneeId === selectedAssignee;
             const sectorMatch = !selectedSector || activity.sector === selectedSector;
-            return requesterMatch && assigneeMatch && sectorMatch;
+            // Exclude archived activities from the main board
+            const notArchived = activity.status !== 'Arquivada';
+            return requesterMatch && assigneeMatch && sectorMatch && notArchived;
         });
     }, [activities, selectedRequester, selectedAssignee, selectedSector]);
 
@@ -197,10 +201,15 @@ const GestaoAtividadesPage = () => {
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold">Gestão de Atividades</h1>
-                    <Button onClick={() => setIsCreateDialogOpen(true)}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Nova Atividade
-                    </Button>
+                    <div className="flex items-center gap-2">
+                         <Link href="/dashboard/gestao-atividades/arquivadas">
+                            <Button variant="outline"><Archive className="mr-2 h-4 w-4"/> Ver Arquivadas</Button>
+                        </Link>
+                        <Button onClick={() => setIsCreateDialogOpen(true)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Nova Atividade
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">

@@ -1892,7 +1892,7 @@
             },
             "status": {
                 "type": "string",
-                "enum": ["Pendente", "Em Andamento", "Concluída", "Recusada", "Aguardando Validação"]
+                "enum": ["Pendente", "Em Andamento", "Concluída", "Recusada", "Aguardando Validação", "Arquivada"]
             },
             "requesterId": { "type": "string" },
             "requesterName": { "type": "string" },

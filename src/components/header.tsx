@@ -85,7 +85,11 @@ const allNavItems: NavItem[] = [
     href: '/dashboard/gestao-atividades',
     icon: Activity,
     label: 'Gestão de Atividades',
-    permission: 'gestao_atividades'
+    permission: 'gestao_atividades',
+     subItems: [
+        { href: '/dashboard/gestao-atividades', label: 'Quadro Kanban' },
+        { href: '/dashboard/gestao-atividades/arquivadas', label: 'Arquivadas' },
+    ]
   },
   { 
     href: '/dashboard/suprimentos', 

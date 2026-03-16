@@ -483,7 +483,7 @@ export type Activity = {
     description: string;
     priority: 'Normal' | 'Média' | 'Urgente';
     sector: 'Ferramentaria' | 'Suprimentos' | 'Engenharia' | 'Manutenção' | 'TI' | 'Qualidade' | 'GSO' | 'Administrativo' | 'Financeiro' | 'Outro';
-    status: 'Pendente' | 'Em Andamento' | 'Concluída' | 'Recusada' | 'Aguardando Validação';
+    status: 'Pendente' | 'Em Andamento' | 'Concluída' | 'Recusada' | 'Aguardando Validação' | 'Arquivada';
     requesterId: string;
     requesterName: string;
     assigneeId: string;
@@ -543,5 +543,6 @@ export type AtendimentoGSO = {
     
 
     
+
 
 
