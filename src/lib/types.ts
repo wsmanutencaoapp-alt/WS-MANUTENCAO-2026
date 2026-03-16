@@ -490,6 +490,8 @@ export type Activity = {
     assigneeName: string;
     createdAt: string; // ISO date string
     dueDate?: string; // ISO date string
+    isPrivate?: boolean;
+    viewerIds?: string[];
     refusalJustification?: string;
     validationNotes?: string;
     isEffective?: boolean;
@@ -541,4 +543,5 @@ export type AtendimentoGSO = {
     
 
     
+
 

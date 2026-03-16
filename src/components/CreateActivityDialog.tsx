@@ -23,13 +23,16 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandGroup, CommandItem, CommandList } from './ui/command';
 import { Calendar } from './ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CalendarIcon, ChevronsUpDown, Check } from 'lucide-react';
+import { Loader2, CalendarIcon, ChevronsUpDown, Check, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
+import { Switch } from './ui/switch';
+import { Badge } from './ui/badge';
+import { X } from 'lucide-react';
 
 interface CreateActivityDialogProps {
   isOpen: boolean;
@@ -45,6 +48,8 @@ const formSchema = z.object({
   sector: z.enum(sectors),
   priority: z.enum(['Normal', 'Média', 'Urgente']).default('Normal'),
   dueDate: z.date().optional(),
+  isPrivate: z.boolean().default(false),
+  viewerIds: z.array(z.string()).optional(),
 });
 
 export default function CreateActivityDialog({ isOpen, onClose }: CreateActivityDialogProps) {
@@ -53,6 +58,8 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = useState(false);
+  const [isViewersPopoverOpen, setIsViewersPopoverOpen] = useState(false);
+  const [selectedViewers, setSelectedViewers] = useState<Map<string, string>>(new Map());
 
   const { data: employees, isLoading: isLoadingEmployees } = useCollection<WithDocId<Employee>>(
     useMemoFirebase(() => firestore ? collection(firestore, 'employees') : null, [firestore])
@@ -60,8 +67,23 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { title: '', description: '', assigneeId: '', priority: 'Normal', sector: 'Administrativo' },
+    defaultValues: { title: '', description: '', assigneeId: '', priority: 'Normal', sector: 'Administrativo', isPrivate: false, viewerIds: [] },
   });
+  
+  const isPrivate = form.watch('isPrivate');
+  
+  const handleViewerSelect = (employee: WithDocId<Employee>) => {
+      setSelectedViewers(prev => {
+          const newMap = new Map(prev);
+          if (newMap.has(employee.docId)) {
+              newMap.delete(employee.docId);
+          } else {
+              newMap.set(employee.docId, `${employee.firstName} ${employee.lastName}`);
+          }
+          form.setValue('viewerIds', Array.from(newMap.keys()));
+          return newMap;
+      })
+  }
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!firestore || !currentUser) {
@@ -74,9 +96,16 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
         return;
     }
 
+    const viewerIds = new Set(values.viewerIds || []);
+    if (values.isPrivate) {
+        viewerIds.add(currentUser.uid); // Creator
+        viewerIds.add(assignee.docId); // Assignee
+    }
+
     try {
       await addDoc(collection(firestore, 'activities'), {
         ...values,
+        viewerIds: values.isPrivate ? Array.from(viewerIds) : [],
         requesterId: currentUser.uid,
         requesterName: currentUser.displayName || currentUser.email,
         assigneeName: `${assignee.firstName} ${assignee.lastName}`,
@@ -93,8 +122,11 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
       });
       toast({ title: 'Sucesso', description: 'Atividade criada.' });
       queryClient.invalidateQueries({ queryKey: ['activities'] });
-      onClose();
+      queryClient.invalidateQueries({ queryKey: ['publicActivities'] });
+      queryClient.invalidateQueries({ queryKey: ['privateActivities'] });
       form.reset();
+      setSelectedViewers(new Map());
+      onClose();
     } catch (err) {
       console.error(err);
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível criar a atividade.' });
@@ -108,142 +140,30 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
           <DialogTitle>Criar Nova Atividade</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Título <span className="text-destructive">*</span></FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Descrição</FormLabel>
-                            <FormControl><Textarea {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="sector"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Setor</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Selecione um setor" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {sectors.map(sector => (
-                                        <SelectItem key={sector} value={sector}>{sector}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="assigneeId"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                            <FormLabel>Responsável <span className="text-destructive">*</span></FormLabel>
-                            <Popover open={isAssigneePopoverOpen} onOpenChange={setIsAssigneePopoverOpen}>
-                                <PopoverTrigger asChild>
-                                    <FormControl>
-                                        <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={isLoadingEmployees}>
-                                            {field.value ? employees?.find(e => e.docId === field.value)?.firstName + ' ' + employees?.find(e => e.docId === field.value)?.lastName : "Selecione um colaborador..."}
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                    <Command>
-                                        <CommandInput placeholder="Buscar por nome..." />
-                                        <CommandList>
-                                            <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
-                                            <CommandGroup>
-                                                {employees?.map(employee => (
-                                                    <CommandItem 
-                                                        key={employee.docId} 
-                                                        value={`${employee.firstName} ${employee.lastName}`} 
-                                                        onSelect={() => {
-                                                            form.setValue('assigneeId', employee.docId);
-                                                            setIsAssigneePopoverOpen(false);
-                                                        }}
-                                                    >
-                                                        <Check className={cn("mr-2 h-4 w-4", field.value === employee.docId ? "opacity-100" : "opacity-0")} />
-                                                        {employee.firstName} {employee.lastName}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4 py-2">
+                <FormField control={form.control} name="title" render={({ field }) => ( <FormItem><FormLabel>Título <span className="text-destructive">*</span></FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="description" render={({ field }) => ( <FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="sector" render={({ field }) => ( <FormItem><FormLabel>Setor</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione um setor" /></SelectTrigger></FormControl><SelectContent>{sectors.map(sector => (<SelectItem key={sector} value={sector}>{sector}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="assigneeId" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Responsável <span className="text-destructive">*</span></FormLabel><Popover open={isAssigneePopoverOpen} onOpenChange={setIsAssigneePopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={isLoadingEmployees}>{field.value ? employees?.find(e => e.docId === field.value)?.firstName + ' ' + employees?.find(e => e.docId === field.value)?.lastName : "Selecione um colaborador..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Buscar por nome..." /><CommandList><CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty><CommandGroup>{employees?.map(employee => (<CommandItem key={employee.docId} value={`${employee.firstName} ${employee.lastName}`} onSelect={() => {form.setValue('assigneeId', employee.docId); setIsAssigneePopoverOpen(false);}}><Check className={cn("mr-2 h-4 w-4", field.value === employee.docId ? "opacity-100" : "opacity-0")} />{employee.firstName} {employee.lastName}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                
+                <FormField control={form.control} name="isPrivate" render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5"><FormLabel>Atividade Privada</FormLabel><FormDescription>Apenas você, o responsável e os visualizadores selecionados poderão ver esta atividade.</FormDescription></div>
+                        <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                    </FormItem>
+                )}/>
+                
+                {isPrivate && (
+                    <div className="animate-in fade-in-50">
+                    <FormField control={form.control} name="viewerIds" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Visualizadores</FormLabel><Popover open={isViewersPopoverOpen} onOpenChange={setIsViewersPopoverOpen}><PopoverTrigger asChild><Button variant="outline" className="w-full justify-between font-normal" disabled={isLoadingEmployees}><span className="truncate">{selectedViewers.size > 0 ? Array.from(selectedViewers.values()).join(', ') : "Selecione os visualizadores..."}</span><UserPlus className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Buscar por nome..." /><CommandList><CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty><CommandGroup>{employees?.map(employee => (<CommandItem key={employee.docId} value={`${employee.firstName} ${employee.lastName}`} onSelect={() => handleViewerSelect(employee)}><Check className={cn("mr-2 h-4 w-4", selectedViewers.has(employee.docId) ? "opacity-100" : "opacity-0")} />{employee.firstName} {employee.lastName}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                    </div>
+                )}
+                
                 <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="priority"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Prioridade</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Defina a prioridade" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="Normal">Normal</SelectItem>
-                                        <SelectItem value="Média">Média</SelectItem>
-                                        <SelectItem value="Urgente">Urgente</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="dueDate"
-                        render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                                <FormLabel>Prazo (Opcional)</FormLabel>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <FormControl>
-                                            <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {field.value ? format(field.value, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}
-                                            </Button>
-                                        </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
-                                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                                    </PopoverContent>
-                                </Popover>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                    <FormField control={form.control} name="priority" render={({ field }) => ( <FormItem><FormLabel>Prioridade</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Defina a prioridade" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Normal">Normal</SelectItem><SelectItem value="Média">Média</SelectItem><SelectItem value="Urgente">Urgente</SelectItem></SelectContent></Select><FormMessage /></FormItem> )}/>
+                    <FormField control={form.control} name="dueDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Prazo (Opcional)</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP', { locale: ptBR }) : <span>Escolha uma data</span>}</Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="pt-4">
                     <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
                     <Button type="submit" disabled={form.formState.isSubmitting}>
                         {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

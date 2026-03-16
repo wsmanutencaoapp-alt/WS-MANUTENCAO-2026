@@ -1875,6 +1875,12 @@
             "id": { "type": "string" },
             "title": { "type": "string" },
             "description": { "type": "string" },
+            "isPrivate": { "type": "boolean", "description": "If true, the activity is only visible to the requester, assignee, and specified viewers." },
+            "viewerIds": {
+                "type": "array",
+                "description": "A list of user IDs who can view a private activity.",
+                "items": { "type": "string" }
+            },
             "priority": {
               "type": "string",
               "enum": ["Normal", "Média", "Urgente"]

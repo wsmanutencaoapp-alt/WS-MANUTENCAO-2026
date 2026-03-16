@@ -163,7 +163,7 @@ service cloud.firestore {
     }
     
     match /activities/{activityId} {
-        allow read: if hasPermission('gestao_atividades_view');
+        allow read: if isAdmin() || resource.data.isPrivate != true || (request.auth.uid in resource.data.viewerIds);
         allow create: if hasPermission('gestao_atividades_create');
         allow update: if hasPermission('gestao_atividades_update') || isOwner(resource.data.assigneeId) || isOwner(resource.data.requesterId);
         allow delete: if hasPermission('gestao_atividades_delete');
