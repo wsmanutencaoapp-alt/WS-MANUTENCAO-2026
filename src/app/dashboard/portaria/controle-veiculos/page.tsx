@@ -172,13 +172,14 @@ const ControleVeiculosPage = () => {
   };
 
   const handleSave = async () => {
-    if (!firestore || !user) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado.' });
+    if (!firestore || !user || !dialogState.type) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Usuário não autenticado ou tipo de operação inválida.' });
       return;
     }
     
     try {
-        if (dialogState.type === 'entrada' && isExternalVehicle) {
+        if (isExternalVehicle) {
+            // Logic for External Vehicles (both 'entrada' and 'saida')
             if (!externalPlate || !driverName) {
                 toast({ variant: 'destructive', title: 'Erro', description: 'Placa e motorista são obrigatórios para veículo externo.' });
                 return;
@@ -187,7 +188,7 @@ const ControleVeiculosPage = () => {
             const movementData: Partial<VehicleMovement> = {
                 vehiclePlaca: externalPlate.toUpperCase(),
                 driverName: driverName,
-                type: 'entrada',
+                type: dialogState.type,
                 date: new Date().toISOString(),
                 notes: notes,
                 isExternal: true,
@@ -195,12 +196,12 @@ const ControleVeiculosPage = () => {
             
             await addDoc(collection(firestore, 'vehicle_movements'), movementData);
 
-        } else { // Internal vehicle logic for both 'entrada' and 'saida'
+        } else { // Logic for Internal Vehicles
             if (!selectedVehicle || !driverName) {
                 toast({ variant: 'destructive', title: 'Erro', description: 'Veículo e motorista são obrigatórios.' });
                 return;
             }
-            if (!isExternalVehicle && !km) {
+            if (!km) {
                 toast({ variant: 'destructive', title: 'Erro', description: 'KM é obrigatório para veículos da frota.' });
                 return;
             }
@@ -212,7 +213,7 @@ const ControleVeiculosPage = () => {
                 vehiclePrefixo: selectedVehicle.prefixo,
                 vehiclePlaca: selectedVehicle.placa,
                 driverName: driverName,
-                type: dialogState.type!,
+                type: dialogState.type,
                 date: new Date().toISOString(),
                 km: Number(km),
                 notes: notes,
@@ -380,18 +381,16 @@ const ControleVeiculosPage = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {dialogState.type === 'entrada' && (
-              <div className="flex items-center space-x-2">
-                  <Switch
-                      id="external-vehicle"
-                      checked={isExternalVehicle}
-                      onCheckedChange={setIsExternalVehicle}
-                  />
-                  <Label htmlFor="external-vehicle">Veículo Externo</Label>
-              </div>
-            )}
+            <div className="flex items-center space-x-2">
+                <Switch
+                    id="external-vehicle"
+                    checked={isExternalVehicle}
+                    onCheckedChange={setIsExternalVehicle}
+                />
+                <Label htmlFor="external-vehicle">Veículo Externo</Label>
+            </div>
             
-            {dialogState.type === 'entrada' && isExternalVehicle ? (
+            {isExternalVehicle ? (
               <div className="space-y-1.5">
                 <Label htmlFor="externalPlate">Placa do Veículo <span className="text-destructive">*</span></Label>
                 <Input
@@ -412,6 +411,7 @@ const ControleVeiculosPage = () => {
                       variant="outline"
                       role="combobox"
                       className="w-full justify-between"
+                      disabled={isLoadingVehicles}
                     >
                       {selectedVehicleId
                         ? allVehicles?.find(v => v.docId === selectedVehicleId)?.prefixo
@@ -430,9 +430,9 @@ const ControleVeiculosPage = () => {
                           {vehiclesForDialog.map((vehicle) => (
                             <CommandItem
                               key={vehicle.docId}
-                              value={vehicle.docId}
-                              onSelect={(currentValue) => {
-                                setSelectedVehicleId(currentValue === selectedVehicleId ? null : currentValue);
+                              value={`${vehicle.prefixo} ${vehicle.placa}`}
+                              onSelect={() => {
+                                setSelectedVehicleId(vehicle.docId);
                                 setVehiclePopoverOpen(false);
                               }}
                             >
@@ -463,7 +463,7 @@ const ControleVeiculosPage = () => {
                 onChange={(e) => setDriverName(e.target.value)}
               />
             </div>
-            {!(dialogState.type === 'entrada' && isExternalVehicle) && (
+            {!isExternalVehicle && (
               <div className="space-y-1.5">
                 <Label htmlFor="km">Quilometragem (KM) <span className="text-destructive">*</span></Label>
                 <Input
