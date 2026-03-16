@@ -29,7 +29,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
 import { X } from 'lucide-react';
@@ -176,3 +176,4 @@ export default function CreateActivityDialog({ isOpen, onClose }: CreateActivity
     </Dialog>
   );
 }
+    
