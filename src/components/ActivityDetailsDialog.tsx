@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
 import type { Activity } from '@/lib/types';
@@ -70,9 +70,13 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity: initi
     firestore && initialActivity?.docId ? doc(firestore, 'activities', initialActivity.docId) : null
   ), [firestore, initialActivity?.docId]);
 
-  const { data: activity, isLoading: isLoadingActivity } = useDoc<WithDocId<Activity>>(activityDocRef, {
+  const { data: activityFromSubscription, isLoading: isLoadingActivity } = useDoc<WithDocId<Activity>>(activityDocRef, {
     enabled: !!initialActivity?.docId && isOpen,
   });
+
+  // Use the live data from the subscription, but fall back to the initial prop data while loading
+  // This prevents UI flickering and ensures data is always available for checks.
+  const activity = useMemo(() => activityFromSubscription || initialActivity, [activityFromSubscription, initialActivity]);
 
   useEffect(() => {
     if (activity) {
@@ -108,7 +112,6 @@ export default function ActivityDetailsDialog({ isOpen, onClose, activity: initi
 
         toast({ title: 'Sucesso', description: 'Progresso adicionado à atividade.' });
         setProgressNote(''); // Clear the textarea
-        // No need to invalidate queries, useDoc handles real-time updates
     } catch (err) {
         console.error(err);
         toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível adicionar a nota de progresso.' });
