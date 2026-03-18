@@ -32,12 +32,13 @@ service cloud.firestore {
 
     // A helper function to determine if a user can read an activity.
     function canReadActivity(activityData) {
-      // If the activity is explicitly public or the privacy field doesn't exist (for old documents), it's visible.
-      if (activityData.get('isPrivate', false) == false) {
-        return true;
+      // Case 1: The document is explicitly private. Check if user is a viewer.
+      if (activityData.get('isPrivate', false) == true) {
+        return request.auth.uid in activityData.get('viewerIds', []);
       }
-      // If it is private, check if the current user is in the list of viewers.
-      return request.auth.uid in activityData.get('viewerIds', []);
+      // Case 2: The document is not explicitly private (isPrivate is false or doesn't exist).
+      // Therefore, it's public.
+      return true;
     }
 
     // This rule specifically allows collectionGroup queries on 'stock'
