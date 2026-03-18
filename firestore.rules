@@ -32,13 +32,9 @@ service cloud.firestore {
 
     // A helper function to determine if a user can read an activity.
     function canReadActivity(activityData) {
-      // Case 1: The document is explicitly private. Check if user is a viewer.
-      if (activityData.get('isPrivate', false) == true) {
-        return request.auth.uid in activityData.get('viewerIds', []);
-      }
-      // Case 2: The document is not explicitly private (isPrivate is false or doesn't exist).
-      // Therefore, it's public.
-      return true;
+      // isPrivate being absent or false means public
+      return activityData.get('isPrivate', false) == false ||
+             (request.auth.uid in activityData.get('viewerIds', []));
     }
 
     // This rule specifically allows collectionGroup queries on 'stock'
@@ -174,7 +170,8 @@ service cloud.firestore {
     }
     
     match /activities/{activityId} {
-        allow read: if isAdmin() || canReadActivity(resource.data);
+        allow get: if isAdmin() || canReadActivity(resource.data);
+        allow list: if isAuthenticated();
         allow create: if hasPermission('gestao_atividades_create');
         allow update: if hasPermission('gestao_atividades_update') || isOwner(resource.data.assigneeId) || isOwner(resource.data.requesterId);
         allow delete: if hasPermission('gestao_atividades_delete');

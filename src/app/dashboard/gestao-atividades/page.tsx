@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, updateDoc, doc } from 'firebase/firestore';
 import type { Activity, Employee } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
@@ -58,6 +58,10 @@ const GestaoAtividadesPage = () => {
     ), [firestore]);
     const { data: activities, isLoading, error } = useCollection<WithDocId<Activity>>(activitiesQuery, { queryKey: ['activities'] });
 
+    const { data: currentUserData } = useDoc<Employee>(useMemoFirebase(() => (firestore && user) ? doc(firestore, 'employees', user.uid) : null, [firestore, user]));
+    const isAdmin = useMemo(() => currentUserData?.accessLevel === 'Admin', [currentUserData]);
+
+
     const { uniqueRequesters, uniqueAssignees, uniqueSectors } = useMemo(() => {
         if (!activities) return { uniqueRequesters: [], uniqueAssignees: [], uniqueSectors: [] };
 
@@ -85,8 +89,13 @@ const GestaoAtividadesPage = () => {
     }, [activities]);
 
     const filteredActivities = useMemo(() => {
-        if (!activities) return [];
+        if (!activities || !user) return [];
         return activities.filter(activity => {
+            const isAllowedToView = isAdmin || !activity.isPrivate || (activity.viewerIds && activity.viewerIds.includes(user.uid));
+            if (!isAllowedToView) {
+                return false;
+            }
+
             const requesterMatch = !selectedRequester || activity.requesterId === selectedRequester;
             const assigneeMatch = !selectedAssignee || activity.assigneeId === selectedAssignee;
             const sectorMatch = !selectedSector || activity.sector === selectedSector;
@@ -94,7 +103,7 @@ const GestaoAtividadesPage = () => {
             const notArchived = activity.status !== 'Arquivada';
             return requesterMatch && assigneeMatch && sectorMatch && notArchived;
         });
-    }, [activities, selectedRequester, selectedAssignee, selectedSector]);
+    }, [activities, selectedRequester, selectedAssignee, selectedSector, user, isAdmin]);
 
 
     useEffect(() => {
