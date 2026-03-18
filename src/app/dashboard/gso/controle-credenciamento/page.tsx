@@ -477,9 +477,9 @@ const TemporariosTab = () => {
 
 
 // =====================================================================
-// Portaria Tab Component
+// Terceiros Tab Component (formerly PortariaTab)
 // =====================================================================
-const PortariaTab = () => {
+const TerceirosTab = () => {
     const firestore = useFirestore();
     const queryClient = useQueryClient();
     const { toast } = useToast();
@@ -559,10 +559,10 @@ const PortariaTab = () => {
             if (editingPersonnel) {
                 const docRef = doc(firestore, 'gate_personnel', editingPersonnel.docId);
                 await updateDoc(docRef, dataToSave);
-                toast({ title: 'Sucesso', description: 'Dados do pessoal da portaria atualizados.' });
+                toast({ title: 'Sucesso', description: 'Dados de terceiro atualizados.' });
             } else {
                 await addDoc(collection(firestore, 'gate_personnel'), dataToSave);
-                toast({ title: 'Sucesso', description: 'Novo pessoal da portaria cadastrado.' });
+                toast({ title: 'Sucesso', description: 'Novo terceiro cadastrado.' });
             }
             queryClient.invalidateQueries({ queryKey: ['gate_personnel'] });
             setDialogOpen(false);
@@ -589,8 +589,8 @@ const PortariaTab = () => {
       <>
         <Card>
             <CardHeader>
-                <CardTitle>Controle da Portaria</CardTitle>
-                <CardDescription>Gerencie as credenciais para a equipe da portaria.</CardDescription>
+                <CardTitle>Controle de Terceiros</CardTitle>
+                <CardDescription>Gerencie as credenciais para a equipe de terceiros.</CardDescription>
                 <div className="flex justify-between items-center pt-4">
                      <div className="relative">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -602,7 +602,7 @@ const PortariaTab = () => {
                         />
                     </div>
                     <Button onClick={() => handleOpenDialog(null)}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Pessoal
+                        <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Terceiro
                     </Button>
                 </div>
             </CardHeader>
@@ -661,7 +661,7 @@ const PortariaTab = () => {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{editingPersonnel ? 'Editar' : 'Adicionar'} Pessoal da Portaria</DialogTitle>
+                    <DialogTitle>{editingPersonnel ? 'Editar' : 'Adicionar'} Terceiro</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
                     <div className="space-y-1.5"><Label htmlFor="name">Nome Completo</Label><Input id="name" value={formData.name || ''} onChange={handleInputChange}/></div>
@@ -823,7 +823,7 @@ export default function ControleCredenciamentoPage() {
             <TabsTrigger value="funcionarios"><Users className="mr-2 h-4 w-4"/> Funcionários</TabsTrigger>
             <TabsTrigger value="veiculos"><Car className="mr-2 h-4 w-4"/> Veículos</TabsTrigger>
             <TabsTrigger value="temporarios"><HardHat className="mr-2 h-4 w-4"/> Temporários</TabsTrigger>
-            <TabsTrigger value="portaria">Portaria</TabsTrigger>
+            <TabsTrigger value="terceiros">Terceiros</TabsTrigger>
             <TabsTrigger value="ex-funcionarios"><Users className="mr-2 h-4 w-4"/> Ex-Funcionários</TabsTrigger>
         </TabsList>
         <TabsContent value="funcionarios">
@@ -835,8 +835,8 @@ export default function ControleCredenciamentoPage() {
          <TabsContent value="temporarios">
             <TemporariosTab />
         </TabsContent>
-        <TabsContent value="portaria">
-            <PortariaTab />
+        <TabsContent value="terceiros">
+            <TerceirosTab />
         </TabsContent>
         <TabsContent value="ex-funcionarios">
             <ExFuncionariosTab />
