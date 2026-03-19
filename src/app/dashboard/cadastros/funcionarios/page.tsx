@@ -1,7 +1,8 @@
+
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, doc, query, orderBy, updateDoc, setDoc, getDocs, limit, deleteDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '@/firebase';
@@ -53,6 +54,7 @@ function getInitials(firstName?: string, lastName?: string) {
 export default function CadastroFuncionariosPage() {
   const firestore = useFirestore();
   const auth = useAuth();
+  const { user } = useUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
@@ -164,6 +166,8 @@ export default function CadastroFuncionariosPage() {
       }
   }
 
+  const isSuperAdmin = (uid: string) => uid === 'SOID8C723XUmlniI3mpjBmBPA5v1';
+
   return (
     <>
     <div className="space-y-6">
@@ -237,7 +241,7 @@ export default function CadastroFuncionariosPage() {
                         </div>
                     </TableCell>
                     <TableCell>
-                        {employee.accessLevel === 'Admin' ? <Badge variant={'default'}><ShieldCheck className="mr-1 h-3.5 w-3.5" />Admin</Badge> : <Badge variant={'secondary'}>Técnico</Badge>}
+                        {isSuperAdmin(employee.uid) || employee.accessLevel === 'Admin' ? <Badge variant={'default'}><ShieldCheck className="mr-1 h-3.5 w-3.5" />Admin</Badge> : <Badge variant={'secondary'}>Técnico</Badge>}
                     </TableCell>
                     <TableCell>{getStatusBadge(employee.status)}</TableCell>
                     <TableCell className="hidden md:table-cell font-mono">{employee.id}</TableCell>
@@ -301,5 +305,3 @@ export default function CadastroFuncionariosPage() {
     </>
   );
 }
-
-    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -65,14 +66,14 @@ export function SettingsForm() {
 
   const { data: employeeData, isLoading: isEmployeeDataLoading } = useDoc<FormData>(userDocRef);
 
-  const isAdmin = employeeData?.accessLevel === 'Admin' || employeeData?.id === 1001;
+  const isAdmin = employeeData?.accessLevel === 'Admin' || employeeData?.id === 1001 || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1';
   
   useEffect(() => {
     if (employeeData) {
       // Logic to auto-correct the admin user's access level if it's missing or wrong
       let accessLevel = employeeData.accessLevel || '';
-      if (employeeData.id === 1001) {
-        accessLevel = 'Admin'; // Force 'Admin' for the first user
+      if (employeeData.id === 1001 || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1') {
+        accessLevel = 'Admin'; // Force 'Admin' for the master users
       }
 
       form.reset({
@@ -129,8 +130,8 @@ export function SettingsForm() {
         lastName: values.lastName,
         phone: values.phone,
         photoURL: photoURL,
-        // Ensure the access level is correctly set, especially for the admin
-        accessLevel: values.id === 1001 ? 'Admin' : values.accessLevel,
+        // Ensure the access level is correctly set, especially for the admins
+        accessLevel: (values.id === 1001 || user.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1') ? 'Admin' : values.accessLevel,
       };
   
       // The update operation is wrapped in a .catch() to handle permission errors
@@ -181,7 +182,7 @@ export function SettingsForm() {
   }
 
   const { isSubmitting } = form.formState;
-  const hasNumericId = typeof form.watch('id') === 'number';
+  const hasNumericId = typeof form.watch('id') === 'number' || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1';
 
   return (
     <Form {...form}>
@@ -240,8 +241,8 @@ export function SettingsForm() {
                     <Input 
                       {...field} 
                       value={field.value ?? ''} 
-                      readOnly={employeeData?.id === 1001} // Lock the field for the admin user
-                      className={employeeData?.id === 1001 ? "bg-muted/50 cursor-not-allowed" : ""} 
+                      readOnly={employeeData?.id === 1001 || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1'} // Lock the field for the admin users
+                      className={(employeeData?.id === 1001 || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1') ? "bg-muted/50 cursor-not-allowed" : ""} 
                     />
                   </FormControl>
                   <FormMessage />

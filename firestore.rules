@@ -14,9 +14,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // An admin is a user with Admin level.
+      // An admin is a user with Admin level or the master UID provided.
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
-             getUserData().accessLevel == 'Admin';
+             (getUserData().accessLevel == 'Admin' || request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1');
     }
     
     function hasPermission(module) {

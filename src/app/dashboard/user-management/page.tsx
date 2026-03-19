@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -109,8 +110,8 @@ export default function UserManagementPage() {
         toast({ variant: 'destructive', title: 'Ação não permitida' });
         return;
     }
-    if (employee.uid === user.uid) {
-        toast({ variant: 'destructive', title: 'Ação Inválida', description: 'Você não pode alterar seu próprio nível de acesso.' });
+    if (employee.uid === user.uid || employee.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1') {
+        toast({ variant: 'destructive', title: 'Ação Inválida', description: 'Você não pode alterar o nível de acesso de um Super Administrador.' });
         return;
     }
 
@@ -148,6 +149,8 @@ export default function UserManagementPage() {
               return <Badge variant="destructive">{currentStatus}</Badge>;
       }
   }
+
+  const isSuperAdmin = (uid: string) => uid === 'SOID8C723XUmlniI3mpjBmBPA5v1';
 
   return (
     <div className="space-y-6">
@@ -200,7 +203,9 @@ export default function UserManagementPage() {
                     </TableRow>
                 ))
               )}
-              {!isLoading && filteredEmployees?.map((employee) => (
+              {!isLoading && filteredEmployees?.map((employee) => {
+                const superAdmin = isSuperAdmin(employee.uid);
+                return (
                 <TableRow key={employee.docId}>
                     <TableCell>
                         <div className="flex items-center gap-4">
@@ -215,7 +220,7 @@ export default function UserManagementPage() {
                         </div>
                     </TableCell>
                     <TableCell>
-                        {employee.accessLevel === 'Admin' ? <Badge variant={'default'}><ShieldCheck className="mr-1 h-3.5 w-3.5" />Admin</Badge> : <Badge variant={'secondary'}>Técnico</Badge>}
+                        {superAdmin || employee.accessLevel === 'Admin' ? <Badge variant={'default'}><ShieldCheck className="mr-1 h-3.5 w-3.5" />Admin</Badge> : <Badge variant={'secondary'}>Técnico</Badge>}
                     </TableCell>
                     <TableCell>{getStatusBadge(employee.status)}</TableCell>
                     <TableCell className="hidden md:table-cell font-mono">{employee.id}</TableCell>
@@ -232,7 +237,7 @@ export default function UserManagementPage() {
                                     variant="outline"
                                     size="icon"
                                     title="Alternar Nível de Acesso"
-                                    disabled={isProcessing === employee.docId || employee.uid === user?.uid}
+                                    disabled={isProcessing === employee.docId || employee.uid === user?.uid || superAdmin}
                                 >
                                     <ShieldCheck className="h-4 w-4" />
                                 </Button>
@@ -252,12 +257,12 @@ export default function UserManagementPage() {
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
-                         <Button variant="outline" size="icon" title="Gerenciar Permissões" onClick={() => setPermissionsEmployee(employee)} disabled={isProcessing === employee.docId}>
+                         <Button variant="outline" size="icon" title="Gerenciar Permissões" onClick={() => setPermissionsEmployee(employee)} disabled={isProcessing === employee.docId || superAdmin}>
                             <Settings className="h-4 w-4" />
                         </Button>
                          <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="icon" disabled={isProcessing === employee.docId}><Trash2 className="h-4 w-4" /></Button>
+                                <Button variant="destructive" size="icon" disabled={isProcessing === employee.docId || superAdmin}><Trash2 className="h-4 w-4" /></Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                                 <AlertDialogHeader>
@@ -274,7 +279,7 @@ export default function UserManagementPage() {
                         </AlertDialog>
                     </TableCell>
                 </TableRow>
-              ))}
+              )})}
             </TableBody>
           </Table>
         </CardContent>

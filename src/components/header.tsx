@@ -294,7 +294,7 @@ export function Header() {
   }, [firestore, user?.uid]);
 
   const { data: employeeData } = useDoc<Employee>(userDocRef);
-  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin', [employeeData]);
+  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin' || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1', [employeeData, user]);
 
   const navItems = useMemo(() => {
     if (!employeeData) return [];

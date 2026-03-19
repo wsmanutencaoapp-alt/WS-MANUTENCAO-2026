@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -142,8 +143,9 @@ const AprovacoesComprasPage = () => {
   // --- FILTERING LOGIC ---
   const filteredRequisitions = useMemo(() => {
     let displayList = requisitionsWithTotals;
+    const isAdmin = currentUserData?.accessLevel === 'Admin' || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1';
 
-    if (currentUserData?.accessLevel !== 'Admin') {
+    if (!isAdmin) {
         if (isLevel2Approver && showAllForLevel2) {
             // Show all, no extra filtering needed
         } else {
@@ -162,7 +164,7 @@ const AprovacoesComprasPage = () => {
         (req.protocol && req.protocol.toLowerCase().includes(lowercasedTerm)) ||
         req.requesterName.toLowerCase().includes(lowercasedTerm)
     );
-  }, [requisitionsWithTotals, searchTerm, currentUserData, isLevel2Approver, level1CostCenterIds, showAllForLevel2]);
+  }, [requisitionsWithTotals, searchTerm, currentUserData, isLevel2Approver, level1CostCenterIds, showAllForLevel2, user]);
   
   
   // --- ACTIONS ---
@@ -228,6 +230,8 @@ const AprovacoesComprasPage = () => {
     return variants[status] || 'secondary';
   }
 
+  const userIsMasterAdmin = user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1' || currentUserData?.accessLevel === 'Admin';
+
   return (
     <>
       <div className="space-y-6">
@@ -239,7 +243,7 @@ const AprovacoesComprasPage = () => {
                     <CardTitle>Requisições e Ordens Pendentes</CardTitle>
                     <CardDescription>Analise, aprove ou recuse documentos que aguardam sua ação.</CardDescription>
                 </div>
-                {(isLevel2Approver || currentUserData?.accessLevel === 'Admin') && (
+                {userIsMasterAdmin && (
                     <div className="flex items-center space-x-2">
                         <Switch id="show-all-switch" checked={showAllForLevel2} onCheckedChange={setShowAllForLevel2} />
                         <Label htmlFor="show-all-switch" className="flex items-center gap-1"><ArrowRightLeft className="h-4 w-4"/> Ver Todas</Label>
