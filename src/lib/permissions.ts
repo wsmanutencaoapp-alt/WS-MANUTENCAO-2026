@@ -1,4 +1,5 @@
 
+
 export const permissionActions = ['view', 'create', 'update', 'delete'] as const;
 export type PermissionAction = typeof permissionActions[number];
 
@@ -65,6 +66,8 @@ export const permissionStructure = [
             { id: 'cadastros_enderecos', label: 'Endereços', path: '/dashboard/cadastros/enderecos', actions: ['view', 'create', 'delete'] },
             { id: 'cadastros_centro_custo', label: 'Centro de Custo', path: '/dashboard/cadastros/centro-de-custo', actions: ['view', 'create', 'update', 'delete'] },
             { id: 'cadastros_treinamentos', label: 'Treinamentos', path: '/dashboard/cadastros/treinamentos', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'cadastros_tecnica_modelos', label: 'Técnica: Modelos', path: '/dashboard/cadastros/tecnica/modelos', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'cadastros_tecnica_tarefas', label: 'Técnica: Tarefas', path: '/dashboard/cadastros/tecnica/tarefas', actions: ['view', 'create', 'update', 'delete'] },
         ]
     },
     {

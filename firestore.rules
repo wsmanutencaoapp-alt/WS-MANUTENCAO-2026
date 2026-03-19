@@ -238,5 +238,22 @@ service cloud.firestore {
       allow update: if hasPermission('gso_ficha_atendimento_update');
       allow delete: if hasPermission('gso_ficha_atendimento_delete');
     }
+
+    match /aircraft_models/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+    }
+    match /engine_models/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+    }
+    match /apu_models/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+    }
+    match /maintenance_tasks/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_tarefas_update');
+    }
   }
 }

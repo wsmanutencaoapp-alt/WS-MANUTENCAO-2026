@@ -1,3 +1,4 @@
+
 'use client';
 
 
@@ -213,6 +214,8 @@ export type Permissions = {
   cadastros_enderecos?: boolean;
   cadastros_centro_custo?: boolean;
   cadastros_treinamentos?: boolean;
+  cadastros_tecnica_modelos?: boolean;
+  cadastros_tecnica_tarefas?: boolean;
   engenharia?: boolean;
   engenharia_aprovacoes?: boolean;
   engenharia_projetos?: boolean;
@@ -540,9 +543,34 @@ export type AtendimentoGSO = {
   createdAt: string; // ISO String
   history?: ActivityLog[];
 };
-    
 
-    
+export type AircraftModel = {
+  id?: string;
+  manufacturer: string;
+  name: string;
+  family?: string;
+};
 
+export type EngineModel = {
+  id?: string;
+  manufacturer: string;
+  name: string;
+};
 
+export type APUModel = {
+  id?: string;
+  manufacturer: string;
+  name: string;
+};
 
+export type MaintenanceTask = {
+  id?: string;
+  code: string;
+  description: string;
+  modelType: 'Aeronave' | 'Motor' | 'APU';
+  modelId: string;
+  modelName: string;
+  intervalHours?: number;
+  intervalCycles?: number;
+  intervalDays?: number;
+};

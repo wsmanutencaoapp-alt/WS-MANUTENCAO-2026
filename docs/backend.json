@@ -1,6 +1,59 @@
 
 {
   "entities": {
+    "AircraftModel": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Aircraft Model",
+      "type": "object",
+      "description": "Represents an aircraft model manufacturer/family.",
+      "properties": {
+        "id": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "name": { "type": "string" },
+        "family": { "type": "string", "description": "e.g., King Air, Citation, Caravan" }
+      },
+      "required": ["manufacturer", "name"]
+    },
+    "EngineModel": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Engine Model",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["manufacturer", "name"]
+    },
+    "APUModel": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "APU Model",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["manufacturer", "name"]
+    },
+    "MaintenanceTask": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Maintenance Task",
+      "type": "object",
+      "description": "Represents a standardized maintenance task linked to a model.",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string", "description": "ATA chapter or internal task code" },
+        "description": { "type": "string" },
+        "modelType": { "type": "string", "enum": ["Aeronave", "Motor", "APU"] },
+        "modelId": { "type": "string", "description": "ID of the linked Aircraft, Engine or APU model" },
+        "modelName": { "type": "string", "description": "Denormalized name for display" },
+        "intervalHours": { "type": "number" },
+        "intervalCycles": { "type": "number" },
+        "intervalDays": { "type": "number" }
+      },
+      "required": ["code", "description", "modelType", "modelId"]
+    },
     "Vehicle": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Vehicle",
@@ -2266,6 +2319,22 @@
           },
           "description": "Armazena as fichas de atendimento a aeronaves."
         }
+      },
+      {
+        "path": "/aircraft_models/{id}",
+        "definition": { "schema": { "$ref": "#/entities/AircraftModel" }, "description": "Modelos de aeronaves." }
+      },
+      {
+        "path": "/engine_models/{id}",
+        "definition": { "schema": { "$ref": "#/entities/EngineModel" }, "description": "Modelos de motores." }
+      },
+      {
+        "path": "/apu_models/{id}",
+        "definition": { "schema": { "$ref": "#/entities/APUModel" }, "description": "Modelos de APU." }
+      },
+      {
+        "path": "/maintenance_tasks/{id}",
+        "definition": { "schema": { "$ref": "#/entities/MaintenanceTask" }, "description": "Tarefas de manutenção técnica." }
       }
     ]
   }
