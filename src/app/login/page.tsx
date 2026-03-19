@@ -35,6 +35,8 @@ const formSchema = z.object({
   password: z.string().min(1, 'A senha é obrigatória'),
 });
 
+const SUPER_ADMIN_UID = 'SOID8C723XUmlniI3mpjBmBPA5v1';
+
 function LoginForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -61,6 +63,16 @@ function LoginForm() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
+
+      // Allow Super Admin to bypass profile checks
+      if (user.uid === SUPER_ADMIN_UID) {
+        toast({
+          title: 'Bem-vindo, Super Admin!',
+          description: 'Login realizado com sucesso.',
+        });
+        router.push('/dashboard');
+        return;
+      }
 
       // Check employee status in Firestore
       const employeeDocRef = doc(firestore, 'employees', user.uid);
@@ -92,9 +104,8 @@ function LoginForm() {
         title: 'Sucesso!',
         description: 'Login realizado com sucesso. Redirecionando...',
       });
-      router.push('/dashboard'); // Redirect to the main authenticated page, which is now home
+      router.push('/dashboard');
     } catch (error: any) {
-      // Use a generic error message for all login failures
       toast({
         variant: 'destructive',
         title: 'Falha no Login',

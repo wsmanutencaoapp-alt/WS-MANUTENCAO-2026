@@ -1,4 +1,3 @@
-
 'use client';
 import type { ReactNode } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
@@ -14,6 +13,7 @@ import { getRequiredPermissionForPath } from '@/lib/permissions';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+const SUPER_ADMIN_UID = 'SOID8C723XUmlniI3mpjBmBPA5v1';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -43,8 +43,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (user && employeeData) {
-      if (employeeData.status !== 'Ativo') {
+    if (user) {
+      const isSuperAdmin = user.uid === SUPER_ADMIN_UID;
+
+      // Check account status for regular users
+      if (employeeData && employeeData.status !== 'Ativo' && !isSuperAdmin) {
          toast({
           variant: 'destructive',
           title: 'Acesso Negado',
@@ -55,23 +58,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       }
       
       const requiredPermission = getRequiredPermissionForPath(pathname);
-      const isAdmin = employeeData.accessLevel === 'Admin' || user.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1';
+      const isAdmin = isSuperAdmin || (employeeData && employeeData.accessLevel === 'Admin');
       
-      if (isAdmin || !requiredPermission || (employeeData.permissions && employeeData.permissions[requiredPermission])) {
+      if (isAdmin || !requiredPermission || (employeeData?.permissions && employeeData.permissions[requiredPermission])) {
         setIsAuthorized(true);
       } else {
         setIsAuthorized(false);
         router.push('/dashboard/home'); // Redirect to home if not authorized
       }
-    } else if (user && !employeeData) {
-        // This case can happen if the employee doc is not yet created or fails to load
-        router.push('/login');
     }
 
   }, [user, employeeData, isLoading, router, pathname, toast, auth]);
 
 
-  if (isLoading || !isAuthorized) {
+  if (isLoading || (!isAuthorized && user?.uid !== SUPER_ADMIN_UID)) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center bg-muted/40">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />

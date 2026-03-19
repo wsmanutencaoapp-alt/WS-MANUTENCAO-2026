@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -53,6 +52,7 @@ import { doc } from 'firebase/firestore';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 
+const SUPER_ADMIN_UID = 'SOID8C723XUmlniI3mpjBmBPA5v1';
 
 const allNavItems: NavItem[] = [
   { 
@@ -234,9 +234,7 @@ const allBottomNavItems: NavItem[] = [
         href: '/dashboard/selfie', 
         icon: Camera, 
         label: 'Self (Público)',
-        // No permission needed for the main item
         subItems: [
-            // These sub-items also don't need permissions as they lead to public-facing functionalities
             { href: '/retirada-veiculo', label: 'Retirada de Veículo', icon: Car },
             { href: '/anexo-comprovante', label: 'Anexo de Comprovante', icon: Receipt },
         ]
@@ -244,16 +242,17 @@ const allBottomNavItems: NavItem[] = [
 ];
 
 const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permissions'] | undefined, isAdmin: boolean): NavItem[] => {
-  if (!permissions && !isAdmin) return [];
+  // Always allow Super Admin
+  if (isAdmin) return items;
+  if (!permissions) return [];
 
   return items.reduce((acc, item) => {
-    // A user has view permission if they are an admin, the item has no specific permission, or they have the specific view permission.
-    const hasViewPermission = isAdmin || !item.permission || (permissions?.[`${item.permission}_view`]);
+    const hasViewPermission = !item.permission || (permissions?.[`${item.permission}_view`]);
 
     if (hasViewPermission) {
       if (item.subItems) {
         const permittedSubItems = item.subItems.filter(subItem => 
-          isAdmin || !subItem.permission || (permissions?.[`${subItem.permission}_view`])
+          !subItem.permission || (permissions?.[`${subItem.permission}_view`])
         );
         
         if (permittedSubItems.length > 0) {
@@ -311,22 +310,23 @@ export function AppSidebar() {
   );
   const { data: employeeData } = useDoc<Employee>(userDocRef);
 
-  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin' || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1', [employeeData, user]);
+  const isAdmin = useMemo(() => user?.uid === SUPER_ADMIN_UID || employeeData?.accessLevel === 'Admin', [employeeData, user]);
 
   const navItems = useMemo(() => {
-    if (!employeeData) return [];
+    // If no employee data yet, but it's Super Admin, allow all items
+    if (!employeeData && user?.uid !== SUPER_ADMIN_UID) return [];
     
-    const permittedItems = filterItemsByPermissions(allNavItems, employeeData.permissions, isAdmin);
+    const permittedItems = filterItemsByPermissions(allNavItems, employeeData?.permissions, isAdmin);
     
     return filterNavItemsBySearch(permittedItems, searchTerm);
 
-  }, [employeeData, isAdmin, searchTerm]);
+  }, [employeeData, isAdmin, searchTerm, user?.uid]);
 
   const bottomNavItems = useMemo(() => {
-    if (!employeeData) return [];
-    const permittedItems = filterItemsByPermissions(allBottomNavItems, employeeData.permissions, isAdmin);
+    if (!employeeData && user?.uid !== SUPER_ADMIN_UID) return [];
+    const permittedItems = filterItemsByPermissions(allBottomNavItems, employeeData?.permissions, isAdmin);
     return filterNavItemsBySearch(permittedItems, searchTerm);
-  }, [employeeData, isAdmin, searchTerm]);
+  }, [employeeData, isAdmin, searchTerm, user?.uid]);
 
   return (
     <Sidebar collapsible="icon" className="group-[[data-variant=sidebar]]:border-r group-[[data-variant=sidebar]]:bg-sidebar">

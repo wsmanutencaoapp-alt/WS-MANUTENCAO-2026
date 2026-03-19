@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -67,6 +66,7 @@ import { ThemeToggle } from './theme-toggle';
 import Image from 'next/image';
 import Notifications from './Notifications';
 
+const SUPER_ADMIN_UID = 'SOID8C723XUmlniI3mpjBmBPA5v1';
 
 const allNavItems: NavItem[] = [
   { 
@@ -248,9 +248,7 @@ const allBottomNavItems: NavItem[] = [
         href: '/dashboard/selfie', 
         icon: Camera, 
         label: 'Self (Público)',
-        // No permission needed for the main item
         subItems: [
-            // These sub-items also don't need permissions as they lead to public-facing functionalities
             { href: '/retirada-veiculo', label: 'Retirada de Veículo', icon: Car },
             { href: '/anexo-comprovante', label: 'Anexo de Comprovante', icon: Receipt },
         ]
@@ -258,15 +256,16 @@ const allBottomNavItems: NavItem[] = [
 ];
 
 const filterItemsByPermissions = (items: NavItem[], permissions: Employee['permissions'] | undefined, isAdmin: boolean): NavItem[] => {
-  if (!permissions && !isAdmin) return [];
+  if (isAdmin) return items;
+  if (!permissions) return [];
 
   return items.reduce((acc, item) => {
-    const hasViewPermission = isAdmin || !item.permission || (permissions?.[`${item.permission}_view`]);
+    const hasViewPermission = !item.permission || (permissions?.[`${item.permission}_view`]);
 
     if (hasViewPermission) {
       if (item.subItems) {
         const permittedSubItems = item.subItems.filter(subItem => 
-          isAdmin || !subItem.permission || (permissions?.[`${subItem.permission}_view`])
+          !subItem.permission || (permissions?.[`${subItem.permission}_view`])
         );
         
         if (permittedSubItems.length > 0) {
@@ -294,14 +293,14 @@ export function Header() {
   }, [firestore, user?.uid]);
 
   const { data: employeeData } = useDoc<Employee>(userDocRef);
-  const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin' || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1', [employeeData, user]);
+  const isAdmin = useMemo(() => user?.uid === SUPER_ADMIN_UID || employeeData?.accessLevel === 'Admin', [employeeData, user]);
 
   const navItems = useMemo(() => {
-    if (!employeeData) return [];
-    const mainPermitted = filterItemsByPermissions(allNavItems, employeeData.permissions, isAdmin);
-    const bottomPermitted = filterItemsByPermissions(allBottomNavItems, employeeData.permissions, isAdmin);
+    if (!employeeData && user?.uid !== SUPER_ADMIN_UID) return [];
+    const mainPermitted = filterItemsByPermissions(allNavItems, employeeData?.permissions, isAdmin);
+    const bottomPermitted = filterItemsByPermissions(allBottomNavItems, employeeData?.permissions, isAdmin);
     return [...mainPermitted, ...bottomPermitted];
-  }, [employeeData, isAdmin]);
+  }, [employeeData, isAdmin, user?.uid]);
 
 
   const handleLogout = async () => {
