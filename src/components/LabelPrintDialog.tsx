@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -61,20 +60,20 @@ export default function LabelPrintDialog({ isOpen, onClose, tools }: LabelPrintD
     tools.forEach((tool) => {
       // URL Inteligente para consulta em tempo real
       const isKit = tool.tipo === 'KIT' || !!tool.toolIds;
-      const targetPath = isKit ? '/dashboard/ferramentaria/lista-ferramentas' : '/dashboard/ferramentaria/lista-ferramentas';
+      const targetPath = '/dashboard/ferramentaria/lista-ferramentas';
       const qrData = `${baseUrl}${targetPath}?search=${encodeURIComponent(tool.codigo)}`;
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
       
       let html = '';
       if (labelSize === 'small') {
+        // Layout sem logo para ganhar espaço de texto
         html = `
-          <div class="label-container" style="width: 120mm; height: 23mm; padding: 0 5mm; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8mm;">
-            <img src="/logo.png" style="height: 16mm; width: auto; object-fit: contain;" />
-            <div style="text-align: center; overflow: hidden;">
-              <div style="font-size: 14pt; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: black;">${tool.descricao}</div>
-              <div style="font-size: 12pt; font-family: monospace; font-weight: bold; margin-top: 1mm; color: #333;">${tool.codigo}</div>
+          <div class="label-container" style="width: 120mm; height: 23mm; padding: 0 8mm; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5mm;">
+            <div style="text-align: left; overflow: hidden;">
+              <div style="font-size: 12pt; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: black; text-transform: uppercase;">${tool.descricao}</div>
+              <div style="font-size: 10pt; font-family: monospace; font-weight: bold; margin-top: 1mm; color: #333;">${tool.codigo}</div>
             </div>
-            <img src="${qrUrl}" style="width: 19mm; height: 19mm;" />
+            <img src="${qrUrl}" style="width: 18mm; height: 18mm;" />
           </div>
         `;
       } else {
