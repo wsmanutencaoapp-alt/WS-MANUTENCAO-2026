@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 
 type ModelType = 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
 
-// Componente para gerenciar os itens dentro da sanfona
+// Componente para gerenciar os itens dentro da sanfona (Peças, Ferramentas, Consumíveis)
 function TaskDetailsAccordion({ task, onSaveSuccess }: { task: WithDocId<MaintenanceTask>, onSaveSuccess: () => void }) {
   const techFirestore = useTechFirestore();
   const { toast } = useToast();
@@ -55,8 +55,12 @@ function TaskDetailsAccordion({ task, onSaveSuccess }: { task: WithDocId<Mainten
     setIsSaving(true);
     try {
       const taskRef = doc(techFirestore, 'maintenanceTasks', task.docId);
-      await updateDoc(taskRef, localItems);
-      toast({ title: 'Sucesso', description: 'Itens relacionados da tarefa atualizados.' });
+      await updateDoc(taskRef, {
+        pecas: localItems.pecas,
+        ferramentasEspeciais: localItems.ferramentasEspeciais,
+        consumiveis: localItems.consumiveis
+      });
+      toast({ title: 'Sucesso', description: 'Itens relacionados atualizados.' });
       onSaveSuccess();
     } catch (err) {
       console.error(err);
@@ -85,25 +89,22 @@ function TaskDetailsAccordion({ task, onSaveSuccess }: { task: WithDocId<Mainten
         {localItems[type].map((item, idx) => (
           <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-muted/30 p-2 rounded-md border">
             <div className="col-span-5">
-              <Label className="text-[10px] uppercase text-muted-foreground ml-1">Descrição</Label>
               <Input 
                 className="h-8 text-xs" 
                 value={item.nome} 
                 onChange={e => updateItem(type, idx, 'nome', e.target.value)} 
-                placeholder="Ex: O-ring"
+                placeholder="Descrição"
               />
             </div>
             <div className="col-span-3">
-              <Label className="text-[10px] uppercase text-muted-foreground ml-1">P/N</Label>
               <Input 
                 className="h-8 text-xs font-mono" 
                 value={item.partNumber} 
                 onChange={e => updateItem(type, idx, 'partNumber', e.target.value)} 
-                placeholder="PN"
+                placeholder="P/N"
               />
             </div>
             <div className="col-span-2">
-              <Label className="text-[10px] uppercase text-muted-foreground ml-1">Qtd</Label>
               <Input 
                 className="h-8 text-xs" 
                 type="number" 
@@ -112,7 +113,6 @@ function TaskDetailsAccordion({ task, onSaveSuccess }: { task: WithDocId<Mainten
               />
             </div>
             <div className="col-span-1">
-              <Label className="text-[10px] uppercase text-muted-foreground ml-1">U.M</Label>
               <Select value={item.unidade} onValueChange={v => updateItem(type, idx, 'unidade', v)}>
                 <SelectTrigger className="h-8 text-[10px] px-1">
                   <SelectValue />
@@ -126,7 +126,7 @@ function TaskDetailsAccordion({ task, onSaveSuccess }: { task: WithDocId<Mainten
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-1 text-right pt-4">
+            <div className="col-span-1 text-right">
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem(type, idx)}>
                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>
@@ -157,7 +157,6 @@ function TaskDetailsAccordion({ task, onSaveSuccess }: { task: WithDocId<Mainten
 export default function TarefasTecnicaPage() {
   const techFirestore = useTechFirestore();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   
   const [activeModelType, setActiveModelType] = useState<ModelType>('Aeronave');
   const [selectedModelId, setSelectedModelId] = useState<string>('');
@@ -168,34 +167,23 @@ export default function TarefasTecnicaPage() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<Partial<MaintenanceTask>>({
-    code: 0,
-    tarefa: '',
-    refOrigem: '',
-    ata: '',
-    procTecn: '',
-    inspecao: '',
-    hhPlanejamento: 0,
-    frequenciaHoras: '',
-    frequenciaCiclos: '',
-    frequenciaCalendario: '',
-    frequenciaInicialHoras: '',
-    frequenciaInicialCiclos: '',
-    frequenciaInicialCalendario: '',
-    pecas: [],
-    ferramentasEspeciais: [],
-    consumiveis: [],
+    code: 0, tarefa: '', refOrigem: '', ata: '', procTecn: '', inspecao: '',
+    hhPlanejamento: 0, frequenciaHoras: '', frequenciaCiclos: '', frequenciaCalendario: '',
+    frequenciaInicialHoras: '', frequenciaInicialCiclos: '', frequenciaInicialCalendario: '',
   });
 
-  // Queries para Modelos
+  // Queries para Modelos (Aircraft, Engine, etc)
   const aircraftQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'aircraftModels')) : null), [techFirestore]);
+  const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery, { queryKey: ['tech_models_aircraft'] });
+  
   const engineQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'engineModels')) : null), [techFirestore]);
-  const apuQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'apuModels')) : null), [techFirestore]);
-  const propellerQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'propellerModels')) : null), [techFirestore]);
+  const { data: engineModels } = useCollection<WithDocId<EngineModel>>(engineQuery, { queryKey: ['tech_models_engine'] });
 
-  const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery, { queryKey: ['tech_models_aircraft_v3'] });
-  const { data: engineModels } = useCollection<WithDocId<EngineModel>>(engineQuery, { queryKey: ['tech_models_engine_v3'] });
-  const { data: apuModels } = useCollection<WithDocId<APUModel>>(apuQuery, { queryKey: ['tech_models_apu_v3'] });
-  const { data: propellerModels } = useCollection<WithDocId<PropellerModel>>(propellerQuery, { queryKey: ['tech_models_propeller_v3'] });
+  const apuQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'apuModels')) : null), [techFirestore]);
+  const { data: apuModels } = useCollection<WithDocId<APUModel>>(apuQuery, { queryKey: ['tech_models_apu'] });
+
+  const propellerQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'propellerModels')) : null), [techFirestore]);
+  const { data: propellerModels } = useCollection<WithDocId<PropellerModel>>(propellerQuery, { queryKey: ['tech_models_propeller'] });
 
   const availableModels = useMemo(() => {
     switch (activeModelType) {
@@ -209,14 +197,14 @@ export default function TarefasTecnicaPage() {
 
   const selectedModel = useMemo(() => availableModels.find(m => m.docId === selectedModelId), [availableModels, selectedModelId]);
 
-  // Query para Tarefas
+  // Query para Tarefas (maintenanceTasks em camelCase conforme banco)
   const tasksQuery = useMemoFirebase(() => {
     if (!techFirestore || !selectedModelId) return null;
     return query(collection(techFirestore, 'maintenanceTasks'), where('modelId', '==', selectedModelId));
   }, [techFirestore, selectedModelId]);
 
   const { data: tasks, isLoading: isLoadingTasks } = useCollection<WithDocId<MaintenanceTask>>(tasksQuery, {
-    queryKey: ['tech_tasks_live_v2', selectedModelId],
+    queryKey: ['tech_tasks_view', selectedModelId],
     enabled: !!selectedModelId && !!techFirestore
   });
 
@@ -236,19 +224,13 @@ export default function TarefasTecnicaPage() {
   const handleOpenDialog = (task: WithDocId<MaintenanceTask> | null = null) => {
     if (task) {
       setEditingTask(task);
-      setFormData({
-          ...task,
-          pecas: task.pecas || [],
-          ferramentasEspeciais: task.ferramentasEspeciais || [],
-          consumiveis: task.consumiveis || [],
-      });
+      setFormData(task);
     } else {
       setEditingTask(null);
       setFormData({
         code: 0, tarefa: '', refOrigem: '', ata: '', procTecn: '', inspecao: '',
         hhPlanejamento: 0, frequenciaHoras: '', frequenciaCiclos: '', frequenciaCalendario: '',
         frequenciaInicialHoras: '', frequenciaInicialCiclos: '', frequenciaInicialCalendario: '',
-        pecas: [], ferramentasEspeciais: [], consumiveis: [],
       });
     }
     setIsDialogOpen(true);
@@ -257,8 +239,8 @@ export default function TarefasTecnicaPage() {
   const handleSave = async () => {
     if (!techFirestore || !selectedModelId) return;
     setIsSaving(true);
-    const dataToSave: Omit<MaintenanceTask, 'id'> = {
-      ...formData as MaintenanceTask,
+    const dataToSave = {
+      ...formData,
       code: Number(formData.code) || 0,
       modelId: selectedModelId,
       modelType: activeModelType,
@@ -274,7 +256,6 @@ export default function TarefasTecnicaPage() {
         toast({ title: 'Sucesso', description: 'Tarefa cadastrada.' });
       }
       setIsDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['tech_tasks_live_v2', selectedModelId] });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a tarefa técnica.' });
     } finally {
@@ -282,22 +263,11 @@ export default function TarefasTecnicaPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!techFirestore) return;
-    try {
-      await deleteDoc(doc(techFirestore, 'maintenanceTasks', id));
-      toast({ title: 'Sucesso', description: 'Tarefa removida.' });
-      queryClient.invalidateQueries({ queryKey: ['tech_tasks_live_v2', selectedModelId] });
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao excluir.' });
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold">Banco de Dados de Tarefas de Manutenção</h1>
-        <p className="text-muted-foreground text-sm">Gerencie o plano de manutenção na instância <strong>operation-manager</strong>.</p>
+        <p className="text-muted-foreground text-sm">Gerencie o catálogo de tarefas técnicas na instância <strong>operation-manager</strong>.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -334,9 +304,7 @@ export default function TarefasTecnicaPage() {
                         <CardTitle>Tarefas: {(selectedModel as any)?.model}</CardTitle>
                         <CardDescription>Total de {isLoadingTasks ? '...' : tasks?.length || 0} tarefas encontradas.</CardDescription>
                     </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenDialog()}><PlusCircle className="mr-1 h-3 w-3"/> Adicionar</Button>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={() => handleOpenDialog()}><PlusCircle className="mr-1 h-3 w-3"/> Adicionar Manualmente</Button>
                 </div>
                 <div className="flex gap-4 pt-4">
                     <div className="relative flex-1">
@@ -381,8 +349,8 @@ export default function TarefasTecnicaPage() {
                                         </TableCell>
                                         <TableCell className="font-mono text-xs font-semibold">{task.code}</TableCell>
                                         <TableCell className="max-w-md">
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-sm">{task.tarefa}</span>
+                                            <div className="flex flex-col text-sm">
+                                                <span className="font-medium">{task.tarefa}</span>
                                                 <span className="text-[10px] text-muted-foreground uppercase">{task.inspecao}</span>
                                             </div>
                                         </TableCell>
@@ -391,18 +359,10 @@ export default function TarefasTecnicaPage() {
                                         <TableCell className="text-center font-mono text-xs">{task.hhPlanejamento || 0}</TableCell>
                                         <TableCell className="text-center font-mono text-xs">{task.frequenciaHoras || '-'}</TableCell>
                                         <TableCell className="text-center font-mono text-xs">{task.frequenciaCiclos || '-'}</TableCell>
-                                        <TableCell className="text-center font-mono text-xs text-orange-600 font-bold">{task.frequenciaCalendario || '-'}</TableCell>
+                                        <TableCell className="text-center font-mono text-xs font-bold">{task.frequenciaCalendario || '-'}</TableCell>
                                         <TableCell className="text-right space-x-1" onClick={(e) => e.stopPropagation()}>
                                             <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(task)}><Edit className="h-4 w-4" /></Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle><AlertDialogDescription>Deseja excluir a tarefa {task.code}?</AlertDialogDescription></AlertDialogHeader>
-                                                    <AlertDialogFooter><AlertDialogCancel>Voltar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(task.docId)}>Excluir</AlertDialogAction></AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
+                                            <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
                                         </TableCell>
                                     </TableRow>
                                     {isExpanded && (
@@ -410,7 +370,7 @@ export default function TarefasTecnicaPage() {
                                             <TableCell colSpan={10} className="p-0 border-b">
                                                 <TaskDetailsAccordion 
                                                     task={task} 
-                                                    onSaveSuccess={() => queryClient.invalidateQueries({ queryKey: ['tech_tasks_live_v2', selectedModelId] })} 
+                                                    onSaveSuccess={() => {}} 
                                                 />
                                             </TableCell>
                                         </TableRow>
@@ -430,53 +390,38 @@ export default function TarefasTecnicaPage() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{editingTask ? 'Editar' : 'Adicionar Nova'} Tarefa de Manutenção</DialogTitle>
-            <DialogDescription>Dados da tarefa para {(selectedModel as any)?.model}</DialogDescription>
+            <DialogTitle>{editingTask ? 'Editar' : 'Adicionar Nova'} Tarefa</DialogTitle>
+            <DialogDescription>Dados técnicos da tarefa para {(selectedModel as any)?.model}</DialogDescription>
           </DialogHeader>
           
-          <Tabs defaultValue="geral" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="geral">Informações da Tarefa</TabsTrigger>
-                <TabsTrigger value="intervalos">Intervalos de Frequência</TabsTrigger>
-            </TabsList>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-6 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5"><Label>Code (Numérico)</Label><Input type="number" value={formData.code} onChange={e => setFormData(p => ({...p, code: Number(e.target.value)}))} /></div>
+                    <div className="space-y-1.5"><Label>Ref. Origem</Label><Input value={formData.refOrigem} onChange={e => setFormData(p => ({...p, refOrigem: e.target.value}))} /></div>
+                    <div className="space-y-1.5"><Label>ATA</Label><Input value={formData.ata} onChange={e => setFormData(p => ({...p, ata: e.target.value}))} /></div>
+                    <div className="space-y-1.5"><Label>Proc. Técn</Label><Input value={formData.procTecn} onChange={e => setFormData(p => ({...p, procTecn: e.target.value}))} /></div>
+                    <div className="space-y-1.5 md:col-span-2"><Label>Tarefa</Label><Input value={formData.tarefa} onChange={e => setFormData(p => ({...p, tarefa: e.target.value}))} /></div>
+                    <div className="space-y-1.5"><Label>Inspeção</Label><Input value={formData.inspecao} onChange={e => setFormData(p => ({...p, inspecao: e.target.value}))} /></div>
+                    <div className="space-y-1.5"><Label>HH (Planejamento)</Label><Input type="number" value={formData.hhPlanejamento} onChange={e => setFormData(p => ({...p, hhPlanejamento: Number(e.target.value)}))} /></div>
+                </div>
 
-            <ScrollArea className="h-[60vh] mt-4 pr-4">
-                <TabsContent value="geral" className="space-y-4 m-0">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-1.5"><Label>Code (Numérico)</Label><Input type="number" value={formData.code} onChange={e => setFormData(p => ({...p, code: Number(e.target.value)}))} /></div>
-                        <div className="space-y-1.5"><Label>Ref. Origem</Label><Input value={formData.refOrigem} onChange={e => setFormData(p => ({...p, refOrigem: e.target.value}))} /></div>
-                        <div className="space-y-1.5"><Label>ATA</Label><Input value={formData.ata} onChange={e => setFormData(p => ({...p, ata: e.target.value}))} /></div>
-                        <div className="space-y-1.5"><Label>Proc. Técn</Label><Input value={formData.procTecn} onChange={e => setFormData(p => ({...p, procTecn: e.target.value}))} /></div>
-                        <div className="space-y-1.5 md:col-span-2"><Label>Tarefa</Label><Input value={formData.tarefa} onChange={e => setFormData(p => ({...p, tarefa: e.target.value}))} /></div>
-                        <div className="space-y-1.5"><Label>Inspeção</Label><Input value={formData.inspecao} onChange={e => setFormData(p => ({...p, inspecao: e.target.value}))} /></div>
-                        <div className="space-y-1.5"><Label>HH (Planejamento)</Label><Input type="number" value={formData.hhPlanejamento} onChange={e => setFormData(p => ({...p, hhPlanejamento: Number(e.target.value)}))} /></div>
-                    </div>
-                </TabsContent>
+                <Separator />
 
-                <TabsContent value="intervalos" className="space-y-6 m-0">
-                    <div className="space-y-4">
-                        <h3 className="font-semibold text-sm">Intervalo Recorrente</h3>
-                        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/20">
-                            <div className="space-y-1.5"><Label>FH (Horas)</Label><Input value={formData.frequenciaHoras} onChange={e => setFormData(p => ({...p, frequenciaHoras: e.target.value}))} /></div>
-                            <div className="space-y-1.5"><Label>FC (Ciclos)</Label><Input value={formData.frequenciaCiclos} onChange={e => setFormData(p => ({...p, frequenciaCiclos: e.target.value}))} /></div>
-                            <div className="space-y-1.5"><Label>MO (Meses)</Label><Input value={formData.frequenciaCalendario} onChange={e => setFormData(p => ({...p, frequenciaCalendario: e.target.value}))} /></div>
-                        </div>
+                <div className="space-y-4">
+                    <h3 className="font-semibold text-sm">Intervalos de Frequência</h3>
+                    <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/20">
+                        <div className="space-y-1.5"><Label>FH (Horas)</Label><Input value={formData.frequenciaHoras} onChange={e => setFormData(p => ({...p, frequenciaHoras: e.target.value}))} /></div>
+                        <div className="space-y-1.5"><Label>FC (Ciclos)</Label><Input value={formData.frequenciaCiclos} onChange={e => setFormData(p => ({...p, frequenciaCiclos: e.target.value}))} /></div>
+                        <div className="space-y-1.5"><Label>MO (Meses)</Label><Input value={formData.frequenciaCalendario} onChange={e => setFormData(p => ({...p, frequenciaCalendario: e.target.value}))} /></div>
                     </div>
-                    <div className="space-y-4">
-                        <h3 className="font-semibold text-sm">Intervalo da Primeira Inspeção (Opcional)</h3>
-                        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/20">
-                            <div className="space-y-1.5"><Label>FH (Horas)</Label><Input value={formData.frequenciaInicialHoras} onChange={e => setFormData(p => ({...p, frequenciaInicialHoras: e.target.value}))} /></div>
-                            <div className="space-y-1.5"><Label>FC (Ciclos)</Label><Input value={formData.frequenciaInicialCiclos} onChange={e => setFormData(p => ({...p, frequenciaInicialCiclos: e.target.value}))} /></div>
-                            <div className="space-y-1.5"><Label>MO (Meses)</Label><Input value={formData.frequenciaInicialCalendario} onChange={e => setFormData(p => ({...p, frequenciaInicialCalendario: e.target.value}))} /></div>
-                        </div>
-                    </div>
-                </TabsContent>
-            </ScrollArea>
-          </Tabs>
+                </div>
+            </div>
+          </ScrollArea>
 
-          <DialogFooter className="border-t pt-4">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>Cancelar</Button>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
