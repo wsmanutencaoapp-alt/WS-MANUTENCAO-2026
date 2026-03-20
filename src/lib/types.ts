@@ -574,14 +574,39 @@ export type PropellerModel = {
   partNumber: string;
 };
 
+export type MaintenanceTaskItem = {
+    nome: string;
+    partNumber: string;
+    quantidade: number;
+    unidade: string;
+};
+
 export type MaintenanceTask = {
   id?: string;
-  code: string;
-  description: string;
-  modelType: 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
+  code: string | number;
+  tarefa: string;
+  refOrigem: string;
+  ata: string;
+  procTecn: string;
+  inspecao: string;
+  hhPlanejamento?: number;
   modelId: string;
+  modelType: 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
   modelName: string;
-  intervalHours?: number;
-  intervalCycles?: number;
-  intervalDays?: number;
+  
+  // Frequências Recorrentes
+  frequenciaHoras: string;
+  frequenciaCiclos: string;
+  frequenciaCalendario: string; // Meses (MO)
+  
+  // Frequências Iniciais
+  frequenciaInicialHoras: string;
+  frequenciaInicialCiclos: string;
+  frequenciaInicialCalendario: string;
+
+  // Itens Relacionados
+  pecas?: MaintenanceTaskItem[];
+  ferramentasEspeciais?: MaintenanceTaskItem[];
+  consumiveis?: MaintenanceTaskItem[];
 };
+
