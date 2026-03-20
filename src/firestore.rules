@@ -14,14 +14,20 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Verifica se o usuário existe na base default e se é admin
-      return exists(/databases/(default)/documents/employees/$(request.auth.uid)) &&
-             (getUserData().accessLevel == 'Admin' || request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1');
+      // O Super Admin deve ter acesso mesmo que o documento de perfil não exista ainda.
+      // Validamos o UID primeiro para evitar erro de avaliação da regra.
+      return request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1' || 
+             (exists(/databases/(default)/documents/employees/$(request.auth.uid)) && 
+              get(/databases/(default)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin');
     }
     
     function hasPermission(module) {
-      let userData = getUserData();
-      return isAuthenticated() && (isAdmin() || (exists(/databases/(default)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true));
+      // Se for Admin (incluindo Super Admin por UID), tem permissão total.
+      // Caso contrário, verifica o mapa de permissões no banco default.
+      return isAuthenticated() && (
+        isAdmin() || 
+        (exists(/databases/(default)/documents/employees/$(request.auth.uid)) && getUserData().permissions[module] == true)
+      );
     }
     
     function isOwner(userId) {
@@ -236,7 +242,7 @@ service cloud.firestore {
       allow delete: if hasPermission('gso_ficha_atendimento_delete');
     }
 
-    // TECNICA (OPERATION MANAGER)
+    // REGRAS PARA O BANCO TÉCNICO (operation-manager)
     match /aircraftModels/{id} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_tecnica_modelos_update');

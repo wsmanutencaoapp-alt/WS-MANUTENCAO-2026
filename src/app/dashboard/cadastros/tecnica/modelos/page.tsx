@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useCollection, useTechFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, addDoc, doc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
+import { collection, query, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { AircraftModel, EngineModel, APUModel, PropellerModel } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -46,8 +46,9 @@ export default function ModelosTecnicaPage() {
     }
   };
 
+  // Simplificamos a query removendo o orderBy temporariamente para descartar erro de índice
   const currentQuery = useMemoFirebase(() => (
-    techFirestore ? query(collection(techFirestore, getCollectionName(activeTab)), orderBy('model')) : null
+    techFirestore ? collection(techFirestore, getCollectionName(activeTab)) : null
   ), [techFirestore, activeTab]);
 
   const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentQuery, {
@@ -154,9 +155,9 @@ export default function ModelosTecnicaPage() {
             {error && (
                 <Alert variant="destructive" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Erro de Permissão</AlertTitle>
+                    <AlertTitle>Falha na Consulta</AlertTitle>
                     <AlertDescription>
-                        Não foi possível carregar os dados da instância técnica. Verifique se as regras de segurança permitem o acesso entre bancos.
+                        Não foi possível carregar os dados. Detalhe: {error.message}
                     </AlertDescription>
                 </Alert>
             )}
@@ -180,7 +181,7 @@ export default function ModelosTecnicaPage() {
               </TableHeader>
               <TableBody>
                 {isLoading && <TableRow><TableCell colSpan={activeTab === 'Aeronave' ? 6 : 4} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={activeTab === 'Aeronave' ? 6 : 4} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado.</TableCell></TableRow>}
+                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={activeTab === 'Aeronave' ? 6 : 4} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado nesta aba.</TableCell></TableRow>}
                 {!isLoading && models?.map((model) => (
                   <TableRow key={model.docId}>
                     <TableCell className="font-medium">{model.manufacturer}</TableCell>
