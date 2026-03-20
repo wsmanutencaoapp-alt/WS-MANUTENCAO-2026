@@ -4,87 +4,71 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Função básica de autenticação
     function isAuthenticated() {
       return request.auth != null;
     }
     
+    // Validação direta do Super Admin (não depende de consulta ao banco)
     function isSuperAdmin() {
       return request.auth != null && request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1';
     }
 
-    function getUserData() {
-      // Busca o perfil do usuário sempre na base (default)
-      return get(/databases/(default)/documents/employees/$(request.auth.uid)).data;
-    }
-
+    // Função para verificar Admin no banco default
     function isAdmin() {
-      if (isSuperAdmin()) {
-        return true;
-      }
-      return exists(/databases/(default)/documents/employees/$(request.auth.uid)) && 
-             get(/databases/(default)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
-    }
-    
-    function hasPermission(module) {
-      if (isSuperAdmin()) {
-        return true;
-      }
-      return isAuthenticated() && (
-        isAdmin() || 
-        (exists(/databases/(default)/documents/employees/$(request.auth.uid)) && getUserData().permissions[module] == true)
-      );
-    }
-    
-    function isOwner(userId) {
-        return request.auth.uid == userId;
+      if (isSuperAdmin()) return true;
+      let userPath = /databases/(default)/documents/employees/$(request.auth.uid);
+      return exists(userPath) && get(userPath).data.accessLevel == 'Admin';
     }
 
-    // --- REGRAS PARA O BANCO TÉCNICO E ATIVIDADES (LEITURA ABERTA PARA AUTH) ---
+    // --- REGRAS PARA O BANCO TÉCNICO (operation-manager) ---
+    // Permitimos leitura para qualquer usuário logado para evitar erros de leitura cruzada entre bases.
     
-    // Permitimos leitura para qualquer usuário logado para evitar erros de consulta vs filtros.
-    // A segurança de escrita permanece restrita aos administradores.
-    
-    match /activities/{activityId} {
-        allow read: if isAuthenticated();
-        allow create: if hasPermission('gestao_atividades_create');
-        allow update: if hasPermission('gestao_atividades_update') || isOwner(resource.data.assigneeId) || isOwner(resource.data.requesterId);
-        allow delete: if hasPermission('gestao_atividades_delete');
-    }
-
     match /aircraftModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_modelos_update');
+      allow write: if isSuperAdmin() || isAdmin();
     }
     match /engineModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_modelos_update');
+      allow write: if isSuperAdmin() || isAdmin();
     }
     match /apuModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_modelos_update');
+      allow write: if isSuperAdmin() || isAdmin();
     }
     match /propellerModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_modelos_update');
+      allow write: if isSuperAdmin() || isAdmin();
     }
     match /maintenance_tasks/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_tarefas_update');
+      allow write: if isSuperAdmin() || isAdmin();
+    }
+
+    // --- REGRAS PARA O QUADRO DE ATIVIDADES ---
+    match /activities/{activityId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated();
+        allow delete: if isSuperAdmin() || isAdmin();
     }
 
     // --- REGRAS GERAIS (BANCO DEFAULT) ---
-
     match /vehicles/{vehicleId} {
       allow get: if true; 
-      allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
-      allow create: if hasPermission('cadastros_veiculos_create');
-      allow update: if hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update');
-      allow delete: if hasPermission('cadastros_veiculos_delete');
+      allow list: if isAuthenticated();
+      allow create, update, delete: if isSuperAdmin() || isAdmin();
     }
 
-    // Fallback padrão para outras coleções
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || request.auth.uid == employeeId || isAdmin();
+    }
+
+    // Fallback padrão para as demais coleções do banco default
     match /{document=**} {
-      allow read, write: if isSuperAdmin() || hasPermission('admin');
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || isAdmin();
     }
   }
 }

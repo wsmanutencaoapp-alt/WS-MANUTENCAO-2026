@@ -45,13 +45,13 @@ export default function ModelosTecnicaPage() {
     }
   };
 
-  // Consulta limpa sem ordenação ou filtros para garantir o carregamento inicial
+  // Consulta simplificada sem orderBy para garantir o acesso imediato
   const currentCollectionRef = useMemoFirebase(() => (
     techFirestore ? collection(techFirestore, getCollectionName(activeTab)) : null
   ), [techFirestore, activeTab]);
 
   const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentCollectionRef, {
-    queryKey: ['tech_models_list_v2', activeTab]
+    queryKey: ['tech_models_direct_v3', activeTab]
   });
 
   const handleOpenDialog = (model: WithDocId<any> | null = null) => {
@@ -158,7 +158,7 @@ export default function ModelosTecnicaPage() {
                     <AlertDescription>
                         {error.message.includes('permission') 
                           ? "Erro de Permissão: O Firestore bloqueou a leitura. Verifique se as regras estão configuradas no banco correto." 
-                          : `Erro: ${error.message}`}
+                          : `Ocorreu um erro ao carregar os dados: ${error.message}`}
                     </AlertDescription>
                 </Alert>
             )}
