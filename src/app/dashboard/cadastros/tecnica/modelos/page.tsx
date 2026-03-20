@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useCollection, useTechFirestore, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, query } from 'firebase/firestore';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -50,7 +50,7 @@ export default function ModelosTecnicaPage() {
   ), [techFirestore, activeTab]);
 
   const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentCollectionRef, {
-    queryKey: ['tech_models_v5', activeTab],
+    queryKey: ['tech_models_v10', activeTab],
     enabled: !!techFirestore
   });
 
@@ -154,10 +154,10 @@ export default function ModelosTecnicaPage() {
             {error && (
                 <Alert variant="destructive" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Erro de Permissão</AlertTitle>
+                    <AlertTitle>Falha no Carregamento</AlertTitle>
                     <AlertDescription>
-                        O acesso ao banco <strong>operation-manager</strong> foi negado. 
-                        Certifique-se de que as novas regras de segurança foram publicadas para este banco de dados no Console do Firebase.
+                        Erro de Permissão: O Firestore bloqueou a leitura no banco <strong>operation-manager</strong>. 
+                        Verifique se as novas regras foram publicadas no console do Firebase.
                     </AlertDescription>
                 </Alert>
             )}
@@ -181,7 +181,7 @@ export default function ModelosTecnicaPage() {
               </TableHeader>
               <TableBody>
                 {isLoading && <TableRow><TableCell colSpan={6} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado no banco operation-manager.</TableCell></TableRow>}
+                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado no banco técnico.</TableCell></TableRow>}
                 {!isLoading && models?.map((model) => (
                   <TableRow key={model.docId}>
                     <TableCell className="font-medium">{model.manufacturer}</TableCell>
