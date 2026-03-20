@@ -3,12 +3,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Funções auxiliares de autenticação e permissão
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // IMPORTANTE: Esta função sempre busca o perfil no banco (default)
+    // IMPORTANTE: Esta função sempre busca o perfil no banco (default) 
+    // permitindo que o banco 'operation-manager' valide seu acesso.
     function isAdmin() {
       let profilePath = /databases/(default)/documents/employees/$(request.auth.uid);
       return isAuthenticated() && (
@@ -73,7 +73,12 @@ service cloud.firestore {
         allow delete: if isAdmin();
     }
 
-    // Regra geral para outras coleções (ex: suprimentos, compras, etc)
+    match /purchase_requisitions/{requisitionId} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('compras_requisicao_update') || hasPermission('compras_controle_update');
+    }
+
+    // Regra geral para garantir que nada quebre nos outros módulos
     match /{document=**} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
