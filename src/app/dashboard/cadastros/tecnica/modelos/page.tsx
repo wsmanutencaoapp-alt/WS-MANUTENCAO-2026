@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -45,12 +44,13 @@ export default function ModelosTecnicaPage() {
     }
   };
 
+  // Consulta sem orderBy para evitar necessidade de índices imediatos durante o debug
   const currentCollectionRef = useMemoFirebase(() => (
     techFirestore ? collection(techFirestore, getCollectionName(activeTab)) : null
   ), [techFirestore, activeTab]);
 
   const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentCollectionRef, {
-    queryKey: ['tech_models_v10', activeTab],
+    queryKey: ['tech_models_v12', activeTab], // Versão da chave para evitar cache antigo
     enabled: !!techFirestore
   });
 
@@ -110,8 +110,9 @@ export default function ModelosTecnicaPage() {
         toast({ title: 'Sucesso', description: 'Modelo cadastrado.' });
       }
       setIsDialogOpen(false);
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível salvar o modelo.' });
+    } catch (err: any) {
+      console.error("Erro ao salvar no operation-manager:", err);
+      toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
     } finally {
       setIsSaving(false);
     }
@@ -122,8 +123,8 @@ export default function ModelosTecnicaPage() {
     try {
       await deleteDoc(doc(techFirestore, getCollectionName(activeTab), id));
       toast({ title: 'Sucesso', description: 'Modelo excluído.' });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir o modelo.' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: err.message });
     }
   };
 
@@ -147,8 +148,8 @@ export default function ModelosTecnicaPage() {
 
         <Card className="mt-4">
           <CardHeader>
-            <CardTitle>Modelos de {activeTab}s</CardTitle>
-            <CardDescription>Gerencie o catálogo técnico na instância operation-manager.</CardDescription>
+            <CardTitle>Catálogo de {activeTab}s</CardTitle>
+            <CardDescription>Visualizando dados da instância técnica <strong>operation-manager</strong>.</CardDescription>
           </CardHeader>
           <CardContent>
             {error && (
@@ -157,7 +158,7 @@ export default function ModelosTecnicaPage() {
                     <AlertTitle>Falha no Carregamento</AlertTitle>
                     <AlertDescription>
                         Erro de Permissão: O Firestore bloqueou a leitura no banco <strong>operation-manager</strong>. 
-                        Verifique se as novas regras foram publicadas no console do Firebase.
+                        Verifique se as novas regras foram publicadas no console do Firebase para ambos os bancos.
                     </AlertDescription>
                 </Alert>
             )}
@@ -181,7 +182,7 @@ export default function ModelosTecnicaPage() {
               </TableHeader>
               <TableBody>
                 {isLoading && <TableRow><TableCell colSpan={6} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado no banco técnico.</TableCell></TableRow>}
+                {!isLoading && models?.length === 0 && !error && <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado no banco técnico.</TableCell></TableRow>}
                 {!isLoading && models?.map((model) => (
                   <TableRow key={model.docId}>
                     <TableCell className="font-medium">{model.manufacturer}</TableCell>

@@ -1,69 +1,69 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Funções auxiliares de autenticação e permissão
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Busca dados do usuário SEMPRE no banco (default), independente de qual banco a regra está rodando
-    function getUserData() {
-      return get(/databases/(default)/documents/employees/$(request.auth.uid)).data;
-    }
-
+    // IMPORTANTE: Esta função sempre busca o perfil no banco (default)
     function isAdmin() {
-      let userPath = /databases/(default)/documents/employees/$(request.auth.uid);
-      return request.auth != null && (
+      let profilePath = /databases/(default)/documents/employees/$(request.auth.uid);
+      return isAuthenticated() && (
         request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1' || 
-        (exists(userPath) && get(userPath).data.accessLevel == 'Admin')
+        (exists(profilePath) && get(profilePath).data.accessLevel == 'Admin')
       );
     }
     
     function hasPermission(module) {
       if (!isAuthenticated()) return false;
       if (isAdmin()) return true;
-      let userPath = /databases/(default)/documents/employees/$(request.auth.uid);
-      return exists(userPath) && get(userPath).data.permissions[module] == true;
+      let profilePath = /databases/(default)/documents/employees/$(request.auth.uid);
+      return exists(profilePath) && get(profilePath).data.permissions[module] == true;
     }
     
     function isOwner(userId) {
         return request.auth.uid == userId;
     }
 
-    // --- REGRAS PARA O BANCO TÉCNICO (aircraftModels, etc) ---
+    // --- REGRAS PARA O BANCO TÉCNICO (operation-manager) ---
     match /aircraftModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
     match /engineModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
     match /apuModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
     match /propellerModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
     match /maintenance_tasks/{id} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if hasPermission('cadastros_tecnica_tarefas_update');
     }
 
-    // --- REGRAS DO BANCO DEFAULT ---
+    // --- REGRAS PARA O BANCO PADRÃO (default) ---
     match /vehicles/{vehicleId} {
       allow get: if true;
-      allow list: if isAuthenticated();
-      allow write: if isAdmin();
+      allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
+      allow create: if hasPermission('cadastros_veiculos_create');
+      allow update: if hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update');
+      allow delete: if hasPermission('cadastros_veiculos_delete');
     }
 
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin() || isOwner(employeeId);
+      allow create: if hasPermission('cadastros_funcionarios_create') || isOwner(employeeId);
+      allow update: if hasPermission('cadastros_funcionarios_update') || isOwner(employeeId);
+      allow delete: if hasPermission('cadastros_funcionarios_delete');
     }
 
     match /activities/{activityId} {
@@ -73,6 +73,7 @@ service cloud.firestore {
         allow delete: if isAdmin();
     }
 
+    // Regra geral para outras coleções (ex: suprimentos, compras, etc)
     match /{document=**} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
