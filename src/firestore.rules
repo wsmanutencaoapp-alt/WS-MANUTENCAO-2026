@@ -13,17 +13,14 @@ service cloud.firestore {
     }
 
     function getUserData() {
-      // BUSCA SEMPRE NA BASE DEFAULT: Garante que as permissões funcionem mesmo em instâncias como 'operation-manager'
-      // Usamos a sintaxe (default) para referenciar o banco principal explicitamente.
+      // Busca o perfil do usuário sempre na base (default)
       return get(/databases/(default)/documents/employees/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
-      // Prioridade absoluta para o UID de Super Admin
       if (isSuperAdmin()) {
         return true;
       }
-      // Fallback para verificar no banco default se o usuário é Admin
       return exists(/databases/(default)/documents/employees/$(request.auth.uid)) && 
              get(/databases/(default)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
     }
@@ -42,30 +39,18 @@ service cloud.firestore {
         return request.auth.uid == userId;
     }
 
-    // Regras para Coleções de Atividades
+    // --- REGRAS PARA O BANCO TÉCNICO E ATIVIDADES (LEITURA ABERTA PARA AUTH) ---
+    
+    // Permitimos leitura para qualquer usuário logado para evitar erros de consulta vs filtros.
+    // A segurança de escrita permanece restrita aos administradores.
+    
     match /activities/{activityId} {
-        allow get: if isAdmin() || 
-                      (resource.data.get('isPrivate', false) == false) || 
-                      (request.auth.uid == resource.data.requesterId) || 
-                      (request.auth.uid == resource.data.assigneeId) || 
-                      (request.auth.uid in resource.data.get('viewerIds', []));
-        allow list: if isAuthenticated();
+        allow read: if isAuthenticated();
         allow create: if hasPermission('gestao_atividades_create');
         allow update: if hasPermission('gestao_atividades_update') || isOwner(resource.data.assigneeId) || isOwner(resource.data.requesterId);
         allow delete: if hasPermission('gestao_atividades_delete');
     }
 
-    // Regras Genéricas (Maioria no banco default)
-    match /vehicles/{vehicleId} {
-      allow get: if true; 
-      allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
-      allow create: if hasPermission('cadastros_veiculos_create');
-      allow update: if hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update');
-      allow delete: if hasPermission('cadastros_veiculos_delete');
-    }
-
-    // REGRAS PARA O BANCO TÉCNICO (operation-manager) E MODELOS
-    // Permitimos leitura para qualquer autenticado para evitar erros de consulta entre bancos (cross-db get)
     match /aircraftModels/{id} {
       allow read: if isAuthenticated();
       allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_modelos_update');
@@ -87,9 +72,19 @@ service cloud.firestore {
       allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_tarefas_update');
     }
 
-    // Outras coleções (Fallback padrão)
+    // --- REGRAS GERAIS (BANCO DEFAULT) ---
+
+    match /vehicles/{vehicleId} {
+      allow get: if true; 
+      allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
+      allow create: if hasPermission('cadastros_veiculos_create');
+      allow update: if hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update');
+      allow delete: if hasPermission('cadastros_veiculos_delete');
+    }
+
+    // Fallback padrão para outras coleções
     match /{document=**} {
-      allow read, write: if hasPermission('admin') || isSuperAdmin();
+      allow read, write: if isSuperAdmin() || hasPermission('admin');
     }
   }
 }

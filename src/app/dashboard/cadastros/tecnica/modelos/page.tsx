@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useCollection, useTechFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -45,21 +45,21 @@ export default function ModelosTecnicaPage() {
     }
   };
 
-  // Query sem orderBy para garantir funcionamento imediato sem necessidade de índices complexos
-  const currentQuery = useMemoFirebase(() => (
+  // Consulta limpa sem ordenação ou filtros para garantir o carregamento inicial
+  const currentCollectionRef = useMemoFirebase(() => (
     techFirestore ? collection(techFirestore, getCollectionName(activeTab)) : null
   ), [techFirestore, activeTab]);
 
-  const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentQuery, {
-    queryKey: ['tech_models_list', activeTab] // Chave única para evitar conflitos de cache
+  const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentCollectionRef, {
+    queryKey: ['tech_models_list_v2', activeTab]
   });
 
   const handleOpenDialog = (model: WithDocId<any> | null = null) => {
     if (model) {
       setEditingModel(model);
       setFormData({
-        manufacturer: model.manufacturer,
-        model: model.model,
+        manufacturer: model.manufacturer || '',
+        model: model.model || '',
         engineCount: model.engineCount || 0,
         propellerCount: model.propellerCount || 0,
         apuCount: model.apuCount || 0,
@@ -148,16 +148,16 @@ export default function ModelosTecnicaPage() {
         <Card className="mt-4">
           <CardHeader>
             <CardTitle>Modelos de {activeTab}s</CardTitle>
-            <CardDescription>Gerencie o catálogo de {activeTab.toLowerCase()}s na instância <strong>operation-manager</strong>.</CardDescription>
+            <CardDescription>Gerencie o catálogo técnico na instância operation-manager.</CardDescription>
           </CardHeader>
           <CardContent>
             {error && (
                 <Alert variant="destructive" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Falha na Consulta</AlertTitle>
+                    <AlertTitle>Falha no Carregamento</AlertTitle>
                     <AlertDescription>
                         {error.message.includes('permission') 
-                          ? "Erro de Permissão: O acesso ao banco técnico foi negado. Verifique se você está logado." 
+                          ? "Erro de Permissão: O Firestore bloqueou a leitura. Verifique se as regras estão configuradas no banco correto." 
                           : `Erro: ${error.message}`}
                     </AlertDescription>
                 </Alert>
@@ -181,8 +181,8 @@ export default function ModelosTecnicaPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading && <TableRow><TableCell colSpan={activeTab === 'Aeronave' ? 6 : 4} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={activeTab === 'Aeronave' ? 6 : 4} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado nesta aba.</TableCell></TableRow>}
+                {isLoading && <TableRow><TableCell colSpan={6} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
+                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado.</TableCell></TableRow>}
                 {!isLoading && models?.map((model) => (
                   <TableRow key={model.docId}>
                     <TableCell className="font-medium">{model.manufacturer}</TableCell>
@@ -206,7 +206,7 @@ export default function ModelosTecnicaPage() {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                            <AlertDialogTitle>Excluir Modelo</AlertDialogTitle>
                             <AlertDialogDescription>Deseja excluir o modelo {model.model}?</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -227,7 +227,7 @@ export default function ModelosTecnicaPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingModel ? 'Editar' : 'Adicionar Novo'} Modelo de {activeTab}</DialogTitle>
+            <DialogTitle>{editingModel ? 'Editar' : 'Adicionar'} Modelo de {activeTab}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">
