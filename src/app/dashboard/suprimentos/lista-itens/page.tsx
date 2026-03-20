@@ -39,7 +39,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, Printer, ExternalLink, Trash2, ShoppingCart, AlertTriangle, AlertCircle, X } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, Printer, ExternalLink, Trash2, ShoppingCart, AlertTriangle, AlertCircle, X, QrCode } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
@@ -58,6 +58,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 
 type EnrichedStockItem = WithDocId<SupplyStock> & {
@@ -77,6 +79,7 @@ function SuprimentosContent() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [printSize, setPrintSize] = useState<'small' | 'large'>('small');
   
   const [movementDialogState, setMovementDialogState] = useState<{
     isOpen: boolean;
@@ -264,17 +267,78 @@ function SuprimentosContent() {
   };
 
   const executePrint = () => {
-    const printableArea = document.getElementById('printable-label-area');
-    if (!printableArea) return;
+    if (!stockToPrint) return;
     const printWindow = window.open('', '', 'height=600,width=800');
-    if (printWindow) {
-        printWindow.document.write('<html><head><title>Imprimir Etiqueta Digital</title><style>@media print { @page { size: 100mm 60mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: 1fr auto; padding: 5mm; box-sizing: border-box; } .qr-code { width: 45mm; height: 45mm; } }</style></head><body>');
-        printWindow.document.write(printableArea.innerHTML);
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
+    if (!printWindow) return;
+
+    const baseUrl = window.location.origin;
+    const targetPath = '/dashboard/suprimentos/lista-itens';
+    const qrData = `${baseUrl}${targetPath}?search=${encodeURIComponent(stockToPrint.supplyInfo.codigo)}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+
+    const styles = `
+      @media print {
+        @page {
+          size: ${printSize === 'small' ? '120mm 23mm' : '100mm 60mm'};
+          margin: 0;
+        }
+        body { 
+          margin: 0; 
+          padding: 0; 
+          font-family: sans-serif; 
+          background: white; 
+          -webkit-print-color-adjust: exact;
+        }
+        .label-container { 
+          page-break-after: always; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          overflow: hidden; 
+          box-sizing: border-box;
+        }
+      }
+    `;
+
+    printWindow.document.write('<html><head><title>Etiqueta Digital Suprimento</title>');
+    printWindow.document.write(`<style>${styles}</style>`);
+    printWindow.document.write('</head><body>');
+
+    let html = '';
+    if (printSize === 'small') {
+        html = `
+          <div class="label-container" style="width: 120mm; height: 23mm; padding: 0 10mm; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5mm;">
+            <div style="text-align: left; overflow: hidden;">
+              <div style="font-size: 10pt; font-weight: 900; line-height: 1.1; color: black; text-transform: uppercase;">${stockToPrint.supplyInfo.descricao}</div>
+              <div style="font-size: 8pt; font-family: monospace; font-weight: bold; margin-top: 1mm; color: #333;">LOTE: ${stockToPrint.loteInterno}</div>
+            </div>
+            <img src="${qrUrl}" style="width: 16mm; height: 16mm;" />
+          </div>
+        `;
+    } else {
+        html = `
+          <div class="label-container" style="width: 100mm; height: 60mm; padding: 2mm 8mm 8mm 8mm; flex-direction: column; text-align: center; justify-content: flex-start;">
+            <img src="/logo.png" style="height: 10mm; object-fit: contain; margin-top: 0; margin-bottom: 5mm;" />
+            <div style="display: flex; flex-direction: column; justify-content: center; margin-bottom: 4mm;">
+              <div style="font-size: 12pt; font-weight: 900; color: black; margin-bottom: 1mm; text-transform: uppercase;">${stockToPrint.supplyInfo.descricao}</div>
+              <div style="font-size: 9pt; font-family: monospace; font-weight: bold; color: #444;">${stockToPrint.supplyInfo.codigo} | LOTE: ${stockToPrint.loteInterno}</div>
+              ${stockToPrint.dataValidade ? `<div style="font-size: 9pt; font-weight: bold; color: black; margin-top: 1mm;">VAL: ${format(parseISO(stockToPrint.dataValidade), 'dd/MM/yyyy')}</div>` : ''}
+            </div>
+            <div style="flex: 1; display: flex; align-items: flex-end; justify-content: center;">
+              <img src="${qrUrl}" style="width: 22mm; height: 22mm;" />
+            </div>
+          </div>
+        `;
     }
+
+    printWindow.document.write(html);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
   };
 
   const isLoading = isLoadingSupplies || isStockLoading;
@@ -527,27 +591,80 @@ function SuprimentosContent() {
        {stockToPrint && (
         <Dialog open={!!stockToPrint} onOpenChange={() => setStockToPrint(null)}>
             <DialogContent className="max-w-2xl">
-                <DialogHeader><DialogTitle>Etiqueta Digital de Suprimento</DialogTitle></DialogHeader>
-                <div id="printable-label-area" className="flex justify-center p-4 bg-muted/50 rounded-md">
-                    <div className="label-container grid grid-cols-[1fr_auto] items-center p-1 border rounded-lg bg-white" style={{ width: '377px', height: '226px', boxSizing: 'content-box', gap: '5mm', padding: '5mm' }}>
-                       <div className="info flex flex-col justify-center h-full">
-                           <p className="desc font-bold text-black" style={{fontSize: '16px'}}>{stockToPrint.supplyInfo.descricao}</p>
-                           <p className="code font-mono text-black" style={{fontSize: '12px'}}>{stockToPrint.supplyInfo.codigo}</p>
-                           <p className="lot font-mono font-bold text-black mt-2" style={{fontSize: '18px'}}>{stockToPrint.loteInterno}</p>
-                           {stockToPrint.dataValidade && <p className="due-date font-bold text-black mt-1" style={{fontSize: '14px'}}>VAL: {format(parseISO(stockToPrint.dataValidade), 'dd/MM/yyyy')}</p>}
-                           <p style={{fontSize: '8pt', color: '#666', marginTop: '2mm'}}>Escaneie para consulta em tempo real</p>
-                       </div>
-                       <div className="qr-code self-center" style={{width: '170px', height: '170px'}}>
-                           <Image 
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/dashboard/suprimentos/lista-itens?search=${stockToPrint.supplyInfo.codigo}`)}`} 
-                                alt="QR" width={170} height={170} 
-                            />
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <QrCode className="h-5 w-5 text-primary" />
+                        Imprimir Etiqueta Digital de Suprimento
+                    </DialogTitle>
+                    <DialogDescription>
+                        Gerando etiqueta inteligente para o lote <span className="font-bold">{stockToPrint.loteInterno}</span>.
+                    </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="supply-print-size">Tamanho da Etiqueta</Label>
+                        <Select value={printSize} onValueChange={(v: any) => setPrintSize(v)}>
+                            <SelectTrigger id="supply-print-size">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="small">Pequena (120mm x 23mm)</SelectItem>
+                                <SelectItem value="large">Grande (100mm x 60mm)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="p-4 border rounded-md bg-muted/50 flex justify-center">
+                        {/* Preview Visual */}
+                        <div id="printable-label-area" className="bg-white border shadow-sm" style={{ 
+                            width: printSize === 'small' ? '452px' : '377px', 
+                            height: printSize === 'small' ? '87px' : '226px',
+                            display: 'flex',
+                            flexDirection: printSize === 'small' ? 'row' : 'column',
+                            alignItems: 'center',
+                            justifyContent: printSize === 'small' ? 'space-between' : 'flex-start',
+                            padding: printSize === 'small' ? '0 10mm' : '2mm 8mm 8mm 8mm',
+                            boxSizing: 'border-box',
+                            textAlign: 'center'
+                        }}>
+                            {printSize === 'small' ? (
+                                <>
+                                    <div style={{ textAlign: 'left', flex: 1, overflow: 'hidden' }}>
+                                        <div style={{ fontSize: '10pt', fontWeight: 900, lineHeight: 1.1, color: 'black', textTransform: 'uppercase' }}>{stockToPrint.supplyInfo.descricao}</div>
+                                        <div style={{ fontSize: '8pt', fontFamily: 'monospace', fontWeight: 'bold', marginTop: '1mm', color: '#333' }}>LOTE: {stockToPrint.loteInterno}</div>
+                                    </div>
+                                    <Image 
+                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/dashboard/suprimentos/lista-itens?search=${stockToPrint.supplyInfo.codigo}`)}`} 
+                                        alt="QR" width={60} height={60} 
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <img src="/logo.png" style={{ height: '10mm', objectFit: 'contain', marginBottom: '5mm' }} alt="Logo" />
+                                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', marginBottom: '4mm' }}>
+                                        <div style={{ fontSize: '12pt', fontWeight: 900, color: 'black', marginBottom: '1mm', textTransform: 'uppercase' }}>{stockToPrint.supplyInfo.descricao}</div>
+                                        <div style={{ fontSize: '9pt', fontFamily: 'monospace', fontWeight: 'bold', color: '#444' }}>{stockToPrint.supplyInfo.codigo} | LOTE: {stockToPrint.loteInterno}</div>
+                                        {stockToPrint.dataValidade && <div style={{ fontSize: '9pt', fontWeight: 'bold', color: 'black', marginTop: '1mm' }}>VAL: {format(parseISO(stockToPrint.dataValidade), 'dd/MM/yyyy')}</div>}
+                                    </div>
+                                    <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                                        <Image 
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/dashboard/suprimentos/lista-itens?search=${stockToPrint.supplyInfo.codigo}`)}`} 
+                                            alt="QR" width={80} height={80} 
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
+
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setStockToPrint(null)}>Cancelar</Button>
-                    <Button onClick={executePrint}><Printer className="mr-2 h-4 w-4"/>Imprimir</Button>
+                    <Button onClick={executePrint}>
+                        <Printer className="mr-2 h-4 w-4"/>
+                        Imprimir Etiqueta
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
