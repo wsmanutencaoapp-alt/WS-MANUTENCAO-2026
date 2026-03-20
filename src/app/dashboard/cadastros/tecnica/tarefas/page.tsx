@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { useCollection, useTechFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, addDoc, doc, updateDoc, deleteDoc, where, getDocs } from 'firebase/firestore';
+import { collection, query, addDoc, doc, updateDoc, where, deleteDoc } from 'firebase/firestore';
 import type { MaintenanceTask, AircraftModel, EngineModel, APUModel, PropellerModel, MaintenanceTaskItem } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -11,13 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Trash2, Search, Wrench, Package, Droplets, ChevronDown, ChevronUp, Save } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Search, Wrench, Package, Droplets, ChevronDown, ChevronUp, Save, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
 type ModelType = 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
@@ -172,7 +172,7 @@ export default function TarefasTecnicaPage() {
     frequenciaInicialHoras: '', frequenciaInicialCiclos: '', frequenciaInicialCalendario: '',
   });
 
-  // Queries para Modelos (Aircraft, Engine, etc)
+  // Queries para Modelos
   const aircraftQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'aircraftModels')) : null), [techFirestore]);
   const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery, { queryKey: ['tech_models_aircraft'] });
   
@@ -197,13 +197,13 @@ export default function TarefasTecnicaPage() {
 
   const selectedModel = useMemo(() => availableModels.find(m => m.docId === selectedModelId), [availableModels, selectedModelId]);
 
-  // Query para Tarefas (maintenanceTasks em camelCase conforme banco)
+  // Query para Tarefas
   const tasksQuery = useMemoFirebase(() => {
     if (!techFirestore || !selectedModelId) return null;
     return query(collection(techFirestore, 'maintenanceTasks'), where('modelId', '==', selectedModelId));
   }, [techFirestore, selectedModelId]);
 
-  const { data: tasks, isLoading: isLoadingTasks } = useCollection<WithDocId<MaintenanceTask>>(tasksQuery, {
+  const { data: tasks, isLoading: isLoadingTasks, error } = useCollection<WithDocId<MaintenanceTask>>(tasksQuery, {
     queryKey: ['tech_tasks_view', selectedModelId],
     enabled: !!selectedModelId && !!techFirestore
   });
@@ -256,10 +256,20 @@ export default function TarefasTecnicaPage() {
         toast({ title: 'Sucesso', description: 'Tarefa cadastrada.' });
       }
       setIsDialogOpen(false);
-    } catch (error) {
+    } catch (err) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a tarefa técnica.' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!techFirestore) return;
+    try {
+      await deleteDoc(doc(techFirestore, 'maintenanceTasks', id));
+      toast({ title: 'Sucesso', description: 'Tarefa excluída.' });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao excluir.' });
     }
   };
 
@@ -362,7 +372,21 @@ export default function TarefasTecnicaPage() {
                                         <TableCell className="text-center font-mono text-xs font-bold">{task.frequenciaCalendario || '-'}</TableCell>
                                         <TableCell className="text-right space-x-1" onClick={(e) => e.stopPropagation()}>
                                             <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(task)}><Edit className="h-4 w-4" /></Button>
-                                            <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Excluir Tarefa Técnica</AlertDialogTitle>
+                                                        <AlertDialogDescription>Deseja excluir a tarefa {task.code}?</AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDelete(task.docId)}>Excluir</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
                                         </TableCell>
                                     </TableRow>
                                     {isExpanded && (
