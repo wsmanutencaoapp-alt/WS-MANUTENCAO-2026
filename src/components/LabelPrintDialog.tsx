@@ -76,16 +76,16 @@ export default function LabelPrintDialog({ isOpen, onClose, tools }: LabelPrintD
           </div>
         `;
       } else {
-        // Etiqueta Grande com fontes reduzidas
+        // Etiqueta Grande com ajustes de posição e fonte
         html = `
-          <div class="label-container" style="width: 100mm; height: 60mm; padding: 8mm; flex-direction: column; text-align: center; justify-content: space-between;">
-            <img src="/logo.png" style="height: 10mm; object-fit: contain;" />
+          <div class="label-container" style="width: 100mm; height: 60mm; padding: 4mm 8mm 8mm 8mm; flex-direction: column; text-align: center; justify-content: space-between;">
+            <img src="/logo.png" style="height: 10mm; object-fit: contain; margin-top: 2mm;" />
             <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
-              <div style="font-size: 14pt; font-weight: 900; color: black; margin-bottom: 2mm;">${tool.descricao}</div>
-              <div style="font-size: 11pt; font-family: monospace; font-weight: bold; color: #444;">${tool.codigo}</div>
-              <div style="font-size: 8pt; color: #666; margin-top: 2mm;">Escaneie para ver localização em tempo real</div>
+              <div style="font-size: 12pt; font-weight: 900; color: black; margin-bottom: 1mm; text-transform: uppercase;">${tool.descricao}</div>
+              <div style="font-size: 9pt; font-family: monospace; font-weight: bold; color: #444;">${tool.codigo}</div>
+              <div style="font-size: 7pt; color: #666; margin-top: 2mm;">Escaneie para ver localização em tempo real</div>
             </div>
-            <img src="${qrUrl}" style="width: 25mm; height: 25mm; margin-top: 2mm;" />
+            <img src="${qrUrl}" style="width: 22mm; height: 22mm; margin-top: 1mm;" />
           </div>
         `;
       }
