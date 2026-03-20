@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Trash2, Search, Filter, Wrench, Package, Droplets, ArrowRight, Download, FileSpreadsheet, PlayCircle } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Search, Filter, Wrench, Package, Droplets, ArrowRight, Download, FileSpreadsheet, PlayCircle, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 type ModelType = 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
 
@@ -36,7 +37,7 @@ export default function TarefasTecnicaPage() {
   const [editingTask, setEditingTask] = useState<WithDocId<MaintenanceTask> | null>(null);
   
   const [formData, setFormData] = useState<Partial<MaintenanceTask>>({
-    code: '',
+    code: 0,
     tarefa: '',
     refOrigem: '',
     ata: '',
@@ -54,16 +55,16 @@ export default function TarefasTecnicaPage() {
     consumiveis: [],
   });
 
-  // Queries para Modelos
+  // Queries para Modelos (Instância Técnica)
   const aircraftQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'aircraftModels')) : null), [techFirestore]);
   const engineQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'engineModels')) : null), [techFirestore]);
   const apuQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'apuModels')) : null), [techFirestore]);
   const propellerQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'propellerModels')) : null), [techFirestore]);
 
-  const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery, { queryKey: ['tech_models_aircraft'] });
-  const { data: engineModels } = useCollection<WithDocId<EngineModel>>(engineQuery, { queryKey: ['tech_models_engine'] });
-  const { data: apuModels } = useCollection<WithDocId<APUModel>>(apuQuery, { queryKey: ['tech_models_apu'] });
-  const { data: propellerModels } = useCollection<WithDocId<PropellerModel>>(propellerQuery, { queryKey: ['tech_models_propeller'] });
+  const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery, { queryKey: ['tech_models_aircraft_v2'] });
+  const { data: engineModels } = useCollection<WithDocId<EngineModel>>(engineQuery, { queryKey: ['tech_models_engine_v2'] });
+  const { data: apuModels } = useCollection<WithDocId<APUModel>>(apuQuery, { queryKey: ['tech_models_apu_v2'] });
+  const { data: propellerModels } = useCollection<WithDocId<PropellerModel>>(propellerQuery, { queryKey: ['tech_models_propeller_v2'] });
 
   const availableModels = useMemo(() => {
     switch (activeModelType) {
@@ -77,22 +78,27 @@ export default function TarefasTecnicaPage() {
 
   const selectedModel = useMemo(() => availableModels.find(m => m.docId === selectedModelId), [availableModels, selectedModelId]);
 
-  // Query para Tarefas baseada no modelo selecionado
+  // Query para Tarefas baseada no modelo selecionado (Instância Técnica)
+  // Nota: Removido orderBy para evitar erro de permissão por falta de índice
   const tasksQuery = useMemoFirebase(() => {
     if (!techFirestore || !selectedModelId) return null;
     return query(collection(techFirestore, 'maintenance_tasks'), where('modelId', '==', selectedModelId));
   }, [techFirestore, selectedModelId]);
 
-  const { data: tasks, isLoading: isLoadingTasks } = useCollection<WithDocId<MaintenanceTask>>(tasksQuery, {
-    queryKey: ['tech_tasks_for_model', selectedModelId],
-    enabled: !!selectedModelId
+  const { data: tasks, isLoading: isLoadingTasks, error: tasksError } = useCollection<WithDocId<MaintenanceTask>>(tasksQuery, {
+    queryKey: ['tech_tasks_v2', selectedModelId],
+    enabled: !!selectedModelId && !!techFirestore
   });
 
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    if (!searchTerm) return tasks;
+    
+    // Ordenação manual client-side para evitar necessidade de índices complexos
+    let sorted = [...tasks].sort((a, b) => Number(a.code) - Number(b.code));
+
+    if (!searchTerm) return sorted;
     const lower = searchTerm.toLowerCase();
-    return tasks.filter(t => 
+    return sorted.filter(t => 
       String(t.code).toLowerCase().includes(lower) || 
       t.tarefa.toLowerCase().includes(lower) ||
       t.procTecn.toLowerCase().includes(lower) ||
@@ -113,7 +119,7 @@ export default function TarefasTecnicaPage() {
     } else {
       setEditingTask(null);
       setFormData({
-        code: '', tarefa: '', refOrigem: '', ata: '', procTecn: '', inspecao: '',
+        code: 0, tarefa: '', refOrigem: '', ata: '', procTecn: '', inspecao: '',
         hhPlanejamento: 0, frequenciaHoras: '', frequenciaCiclos: '', frequenciaCalendario: '',
         frequenciaInicialHoras: '', frequenciaInicialCiclos: '', frequenciaInicialCalendario: '',
         pecas: [], ferramentasEspeciais: [], consumiveis: [],
@@ -147,14 +153,15 @@ export default function TarefasTecnicaPage() {
 
   const handleSave = async () => {
     if (!techFirestore || !selectedModelId) return;
-    if (!formData.code || !formData.tarefa) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Código e Descrição da Tarefa são obrigatórios.' });
+    if (!formData.tarefa) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'A Descrição da Tarefa é obrigatória.' });
       return;
     }
 
     setIsSaving(true);
     const dataToSave: Omit<MaintenanceTask, 'id'> = {
       ...formData as MaintenanceTask,
+      code: Number(formData.code) || 0,
       modelId: selectedModelId,
       modelType: activeModelType,
       modelName: selectedModel ? `${(selectedModel as any).manufacturer} ${(selectedModel as any).model}` : 'N/A',
@@ -171,7 +178,7 @@ export default function TarefasTecnicaPage() {
       }
       setIsDialogOpen(false);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a tarefa técnica.' });
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a tarefa técnica no banco operation-manager.' });
     } finally {
       setIsSaving(false);
     }
@@ -210,6 +217,16 @@ export default function TarefasTecnicaPage() {
         </div>
       </div>
 
+      {tasksError && (
+          <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Erro de Permissão</AlertTitle>
+              <AlertDescription>
+                  O acesso às tarefas no banco técnico foi negado. Verifique as regras de segurança do operation-manager.
+              </AlertDescription>
+          </Alert>
+      )}
+
       {selectedModelId ? (
         <Card>
             <CardHeader className="border-b bg-muted/20">
@@ -219,10 +236,8 @@ export default function TarefasTecnicaPage() {
                         <CardDescription>Total de {isLoadingTasks ? '...' : tasks?.length || 0} tarefas encontradas para este modelo.</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" className="text-xs"><PlayCircle className="mr-1 h-3 w-3"/> Tutorial</Button>
                         <Button variant="outline" size="sm" onClick={() => handleOpenDialog()}><PlusCircle className="mr-1 h-3 w-3"/> Adicionar Manualmente</Button>
                         <Button variant="outline" size="sm"><FileSpreadsheet className="mr-1 h-3 w-3"/> Importar Planilha</Button>
-                        <Button variant="ghost" size="sm" className="text-xs"><Download className="mr-1 h-3 w-3"/> Baixar Modelo</Button>
                     </div>
                 </div>
                 <div className="flex gap-4 pt-4">
@@ -235,12 +250,9 @@ export default function TarefasTecnicaPage() {
                             className="pl-8"
                         />
                     </div>
-                    <Button variant="outline" className="gap-2">
-                        <Filter className="h-4 w-4"/> Filtrar por Vencimentos
-                    </Button>
                 </div>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -258,7 +270,7 @@ export default function TarefasTecnicaPage() {
                     </TableHeader>
                     <TableBody>
                         {isLoadingTasks && <TableRow><TableCell colSpan={10} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                        {!isLoadingTasks && filteredTasks.length === 0 && <TableRow><TableCell colSpan={10} className="text-center h-24 text-muted-foreground">Nenhuma tarefa encontrada para este modelo.</TableCell></TableRow>}
+                        {!isLoadingTasks && filteredTasks.length === 0 && !tasksError && <TableRow><TableCell colSpan={10} className="text-center h-24 text-muted-foreground">Nenhuma tarefa encontrada para este modelo.</TableCell></TableRow>}
                         {!isLoadingTasks && filteredTasks.map(task => (
                             <TableRow key={task.docId} className="hover:bg-muted/50 transition-colors">
                                 <TableCell className="font-mono text-xs font-semibold">{task.code}</TableCell>
@@ -282,7 +294,7 @@ export default function TarefasTecnicaPage() {
                                             <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
-                                            <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle><AlertDialogDescription>Deseja excluir a tarefa {task.code}?</AlertDialogDescription></AlertDialogHeader>
+                                            <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle><AlertDialogDescription>Deseja excluir a tarefa {task.code} do catálogo técnico?</AlertDialogDescription></AlertDialogHeader>
                                             <AlertDialogFooter><AlertDialogCancel>Voltar</AlertDialogCancel><AlertDialogAction onClick={() => deleteDoc(doc(techFirestore!, 'maintenance_tasks', task.docId))}>Excluir</AlertDialogAction></AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>
@@ -300,12 +312,11 @@ export default function TarefasTecnicaPage() {
         </div>
       )}
 
-      {/* DIALOG DE CADASTRO/EDIÇÃO */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>{editingTask ? 'Editar' : 'Adicionar Nova'} Tarefa de Manutenção</DialogTitle>
-            <DialogDescription>Preencha os campos ou importe uma planilha para adicionar tarefas.</DialogDescription>
+            <DialogDescription>Preencha os campos técnicos da tarefa.</DialogDescription>
           </DialogHeader>
           
           <Tabs defaultValue="geral" className="w-full">
@@ -319,7 +330,7 @@ export default function TarefasTecnicaPage() {
             <ScrollArea className="h-[60vh] mt-4 pr-4">
                 <TabsContent value="geral" className="space-y-4 m-0">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-1.5"><Label>Code</Label><Input value={formData.code} onChange={e => setFormData(p => ({...p, code: e.target.value}))} /></div>
+                        <div className="space-y-1.5"><Label>Code (Numérico)</Label><Input type="number" value={formData.code} onChange={e => setFormData(p => ({...p, code: Number(e.target.value)}))} /></div>
                         <div className="space-y-1.5"><Label>Ref. Origem</Label><Input value={formData.refOrigem} onChange={e => setFormData(p => ({...p, refOrigem: e.target.value}))} /></div>
                         <div className="space-y-1.5"><Label>ATA</Label><Input value={formData.ata} onChange={e => setFormData(p => ({...p, ata: e.target.value}))} /></div>
                         <div className="space-y-1.5"><Label>Proc. Técn</Label><Input value={formData.procTecn} onChange={e => setFormData(p => ({...p, procTecn: e.target.value}))} /></div>

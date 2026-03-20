@@ -583,7 +583,7 @@ export type MaintenanceTaskItem = {
 
 export type MaintenanceTask = {
   id?: string;
-  code: string | number;
+  code: number;
   tarefa: string;
   refOrigem: string;
   ata: string;
@@ -609,4 +609,3 @@ export type MaintenanceTask = {
   ferramentasEspeciais?: MaintenanceTaskItem[];
   consumiveis?: MaintenanceTaskItem[];
 };
-
