@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import {
   collection,
@@ -40,7 +39,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, ChevronRight, Printer, ExternalLink, Trash2, Undo } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, Printer, ExternalLink, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
@@ -107,8 +106,6 @@ const SuprimentosPage = () => {
   const { data: employeeData } = useDoc<Employee>(userDocRef);
   const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin' || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1', [employeeData, user]);
 
-  
-  // 1. Fetch all master supply data 
   const suppliesQueryKey = ['suppliesMasterDataForStockList'];
   const suppliesQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'supplies'), orderBy('codigo')) : null),
@@ -121,7 +118,6 @@ const SuprimentosPage = () => {
   const [enrichedStock, setEnrichedStock] = useState<EnrichedStockItem[]>([]);
   const [isStockLoading, setIsStockLoading] = useState(true);
 
-  // 2. Fetch all stock items from all supplies using a collectionGroup query
   useEffect(() => {
     if (!supplies || !firestore) {
         if (!isLoadingSupplies) {
@@ -133,15 +129,13 @@ const SuprimentosPage = () => {
 
     setIsStockLoading(true);
     const supplyMap = new Map(supplies.map(s => [s.docId, s]));
-    
-    // Use a collectionGroup query for real-time updates on all stock items
     const stockQuery = query(collectionGroup(firestore, 'stock'));
     
     const unsubscribe = onSnapshot(stockQuery, (snapshot) => {
         const allStockItems: EnrichedStockItem[] = [];
         snapshot.forEach(doc => {
             const stockData = { docId: doc.id, ...doc.data() } as WithDocId<SupplyStock>;
-            const supplyId = doc.ref.parent.parent?.id; // supplies/{supplyId}/stock/{stockId}
+            const supplyId = doc.ref.parent.parent?.id;
             
             if (supplyId) {
                 const supplyInfo = supplyMap.get(supplyId);
@@ -157,12 +151,11 @@ const SuprimentosPage = () => {
         setIsStockLoading(false);
     }, (err) => {
         console.error("Error fetching stock collection group:", err);
-        toast({ variant: 'destructive', title: 'Erro ao carregar estoque', description: 'Não foi possível buscar os itens de estoque. Verifique suas permissões de acesso.'});
         setIsStockLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
-  }, [supplies, firestore, toast, isLoadingSupplies]);
+    return () => unsubscribe();
+  }, [supplies, firestore, isLoadingSupplies]);
   
 
   const filteredStock = useMemo(() => {
@@ -184,23 +177,10 @@ const SuprimentosPage = () => {
   }
 
   const handleOpenMovementDialog = (type: 'entrada' | 'saida', supply: WithDocId<Supply> | null) => {
-    setMovementDialogState({ isOpen: true, type, supply });
-  };
-
-  const handleOpenFormDialog = (supply: WithDocId<Supply>) => {
-    setFormDialogState({ isOpen: true, supply: supply });
-  };
-  
-  const handleOpenEditStockDialog = (item: EnrichedStockItem) => {
-    setEditStockDialogState({ isOpen: true, stockItem: item });
-  };
-  
-  const handleOpenReturnDialog = (item: EnrichedStockItem) => {
-    setReturnDialogState({ isOpen: true, stockItem: item });
+    setMovementDialogState({ isOpen: boolean = true, type, supply });
   };
 
   const handleDialogSuccess = (newItem?: EnrichedStockItem) => {
-      // Re-trigger the stock fetching
       queryClient.invalidateQueries({ queryKey: suppliesQueryKey });
       setMovementDialogState({ isOpen: false, type: 'entrada', supply: null });
       setFormDialogState({ isOpen: false, supply: null });
@@ -219,7 +199,6 @@ const SuprimentosPage = () => {
         const stockDocRef = doc(firestore, 'supplies', item.supplyInfo.docId, 'stock', item.docId);
         await deleteDoc(stockDocRef);
         toast({ title: 'Sucesso!', description: 'Lote de suprimento excluído.' });
-        // The onSnapshot listener will automatically update the UI
     } catch (err) {
         console.error("Erro ao excluir lote:", err);
         toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível excluir o lote.' });
@@ -248,7 +227,6 @@ const SuprimentosPage = () => {
     }
   };
 
-
   const isLoading = isLoadingSupplies || isStockLoading;
 
   return (
@@ -264,7 +242,7 @@ const SuprimentosPage = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => handleOpenMovementDialog('entrada', null)}>
+                <DropdownMenuItem onSelect={() => setMovementDialogState({ isOpen: true, type: 'entrada', supply: null })}>
                   Entrada Avulsa / Manual
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => router.push('/dashboard/compras/controle-compras')}>
@@ -272,7 +250,7 @@ const SuprimentosPage = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button onClick={() => handleOpenMovementDialog('saida', null)}>
+            <Button onClick={() => setMovementDialogState({ isOpen: true, type: 'saida', supply: null })}>
                 <LogOut className="mr-2 h-4 w-4"/>
                 Registrar Saída
             </Button>
@@ -358,10 +336,10 @@ const SuprimentosPage = () => {
                     </TableCell>
                     <TableCell>{item.dataValidade ? format(parseISO(item.dataValidade), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                     <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" title="Registrar Saída deste Lote" onClick={() => handleOpenMovementDialog('saida', supplyInfo)}>
+                        <Button variant="ghost" size="icon" title="Registrar Saída deste Lote" onClick={() => setMovementDialogState({ isOpen: true, type: 'saida', supply: supplyInfo })}>
                             <LogOut className="h-4 w-4 text-orange-600"/>
                         </Button>
-                        <Button variant="ghost" size="icon" title="Editar Lote" onClick={() => handleOpenEditStockDialog(item)}>
+                        <Button variant="ghost" size="icon" title="Editar Lote" onClick={() => setEditStockDialogState({ isOpen: true, stockItem: item })}>
                             <Edit className="h-4 w-4"/>
                         </Button>
                         {item.documentoUrl && (
@@ -385,7 +363,7 @@ const SuprimentosPage = () => {
                                     <AlertDialogHeader>
                                     <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        Tem certeza que deseja excluir o lote <span className="font-bold">{item.loteInterno}</span>? Esta ação não pode ser desfeita e não irá gerar um registro de movimentação.
+                                        Tem certeza que deseja excluir o lote <span className="font-bold">{item.loteInterno}</span>? Esta ação não pode ser desfeita.
                                     </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -394,7 +372,8 @@ const SuprimentosPage = () => {
                                         Sim, Excluir
                                     </AlertDialogAction>
                                     </AlertDialogFooter>
-                                </AlertDialog>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         )}
                     </TableCell>
                     </TableRow>
@@ -415,15 +394,6 @@ const SuprimentosPage = () => {
           />
       )}
       
-      {formDialogState.isOpen && (
-          <SupplyFormDialog
-            isOpen={formDialogState.isOpen}
-            onClose={() => setFormDialogState(prev => ({...prev, isOpen: false}))}
-            onSuccess={handleDialogSuccess}
-            supply={formDialogState.supply}
-          />
-      )}
-
       {editStockDialogState.isOpen && (
         <EditStockItemDialog
           isOpen={editStockDialogState.isOpen}
@@ -432,29 +402,13 @@ const SuprimentosPage = () => {
           stockItem={editStockDialogState.stockItem}
         />
       )}
-      
-       {returnDialogState.isOpen && returnDialogState.stockItem && (
-        <ReturnMovementDialog
-          isOpen={returnDialogState.isOpen}
-          onClose={() => setReturnDialogState({ isOpen: false, stockItem: null })}
-          stockItem={returnDialogState.stockItem}
-          onSuccess={handleDialogSuccess}
-        />
-      )}
 
       {imageToView && (
         <Dialog open={!!imageToView} onOpenChange={() => setImageToView(null)}>
           <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{imageToView.alt}</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>{imageToView.alt}</DialogTitle></DialogHeader>
             <div className="relative w-full aspect-square">
-              <Image 
-                src={imageToView.src}
-                alt={imageToView.alt}
-                fill
-                className="object-contain rounded-md"
-              />
+              <Image src={imageToView.src} alt={imageToView.alt} fill className="object-contain rounded-md" />
             </div>
           </DialogContent>
         </Dialog>
@@ -465,9 +419,7 @@ const SuprimentosPage = () => {
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Etiqueta de Suprimento</DialogTitle>
-                    <DialogDescription>
-                        Confirme a etiqueta e clique em imprimir. Dimensões: 100mm x 60mm.
-                    </DialogDescription>
+                    <DialogDescription>Confirme a etiqueta e clique em imprimir.</DialogDescription>
                 </DialogHeader>
                 <div id="printable-label-area" className="flex justify-center p-4 bg-muted/50 rounded-md">
                     <div className="label-container grid grid-cols-[1fr_auto] items-center p-1 border rounded-lg bg-white" style={{ width: '377px', height: '226px', boxSizing: 'content-box', gap: '5mm', padding: '5mm' }}>
@@ -489,15 +441,11 @@ const SuprimentosPage = () => {
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setStockToPrint(null)}>Cancelar</Button>
-                    <Button onClick={executePrint}>
-                        <Printer className="mr-2 h-4 w-4"/>
-                        Imprimir
-                    </Button>
+                    <Button onClick={executePrint}><Printer className="mr-2 h-4 w-4"/>Imprimir</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
       )}
-
     </div>
   );
 };

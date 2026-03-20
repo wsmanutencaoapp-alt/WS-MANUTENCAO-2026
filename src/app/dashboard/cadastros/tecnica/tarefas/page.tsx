@@ -22,7 +22,6 @@ import { cn } from '@/lib/utils';
 
 type ModelType = 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
 
-// Componente para gerenciar os itens dentro da sanfona (Peças, Ferramentas, Consumíveis)
 function TaskDetailsAccordion({ task, onSaveSuccess }: { task: WithDocId<MaintenanceTask>, onSaveSuccess: () => void }) {
   const techFirestore = useTechFirestore();
   const { toast } = useToast();
@@ -231,7 +230,6 @@ export default function TarefasTecnicaPage() {
     frequenciaInicialHoras: '', frequenciaInicialCiclos: '', frequenciaInicialCalendario: '',
   });
 
-  // Queries para Modelos
   const aircraftQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'aircraftModels')) : null), [techFirestore]);
   const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery, { queryKey: ['tech_models_aircraft'] });
   
@@ -256,7 +254,6 @@ export default function TarefasTecnicaPage() {
 
   const selectedModel = useMemo(() => availableModels.find(m => m.docId === selectedModelId), [availableModels, selectedModelId]);
 
-  // Query para Tarefas
   const tasksQuery = useMemoFirebase(() => {
     if (!techFirestore || !selectedModelId) return null;
     return query(collection(techFirestore, 'maintenanceTasks'), where('modelId', '==', selectedModelId));
