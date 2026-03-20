@@ -442,12 +442,12 @@ const CadastroEnderecosPage = () => {
                     </div>`;
             } else {
                  contentToPrint += `
-                    <div style="width: 120mm; height: 23mm; display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding: 0 2mm; gap: 8mm; box-sizing: border-box; break-inside: avoid; page-break-after: always;">
-                        <img src="/logo.png" alt="Logo" style="height: 18mm; width: auto; object-fit: contain; align-self: center;" />
-                        <p style="font-size: 24px; font-weight: 900; text-align: center; color: rgb(0, 0, 0);">
+                    <div style="width: 120mm; height: 23mm; display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding: 0 4mm; gap: 8mm; box-sizing: border-box; break-inside: avoid; page-break-after: always;">
+                        <img src="/logo.png" alt="Logo" style="height: 16mm; width: auto; object-fit: contain; align-self: center;" />
+                        <p style="font-size: 24px; font-weight: 900; text-align: center; color: rgb(0, 0, 0); margin: 0;">
                             ${address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
                         </p>
-                        <img src="${qrUrl}" alt="QR Code" style="width: 20mm; height: 20mm;" />
+                        <img src="${qrUrl}" alt="QR Code" style="width: 18mm; height: 18mm; margin-top: -1mm;" />
                     </div>`;
             }
         });
@@ -697,12 +697,12 @@ const CadastroEnderecosPage = () => {
                                 </div>
                             </div>
                         ) : (
-                            <div key={address.docId} className="bg-white w-[452px] h-[87px] grid grid-cols-[auto_1fr_auto] gap-8 items-center p-2 border">
-                                <img src="/logo.png" alt="Logo" className="h-[40px] w-auto object-contain" />
-                                <p className="text-2xl font-black text-black text-center" style={{ color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
+                            <div key={address.docId} className="bg-white w-[452px] h-[87px] grid grid-cols-[auto_1fr_auto] gap-8 items-center px-4 border">
+                                <img src="/logo.png" alt="Logo" className="h-[35px] w-auto object-contain" />
+                                <p className="text-2xl font-black text-black text-center" style={{ color: 'rgb(0, 0, 0)', fontWeight: 900, margin: 0 }}>
                                     {address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
                                 </p>
-                                <img src={qrUrl} alt="QR Code" className="w-[80px] h-[80px]" />
+                                <img src={qrUrl} alt="QR Code" className="w-[70px] h-[70px]" style={{ marginTop: '-4px' }} />
                             </div>
                         )
                     })}
