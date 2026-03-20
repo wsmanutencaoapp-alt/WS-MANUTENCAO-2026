@@ -4,7 +4,6 @@
 import { useState } from 'react';
 import { useCollection, useTechFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import type { AircraftModel, EngineModel, APUModel, PropellerModel } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -46,13 +45,13 @@ export default function ModelosTecnicaPage() {
     }
   };
 
-  // Simplificamos a query removendo o orderBy temporariamente para descartar erro de índice
+  // Query sem orderBy para garantir funcionamento imediato sem necessidade de índices complexos
   const currentQuery = useMemoFirebase(() => (
     techFirestore ? collection(techFirestore, getCollectionName(activeTab)) : null
   ), [techFirestore, activeTab]);
 
   const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentQuery, {
-    queryKey: ['tech_models', activeTab]
+    queryKey: ['tech_models_list', activeTab] // Chave única para evitar conflitos de cache
   });
 
   const handleOpenDialog = (model: WithDocId<any> | null = null) => {
@@ -157,7 +156,9 @@ export default function ModelosTecnicaPage() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Falha na Consulta</AlertTitle>
                     <AlertDescription>
-                        Não foi possível carregar os dados. Detalhe: {error.message}
+                        {error.message.includes('permission') 
+                          ? "Erro de Permissão: O acesso ao banco técnico foi negado. Verifique se você está logado." 
+                          : `Erro: ${error.message}`}
                     </AlertDescription>
                 </Alert>
             )}

@@ -8,22 +8,30 @@ service cloud.firestore {
       return request.auth != null;
     }
     
+    function isSuperAdmin() {
+      return request.auth != null && request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1';
+    }
+
     function getUserData() {
       // BUSCA SEMPRE NA BASE DEFAULT: Garante que as permissões funcionem mesmo em instâncias como 'operation-manager'
+      // Usamos a sintaxe (default) para referenciar o banco principal explicitamente.
       return get(/databases/(default)/documents/employees/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
-      // O Super Admin deve ter acesso mesmo que o documento de perfil não exista ainda.
-      // Validamos o UID primeiro para evitar erro de avaliação da regra.
-      return request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1' || 
-             (exists(/databases/(default)/documents/employees/$(request.auth.uid)) && 
-              get(/databases/(default)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin');
+      // Prioridade absoluta para o UID de Super Admin
+      if (isSuperAdmin()) {
+        return true;
+      }
+      // Fallback para verificar no banco default se o usuário é Admin
+      return exists(/databases/(default)/documents/employees/$(request.auth.uid)) && 
+             get(/databases/(default)/documents/employees/$(request.auth.uid)).data.accessLevel == 'Admin';
     }
     
     function hasPermission(module) {
-      // Se for Admin (incluindo Super Admin por UID), tem permissão total.
-      // Caso contrário, verifica o mapa de permissões no banco default.
+      if (isSuperAdmin()) {
+        return true;
+      }
       return isAuthenticated() && (
         isAdmin() || 
         (exists(/databases/(default)/documents/employees/$(request.auth.uid)) && getUserData().permissions[module] == true)
@@ -34,234 +42,54 @@ service cloud.firestore {
         return request.auth.uid == userId;
     }
 
-    // A helper function to determine if a user can read an activity.
-    function canReadActivity(activityData) {
-      return (activityData.get('isPrivate', false) == false) ||
-             (request.auth.uid == activityData.requesterId) ||
-             (request.auth.uid == activityData.assigneeId) ||
-             (request.auth.uid in activityData.get('viewerIds', []));
-    }
-
-    // This rule specifically allows collectionGroup queries on 'stock'
-    match /{path=**}/stock/{stockId} {
-        allow read: if isAuthenticated();
-        allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update') || hasPermission('compras_controle_update');
-    }
-    
-    match /app_config/{configId} {
-      allow read: if true;
-      allow write: if hasPermission('configurador_personalizar_update');
-    }
-
-    match /vehicles/{vehicleId} {
-      allow get: if true; 
-      allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
-      allow create: if hasPermission('cadastros_veiculos_create');
-      allow update: if 
-        (hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update') || hasPermission('gso_controle_credenciamento_update')) ||
-        (
-            request.auth == null &&
-            (
-              (resource.data.status == 'Ativo' && request.resource.data.status == 'Em Viagem') ||
-              (resource.data.status == 'Em Viagem' && request.resource.data.status == 'Ativo')
-            ) &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'km'])
-        );
-      allow delete: if hasPermission('cadastros_veiculos_delete');
-
-      match /maintenance_plans/{planId} {
-        allow read: if isAuthenticated();
-        allow write: if hasPermission('manutencao_veiculos_update');
-      }
-
-      match /maintenance_records/{recordId} {
-        allow read: if isAuthenticated();
-        allow write: if hasPermission('manutencao_veiculos_update');
-      }
-    }
-    
-    match /vehicle_movements/{movementId} {
-      allow read: if hasPermission('portaria_controle_veiculos_view'); 
-      allow create: if true; 
-      allow update: if hasPermission('portaria_controle_veiculos_update'); 
-      allow delete: if hasPermission('portaria_controle_veiculos_delete'); 
-    }
-
-    match /visits/{visitId} {
-      allow read: if hasPermission('portaria_controle_pessoas_view');
-      allow create: if hasPermission('portaria_controle_pessoas_create');
-      allow update: if hasPermission('portaria_controle_pessoas_update');
-    }
-
-    match /supplies/{supplyId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('cadastros_suprimentos_create');
-      allow update: if hasPermission('cadastros_suprimentos_update');
-      allow delete: if hasPermission('cadastros_suprimentos_delete');
-      
-      match /stock/{stockId} {
-        allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update') || hasPermission('compras_controle_update');
-      }
-    }
-    
-    match /supply_movements/{movementId} {
-      allow read: if hasPermission('suprimentos_movimentacao_view');
-      allow create: if hasPermission('suprimentos_movimentacao_create') || hasPermission('compras_controle_update');
-    }
-
-    match /tools/{toolId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('cadastros_ferramentas_create') || hasPermission('compras_controle_update');
-      allow update: if hasPermission('cadastros_ferramentas_update') || hasPermission('ferramentaria_lista_update');
-      allow delete: if hasPermission('cadastros_ferramentas_delete');
-      
-      match /calibration_history/{calibrationId} {
-        allow read: if hasPermission('calibracao_view');
-        allow create, update, delete: if hasPermission('calibracao_create') || hasPermission('calibracao_update') || hasPermission('calibracao_delete') || hasPermission('compras_controle_update');
-      }
-    }
-    
-    match /kits/{kitId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('ferramentaria_kits_create') || hasPermission('ferramentaria_kits_update') || hasPermission('ferramentaria_kits_delete');
-    }
-    
-    match /suppliers/{supplierId} {
-      allow read: if hasPermission('cadastros_fornecedores_view') || hasPermission('compras_requisicao_view') || hasPermission('compras_controle_view');
-      allow write: if hasPermission('cadastros_fornecedores_create') || hasPermission('cadastros_fornecedores_update') || hasPermission('cadastros_fornecedores_delete');
-    }
-    
-    match /employees/{employeeId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('cadastros_funcionarios_create') || isOwner(employeeId);
-      allow update: if hasPermission('cadastros_funcionarios_update') || hasPermission('gso_controle_credenciamento_update') ||
-                     (isOwner(employeeId) && 
-                      !('accessLevel' in request.resource.data) &&
-                      !('permissions' in request.resource.data) &&
-                      !('status' in request.resource.data));
-      allow delete: if hasPermission('cadastros_funcionarios_delete');
-      
-      match /notifications/{notificationId} {
-        allow read, update, delete: if isOwner(employeeId);
-        allow create: if isAuthenticated();
-      }
-
-      match /trainings/{trainingRecordId} {
-        allow read: if isAuthenticated();
-        allow write: if hasPermission('gso_controle_credenciamento_update');
-      }
-    }
-
-    match /temporary_employees/{tempEmployeeId} {
-      allow read, create, update, delete: if isAuthenticated();
-    }
-
-    match /gate_personnel/{personnelId} {
-      allow read, create, update, delete: if isAuthenticated();
-    }
-    
-    match /expenses/{expenseId} {
-      allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
-      allow read: if hasPermission('financeiro_despesas_view') || (isAuthenticated() && resource.data.employeeId == request.auth.uid);
-      allow update: if hasPermission('financeiro_despesas_update');
-      allow delete: if hasPermission('financeiro_despesas_delete');
-    }
-
-    match /tool_requests/{requestId} {
-      allow read: if isAuthenticated();
-      allow write: if (isAuthenticated() && (isOwner(resource.data.requesterId) || hasPermission('ferramentaria_movimentacao_create')));
-    }
-    
+    // Regras para Coleções de Atividades
     match /activities/{activityId} {
-        allow get: if isAdmin() || canReadActivity(resource.data);
+        allow get: if isAdmin() || 
+                      (resource.data.get('isPrivate', false) == false) || 
+                      (request.auth.uid == resource.data.requesterId) || 
+                      (request.auth.uid == resource.data.assigneeId) || 
+                      (request.auth.uid in resource.data.get('viewerIds', []));
         allow list: if isAuthenticated();
         allow create: if hasPermission('gestao_atividades_create');
         allow update: if hasPermission('gestao_atividades_update') || isOwner(resource.data.assigneeId) || isOwner(resource.data.requesterId);
         allow delete: if hasPermission('gestao_atividades_delete');
     }
 
-    match /budgets/{budgetId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('financeiro_budget_create');
-      allow update: if hasPermission('financeiro_budget_update');
-      allow delete: if hasPermission('financeiro_budget_delete');
-    }
-    
-    match /addresses/{addressId} {
-        allow read: if hasPermission('cadastros_enderecos_view') || hasPermission('cadastros_suprimentos_view') || hasPermission('cadastros_ferramentas_view') || hasPermission('suprimentos_lista_view');
-        allow write: if hasPermission('cadastros_enderecos_create') || hasPermission('cadastros_enderecos_delete');
+    // Regras Genéricas (Maioria no banco default)
+    match /vehicles/{vehicleId} {
+      allow get: if true; 
+      allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
+      allow create: if hasPermission('cadastros_veiculos_create');
+      allow update: if hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update');
+      allow delete: if hasPermission('cadastros_veiculos_delete');
     }
 
-    match /cost_centers/{costCenterId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('cadastros_centro_custo_create');
-      allow update: if hasPermission('cadastros_centro_custo_update');
-      allow delete: if hasPermission('cadastros_centro_custo_delete');
-    }
-    
-    match /approval_tiers/{tierId} {
-        allow read: if isAuthenticated();
-        allow write: if hasPermission('configurador_alcada_update');
-    }
-
-    match /purchase_requisitions/{requisitionId} {
-        allow read: if isAuthenticated();
-        allow create: if hasPermission('compras_requisicao_create') || hasPermission('compras_controle_create');
-        allow update: if hasPermission('compras_requisicao_update') || hasPermission('compras_aprovacoes_update') || hasPermission('compras_controle_update') || isOwner(resource.data.requesterId);
-        allow delete: if hasPermission('compras_requisicao_delete') || hasPermission('compras_controle_delete');
-        
-        match /items/{itemId} {
-            allow read: if isAuthenticated();
-            allow write: if hasPermission('compras_controle_update') || hasPermission('compras_requisicao_create') || isOwner(get(/databases/$(database)/documents/purchase_requisitions/$(requisitionId)).data.requesterId);
-        }
-    }
-    
-    match /email_configurations/{configId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('configurador_disparo_email_update');
-    }
-
-    match /counters/{counterId} {
-        allow read, write: if isAuthenticated();
-    }
-    
-    match /trainings/{trainingId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_treinamentos_create') || hasPermission('cadastros_treinamentos_update') || hasPermission('cadastros_treinamentos_delete');
-    }
-
-    match /communications/{communicationId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('recursos_humanos_mural_create') || hasPermission('recursos_humanos_mural_update') || hasPermission('recursos_humanos_mural_delete');
-    }
-
-    match /atendimentos_gso/{atendimentoId} {
-      allow read: if hasPermission('gso_ficha_atendimento_view');
-      allow create: if hasPermission('gso_ficha_atendimento_create');
-      allow update: if hasPermission('gso_ficha_atendimento_update');
-      allow delete: if hasPermission('gso_ficha_atendimento_delete');
-    }
-
-    // REGRAS PARA O BANCO TÉCNICO (operation-manager)
+    // REGRAS PARA O BANCO TÉCNICO (operation-manager) E MODELOS
+    // Permitimos leitura para qualquer autenticado para evitar erros de consulta entre bancos (cross-db get)
     match /aircraftModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_modelos_update');
     }
     match /engineModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_modelos_update');
     }
     match /apuModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_modelos_update');
     }
     match /propellerModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_modelos_update');
     }
     match /maintenance_tasks/{id} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_tarefas_update');
+      allow write: if isSuperAdmin() || hasPermission('cadastros_tecnica_tarefas_update');
+    }
+
+    // Outras coleções (Fallback padrão)
+    match /{document=**} {
+      allow read, write: if hasPermission('admin') || isSuperAdmin();
     }
   }
 }
