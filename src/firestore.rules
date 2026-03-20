@@ -14,9 +14,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // An admin is a user with Admin level.
+      // An admin is a user with Admin level or the master UID provided.
       return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
-             getUserData().accessLevel == 'Admin';
+             (getUserData().accessLevel == 'Admin' || request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1');
     }
     
     function hasPermission(module) {
@@ -30,8 +30,19 @@ service cloud.firestore {
         return request.auth.uid == userId;
     }
 
+    // A helper function to determine if a user can read an activity.
+    function canReadActivity(activityData) {
+      // Access granted if activity is public OR if user is creator, assignee, or in viewer list.
+      return (activityData.get('isPrivate', false) == false) ||
+             (request.auth.uid == activityData.requesterId) ||
+             (request.auth.uid == activityData.assigneeId) ||
+             (request.auth.uid in activityData.get('viewerIds', []));
+    }
+
+    // This rule specifically allows collectionGroup queries on 'stock'
     match /{path=**}/stock/{stockId} {
         allow read: if isAuthenticated();
+        allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update') || hasPermission('compras_controle_update');
     }
     
     match /app_config/{configId} {
@@ -86,26 +97,26 @@ service cloud.firestore {
       allow delete: if hasPermission('cadastros_suprimentos_delete');
       
       match /stock/{stockId} {
-        allow read: if isAuthenticated();
-        // Allow stock writes if user can create movements or edit master data
-        allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update');
+        // Read is handled by collectionGroup rule.
+        // This rule is for direct writes.
+        allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update') || hasPermission('compras_controle_update');
       }
     }
     
     match /supply_movements/{movementId} {
       allow read: if hasPermission('suprimentos_movimentacao_view');
-      allow create: if hasPermission('suprimentos_movimentacao_create');
+      allow create: if hasPermission('suprimentos_movimentacao_create') || hasPermission('compras_controle_update');
     }
 
     match /tools/{toolId} {
       allow read: if isAuthenticated();
-      allow create: if hasPermission('cadastros_ferramentas_create');
+      allow create: if hasPermission('cadastros_ferramentas_create') || hasPermission('compras_controle_update');
       allow update: if hasPermission('cadastros_ferramentas_update') || hasPermission('ferramentaria_lista_update');
       allow delete: if hasPermission('cadastros_ferramentas_delete');
       
       match /calibration_history/{calibrationId} {
         allow read: if hasPermission('calibracao_view');
-        allow create, update, delete: if hasPermission('calibracao_create') || hasPermission('calibracao_update') || hasPermission('calibracao_delete');
+        allow create, update, delete: if hasPermission('calibracao_create') || hasPermission('calibracao_update') || hasPermission('calibracao_delete') || hasPermission('compras_controle_update');
       }
     }
     
@@ -160,6 +171,14 @@ service cloud.firestore {
       allow write: if (isAuthenticated() && (isOwner(resource.data.requesterId) || hasPermission('ferramentaria_movimentacao_create')));
     }
     
+    match /activities/{activityId} {
+        allow get: if isAdmin() || canReadActivity(resource.data);
+        allow list: if isAuthenticated();
+        allow create: if hasPermission('gestao_atividades_create');
+        allow update: if hasPermission('gestao_atividades_update') || isOwner(resource.data.assigneeId) || isOwner(resource.data.requesterId);
+        allow delete: if hasPermission('gestao_atividades_delete');
+    }
+
     match /budgets/{budgetId} {
       allow read: if isAuthenticated();
       allow create: if hasPermission('financeiro_budget_create');
@@ -208,6 +227,39 @@ service cloud.firestore {
     match /trainings/{trainingId} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_treinamentos_create') || hasPermission('cadastros_treinamentos_update') || hasPermission('cadastros_treinamentos_delete');
+    }
+
+    match /communications/{communicationId} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('recursos_humanos_mural_create') || hasPermission('recursos_humanos_mural_update') || hasPermission('recursos_humanos_mural_delete');
+    }
+
+    match /atendimentos_gso/{atendimentoId} {
+      allow read: if hasPermission('gso_ficha_atendimento_view');
+      allow create: if hasPermission('gso_ficha_atendimento_create');
+      allow update: if hasPermission('gso_ficha_atendimento_update');
+      allow delete: if hasPermission('gso_ficha_atendimento_delete');
+    }
+
+    match /aircraft_models/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+    }
+    match /engine_models/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+    }
+    match /apu_models/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+    }
+    match /propeller_models/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+    }
+    match /maintenance_tasks/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_tarefas_update');
     }
   }
 }

@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
-import type { AircraftModel, EngineModel, APUModel } from '@/lib/types';
+import type { AircraftModel, EngineModel, APUModel, PropellerModel } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -13,11 +13,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Trash2, Plane, Settings2, Zap } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Plane, Settings2, Zap, Wind } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
-type ModelType = 'Aeronave' | 'Motor' | 'APU';
+type ModelType = 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
 
 export default function ModelosTecnicaPage() {
   const firestore = useFirestore();
@@ -25,12 +25,15 @@ export default function ModelosTecnicaPage() {
   const [activeTab, setActiveTab] = useState<ModelType>('Aeronave');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editingModel, setEditingModel] = useState<WithDocId<AircraftModel | EngineModel | APUModel> | null>(null);
+  const [editingModel, setEditingModel] = useState<WithDocId<any> | null>(null);
   
   const [formData, setFormData] = useState({
     manufacturer: '',
     name: '',
-    family: '',
+    numEngines: 0,
+    numPropellers: 0,
+    numAPUs: 0,
+    partNumber: '',
   });
 
   const getCollectionName = (type: ModelType) => {
@@ -38,6 +41,7 @@ export default function ModelosTecnicaPage() {
       case 'Aeronave': return 'aircraft_models';
       case 'Motor': return 'engine_models';
       case 'APU': return 'apu_models';
+      case 'Hélice': return 'propeller_models';
     }
   };
 
@@ -45,21 +49,24 @@ export default function ModelosTecnicaPage() {
     firestore ? query(collection(firestore, getCollectionName(activeTab)), orderBy('name')) : null
   ), [firestore, activeTab]);
 
-  const { data: models, isLoading } = useCollection<WithDocId<AircraftModel | EngineModel | APUModel>>(currentQuery, {
+  const { data: models, isLoading } = useCollection<WithDocId<any>>(currentQuery, {
     queryKey: ['models', activeTab]
   });
 
-  const handleOpenDialog = (model: WithDocId<AircraftModel | EngineModel | APUModel> | null = null) => {
+  const handleOpenDialog = (model: WithDocId<any> | null = null) => {
     if (model) {
       setEditingModel(model);
       setFormData({
         manufacturer: model.manufacturer,
         name: model.name,
-        family: (model as AircraftModel).family || '',
+        numEngines: model.numEngines || 0,
+        numPropellers: model.numPropellers || 0,
+        numAPUs: model.numAPUs || 0,
+        partNumber: model.partNumber || '',
       });
     } else {
       setEditingModel(null);
-      setFormData({ manufacturer: '', name: '', family: '' });
+      setFormData({ manufacturer: '', name: '', numEngines: 0, numPropellers: 0, numAPUs: 0, partNumber: '' });
     }
     setIsDialogOpen(true);
   };
@@ -73,8 +80,25 @@ export default function ModelosTecnicaPage() {
 
     setIsSaving(true);
     const collectionName = getCollectionName(activeTab);
-    const dataToSave = { ...formData };
-    if (activeTab !== 'Aeronave') delete (dataToSave as any).family;
+    
+    let dataToSave: any = {
+        manufacturer: formData.manufacturer,
+        name: formData.name,
+    };
+
+    if (activeTab === 'Aeronave') {
+        dataToSave = {
+            ...dataToSave,
+            numEngines: Number(formData.numEngines) || 0,
+            numPropellers: Number(formData.numPropellers) || 0,
+            numAPUs: Number(formData.numAPUs) || 0,
+        };
+    } else {
+        dataToSave = {
+            ...dataToSave,
+            partNumber: formData.partNumber || '',
+        };
+    }
 
     try {
       if (editingModel) {
@@ -113,10 +137,11 @@ export default function ModelosTecnicaPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ModelType)}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="Aeronave"><Plane className="mr-2 h-4 w-4" /> Aeronaves</TabsTrigger>
           <TabsTrigger value="Motor"><Settings2 className="mr-2 h-4 w-4" /> Motores</TabsTrigger>
           <TabsTrigger value="APU"><Zap className="mr-2 h-4 w-4" /> APU</TabsTrigger>
+          <TabsTrigger value="Hélice"><Wind className="mr-2 h-4 w-4" /> Hélices</TabsTrigger>
         </TabsList>
 
         <Card className="mt-4">
@@ -130,17 +155,33 @@ export default function ModelosTecnicaPage() {
                 <TableRow>
                   <TableHead>Fabricante</TableHead>
                   <TableHead>Modelo</TableHead>
-                  {activeTab === 'Aeronave' && <TableHead>Família</TableHead>}
+                  {activeTab === 'Aeronave' ? (
+                      <>
+                        <TableHead className="text-center">Motores</TableHead>
+                        <TableHead className="text-center">Hélices</TableHead>
+                        <TableHead className="text-center">APU</TableHead>
+                      </>
+                  ) : (
+                      <TableHead>Part Number (PN)</TableHead>
+                  )}
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading && <TableRow><TableCell colSpan={activeTab === 'Aeronave' ? 4 : 3} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
+                {isLoading && <TableRow><TableCell colSpan={activeTab === 'Aeronave' ? 6 : 4} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
                 {!isLoading && models?.map((model) => (
                   <TableRow key={model.docId}>
                     <TableCell className="font-medium">{model.manufacturer}</TableCell>
                     <TableCell>{model.name}</TableCell>
-                    {activeTab === 'Aeronave' && <TableCell>{(model as AircraftModel).family || '-'}</TableCell>}
+                    {activeTab === 'Aeronave' ? (
+                        <>
+                            <TableCell className="text-center">{model.numEngines || 0}</TableCell>
+                            <TableCell className="text-center">{model.numPropellers || 0}</TableCell>
+                            <TableCell className="text-center">{model.numAPUs || 0}</TableCell>
+                        </>
+                    ) : (
+                        <TableCell>{model.partNumber || '-'}</TableCell>
+                    )}
                     <TableCell className="text-right space-x-2">
                       <Button variant="outline" size="icon" onClick={() => handleOpenDialog(model)}>
                         <Edit className="h-4 w-4" />
@@ -172,7 +213,7 @@ export default function ModelosTecnicaPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingModel ? 'Editar' : 'Novo'} Modelo de {activeTab}</DialogTitle>
+            <DialogTitle>{editingModel ? 'Editar' : 'Adicionar Novo'} Modelo de {activeTab}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">
@@ -180,14 +221,30 @@ export default function ModelosTecnicaPage() {
               <Input id="manufacturer" value={formData.manufacturer} onChange={(e) => setFormData(p => ({...p, manufacturer: e.target.value}))} placeholder="Ex: Beechcraft, Pratt & Whitney" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="name">Nome do Modelo</Label>
+              <Label htmlFor="name">Modelo</Label>
               <Input id="name" value={formData.name} onChange={(e) => setFormData(p => ({...p, name: e.target.value}))} placeholder="Ex: King Air B200, PT6A-42" />
             </div>
-            {activeTab === 'Aeronave' && (
-              <div className="space-y-1.5">
-                <Label htmlFor="family">Família (Opcional)</Label>
-                <Input id="family" value={formData.family} onChange={(e) => setFormData(p => ({...p, family: e.target.value}))} placeholder="Ex: King Air" />
-              </div>
+            
+            {activeTab === 'Aeronave' ? (
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="numEngines">Nº de Motores</Label>
+                        <Input id="numEngines" type="number" value={formData.numEngines} onChange={(e) => setFormData(p => ({...p, numEngines: parseInt(e.target.value) || 0}))} />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="numPropellers">Nº de Hélices</Label>
+                        <Input id="numPropellers" type="number" value={formData.numPropellers} onChange={(e) => setFormData(p => ({...p, numPropellers: parseInt(e.target.value) || 0}))} />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="numAPUs">Nº de APU</Label>
+                        <Input id="numAPUs" type="number" value={formData.numAPUs} onChange={(e) => setFormData(p => ({...p, numAPUs: parseInt(e.target.value) || 0}))} />
+                    </div>
+                </div>
+            ) : (
+                <div className="space-y-1.5">
+                    <Label htmlFor="partNumber">Part Number (PN)</Label>
+                    <Input id="partNumber" value={formData.partNumber} onChange={(e) => setFormData(p => ({...p, partNumber: e.target.value}))} placeholder="Ex: 3034500-01" />
+                </div>
             )}
           </div>
           <DialogFooter>

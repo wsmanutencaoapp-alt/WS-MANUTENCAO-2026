@@ -5,12 +5,14 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Aircraft Model",
       "type": "object",
-      "description": "Represents an aircraft model manufacturer/family.",
+      "description": "Represents an aircraft model manufacturer/family and its configuration.",
       "properties": {
         "id": { "type": "string" },
         "manufacturer": { "type": "string" },
         "name": { "type": "string" },
-        "family": { "type": "string", "description": "e.g., King Air, Citation, Caravan" }
+        "numEngines": { "type": "number", "default": 0 },
+        "numPropellers": { "type": "number", "default": 0 },
+        "numAPUs": { "type": "number", "default": 0 }
       },
       "required": ["manufacturer", "name"]
     },
@@ -21,7 +23,8 @@
       "properties": {
         "id": { "type": "string" },
         "manufacturer": { "type": "string" },
-        "name": { "type": "string" }
+        "name": { "type": "string" },
+        "partNumber": { "type": "string" }
       },
       "required": ["manufacturer", "name"]
     },
@@ -32,7 +35,20 @@
       "properties": {
         "id": { "type": "string" },
         "manufacturer": { "type": "string" },
-        "name": { "type": "string" }
+        "name": { "type": "string" },
+        "partNumber": { "type": "string" }
+      },
+      "required": ["manufacturer", "name"]
+    },
+    "PropellerModel": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Propeller Model",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "name": { "type": "string" },
+        "partNumber": { "type": "string" }
       },
       "required": ["manufacturer", "name"]
     },
@@ -45,8 +61,8 @@
         "id": { "type": "string" },
         "code": { "type": "string", "description": "ATA chapter or internal task code" },
         "description": { "type": "string" },
-        "modelType": { "type": "string", "enum": ["Aeronave", "Motor", "APU"] },
-        "modelId": { "type": "string", "description": "ID of the linked Aircraft, Engine or APU model" },
+        "modelType": { "type": "string", "enum": ["Aeronave", "Motor", "APU", "Hélice"] },
+        "modelId": { "type": "string", "description": "ID of the linked Aircraft, Engine, APU or Propeller model" },
         "modelName": { "type": "string", "description": "Denormalized name for display" },
         "intervalHours": { "type": "number" },
         "intervalCycles": { "type": "number" },
@@ -1685,8 +1701,7 @@
           "description": "A URL to navigate to when the notification is clicked."
         },
         "read": {
-          "type": "boolean",
-          "description": "Whether the notification has been read."
+          "boolean": "Whether the notification has been read."
         },
         "createdAt": {
           "type": "string",
@@ -2331,6 +2346,10 @@
       {
         "path": "/apu_models/{id}",
         "definition": { "schema": { "$ref": "#/entities/APUModel" }, "description": "Modelos de APU." }
+      },
+      {
+        "path": "/propeller_models/{id}",
+        "definition": { "schema": { "$ref": "#/entities/PropellerModel" }, "description": "Modelos de hélices." }
       },
       {
         "path": "/maintenance_tasks/{id}",

@@ -548,26 +548,37 @@ export type AircraftModel = {
   id?: string;
   manufacturer: string;
   name: string;
-  family?: string;
+  numEngines: number;
+  numPropellers: number;
+  numAPUs: number;
 };
 
 export type EngineModel = {
   id?: string;
   manufacturer: string;
   name: string;
+  partNumber: string;
 };
 
 export type APUModel = {
   id?: string;
   manufacturer: string;
   name: string;
+  partNumber: string;
+};
+
+export type PropellerModel = {
+  id?: string;
+  manufacturer: string;
+  name: string;
+  partNumber: string;
 };
 
 export type MaintenanceTask = {
   id?: string;
   code: string;
   description: string;
-  modelType: 'Aeronave' | 'Motor' | 'APU';
+  modelType: 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
   modelId: string;
   modelName: string;
   intervalHours?: number;
