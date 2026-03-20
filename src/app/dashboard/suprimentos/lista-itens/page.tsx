@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -62,6 +61,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 
 type EnrichedStockItem = WithDocId<SupplyStock> & {
@@ -102,7 +102,7 @@ const SuprimentosPage = () => {
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
     [firestore, user]
   );
-  const { data: employeeData } = useDoc<Employee>(userDocRef);
+  const { data: employeeData, isLoading: isEmployeeLoading } = useDoc<Employee>(userDocRef);
   const isAdmin = useMemo(() => employeeData?.accessLevel === 'Admin' || user?.uid === 'SOID8C723XUmlniI3mpjBmBPA5v1', [employeeData, user]);
 
   const suppliesQueryKey = ['suppliesMasterDataForStockList'];
