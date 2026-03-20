@@ -45,13 +45,13 @@ export default function ModelosTecnicaPage() {
     }
   };
 
-  // Consulta simplificada sem orderBy para garantir o acesso imediato
   const currentCollectionRef = useMemoFirebase(() => (
     techFirestore ? collection(techFirestore, getCollectionName(activeTab)) : null
   ), [techFirestore, activeTab]);
 
   const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentCollectionRef, {
-    queryKey: ['tech_models_direct_v3', activeTab]
+    queryKey: ['tech_models_v4', activeTab],
+    enabled: !!techFirestore
   });
 
   const handleOpenDialog = (model: WithDocId<any> | null = null) => {
@@ -157,8 +157,8 @@ export default function ModelosTecnicaPage() {
                     <AlertTitle>Falha no Carregamento</AlertTitle>
                     <AlertDescription>
                         {error.message.includes('permission') 
-                          ? "Erro de Permissão: O Firestore bloqueou a leitura. Verifique se as regras estão configuradas no banco correto." 
-                          : `Ocorreu um erro ao carregar os dados: ${error.message}`}
+                          ? "Erro de Permissão: O Firestore bloqueou a leitura no banco operation-manager. Verifique se as novas regras foram publicadas no console do Firebase." 
+                          : `Erro: ${error.message}`}
                     </AlertDescription>
                 </Alert>
             )}
@@ -182,7 +182,7 @@ export default function ModelosTecnicaPage() {
               </TableHeader>
               <TableBody>
                 {isLoading && <TableRow><TableCell colSpan={6} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado.</TableCell></TableRow>}
+                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado no banco operation-manager.</TableCell></TableRow>}
                 {!isLoading && models?.map((model) => (
                   <TableRow key={model.docId}>
                     <TableCell className="font-medium">{model.manufacturer}</TableCell>
