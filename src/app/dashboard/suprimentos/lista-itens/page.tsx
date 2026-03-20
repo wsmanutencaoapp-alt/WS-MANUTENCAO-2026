@@ -39,7 +39,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, Printer, ExternalLink, Trash2, ShoppingCart, AlertTriangle, AlertCircle, Package } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, Printer, ExternalLink, Trash2, ShoppingCart, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
@@ -47,8 +47,7 @@ import { useRouter } from 'next/navigation';
 import SupplyMovementDialog from '@/components/SupplyMovementDialog';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import Image from 'next/image';
-import SupplyFormDialog from '@/components/SupplyFormDialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import EditStockItemDialog from '@/components/EditStockItemDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -155,7 +154,7 @@ const SuprimentosPage = () => {
     return () => unsubscribe();
   }, [supplies, firestore, isLoadingSupplies]);
   
-  // Calculate total quantities per supply ID for visual indicators
+  // Calculate total quantities per supply ID for visual indicators (Real-time derived)
   const totalsPerSupply = useMemo(() => {
     const totals = new Map<string, number>();
     enrichedStock.forEach(item => {
@@ -165,7 +164,7 @@ const SuprimentosPage = () => {
     return totals;
   }, [enrichedStock]);
 
-  // Dashboard Calculations
+  // Dashboard Stats (Real-time derived)
   const stats = useMemo(() => {
     if (!supplies || !enrichedStock) return { noStock: 0, lowStock: 0, nearExpiry: 0 };
 
@@ -275,19 +274,33 @@ const SuprimentosPage = () => {
   return (
     <div className="space-y-6">
        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className={cn(stats.noStock > 0 ? "border-destructive bg-destructive/5" : "")}>
+            <Card 
+                className={cn(
+                    "cursor-pointer transition-all hover:shadow-md",
+                    stats.noStock > 0 ? "border-destructive bg-destructive/5" : "",
+                    showLowStockOnly && stats.noStock > 0 ? "ring-2 ring-destructive" : ""
+                )}
+                onClick={() => stats.noStock > 0 && setShowLowStockOnly(!showLowStockOnly)}
+            >
                 <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
                     <div>
                         <CardTitle className="text-sm font-medium">Sem Estoque</CardTitle>
                         <CardDescription className="text-xs">Itens com saldo zero</CardDescription>
                     </div>
-                    <PackageSearch className={cn("h-5 w-5", stats.noStock > 0 ? "text-destructive" : "text-muted-foreground")} />
+                    <AlertCircle className={cn("h-5 w-5", stats.noStock > 0 ? "text-destructive" : "text-muted-foreground")} />
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                     <div className="text-2xl font-bold">{stats.noStock}</div>
                 </CardContent>
             </Card>
-            <Card className={cn(stats.lowStock > 0 ? "border-orange-500 bg-orange-500/5" : "")}>
+            <Card 
+                className={cn(
+                    "cursor-pointer transition-all hover:shadow-md",
+                    stats.lowStock > 0 ? "border-orange-500 bg-orange-500/5" : "",
+                    showLowStockOnly && !showLowStockOnly ? "" : "" // Logic for selection state if needed
+                )}
+                onClick={() => stats.lowStock > 0 && setShowLowStockOnly(!showLowStockOnly)}
+            >
                 <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
                     <div>
                         <CardTitle className="text-sm font-medium">Estoque Baixo</CardTitle>
