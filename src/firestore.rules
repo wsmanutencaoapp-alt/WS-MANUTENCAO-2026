@@ -4,71 +4,67 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Função básica de autenticação
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Validação direta do Super Admin (não depende de consulta ao banco)
     function isSuperAdmin() {
       return request.auth != null && request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1';
     }
 
-    // Função para verificar Admin no banco default
+    // Função crucial: Sempre busca o perfil no banco (default), 
+    // mesmo que a regra esteja rodando na instância operation-manager.
     function isAdmin() {
       if (isSuperAdmin()) return true;
       let userPath = /databases/(default)/documents/employees/$(request.auth.uid);
       return exists(userPath) && get(userPath).data.accessLevel == 'Admin';
     }
+    
+    function hasPermission(module) {
+      if (isSuperAdmin()) return true;
+      let userPath = /databases/(default)/documents/employees/$(request.auth.uid);
+      return exists(userPath) && get(userPath).data.permissions[module] == true;
+    }
 
     // --- REGRAS PARA O BANCO TÉCNICO (operation-manager) ---
-    // Permitimos leitura para qualquer usuário logado para evitar erros de leitura cruzada entre bases.
-    
+    // Permitimos leitura para qualquer usuário autenticado para simplificar a listagem.
     match /aircraftModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isAdmin();
+      allow write: if isAdmin();
     }
     match /engineModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isAdmin();
+      allow write: if isAdmin();
     }
     match /apuModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isAdmin();
+      allow write: if isAdmin();
     }
     match /propellerModels/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isAdmin();
+      allow write: if isAdmin();
     }
     match /maintenance_tasks/{id} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isAdmin();
-    }
-
-    // --- REGRAS PARA O QUADRO DE ATIVIDADES ---
-    match /activities/{activityId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
-        allow update: if isAuthenticated();
-        allow delete: if isSuperAdmin() || isAdmin();
+      allow write: if isAdmin();
     }
 
     // --- REGRAS GERAIS (BANCO DEFAULT) ---
     match /vehicles/{vehicleId} {
       allow get: if true; 
       allow list: if isAuthenticated();
-      allow create, update, delete: if isSuperAdmin() || isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || request.auth.uid == employeeId || isAdmin();
+      allow write: if request.auth.uid == employeeId || isAdmin();
     }
 
-    // Fallback padrão para as demais coleções do banco default
+    // Fallback padrão para as demais coleções
     match /{document=**} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isAdmin();
+      allow write: if isAdmin();
     }
   }
 }

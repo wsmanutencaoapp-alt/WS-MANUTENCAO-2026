@@ -50,7 +50,7 @@ export default function ModelosTecnicaPage() {
   ), [techFirestore, activeTab]);
 
   const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentCollectionRef, {
-    queryKey: ['tech_models_v4', activeTab],
+    queryKey: ['tech_models_v5', activeTab],
     enabled: !!techFirestore
   });
 
@@ -154,11 +154,10 @@ export default function ModelosTecnicaPage() {
             {error && (
                 <Alert variant="destructive" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Falha no Carregamento</AlertTitle>
+                    <AlertTitle>Erro de Permissão</AlertTitle>
                     <AlertDescription>
-                        {error.message.includes('permission') 
-                          ? "Erro de Permissão: O Firestore bloqueou a leitura no banco operation-manager. Verifique se as novas regras foram publicadas no console do Firebase." 
-                          : `Erro: ${error.message}`}
+                        O acesso ao banco <strong>operation-manager</strong> foi negado. 
+                        Certifique-se de que as novas regras de segurança foram publicadas para este banco de dados no Console do Firebase.
                     </AlertDescription>
                 </Alert>
             )}
