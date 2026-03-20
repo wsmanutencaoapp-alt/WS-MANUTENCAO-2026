@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, addDoc, writeBatch, doc, where, getDocs, orderBy, getDoc } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -31,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useStorage } from '@/firebase/provider';
 import { sendPurchaseRequisitionEmail } from '@/lib/email';
+import { useSearchParams } from 'next/navigation';
 
 
 type RequisitionableItem = (WithDocId<Supply> | WithDocId<Tool>) & { itemType: 'supply' | 'tool' };
@@ -42,11 +44,12 @@ type CartItem = RequisitionableItem & {
     attachmentFile?: File | null;
 };
 
-const RequisicaoCompraPage = () => {
+function RequisicaoCompraContent() {
   const { user } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   
   const [cart, setCart] = useState<CartItem[]>([]);
   const [costCenterId, setCostCenterId] = useState('');
@@ -67,6 +70,31 @@ const RequisicaoCompraPage = () => {
   const costCentersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'cost_centers')) : null, [firestore]);
   const { data: costCenters, isLoading: isLoadingCostCenters } = useCollection<WithDocId<CostCenter>>(costCentersQuery);
 
+  // Handle Quick Requisition from other pages
+  useEffect(() => {
+    const preselectItemId = searchParams.get('itemId');
+    const preselectItemType = searchParams.get('itemType') as 'supply' | 'tool';
+
+    if (preselectItemId && preselectItemType && !isLoadingSupplies && !isLoadingTools) {
+        const sourceList = preselectItemType === 'supply' ? allSupplies : allTools;
+        const item = sourceList?.find(i => i.docId === preselectItemId);
+        
+        if (item && !cart.some(c => c.docId === item.docId)) {
+            setCart(prev => [...prev, { 
+                ...item, 
+                itemType: preselectItemType,
+                requisitionQuantity: 1, 
+                estimatedPrice: (item as any).valor_estimado || 0, 
+                notes: 'Adicionado via atalho de estoque baixo.', 
+                referenceLink: '',
+                attachmentFile: null 
+            }]);
+            toast({ title: "Item Adicionado", description: `${(item as any).descricao} foi adicionado ao seu carrinho.` });
+        }
+    }
+  }, [searchParams, allSupplies, allTools, isLoadingSupplies, isLoadingTools, toast, cart.length]); // Dependencies to trigger when data is ready
+
+
   const catalogItems = useMemo((): RequisitionableItem[] => {
     if (isLoadingSupplies || isLoadingTools) return [];
     const suppliesWithType = allSupplies?.map(s => ({...s, itemType: 'supply' as const })) || [];
@@ -79,7 +107,7 @@ const RequisicaoCompraPage = () => {
     setCart(prev => [...prev, { 
         ...item, 
         requisitionQuantity: 1, 
-        estimatedPrice: item.valor_estimado || 0, 
+        estimatedPrice: (item as any).valor_estimado || 0, 
         notes: '', 
         referenceLink: '',
         attachmentFile: null 
@@ -171,7 +199,7 @@ const RequisicaoCompraPage = () => {
 
         await batch.commit();
 
-        // Send email notifications based on configuration (after commit)
+        // Send email notifications
         const emailConfigRef = doc(firestore, 'email_configurations', 'purchase_requisition');
         try {
             const emailConfigSnap = await getDoc(emailConfigRef);
@@ -183,7 +211,6 @@ const RequisicaoCompraPage = () => {
             }
         } catch (emailError) {
             console.error("Failed to check or send email notifications:", emailError);
-            // Do not block the user for email errors, just log it.
         }
 
         toast({ title: 'Sucesso!', description: 'Sua requisição de compra foi enviada para aprovação.' });
@@ -300,14 +327,14 @@ const RequisicaoCompraPage = () => {
                                 <Card key={item.docId} className="p-3 shadow-none">
                                     <div className="flex items-start gap-4">
                                         <Image
-                                            src={item.imageUrl || 'https://picsum.photos/seed/item/64/64'}
-                                            alt={item.descricao}
+                                            src={(item as any).imageUrl || 'https://picsum.photos/seed/item/64/64'}
+                                            alt={(item as any).descricao || 'Item'}
                                             width={48}
                                             height={48}
                                             className="rounded-md aspect-square object-cover"
                                         />
                                         <div className="flex-1 text-sm space-y-2">
-                                            <p className="font-bold">{item.descricao}</p>
+                                            <p className="font-bold">{(item as any).descricao}</p>
                                             <p className="font-mono text-xs text-muted-foreground">{item.codigo}</p>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                  <div>
@@ -385,11 +412,11 @@ const RequisicaoCompraPage = () => {
           items={catalogItems}
           onSelect={addToCart}
           filterFunction={(items, term) => {
-              if (!term) return []; // Don't show anything if no search term
+              if (!term) return [];
               const lowercasedTerm = term.toLowerCase();
               return items.filter(item => 
-                item.descricao.toLowerCase().includes(lowercasedTerm) || 
-                item.codigo.toLowerCase().includes(lowercasedTerm) ||
+                (item as any).descricao?.toLowerCase().includes(lowercasedTerm) || 
+                item.codigo?.toLowerCase().includes(lowercasedTerm) ||
                 (item.itemType === 'supply' && (item as Supply).partNumber && (item as Supply).partNumber.toLowerCase().includes(lowercasedTerm)) ||
                 (item.itemType === 'tool' && (item as Tool).pn_fabricante && (item as Tool).pn_fabricante.toLowerCase().includes(lowercasedTerm))
             );
@@ -397,14 +424,14 @@ const RequisicaoCompraPage = () => {
           renderItem={(item) => (
              <div className="flex items-center gap-4 w-full">
                 <Image 
-                    src={item.imageUrl || 'https://picsum.photos/seed/item/64/64'}
-                    alt={item.descricao}
+                    src={(item as any).imageUrl || 'https://picsum.photos/seed/item/64/64'}
+                    alt={(item as any).descricao || 'Item'}
                     width={40}
                     height={40}
                     className="rounded-md aspect-square object-cover"
                 />
                 <div className="flex-1 text-sm text-left">
-                    <p className="font-bold">{item.descricao}</p>
+                    <p className="font-bold">{(item as any).descricao}</p>
                     <p className="font-mono text-xs text-muted-foreground">
                         {item.codigo} / {item.itemType === 'supply' ? (item as WithDocId<Supply>).partNumber : (item as WithDocId<Tool>).pn_fabricante || 'N/A'}
                     </p>
@@ -417,6 +444,12 @@ const RequisicaoCompraPage = () => {
        />
     </>
   );
-};
+}
 
-export default RequisicaoCompraPage;
+export default function RequisicaoCompraPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin"/></div>}>
+            <RequisicaoCompraContent />
+        </Suspense>
+    );
+}

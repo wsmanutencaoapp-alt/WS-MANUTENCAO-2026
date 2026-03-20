@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -39,13 +40,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, Printer, ExternalLink, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, Printer, ExternalLink, Trash2, ShoppingCart, AlertTriangle, AlertCircle, Package } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import SupplyMovementDialog from '@/components/SupplyMovementDialog';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInDays } from 'date-fns';
 import Image from 'next/image';
 import SupplyFormDialog from '@/components/SupplyFormDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -59,6 +60,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 
 type EnrichedStockItem = WithDocId<SupplyStock> & {
@@ -74,6 +77,7 @@ const SuprimentosPage = () => {
   const { user } = useUser();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [movementDialogState, setMovementDialogState] = useState<{
     isOpen: boolean;
     type: 'entrada' | 'saida';
@@ -86,11 +90,6 @@ const SuprimentosPage = () => {
   }>({ isOpen: false, supply: null });
   
   const [editStockDialogState, setEditStockDialogState] = useState<{
-    isOpen: boolean;
-    stockItem: EnrichedStockItem | null;
-  }>({ isOpen: false, stockItem: null });
-
-  const [returnDialogState, setReturnDialogState] = useState<{
     isOpen: boolean;
     stockItem: EnrichedStockItem | null;
   }>({ isOpen: false, stockItem: null });
@@ -157,27 +156,72 @@ const SuprimentosPage = () => {
     return () => unsubscribe();
   }, [supplies, firestore, isLoadingSupplies]);
   
+  // Dashboard Calculations
+  const stats = useMemo(() => {
+    if (!supplies || !enrichedStock) return { noStock: 0, lowStock: 0, nearExpiry: 0 };
+
+    const totalsPerSupply = new Map<string, number>();
+    enrichedStock.forEach(item => {
+        const current = totalsPerSupply.get(item.supplyInfo.docId) || 0;
+        totalsPerSupply.set(item.supplyInfo.docId, current + item.quantidade);
+    });
+
+    let noStock = 0;
+    let lowStock = 0;
+    supplies.forEach(s => {
+        const total = totalsPerSupply.get(s.docId) || 0;
+        if (total === 0) noStock++;
+        else if (total <= s.estoqueMinimo) lowStock++;
+    });
+
+    const nearExpiry = enrichedStock.filter(item => {
+        if (!item.dataValidade) return false;
+        const days = differenceInDays(new Date(item.dataValidade), new Date());
+        return days >= 0 && days <= 30;
+    }).length;
+
+    return { noStock, lowStock, nearExpiry };
+  }, [supplies, enrichedStock]);
 
   const filteredStock = useMemo(() => {
     if (!enrichedStock) return [];
-    if (!searchTerm) return enrichedStock;
+    
+    // First aggregate totals to support the "Low Stock" filter
+    const totalsPerSupply = new Map<string, number>();
+    enrichedStock.forEach(item => {
+        const current = totalsPerSupply.get(item.supplyInfo.docId) || 0;
+        totalsPerSupply.set(item.supplyInfo.docId, current + item.quantidade);
+    });
 
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return enrichedStock.filter(item => 
-      (item.supplyInfo.descricao && item.supplyInfo.descricao.toLowerCase().includes(lowercasedTerm)) ||
-      (item.supplyInfo.codigo && item.supplyInfo.codigo.toLowerCase().includes(lowercasedTerm)) ||
-      (item.supplyInfo.partNumber && item.supplyInfo.partNumber.toLowerCase().includes(lowercasedTerm)) ||
-      (item.loteInterno && item.loteInterno.toLowerCase().includes(lowercasedTerm)) ||
-      (item.localizacao && item.localizacao.toLowerCase().includes(lowercasedTerm))
-    );
-  }, [enrichedStock, searchTerm]);
+    let result = enrichedStock;
+
+    if (showLowStockOnly) {
+        result = result.filter(item => {
+            const total = totalsPerSupply.get(item.supplyInfo.docId) || 0;
+            return total <= item.supplyInfo.estoqueMinimo;
+        });
+    }
+
+    if (searchTerm) {
+        const lowercasedTerm = searchTerm.toLowerCase();
+        result = result.filter(item => 
+          (item.supplyInfo.descricao && item.supplyInfo.descricao.toLowerCase().includes(lowercasedTerm)) ||
+          (item.supplyInfo.codigo && item.supplyInfo.codigo.toLowerCase().includes(lowercasedTerm)) ||
+          (item.supplyInfo.partNumber && item.supplyInfo.partNumber.toLowerCase().includes(lowercasedTerm)) ||
+          (item.loteInterno && item.loteInterno.toLowerCase().includes(lowercasedTerm)) ||
+          (item.localizacao && item.localizacao.toLowerCase().includes(lowercasedTerm))
+        );
+    }
+    
+    return result;
+  }, [enrichedStock, searchTerm, showLowStockOnly]);
   
   const handleGoToCadastro = () => {
     router.push('/dashboard/cadastros/suprimentos');
   }
 
   const handleOpenMovementDialog = (type: 'entrada' | 'saida', supply: WithDocId<Supply> | null) => {
-    setMovementDialogState({ isOpen: boolean = true, type, supply });
+    setMovementDialogState({ isOpen: true, type, supply });
   };
 
   const handleDialogSuccess = (newItem?: EnrichedStockItem) => {
@@ -185,7 +229,6 @@ const SuprimentosPage = () => {
       setMovementDialogState({ isOpen: false, type: 'entrada', supply: null });
       setFormDialogState({ isOpen: false, supply: null });
       setEditStockDialogState({ isOpen: false, stockItem: null });
-      setReturnDialogState({ isOpen: false, stockItem: null });
 
       if (newItem) {
         setStockToPrint(newItem);
@@ -227,13 +270,56 @@ const SuprimentosPage = () => {
     }
   };
 
+  const handleQuickRequisition = (item: EnrichedStockItem) => {
+      router.push(`/dashboard/compras/requisicao?itemId=${item.supplyInfo.docId}&itemType=supply`);
+  };
+
   const isLoading = isLoadingSupplies || isStockLoading;
 
   return (
     <div className="space-y-6">
-       <div className="flex items-center justify-between">
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className={cn(stats.noStock > 0 ? "border-destructive bg-destructive/5" : "")}>
+                <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                        <CardTitle className="text-sm font-medium">Sem Estoque</CardTitle>
+                        <CardDescription className="text-xs">Itens com saldo zero</CardDescription>
+                    </div>
+                    <PackageSearch className={cn("h-5 w-5", stats.noStock > 0 ? "text-destructive" : "text-muted-foreground")} />
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                    <div className="text-2xl font-bold">{stats.noStock}</div>
+                </CardContent>
+            </Card>
+            <Card className={cn(stats.lowStock > 0 ? "border-orange-500 bg-orange-500/5" : "")}>
+                <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                        <CardTitle className="text-sm font-medium">Estoque Baixo</CardTitle>
+                        <CardDescription className="text-xs">Igual ou abaixo do mínimo</CardDescription>
+                    </div>
+                    <AlertTriangle className={cn("h-5 w-5", stats.lowStock > 0 ? "text-orange-500" : "text-muted-foreground")} />
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                    <div className="text-2xl font-bold">{stats.lowStock}</div>
+                </CardContent>
+            </Card>
+            <Card className={cn(stats.nearExpiry > 0 ? "border-yellow-500 bg-yellow-500/5" : "")}>
+                <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                        <CardTitle className="text-sm font-medium">Vencimento Próximo</CardTitle>
+                        <CardDescription className="text-xs">Próximos 30 dias</CardDescription>
+                    </div>
+                    <AlertCircle className={cn("h-5 w-5", stats.nearExpiry > 0 ? "text-yellow-500" : "text-muted-foreground")} />
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                    <div className="text-2xl font-bold">{stats.nearExpiry}</div>
+                </CardContent>
+            </Card>
+       </div>
+
+       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Inventário de Suprimentos por Lote</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button>
@@ -263,10 +349,20 @@ const SuprimentosPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Visão de Estoque por Lote</CardTitle>
-          <CardDescription>
-            Visualize cada lote de item individualmente no estoque.
-          </CardDescription>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <CardTitle>Visão de Estoque por Lote</CardTitle>
+                <CardDescription>Visualize cada lote de item individualmente no estoque.</CardDescription>
+            </div>
+            <div className="flex items-center space-x-2 bg-muted/50 p-2 rounded-lg border">
+                <Switch 
+                    id="low-stock-filter" 
+                    checked={showLowStockOnly} 
+                    onCheckedChange={setShowLowStockOnly} 
+                />
+                <Label htmlFor="low-stock-filter" className="text-sm font-medium cursor-pointer">Mostrar apenas estoque baixo</Label>
+            </div>
+          </div>
           <div className="relative pt-4">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -301,7 +397,7 @@ const SuprimentosPage = () => {
                 <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center">
                         <PackageSearch className="mx-auto h-8 w-8 text-muted-foreground mb-2"/>
-                        <p className="text-muted-foreground">Nenhum item em estoque.</p>
+                        <p className="text-muted-foreground">Nenhum item encontrado.</p>
                     </TableCell>
                 </TableRow>
               )}
@@ -334,8 +430,20 @@ const SuprimentosPage = () => {
                         <div className="font-bold">{item.quantidade.toLocaleString()} {supplyInfo.unidadeMedida}</div>
                         {item.pesoLiquido !== undefined && <div className="text-xs text-muted-foreground">{item.pesoLiquido.toLocaleString()} {supplyInfo.unidadeSecundaria}</div>}
                     </TableCell>
-                    <TableCell>{item.dataValidade ? format(parseISO(item.dataValidade), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                    <TableCell>
+                        {item.dataValidade ? (
+                            <div className="flex flex-col">
+                                <span>{format(parseISO(item.dataValidade), 'dd/MM/yyyy')}</span>
+                                {differenceInDays(new Date(item.dataValidade), new Date()) <= 30 && (
+                                    <Badge variant="warning" className="text-[10px] py-0 h-4 w-fit">Vencendo</Badge>
+                                )}
+                            </div>
+                        ) : 'N/A'}
+                    </TableCell>
                     <TableCell className="text-right space-x-1">
+                        <Button variant="outline" size="icon" title="Solicitar Compra deste Item" className="text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleQuickRequisition(item)}>
+                            <ShoppingCart className="h-4 w-4"/>
+                        </Button>
                         <Button variant="ghost" size="icon" title="Registrar Saída deste Lote" onClick={() => setMovementDialogState({ isOpen: true, type: 'saida', supply: supplyInfo })}>
                             <LogOut className="h-4 w-4 text-orange-600"/>
                         </Button>
