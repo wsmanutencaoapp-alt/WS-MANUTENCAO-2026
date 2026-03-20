@@ -2,24 +2,28 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, setDoc, doc, enableIndexedDbPersistence } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 let services: { firebaseApp: FirebaseApp; auth: Auth; firestore: Firestore; storage: FirebaseStorage; } | null = null;
 let persistenceEnabled = false;
 
-// This function now ensures that persistence is enabled only once.
+/**
+ * Inicializa os serviços do Firebase.
+ * Configurado para utilizar a instância de banco de dados 'operation-manager'.
+ */
 export function initializeFirebase() {
   if (services) {
     return services;
   }
 
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  const firestore = getFirestore(app);
+  
+  // CRITICAL: Conectando especificamente à instância 'operation-manager' conforme estrutura do projeto.
+  const firestore = getFirestore(app, 'operation-manager');
 
-  // Guard to ensure persistence is only enabled once per client session.
-  // This is robust against React 18's StrictMode double-invocations in development.
+  // Habilita persistência offline (apenas no cliente)
   if (typeof window !== 'undefined' && !persistenceEnabled) {
     persistenceEnabled = true;
     enableIndexedDbPersistence(firestore).catch((err) => {
