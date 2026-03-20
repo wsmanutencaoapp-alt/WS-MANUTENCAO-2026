@@ -76,12 +76,13 @@ export default function LabelPrintDialog({ isOpen, onClose, tools }: LabelPrintD
           </div>
         `;
       } else {
+        // Etiqueta Grande com fontes reduzidas
         html = `
           <div class="label-container" style="width: 100mm; height: 60mm; padding: 8mm; flex-direction: column; text-align: center; justify-content: space-between;">
             <img src="/logo.png" style="height: 10mm; object-fit: contain;" />
             <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
-              <div style="font-size: 18pt; font-weight: 900; color: black; margin-bottom: 2mm;">${tool.descricao}</div>
-              <div style="font-size: 14pt; font-family: monospace; font-weight: bold; color: #444;">${tool.codigo}</div>
+              <div style="font-size: 14pt; font-weight: 900; color: black; margin-bottom: 2mm;">${tool.descricao}</div>
+              <div style="font-size: 11pt; font-family: monospace; font-weight: bold; color: #444;">${tool.codigo}</div>
               <div style="font-size: 8pt; color: #666; margin-top: 2mm;">Escaneie para ver localização em tempo real</div>
             </div>
             <img src="${qrUrl}" style="width: 25mm; height: 25mm; margin-top: 2mm;" />
