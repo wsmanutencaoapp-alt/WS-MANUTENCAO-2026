@@ -431,12 +431,14 @@ const CadastroEnderecosPage = () => {
 
             if (printSize === '100mm x 60mm') {
                 contentToPrint += `
-                    <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding-top: 8mm; box-sizing: border-box; text-align: center; page-break-after: always;">
-                        <img src="/logo.png" alt="Logo" style="height: 12px; object-fit: contain; margin-bottom: 8px;" />
-                        <p style="font-size: 32px; line-height: 1.1; font-weight: 900; color: rgb(0, 0, 0); margin-top: 22px; margin-bottom: 12px;">
+                    <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 2mm 8mm 8mm 8mm; box-sizing: border-box; text-align: center; page-break-after: always;">
+                        <img src="/logo.png" alt="Logo" style="height: 10mm; object-fit: contain; margin-bottom: 4mm;" />
+                        <p style="font-size: 32px; line-height: 1.1; font-weight: 900; color: rgb(0, 0, 0); margin: 0; padding: 0;">
                             ${address.codigoCompleto}
                         </p>
-                        <img src="${qrUrl}" alt="QR Code" style="width: 60px; height: 60px; margin-top: 20px;" />
+                        <div style="flex: 1; display: flex; align-items: flex-end; justify-content: center; margin-top: 4mm;">
+                            <img src="${qrUrl}" alt="QR Code" style="width: 22mm; height: 22mm;" />
+                        </div>
                     </div>`;
             } else {
                  contentToPrint += `
@@ -686,11 +688,13 @@ const CadastroEnderecosPage = () => {
 
                         return printSize === '100mm x 60mm' ? (
                             <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 box-border text-center border">
-                                <img src="/logo.png" alt="Logo" className="h-3 object-contain mt-2 mb-2" />
-                                <p className="leading-tight font-black text-black mt-5 mb-3" style={{ fontSize: '32px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
+                                <img src="/logo.png" alt="Logo" className="h-10 object-contain mb-4" />
+                                <p className="leading-tight font-black text-black" style={{ fontSize: '32px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
                                     {address.codigoCompleto}
                                 </p>
-                                <img src={qrUrl} alt="QR Code" className="w-[60px] h-[60px] mt-5" />
+                                <div className="flex-1 flex items-end justify-center mt-4">
+                                    <img src={qrUrl} alt="QR Code" className="w-[83px] h-[83px]" />
+                                </div>
                             </div>
                         ) : (
                             <div key={address.docId} className="bg-white w-[452px] h-[87px] grid grid-cols-[auto_1fr_auto] gap-8 items-center p-2 border">
