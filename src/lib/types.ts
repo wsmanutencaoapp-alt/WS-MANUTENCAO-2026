@@ -547,30 +547,30 @@ export type AtendimentoGSO = {
 export type AircraftModel = {
   id?: string;
   manufacturer: string;
-  name: string;
-  numEngines: number;
-  numPropellers: number;
-  numAPUs: number;
+  model: string;
+  engineCount: number;
+  propellerCount: number;
+  apuCount: number;
 };
 
 export type EngineModel = {
   id?: string;
   manufacturer: string;
-  name: string;
+  model: string;
   partNumber: string;
 };
 
 export type APUModel = {
   id?: string;
   manufacturer: string;
-  name: string;
+  model: string;
   partNumber: string;
 };
 
 export type PropellerModel = {
   id?: string;
   manufacturer: string;
-  name: string;
+  model: string;
   partNumber: string;
 };
 

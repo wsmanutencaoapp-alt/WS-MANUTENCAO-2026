@@ -9,12 +9,12 @@
       "properties": {
         "id": { "type": "string" },
         "manufacturer": { "type": "string" },
-        "name": { "type": "string" },
-        "numEngines": { "type": "number", "default": 0 },
-        "numPropellers": { "type": "number", "default": 0 },
-        "numAPUs": { "type": "number", "default": 0 }
+        "model": { "type": "string" },
+        "engineCount": { "type": "number", "default": 0 },
+        "propellerCount": { "type": "number", "default": 0 },
+        "apuCount": { "type": "number", "default": 0 }
       },
-      "required": ["manufacturer", "name"]
+      "required": ["manufacturer", "model"]
     },
     "EngineModel": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -23,10 +23,10 @@
       "properties": {
         "id": { "type": "string" },
         "manufacturer": { "type": "string" },
-        "name": { "type": "string" },
+        "model": { "type": "string" },
         "partNumber": { "type": "string" }
       },
-      "required": ["manufacturer", "name"]
+      "required": ["manufacturer", "model"]
     },
     "APUModel": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -35,10 +35,10 @@
       "properties": {
         "id": { "type": "string" },
         "manufacturer": { "type": "string" },
-        "name": { "type": "string" },
+        "model": { "type": "string" },
         "partNumber": { "type": "string" }
       },
-      "required": ["manufacturer", "name"]
+      "required": ["manufacturer", "model"]
     },
     "PropellerModel": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -47,10 +47,10 @@
       "properties": {
         "id": { "type": "string" },
         "manufacturer": { "type": "string" },
-        "name": { "type": "string" },
+        "model": { "type": "string" },
         "partNumber": { "type": "string" }
       },
-      "required": ["manufacturer", "name"]
+      "required": ["manufacturer", "model"]
     },
     "MaintenanceTask": {
       "$schema": "http://json-schema.org/draft-07/schema#",

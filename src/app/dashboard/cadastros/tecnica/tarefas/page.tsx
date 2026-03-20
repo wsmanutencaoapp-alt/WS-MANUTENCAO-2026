@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc, orderBy, getDocs } from 'firebase/firestore';
-import type { MaintenanceTask, AircraftModel, EngineModel, APUModel } from '@/lib/types';
+import type { MaintenanceTask, AircraftModel, EngineModel, APUModel, PropellerModel } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -46,22 +46,25 @@ export default function TarefasTecnicaPage() {
   });
 
   // Fetch all possible models for the selector
-  const aircraftQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'aircraft_models'), orderBy('name')) : null), [firestore]);
-  const engineQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'engine_models'), orderBy('name')) : null), [firestore]);
-  const apuQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'apu_models'), orderBy('name')) : null), [firestore]);
+  const aircraftQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'aircraft_models'), orderBy('model')) : null), [firestore]);
+  const engineQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'engine_models'), orderBy('model')) : null), [firestore]);
+  const apuQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'apu_models'), orderBy('model')) : null), [firestore]);
+  const propellerQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'propeller_models'), orderBy('model')) : null), [firestore]);
 
   const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery);
   const { data: engineModels } = useCollection<WithDocId<EngineModel>>(engineQuery);
   const { data: apuModels } = useCollection<WithDocId<APUModel>>(apuQuery);
+  const { data: propellerModels } = useCollection<WithDocId<PropellerModel>>(propellerQuery);
 
   const availableModels = useMemo(() => {
     switch (formData.modelType) {
       case 'Aeronave': return aircraftModels || [];
       case 'Motor': return engineModels || [];
       case 'APU': return apuModels || [];
+      case 'Hélice': return propellerModels || [];
       default: return [];
     }
-  }, [formData.modelType, aircraftModels, engineModels, apuModels]);
+  }, [formData.modelType, aircraftModels, engineModels, apuModels, propellerModels]);
 
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
@@ -99,7 +102,7 @@ export default function TarefasTecnicaPage() {
     const selectedModel = availableModels.find(m => m.docId === formData.modelId);
     const dataToSave = {
       ...formData,
-      modelName: selectedModel ? `${selectedModel.manufacturer} ${selectedModel.name}` : 'Modelo desconhecido',
+      modelName: selectedModel ? `${selectedModel.manufacturer} ${selectedModel.model}` : 'Modelo desconhecido',
       intervalHours: Number(formData.intervalHours) || 0,
       intervalCycles: Number(formData.intervalCycles) || 0,
       intervalDays: Number(formData.intervalDays) || 0,
@@ -223,6 +226,7 @@ export default function TarefasTecnicaPage() {
                   <SelectItem value="Aeronave">Aeronave</SelectItem>
                   <SelectItem value="Motor">Motor</SelectItem>
                   <SelectItem value="APU">APU</SelectItem>
+                  <SelectItem value="Hélice">Hélice</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -233,7 +237,7 @@ export default function TarefasTecnicaPage() {
                 <SelectTrigger><SelectValue placeholder="Selecione o modelo..." /></SelectTrigger>
                 <SelectContent>
                   {availableModels.map(m => (
-                    <SelectItem key={m.docId} value={m.docId}>{m.manufacturer} {m.name}</SelectItem>
+                    <SelectItem key={m.docId} value={m.docId}>{m.manufacturer} {m.model}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

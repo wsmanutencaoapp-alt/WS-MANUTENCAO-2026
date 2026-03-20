@@ -29,10 +29,10 @@ export default function ModelosTecnicaPage() {
   
   const [formData, setFormData] = useState({
     manufacturer: '',
-    name: '',
-    numEngines: 0,
-    numPropellers: 0,
-    numAPUs: 0,
+    model: '',
+    engineCount: 0,
+    propellerCount: 0,
+    apuCount: 0,
     partNumber: '',
   });
 
@@ -46,7 +46,7 @@ export default function ModelosTecnicaPage() {
   };
 
   const currentQuery = useMemoFirebase(() => (
-    firestore ? query(collection(firestore, getCollectionName(activeTab)), orderBy('name')) : null
+    firestore ? query(collection(firestore, getCollectionName(activeTab)), orderBy('model')) : null
   ), [firestore, activeTab]);
 
   const { data: models, isLoading } = useCollection<WithDocId<any>>(currentQuery, {
@@ -58,22 +58,22 @@ export default function ModelosTecnicaPage() {
       setEditingModel(model);
       setFormData({
         manufacturer: model.manufacturer,
-        name: model.name,
-        numEngines: model.numEngines || 0,
-        numPropellers: model.numPropellers || 0,
-        numAPUs: model.numAPUs || 0,
+        model: model.model,
+        engineCount: model.engineCount || 0,
+        propellerCount: model.propellerCount || 0,
+        apuCount: model.apuCount || 0,
         partNumber: model.partNumber || '',
       });
     } else {
       setEditingModel(null);
-      setFormData({ manufacturer: '', name: '', numEngines: 0, numPropellers: 0, numAPUs: 0, partNumber: '' });
+      setFormData({ manufacturer: '', model: '', engineCount: 0, propellerCount: 0, apuCount: 0, partNumber: '' });
     }
     setIsDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!firestore) return;
-    if (!formData.manufacturer || !formData.name) {
+    if (!formData.manufacturer || !formData.model) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Fabricante e Modelo são obrigatórios.' });
       return;
     }
@@ -83,15 +83,15 @@ export default function ModelosTecnicaPage() {
     
     let dataToSave: any = {
         manufacturer: formData.manufacturer,
-        name: formData.name,
+        model: formData.model,
     };
 
     if (activeTab === 'Aeronave') {
         dataToSave = {
             ...dataToSave,
-            numEngines: Number(formData.numEngines) || 0,
-            numPropellers: Number(formData.numPropellers) || 0,
-            numAPUs: Number(formData.numAPUs) || 0,
+            engineCount: Number(formData.engineCount) || 0,
+            propellerCount: Number(formData.propellerCount) || 0,
+            apuCount: Number(formData.apuCount) || 0,
         };
     } else {
         dataToSave = {
@@ -172,12 +172,12 @@ export default function ModelosTecnicaPage() {
                 {!isLoading && models?.map((model) => (
                   <TableRow key={model.docId}>
                     <TableCell className="font-medium">{model.manufacturer}</TableCell>
-                    <TableCell>{model.name}</TableCell>
+                    <TableCell>{model.model}</TableCell>
                     {activeTab === 'Aeronave' ? (
                         <>
-                            <TableCell className="text-center">{model.numEngines || 0}</TableCell>
-                            <TableCell className="text-center">{model.numPropellers || 0}</TableCell>
-                            <TableCell className="text-center">{model.numAPUs || 0}</TableCell>
+                            <TableCell className="text-center">{model.engineCount || 0}</TableCell>
+                            <TableCell className="text-center">{model.propellerCount || 0}</TableCell>
+                            <TableCell className="text-center">{model.apuCount || 0}</TableCell>
                         </>
                     ) : (
                         <TableCell>{model.partNumber || '-'}</TableCell>
@@ -193,7 +193,7 @@ export default function ModelosTecnicaPage() {
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                            <AlertDialogDescription>Deseja excluir o modelo {model.name}?</AlertDialogDescription>
+                            <AlertDialogDescription>Deseja excluir o modelo {model.model}?</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -218,32 +218,32 @@ export default function ModelosTecnicaPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">
               <Label htmlFor="manufacturer">Fabricante</Label>
-              <Input id="manufacturer" value={formData.manufacturer} onChange={(e) => setFormData(p => ({...p, manufacturer: e.target.value}))} placeholder="Ex: Beechcraft, Pratt & Whitney" />
+              <Input id="manufacturer" value={formData.manufacturer} onChange={(e) => setFormData(p => ({...p, manufacturer: e.target.value.toUpperCase()}))} placeholder="Ex: CESSNA, BEECHCRAFT" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="name">Modelo</Label>
-              <Input id="name" value={formData.name} onChange={(e) => setFormData(p => ({...p, name: e.target.value}))} placeholder="Ex: King Air B200, PT6A-42" />
+              <Label htmlFor="model">Modelo</Label>
+              <Input id="model" value={formData.model} onChange={(e) => setFormData(p => ({...p, model: e.target.value.toUpperCase()}))} placeholder="Ex: 525, B200" />
             </div>
             
             {activeTab === 'Aeronave' ? (
                 <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-1.5">
-                        <Label htmlFor="numEngines">Nº de Motores</Label>
-                        <Input id="numEngines" type="number" value={formData.numEngines} onChange={(e) => setFormData(p => ({...p, numEngines: parseInt(e.target.value) || 0}))} />
+                        <Label htmlFor="engineCount">Nº de Motores</Label>
+                        <Input id="engineCount" type="number" value={formData.engineCount} onChange={(e) => setFormData(p => ({...p, engineCount: parseInt(e.target.value) || 0}))} />
                     </div>
                     <div className="space-y-1.5">
-                        <Label htmlFor="numPropellers">Nº de Hélices</Label>
-                        <Input id="numPropellers" type="number" value={formData.numPropellers} onChange={(e) => setFormData(p => ({...p, numPropellers: parseInt(e.target.value) || 0}))} />
+                        <Label htmlFor="propellerCount">Nº de Hélices</Label>
+                        <Input id="propellerCount" type="number" value={formData.propellerCount} onChange={(e) => setFormData(p => ({...p, propellerCount: parseInt(e.target.value) || 0}))} />
                     </div>
                     <div className="space-y-1.5">
-                        <Label htmlFor="numAPUs">Nº de APU</Label>
-                        <Input id="numAPUs" type="number" value={formData.numAPUs} onChange={(e) => setFormData(p => ({...p, numAPUs: parseInt(e.target.value) || 0}))} />
+                        <Label htmlFor="apuCount">Nº de APU</Label>
+                        <Input id="apuCount" type="number" value={formData.apuCount} onChange={(e) => setFormData(p => ({...p, apuCount: parseInt(e.target.value) || 0}))} />
                     </div>
                 </div>
             ) : (
                 <div className="space-y-1.5">
                     <Label htmlFor="partNumber">Part Number (PN)</Label>
-                    <Input id="partNumber" value={formData.partNumber} onChange={(e) => setFormData(p => ({...p, partNumber: e.target.value}))} placeholder="Ex: 3034500-01" />
+                    <Input id="partNumber" value={formData.partNumber} onChange={(e) => setFormData(p => ({...p, partNumber: e.target.value.toUpperCase()}))} placeholder="Ex: 3034500-01" />
                 </div>
             )}
           </div>
