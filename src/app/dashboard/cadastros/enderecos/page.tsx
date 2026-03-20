@@ -421,8 +421,14 @@ const CadastroEnderecosPage = () => {
         printWindow.document.write(`<style>${styles}</style>`);
         printWindow.document.write('</head><body>');
         
+        const baseUrl = window.location.origin;
+        const targetPath = '/dashboard/enderecos/consulta';
+
         let contentToPrint = '';
         addressesToPrint.forEach(address => {
+            const qrData = `${baseUrl}${targetPath}?code=${encodeURIComponent(address.codigoCompleto)}`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+
             if (printSize === '100mm x 60mm') {
                 contentToPrint += `
                     <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding-top: 8mm; box-sizing: border-box; text-align: center;">
@@ -430,16 +436,16 @@ const CadastroEnderecosPage = () => {
                         <p style="font-size: 32px; line-height: 1.1; font-weight: 900; color: rgb(0, 0, 0); margin-top: 22px; margin-bottom: 12px;">
                             ${address.codigoCompleto}
                         </p>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 60px; height: 60px; margin-top: 20px;" />
+                        <img src="${qrUrl}" alt="QR Code" style="width: 60px; height: 60px; margin-top: 20px;" />
                     </div>`;
             } else {
                  contentToPrint += `
                     <div style="width: 120mm; height: 23mm; display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding: 0 2mm; gap: 8mm; box-sizing: border-box; break-inside: avoid;">
                         <img src="/logo.png" alt="Logo" style="height: 18mm; width: auto; object-fit: contain; align-self: center;" />
                         <p style="font-size: 24px; font-weight: 900; text-align: center; color: rgb(0, 0, 0);">
-                            ${address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
+                            ${address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
                         </p>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}" alt="QR Code" style="width: 20mm; height: 20mm;" />
+                        <img src="${qrUrl}" alt="QR Code" style="width: 20mm; height: 20mm;" />
                     </div>`;
             }
         });
@@ -512,7 +518,7 @@ const CadastroEnderecosPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
              <div>
                 <Label>Nível 3: Rua / Corredor</Label>
-                <Input value={formState.rua} onChange={(e) => setFormState(p => ({...p, rua: e.target.value.replace(/\\D/g, '')}))} placeholder="Ex: 01" maxLength={2}/>
+                <Input value={formState.rua} onChange={(e) => setFormState(p => ({...p, rua: e.target.value.replace(/\D/g, '')}))} placeholder="Ex: 01" maxLength={2}/>
             </div>
             <div>
                 <Label>Nível 4: Móvel / Estante</Label>
@@ -520,7 +526,7 @@ const CadastroEnderecosPage = () => {
             </div>
             <div>
                 <Label>Nível 5: Nível / Vão</Label>
-                <Input value={formState.nivel} onChange={(e) => setFormState(p => ({...p, nivel: e.target.value.replace(/\\D/g, '')}))} placeholder="Ex: 03" maxLength={2}/>
+                <Input value={formState.nivel} onChange={(e) => setFormState(p => ({...p, nivel: e.target.value.replace(/\D/g, '')}))} placeholder="Ex: 03" maxLength={2}/>
             </div>
              <div className="flex items-center space-x-2 h-10">
                 <Checkbox id="useDetalhe" checked={useDetalhe} onCheckedChange={(checked) => setUseDetalhe(!!checked)} disabled={!formState.setor} />
@@ -670,25 +676,30 @@ const CadastroEnderecosPage = () => {
                     </div>
                 </DialogHeader>
                 <div ref={printableAreaRef} className="flex flex-col items-center gap-4 max-h-96 overflow-y-auto p-4 bg-muted/50 rounded-md">
-                    {addressesToPrint.map(address =>
-                    printSize === '100mm x 60mm' ? (
-                        <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 box-border text-center border">
-                           <img src="/logo.png" alt="Logo" className="h-3 object-contain mt-2 mb-2" />
-                           <p className="leading-tight font-black text-black mt-5 mb-3" style={{ fontSize: '32px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
-                               {address.codigoCompleto}
-                           </p>
-                           <img src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[60px] h-[60px] mt-5" />
-                       </div>
-                    ) : (
-                        <div key={address.docId} className="bg-white w-[452px] h-[87px] grid grid-cols-[auto_1fr_auto] gap-8 items-center p-2 border">
-                            <img src="/logo.png" alt="Logo" className="h-[40px] w-auto object-contain" />
-                            <p className="text-2xl font-black text-black text-center" style={{ color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
-                                {address.codigoCompleto.replace(/^[A-Z]\\.\\d{2}\\.R\\d{2}\\./, '')}
-                            </p>
-                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(address.codigoCompleto)}`} alt={`QR Code for ${address.codigoCompleto}`} className="w-[80px] h-[80px]" />
-                        </div>
-                    )
-                    )}
+                    {addressesToPrint.map(address => {
+                        const baseUrl = window.location.origin;
+                        const targetPath = '/dashboard/enderecos/consulta';
+                        const qrData = `${baseUrl}${targetPath}?code=${encodeURIComponent(address.codigoCompleto)}`;
+                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+
+                        return printSize === '100mm x 60mm' ? (
+                            <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 box-border text-center border">
+                                <img src="/logo.png" alt="Logo" className="h-3 object-contain mt-2 mb-2" />
+                                <p className="leading-tight font-black text-black mt-5 mb-3" style={{ fontSize: '32px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
+                                    ${address.codigoCompleto}
+                                </p>
+                                <img src="${qrUrl}" alt="QR Code" className="w-[60px] h-[60px] mt-5" />
+                            </div>
+                        ) : (
+                            <div key={address.docId} className="bg-white w-[452px] h-[87px] grid grid-cols-[auto_1fr_auto] gap-8 items-center p-2 border">
+                                <img src="/logo.png" alt="Logo" className="h-[40px] w-auto object-contain" />
+                                <p className="text-2xl font-black text-black text-center" style={{ color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
+                                    {address.codigoCompleto.replace(/^[A-Z]\.\d{2}\.R\d{2}\./, '')}
+                                </p>
+                                <img src="${qrUrl}" alt="QR Code" className="w-[80px] h-[80px]" />
+                            </div>
+                        )
+                    })}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={closePrintDialog}>Cancelar</Button>
@@ -705,4 +716,3 @@ const CadastroEnderecosPage = () => {
 }
 
 export default CadastroEnderecosPage;
-    

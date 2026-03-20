@@ -1,5 +1,3 @@
-
-
 export const permissionActions = ['view', 'create', 'update', 'delete'] as const;
 export type PermissionAction = typeof permissionActions[number];
 
@@ -186,6 +184,13 @@ export const permissionStructure = [
         actions: ['view', 'update', 'create'],
     },
     {
+        id: 'enderecos_consulta',
+        label: 'Consulta de Endereço',
+        path: '/dashboard/enderecos/consulta',
+        isModule: false,
+        actions: ['view'],
+    },
+    {
         id: 'configurador',
         label: 'Configurador',
         path: '/dashboard/configurador',
@@ -215,6 +220,7 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
     if (path.startsWith('/dashboard/overview')) return 'dashboard_overview_view';
     if (path === '/dashboard/settings') return null; // All users can see their own settings
     if (path === '/dashboard/financeiro/despesas-individuais') return null;
+    if (path === '/dashboard/enderecos/consulta') return null; // Permite consulta de QR code de endereço para todos logados
 
     // Find the most specific submodule path match first
     for (const module of permissionStructure) {
