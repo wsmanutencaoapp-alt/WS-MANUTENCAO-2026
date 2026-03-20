@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useCollection, useTechFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc, orderBy, where } from 'firebase/firestore';
 import type { MaintenanceTask, AircraftModel, EngineModel, APUModel, PropellerModel, MaintenanceTaskItem } from '@/lib/types';
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Trash2, Search, Filter, Wrench, Package, Droplets, ArrowRight, Download, FileSpreadsheet, PlayCircle, AlertCircle } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Search, Filter, Wrench, Package, Droplets, ArrowRight, Download, FileSpreadsheet, PlayCircle, AlertCircle, Bug } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -55,7 +55,7 @@ export default function TarefasTecnicaPage() {
     consumiveis: [],
   });
 
-  // Queries para Modelos (Instância Técnica)
+  // --- QUERIES PARA MODELOS ---
   const aircraftQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'aircraftModels')) : null), [techFirestore]);
   const engineQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'engineModels')) : null), [techFirestore]);
   const apuQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'apuModels')) : null), [techFirestore]);
@@ -78,31 +78,41 @@ export default function TarefasTecnicaPage() {
 
   const selectedModel = useMemo(() => availableModels.find(m => m.docId === selectedModelId), [availableModels, selectedModelId]);
 
-  // Query para Tarefas baseada no modelo selecionado (Instância Técnica)
-  // Nota: Removido orderBy para evitar erro de permissão por falta de índice
+  // --- QUERY PARA TAREFAS (Coleção: maintenanceTasks) ---
   const tasksQuery = useMemoFirebase(() => {
     if (!techFirestore || !selectedModelId) return null;
-    return query(collection(techFirestore, 'maintenance_tasks'), where('modelId', '==', selectedModelId));
+    // Usando o nome exato da coleção informado pelo usuário: maintenanceTasks
+    return query(collection(techFirestore, 'maintenanceTasks'), where('modelId', '==', selectedModelId));
   }, [techFirestore, selectedModelId]);
 
   const { data: tasks, isLoading: isLoadingTasks, error: tasksError } = useCollection<WithDocId<MaintenanceTask>>(tasksQuery, {
-    queryKey: ['tech_tasks_v2', selectedModelId],
+    queryKey: ['tech_tasks_live', selectedModelId],
     enabled: !!selectedModelId && !!techFirestore
   });
 
+  // --- LOGS DE DEBUG ---
+  useEffect(() => {
+    console.log("--- DEBUG TAREFAS ---");
+    console.log("Instância TechFirestore:", !!techFirestore);
+    console.log("Tipo Selecionado:", activeModelType);
+    console.log("Model ID Selecionado:", selectedModelId);
+    console.log("Status Carregamento:", isLoadingTasks);
+    console.log("Erro capturado:", tasksError?.message || "Nenhum");
+    console.log("Total de tarefas recebidas:", tasks?.length || 0);
+    if (tasks && tasks.length > 0) {
+        console.log("Exemplo da primeira tarefa:", tasks[0]);
+    }
+  }, [techFirestore, activeModelType, selectedModelId, isLoadingTasks, tasksError, tasks]);
+
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    
-    // Ordenação manual client-side para evitar necessidade de índices complexos
     let sorted = [...tasks].sort((a, b) => Number(a.code) - Number(b.code));
-
     if (!searchTerm) return sorted;
     const lower = searchTerm.toLowerCase();
     return sorted.filter(t => 
       String(t.code).toLowerCase().includes(lower) || 
       t.tarefa.toLowerCase().includes(lower) ||
       t.procTecn.toLowerCase().includes(lower) ||
-      t.refOrigem.toLowerCase().includes(lower) ||
       t.ata.toLowerCase().includes(lower)
     );
   }, [tasks, searchTerm]);
@@ -130,10 +140,7 @@ export default function TarefasTecnicaPage() {
 
   const addItem = (type: 'pecas' | 'ferramentasEspeciais' | 'consumiveis') => {
     const newItem: MaintenanceTaskItem = { nome: '', partNumber: '', quantidade: 1, unidade: 'UN' };
-    setFormData(prev => ({
-        ...prev,
-        [type]: [...(prev[type] || []), newItem]
-    }));
+    setFormData(prev => ({ ...prev, [type]: [...(prev[type] || []), newItem] }));
   };
 
   const updateItem = (type: 'pecas' | 'ferramentasEspeciais' | 'consumiveis', index: number, field: keyof MaintenanceTaskItem, value: any) => {
@@ -145,19 +152,11 @@ export default function TarefasTecnicaPage() {
   };
 
   const removeItem = (type: 'pecas' | 'ferramentasEspeciais' | 'consumiveis', index: number) => {
-    setFormData(prev => ({
-        ...prev,
-        [type]: (prev[type] || []).filter((_, i) => i !== index)
-    }));
+    setFormData(prev => ({ ...prev, [type]: (prev[type] || []).filter((_, i) => i !== index) }));
   };
 
   const handleSave = async () => {
     if (!techFirestore || !selectedModelId) return;
-    if (!formData.tarefa) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'A Descrição da Tarefa é obrigatória.' });
-      return;
-    }
-
     setIsSaving(true);
     const dataToSave: Omit<MaintenanceTask, 'id'> = {
       ...formData as MaintenanceTask,
@@ -165,20 +164,19 @@ export default function TarefasTecnicaPage() {
       modelId: selectedModelId,
       modelType: activeModelType,
       modelName: selectedModel ? `${(selectedModel as any).manufacturer} ${(selectedModel as any).model}` : 'N/A',
-      hhPlanejamento: Number(formData.hhPlanejamento) || 0,
     };
 
     try {
       if (editingTask) {
-        await updateDoc(doc(techFirestore, 'maintenance_tasks', editingTask.docId), dataToSave as any);
+        await updateDoc(doc(techFirestore, 'maintenanceTasks', editingTask.docId), dataToSave as any);
         toast({ title: 'Sucesso', description: 'Tarefa técnica atualizada.' });
       } else {
-        await addDoc(collection(techFirestore, 'maintenance_tasks'), dataToSave);
-        toast({ title: 'Sucesso', description: 'Tarefa cadastrada no catálogo técnico.' });
+        await addDoc(collection(techFirestore, 'maintenanceTasks'), dataToSave);
+        toast({ title: 'Sucesso', description: 'Tarefa cadastrada.' });
       }
       setIsDialogOpen(false);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a tarefa técnica no banco operation-manager.' });
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a tarefa técnica.' });
     } finally {
       setIsSaving(false);
     }
@@ -188,7 +186,7 @@ export default function TarefasTecnicaPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold">Banco de Dados de Tarefas de Manutenção</h1>
-        <p className="text-muted-foreground text-sm">Selecione um tipo de item e um modelo para visualizar ou adicionar tarefas de manutenção.</p>
+        <p className="text-muted-foreground text-sm">Gerencie o plano de manutenção na instância <strong>operation-manager</strong>.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -220,9 +218,9 @@ export default function TarefasTecnicaPage() {
       {tasksError && (
           <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Erro de Permissão</AlertTitle>
+              <AlertTitle>Erro na Consulta</AlertTitle>
               <AlertDescription>
-                  O acesso às tarefas no banco técnico foi negado. Verifique as regras de segurança do operation-manager.
+                  {tasksError.message}. Verifique se a coleção "maintenanceTasks" existe no banco operation-manager.
               </AlertDescription>
           </Alert>
       )}
@@ -232,19 +230,18 @@ export default function TarefasTecnicaPage() {
             <CardHeader className="border-b bg-muted/20">
                 <div className="flex justify-between items-center">
                     <div>
-                        <CardTitle>Tarefas Cadastradas</CardTitle>
-                        <CardDescription>Total de {isLoadingTasks ? '...' : tasks?.length || 0} tarefas encontradas para este modelo.</CardDescription>
+                        <CardTitle>Tarefas: {(selectedModel as any)?.model}</CardTitle>
+                        <CardDescription>Total de {isLoadingTasks ? '...' : tasks?.length || 0} tarefas encontradas.</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenDialog()}><PlusCircle className="mr-1 h-3 w-3"/> Adicionar Manualmente</Button>
-                        <Button variant="outline" size="sm"><FileSpreadsheet className="mr-1 h-3 w-3"/> Importar Planilha</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenDialog()}><PlusCircle className="mr-1 h-3 w-3"/> Adicionar</Button>
                     </div>
                 </div>
                 <div className="flex gap-4 pt-4">
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Buscar por tarefa, código, ATA, referência, etc..."
+                            placeholder="Buscar por tarefa, código, ATA..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-8"
@@ -253,15 +250,22 @@ export default function TarefasTecnicaPage() {
                 </div>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
+                {/* DEBUG VISUAL EM CASO DE ERRO OU VAZIO */}
+                {!isLoadingTasks && tasks?.length === 0 && (
+                    <div className="p-8 text-center bg-yellow-50 dark:bg-yellow-900/10 border-y border-yellow-200">
+                        <Bug className="mx-auto h-8 w-8 text-yellow-600 mb-2" />
+                        <p className="font-medium text-yellow-800 dark:text-yellow-400">Nenhuma tarefa retornada para o ID: {selectedModelId}</p>
+                        <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">Verifique no Firestore se a coleção chama-se "maintenanceTasks" e se o campo "modelId" está correto.</p>
+                    </div>
+                )}
+
                 <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead className="w-24">Code</TableHead>
                             <TableHead>Tarefa</TableHead>
-                            <TableHead>Ref. Origem</TableHead>
                             <TableHead className="text-center">ATA</TableHead>
                             <TableHead>Proc. Técn.</TableHead>
-                            <TableHead className="text-center">HH Planej.</TableHead>
                             <TableHead className="text-center">FH</TableHead>
                             <TableHead className="text-center">FC</TableHead>
                             <TableHead className="text-center">MO</TableHead>
@@ -269,8 +273,7 @@ export default function TarefasTecnicaPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoadingTasks && <TableRow><TableCell colSpan={10} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
-                        {!isLoadingTasks && filteredTasks.length === 0 && !tasksError && <TableRow><TableCell colSpan={10} className="text-center h-24 text-muted-foreground">Nenhuma tarefa encontrada para este modelo.</TableCell></TableRow>}
+                        {isLoadingTasks && <TableRow><TableCell colSpan={8} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
                         {!isLoadingTasks && filteredTasks.map(task => (
                             <TableRow key={task.docId} className="hover:bg-muted/50 transition-colors">
                                 <TableCell className="font-mono text-xs font-semibold">{task.code}</TableCell>
@@ -280,10 +283,8 @@ export default function TarefasTecnicaPage() {
                                         <span className="text-[10px] text-muted-foreground uppercase">{task.inspecao}</span>
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-xs text-muted-foreground">{task.refOrigem}</TableCell>
                                 <TableCell className="text-center font-bold text-blue-600">{task.ata}</TableCell>
                                 <TableCell className="text-xs font-mono">{task.procTecn}</TableCell>
-                                <TableCell className="text-center">{task.hhPlanejamento || 0}</TableCell>
                                 <TableCell className="text-center font-mono text-xs">{task.frequenciaHoras || '-'}</TableCell>
                                 <TableCell className="text-center font-mono text-xs">{task.frequenciaCiclos || '-'}</TableCell>
                                 <TableCell className="text-center font-mono text-xs text-orange-600 font-bold">{task.frequenciaCalendario || '-'}</TableCell>
@@ -294,8 +295,8 @@ export default function TarefasTecnicaPage() {
                                             <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
-                                            <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle><AlertDialogDescription>Deseja excluir a tarefa {task.code} do catálogo técnico?</AlertDialogDescription></AlertDialogHeader>
-                                            <AlertDialogFooter><AlertDialogCancel>Voltar</AlertDialogCancel><AlertDialogAction onClick={() => deleteDoc(doc(techFirestore!, 'maintenance_tasks', task.docId))}>Excluir</AlertDialogAction></AlertDialogFooter>
+                                            <AlertDialogHeader><AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle><AlertDialogDescription>Deseja excluir a tarefa {task.code}?</AlertDialogDescription></AlertDialogHeader>
+                                            <AlertDialogFooter><AlertDialogCancel>Voltar</AlertDialogCancel><AlertDialogAction onClick={() => deleteDoc(doc(techFirestore!, 'maintenanceTasks', task.docId))}>Excluir</AlertDialogAction></AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>
                                 </TableCell>
@@ -316,14 +317,13 @@ export default function TarefasTecnicaPage() {
         <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>{editingTask ? 'Editar' : 'Adicionar Nova'} Tarefa de Manutenção</DialogTitle>
-            <DialogDescription>Preencha os campos técnicos da tarefa.</DialogDescription>
           </DialogHeader>
           
           <Tabs defaultValue="geral" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="geral">Informações da Tarefa</TabsTrigger>
-                <TabsTrigger value="intervalos">Intervalos de Frequência</TabsTrigger>
-                <TabsTrigger value="pecas">Peças e Ferramentas</TabsTrigger>
+                <TabsTrigger value="geral">Geral</TabsTrigger>
+                <TabsTrigger value="intervalos">Intervalos</TabsTrigger>
+                <TabsTrigger value="pecas">Peças/Ferr.</TabsTrigger>
                 <TabsTrigger value="consumiveis">Consumíveis</TabsTrigger>
             </TabsList>
 
@@ -334,85 +334,53 @@ export default function TarefasTecnicaPage() {
                         <div className="space-y-1.5"><Label>Ref. Origem</Label><Input value={formData.refOrigem} onChange={e => setFormData(p => ({...p, refOrigem: e.target.value}))} /></div>
                         <div className="space-y-1.5"><Label>ATA</Label><Input value={formData.ata} onChange={e => setFormData(p => ({...p, ata: e.target.value}))} /></div>
                         <div className="space-y-1.5"><Label>Proc. Técn</Label><Input value={formData.procTecn} onChange={e => setFormData(p => ({...p, procTecn: e.target.value}))} /></div>
-                        <div className="space-y-1.5 md:col-span-2"><Label>Tarefa</Label><Input value={formData.tarefa} onChange={e => setFormData(p => ({...p, tarefa: e.target.value}))} placeholder="Descreva a tarefa de manutenção..."/></div>
+                        <div className="space-y-1.5 md:col-span-2"><Label>Tarefa</Label><Input value={formData.tarefa} onChange={e => setFormData(p => ({...p, tarefa: e.target.value}))} /></div>
                         <div className="space-y-1.5"><Label>Inspeção</Label><Input value={formData.inspecao} onChange={e => setFormData(p => ({...p, inspecao: e.target.value}))} /></div>
-                        <div className="space-y-1.5"><Label>Homem Hora (Planejamento)</Label><Input type="number" value={formData.hhPlanejamento} onChange={e => setFormData(p => ({...p, hhPlanejamento: Number(e.target.value)}))} /></div>
+                        <div className="space-y-1.5"><Label>HH (Planejamento)</Label><Input type="number" value={formData.hhPlanejamento} onChange={e => setFormData(p => ({...p, hhPlanejamento: Number(e.target.value)}))} /></div>
                     </div>
                 </TabsContent>
 
                 <TabsContent value="intervalos" className="space-y-6 m-0">
-                    <div className="space-y-4">
-                        <h3 className="font-semibold text-sm flex items-center gap-2"><ArrowRight className="h-4 w-4"/> Intervalo Recorrente</h3>
-                        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/20">
-                            <div className="space-y-1.5"><Label>FH (Horas)</Label><Input value={formData.frequenciaHoras} onChange={e => setFormData(p => ({...p, frequenciaHoras: e.target.value}))} /></div>
-                            <div className="space-y-1.5"><Label>FC (Ciclos)</Label><Input value={formData.frequenciaCiclos} onChange={e => setFormData(p => ({...p, frequenciaCiclos: e.target.value}))} /></div>
-                            <div className="space-y-1.5"><Label>MO (Meses)</Label><Input value={formData.frequenciaCalendario} onChange={e => setFormData(p => ({...p, frequenciaCalendario: e.target.value}))} /></div>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <h3 className="font-semibold text-sm flex items-center gap-2 text-muted-foreground"><ArrowRight className="h-4 w-4"/> Intervalo da Primeira Inspeção (Opcional)</h3>
-                        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/10 border-dashed">
-                            <div className="space-y-1.5"><Label>FH (Horas)</Label><Input value={formData.frequenciaInicialHoras} onChange={e => setFormData(p => ({...p, frequenciaInicialHoras: e.target.value}))} /></div>
-                            <div className="space-y-1.5"><Label>FC (Ciclos)</Label><Input value={formData.frequenciaInicialCiclos} onChange={e => setFormData(p => ({...p, frequenciaInicialCiclos: e.target.value}))} /></div>
-                            <div className="space-y-1.5"><Label>MO (Meses)</Label><Input value={formData.frequenciaInicialCalendario} onChange={e => setFormData(p => ({...p, frequenciaInicialCalendario: e.target.value}))} /></div>
-                        </div>
+                    <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/20">
+                        <div className="space-y-1.5"><Label>FH (Horas)</Label><Input value={formData.frequenciaHoras} onChange={e => setFormData(p => ({...p, frequenciaHoras: e.target.value}))} /></div>
+                        <div className="space-y-1.5"><Label>FC (Ciclos)</Label><Input value={formData.frequenciaCiclos} onChange={e => setFormData(p => ({...p, frequenciaCiclos: e.target.value}))} /></div>
+                        <div className="space-y-1.5"><Label>MO (Meses)</Label><Input value={formData.frequenciaCalendario} onChange={e => setFormData(p => ({...p, frequenciaCalendario: e.target.value}))} /></div>
                     </div>
                 </TabsContent>
 
                 <TabsContent value="pecas" className="space-y-6 m-0">
                     <div className="space-y-4">
-                        <div className="flex justify-between items-center"><h3 className="font-semibold text-sm flex items-center gap-2"><Package className="h-4 w-4"/> Peças</h3><Button variant="outline" size="sm" onClick={() => addItem('pecas')}><PlusCircle className="mr-1 h-3 w-3"/> Adicionar Peça</Button></div>
-                        <div className="space-y-2">
-                            {formData.pecas?.map((item, idx) => (
-                                <div key={idx} className="grid grid-cols-12 gap-2 items-end border p-2 rounded-md">
-                                    <div className="col-span-5"><Label className="text-[10px]">Nome</Label><Input className="h-8 text-xs" value={item.nome} onChange={e => updateItem('pecas', idx, 'nome', e.target.value)}/></div>
-                                    <div className="col-span-3"><Label className="text-[10px]">P/N</Label><Input className="h-8 text-xs" value={item.partNumber} onChange={e => updateItem('pecas', idx, 'partNumber', e.target.value)}/></div>
-                                    <div className="col-span-2"><Label className="text-[10px]">Qtd</Label><Input className="h-8 text-xs" type="number" value={item.quantidade} onChange={e => updateItem('pecas', idx, 'quantidade', Number(e.target.value))}/></div>
-                                    <div className="col-span-1"><Label className="text-[10px]">U.M</Label><Input className="h-8 text-xs" value={item.unidade} onChange={e => updateItem('pecas', idx, 'unidade', e.target.value)}/></div>
-                                    <div className="col-span-1 text-right"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem('pecas', idx)}><Trash2 className="h-4 w-4 text-destructive"/></Button></div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <Separator/>
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center"><h3 className="font-semibold text-sm flex items-center gap-2"><Wrench className="h-4 w-4"/> Ferramentas Especiais</h3><Button variant="outline" size="sm" onClick={() => addItem('ferramentasEspeciais')}><PlusCircle className="mr-1 h-3 w-3"/> Adicionar Ferramenta</Button></div>
-                        <div className="space-y-2">
-                            {formData.ferramentasEspeciais?.map((item, idx) => (
-                                <div key={idx} className="grid grid-cols-12 gap-2 items-end border p-2 rounded-md">
-                                    <div className="col-span-5"><Label className="text-[10px]">Nome</Label><Input className="h-8 text-xs" value={item.nome} onChange={e => updateItem('ferramentasEspeciais', idx, 'nome', e.target.value)}/></div>
-                                    <div className="col-span-3"><Label className="text-[10px]">P/N</Label><Input className="h-8 text-xs" value={item.partNumber} onChange={e => updateItem('ferramentasEspeciais', idx, 'partNumber', e.target.value)}/></div>
-                                    <div className="col-span-2"><Label className="text-[10px]">Qtd</Label><Input className="h-8 text-xs" type="number" value={item.quantidade} onChange={e => updateItem('ferramentasEspeciais', idx, 'quantidade', Number(e.target.value))}/></div>
-                                    <div className="col-span-1"><Label className="text-[10px]">U.M</Label><Input className="h-8 text-xs" value={item.unidade} onChange={e => updateItem('ferramentasEspeciais', idx, 'unidade', e.target.value)}/></div>
-                                    <div className="col-span-1 text-right"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem('ferramentasEspeciais', idx)}><Trash2 className="h-4 w-4 text-destructive"/></Button></div>
-                                </div>
-                            ))}
-                        </div>
+                        <div className="flex justify-between items-center"><h3 className="font-semibold text-sm">Peças</h3><Button variant="outline" size="sm" onClick={() => addItem('pecas')}>+ Adicionar</Button></div>
+                        {formData.pecas?.map((item, idx) => (
+                            <div key={idx} className="grid grid-cols-12 gap-2 items-end border p-2 rounded-md">
+                                <div className="col-span-5"><Input className="h-8 text-xs" value={item.nome} onChange={e => updateItem('pecas', idx, 'nome', e.target.value)}/></div>
+                                <div className="col-span-3"><Input className="h-8 text-xs" value={item.partNumber} onChange={e => updateItem('pecas', idx, 'partNumber', e.target.value)}/></div>
+                                <div className="col-span-2"><Input className="h-8 text-xs" type="number" value={item.quantidade} onChange={e => updateItem('pecas', idx, 'quantidade', Number(e.target.value))}/></div>
+                                <div className="col-span-1 text-right"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem('pecas', idx)}><Trash2 className="h-4 w-4 text-destructive"/></Button></div>
+                            </div>
+                        ))}
                     </div>
                 </TabsContent>
 
                 <TabsContent value="consumiveis" className="space-y-4 m-0">
-                    <div className="flex justify-between items-center"><h3 className="font-semibold text-sm flex items-center gap-2"><Droplets className="h-4 w-4"/> Consumíveis</h3><Button variant="outline" size="sm" onClick={() => addItem('consumiveis')}><PlusCircle className="mr-1 h-3 w-3"/> Adicionar Consumível</Button></div>
-                    <div className="space-y-2">
-                        {formData.consumiveis?.map((item, idx) => (
-                            <div key={idx} className="grid grid-cols-12 gap-2 items-end border p-2 rounded-md">
-                                <div className="col-span-5"><Label className="text-[10px]">Nome</Label><Input className="h-8 text-xs" value={item.nome} onChange={e => updateItem('consumiveis', idx, 'nome', e.target.value)}/></div>
-                                <div className="col-span-3"><Label className="text-[10px]">P/N</Label><Input className="h-8 text-xs" value={item.partNumber} onChange={e => updateItem('consumiveis', idx, 'partNumber', e.target.value)}/></div>
-                                <div className="col-span-2"><Label className="text-[10px]">Qtd</Label><Input className="h-8 text-xs" type="number" value={item.quantidade} onChange={e => updateItem('consumiveis', idx, 'quantidade', Number(e.target.value))}/></div>
-                                <div className="col-span-1"><Label className="text-[10px]">U.M</Label><Input className="h-8 text-xs" value={item.unidade} onChange={e => updateItem('consumiveis', idx, 'unidade', e.target.value)}/></div>
-                                <div className="col-span-1 text-right"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem('consumiveis', idx)}><Trash2 className="h-4 w-4 text-destructive"/></Button></div>
-                            </div>
-                        ))}
-                    </div>
+                    <div className="flex justify-between items-center"><h3 className="font-semibold text-sm">Consumíveis</h3><Button variant="outline" size="sm" onClick={() => addItem('consumiveis')}>+ Adicionar</Button></div>
+                    {formData.consumiveis?.map((item, idx) => (
+                        <div key={idx} className="grid grid-cols-12 gap-2 items-end border p-2 rounded-md">
+                            <div className="col-span-5"><Input className="h-8 text-xs" value={item.nome} onChange={e => updateItem('consumiveis', idx, 'nome', e.target.value)}/></div>
+                            <div className="col-span-3"><Input className="h-8 text-xs" value={item.partNumber} onChange={e => updateItem('consumiveis', idx, 'partNumber', e.target.value)}/></div>
+                            <div className="col-span-2"><Input className="h-8 text-xs" type="number" value={item.quantidade} onChange={e => updateItem('consumiveis', idx, 'quantidade', Number(e.target.value))}/></div>
+                            <div className="col-span-1 text-right"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem('consumiveis', idx)}><Trash2 className="h-4 w-4 text-destructive"/></Button></div>
+                        </div>
+                    ))}
                 </TabsContent>
             </ScrollArea>
           </Tabs>
 
           <DialogFooter className="border-t pt-4">
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingTask ? 'Salvar Alterações' : 'Cadastrar Tarefa'}
+              {editingTask ? 'Salvar' : 'Cadastrar'}
             </Button>
           </DialogFooter>
         </DialogContent>
