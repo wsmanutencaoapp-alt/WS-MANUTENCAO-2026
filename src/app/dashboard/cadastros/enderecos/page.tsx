@@ -366,7 +366,7 @@ const CadastroEnderecosPage = () => {
 
     } catch (err) {
       console.error("Erro ao salvar endereço:", err);
-      toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar o endereço.' });
+      toast({ variant: 'destructive', title: 'Erro na Operação', description: 'Não foi possível salvar the endereço.' });
     } finally {
       setIsSaving(false);
     }
@@ -431,13 +431,13 @@ const CadastroEnderecosPage = () => {
 
             if (printSize === '100mm x 60mm') {
                 contentToPrint += `
-                    <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 2mm 8mm 8mm 8mm; box-sizing: border-box; text-align: center; page-break-after: always;">
-                        <img src="/logo.png" alt="Logo" style="height: 10mm; object-fit: contain; margin-bottom: 4mm;" />
-                        <p style="font-size: 32px; line-height: 1.1; font-weight: 900; color: rgb(0, 0, 0); margin: 0; padding: 0;">
+                    <div style="width: 100mm; height: 60mm; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 2mm 8mm 4mm 8mm; box-sizing: border-box; text-align: center; page-break-after: always;">
+                        <img src="/logo.png" alt="Logo" style="height: 10mm; object-fit: contain; margin-bottom: 2mm;" />
+                        <p style="font-size: 28px; line-height: 1.1; font-weight: 900; color: rgb(0, 0, 0); margin: 0; padding: 0;">
                             ${address.codigoCompleto}
                         </p>
-                        <div style="flex: 1; display: flex; align-items: flex-end; justify-content: center; margin-top: 4mm;">
-                            <img src="${qrUrl}" alt="QR Code" style="width: 22mm; height: 22mm;" />
+                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; margin-top: 2mm;">
+                            <img src="${qrUrl}" alt="QR Code" style="width: 24mm; height: 24mm;" />
                         </div>
                     </div>`;
             } else {
@@ -687,13 +687,13 @@ const CadastroEnderecosPage = () => {
                         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
 
                         return printSize === '100mm x 60mm' ? (
-                            <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 box-border text-center border">
-                                <img src="/logo.png" alt="Logo" className="h-10 object-contain mb-4" />
-                                <p className="leading-tight font-black text-black" style={{ fontSize: '32px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
+                            <div key={address.docId} className="bg-white w-[377px] h-[226px] flex flex-col justify-start items-center p-4 pt-2 pb-2 box-border text-center border">
+                                <img src="/logo.png" alt="Logo" className="h-10 object-contain mb-2" />
+                                <p className="leading-tight font-black text-black" style={{ fontSize: '28px', color: 'rgb(0, 0, 0)', fontWeight: 900 }}>
                                     {address.codigoCompleto}
                                 </p>
-                                <div className="flex-1 flex items-end justify-center mt-4">
-                                    <img src={qrUrl} alt="QR Code" className="w-[83px] h-[83px]" />
+                                <div className="flex-1 flex items-center justify-center mt-2">
+                                    <img src={qrUrl} alt="QR Code" className="w-[90px] h-[90px]" />
                                 </div>
                             </div>
                         ) : (
