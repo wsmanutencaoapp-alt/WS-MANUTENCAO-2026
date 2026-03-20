@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from 'react';
 import {
   collection,
   query,
@@ -20,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare, PackagePlus, Box, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Repeat2, MoreHorizontal, ZoomIn, Search, PlusSquare, PackagePlus, Box, AlertTriangle, AlertCircle, Loader2 } from 'lucide-react';
 import LabelPrintDialog from '@/components/LabelPrintDialog';
 import type { Tool, Kit } from '@/lib/types';
 import Image from 'next/image';
@@ -31,7 +32,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import ReprintDialog from '@/components/ReprintDialog';
 import { cn } from '@/lib/utils';
 import { differenceInDays } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import KitDetailsDialog from '@/components/KitDetailsDialog';
 import { ToolingAlertHeader } from '@/components/ToolingAlertHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -47,12 +48,12 @@ interface KitComDocId extends Kit {
 }
 type InventarioItem = (Ferramenta | KitComDocId) & { isKit?: boolean };
 
-
-const ListaFerramentasPage = () => {
+function ListaFerramentasContent() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isLabelPrintDialogOpen, setIsLabelPrintDialogOpen] = useState(false);
@@ -62,6 +63,14 @@ const ListaFerramentasPage = () => {
   const [selectedKitForDetails, setSelectedKitForDetails] = useState<KitComDocId | null>(null);
   const [selectedItemForReprint, setSelectedItemForReprint] = useState<WithDocId<Tool | Kit> | null>(null);
   
+  // Captura busca via URL (QR Code)
+  useEffect(() => {
+    const urlSearch = searchParams.get('search');
+    if (urlSearch) {
+        setSearchTerm(urlSearch);
+    }
+  }, [searchParams]);
+
   const ferramentasQueryKey = 'ferramentas';
   const kitsQueryKey = 'kits';
 
@@ -84,7 +93,6 @@ const ListaFerramentasPage = () => {
   });
   
   const inventarioVisivel = useMemo(() => {
-    // Explicitly filter for items that are unique tools (sequencial > 0)
     const ferramentas = todasAsFerramentas?.filter(ferramenta => ferramenta.sequencial > 0) || [];
     const kits = todosOsKits?.map(kit => ({ ...kit, isKit: true, tipo: 'KIT' as const })) || [];
     return [...ferramentas, ...kits].sort((a, b) => a.codigo.localeCompare(b.codigo));
@@ -104,7 +112,6 @@ const ListaFerramentasPage = () => {
   }, [inventarioVisivel, searchTerm]);
   
   const getDynamicStatus = (item: InventarioItem): { status: string; variant: 'success' | 'destructive' | 'default' | 'attention' | 'warning' | 'critical' } => {
-    
     if (item.isKit) {
          const statusMap: { [key: string]: 'success' | 'default' } = {
             'Disponível': 'success',
@@ -153,9 +160,9 @@ const ListaFerramentasPage = () => {
 const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'attention' | 'warning' | 'critical') => {
     switch(variant) {
         case 'success': return 'success';
-        case 'attention': return 'secondary'; // Amarelo
-        case 'warning': return 'default'; // Laranja
-        case 'critical': return 'destructive'; // Vermelho
+        case 'attention': return 'secondary';
+        case 'warning': return 'default';
+        case 'critical': return 'destructive';
         case 'destructive': return 'destructive';
         default: return 'secondary';
     }
@@ -203,7 +210,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
         <h1 className="text-2xl font-bold">Lista de Ferramentas e Kits</h1>
         <div className="flex gap-2">
             <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setIsAddQuantityDialogOpen(true)}>
-              Adicionar Ferramenta!!
+              Adicionar Ferramenta
             </Button>
           <Button variant="outline" onClick={() => router.push('/dashboard/ferramentaria/kits')}>
               <PackagePlus className="mr-2 h-4 w-4" />
@@ -276,19 +283,9 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
                                     src={item.imageUrl || (isKit ? "https://picsum.photos/seed/kit/64/64" : "https://picsum.photos/seed/tool/64/64")}
                                     width="64"
                                 />
-                                {(item as Ferramenta).status === 'Liberado Condicional' && (
-                                    <div className="absolute top-0 right-0 p-0.5 bg-orange-500 rounded-bl-md rounded-tr-md">
-                                        <AlertCircle className="h-3 w-3 text-white" />
-                                    </div>
-                                )}
                                 {!isKit && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity rounded-md">
                                     <ZoomIn className="h-6 w-6 text-white" />
-                                    </div>
-                                )}
-                                {isKit && (
-                                    <div className="absolute bottom-0 right-0 p-0.5 bg-purple-600 rounded-tl-md rounded-br-md">
-                                        <Box className="h-3 w-3 text-white" />
                                     </div>
                                 )}
                               </button>
@@ -307,7 +304,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
                                     <Button variant="ghost" size="icon" title="Detalhes" onClick={() => setSelectedToolForDetails(item as Ferramenta)}>
                                     <MoreHorizontal className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" title="Reimprimir Etiqueta" onClick={() => setSelectedItemForReprint(item as WithDocId<Tool>)}>
+                                    <Button variant="ghost" size="icon" title="Reimprimir Etiqueta Digital" onClick={() => setSelectedItemForReprint(item as WithDocId<Tool>)}>
                                     <Repeat2 className="h-4 w-4" />
                                     </Button>
                                 </>
@@ -317,7 +314,7 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
                                       <ZoomIn className="mr-2 h-4 w-4" />
                                       Ver Itens
                                     </Button>
-                                    <Button variant="ghost" size="icon" title="Reimprimir Etiqueta do Kit" onClick={() => setSelectedItemForReprint(item as WithDocId<Kit>)}>
+                                    <Button variant="ghost" size="icon" title="Reimprimir Etiqueta Digital do Kit" onClick={() => setSelectedItemForReprint(item as WithDocId<Kit>)}>
                                         <Repeat2 className="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -374,6 +371,12 @@ const getBadgeVariant = (variant: 'success' | 'destructive' | 'default' | 'atten
 
     </div>
   );
-};
+}
 
-export default ListaFerramentasPage;
+export default function ListaFerramentasPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin"/></div>}>
+            <ListaFerramentasContent />
+        </Suspense>
+    )
+}

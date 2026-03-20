@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import {
   collection,
@@ -43,7 +44,7 @@ import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, Chevro
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import SupplyMovementDialog from '@/components/SupplyMovementDialog';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import Image from 'next/image';
@@ -67,9 +68,10 @@ type EnrichedStockItem = WithDocId<SupplyStock> & {
 
 type FilterType = 'all' | 'low' | 'no' | 'expiry';
 
-const SuprimentosPage = () => {
+function SuprimentosContent() {
   const firestore = useFirestore();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useUser();
@@ -91,6 +93,14 @@ const SuprimentosPage = () => {
   const [imageToView, setImageToView] = useState<{ src: string, alt: string } | null>(null);
   const [stockToPrint, setStockToPrint] = useState<EnrichedStockItem | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  // Captura busca via URL (QR Code)
+  useEffect(() => {
+    const urlSearch = searchParams.get('search');
+    if (urlSearch) {
+        setSearchTerm(urlSearch);
+    }
+  }, [searchParams]);
 
   const userDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'employees', user.uid) : null),
@@ -187,7 +197,6 @@ const SuprimentosPage = () => {
     let result: EnrichedStockItem[] = [];
 
     if (activeFilter === 'no') {
-        // Para "Sem Estoque", precisamos mostrar os itens mestre que não têm lotes
         supplies?.forEach(s => {
             const total = totalsPerSupply.get(s.docId) || 0;
             if (total === 0) {
@@ -260,7 +269,7 @@ const SuprimentosPage = () => {
     if (!printableArea) return;
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
-        printWindow.document.write('<html><head><title>Imprimir</title><style>@media print { @page { size: 100mm 60mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: 1fr auto; padding: 5mm; box-sizing: border-box; } .qr-code { width: 45mm; height: 45mm; } }</style></head><body>');
+        printWindow.document.write('<html><head><title>Imprimir Etiqueta Digital</title><style>@media print { @page { size: 100mm 60mm; margin: 0; } body { margin: 0; padding: 0; font-family: sans-serif; } .label-container { width: 100%; height: 100%; display: grid; grid-template-columns: 1fr auto; padding: 5mm; box-sizing: border-box; } .qr-code { width: 45mm; height: 45mm; } }</style></head><body>');
         printWindow.document.write(printableArea.innerHTML);
         printWindow.document.write('</body></html>');
         printWindow.document.close();
@@ -417,14 +426,8 @@ const SuprimentosPage = () => {
               {!isLoading && filteredDisplayItems.map(item => {
                   const { supplyInfo } = item;
                   const totalQty = totalsPerSupply.get(supplyInfo.docId) || 0;
-                  
-                  // REGRAS DE CORES:
-                  // Vermelho: Zero ou no mínimo
-                  // Laranja: Perto do mínimo (até 25% acima)
-                  // Padrão: Regular
                   const isCritical = totalQty <= supplyInfo.estoqueMinimo;
                   const isWarning = totalQty > supplyInfo.estoqueMinimo && totalQty <= (supplyInfo.estoqueMinimo * 1.25);
-                  
                   const qtyColorClass = isCritical ? "text-destructive" : isWarning ? "text-orange-500" : "text-foreground";
 
                   return (
@@ -472,7 +475,7 @@ const SuprimentosPage = () => {
                                     <Button variant="ghost" size="icon" title="Editar Lote" onClick={() => setEditStockDialogState({ isOpen: true, stockItem: item })}>
                                         <Edit className="h-4 w-4"/>
                                     </Button>
-                                    <Button variant="ghost" size="icon" title="Imprimir Etiqueta" onClick={() => setStockToPrint(item)}>
+                                    <Button variant="ghost" size="icon" title="Imprimir Etiqueta Digital" onClick={() => setStockToPrint(item)}>
                                         <Printer className="h-4 w-4" />
                                     </Button>
                                     {isAdmin && (
@@ -525,7 +528,7 @@ const SuprimentosPage = () => {
        {stockToPrint && (
         <Dialog open={!!stockToPrint} onOpenChange={() => setStockToPrint(null)}>
             <DialogContent className="max-w-2xl">
-                <DialogHeader><DialogTitle>Etiqueta de Suprimento</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Etiqueta Digital de Suprimento</DialogTitle></DialogHeader>
                 <div id="printable-label-area" className="flex justify-center p-4 bg-muted/50 rounded-md">
                     <div className="label-container grid grid-cols-[1fr_auto] items-center p-1 border rounded-lg bg-white" style={{ width: '377px', height: '226px', boxSizing: 'content-box', gap: '5mm', padding: '5mm' }}>
                        <div className="info flex flex-col justify-center h-full">
@@ -533,8 +536,14 @@ const SuprimentosPage = () => {
                            <p className="code font-mono text-black" style={{fontSize: '12px'}}>{stockToPrint.supplyInfo.codigo}</p>
                            <p className="lot font-mono font-bold text-black mt-2" style={{fontSize: '18px'}}>{stockToPrint.loteInterno}</p>
                            {stockToPrint.dataValidade && <p className="due-date font-bold text-black mt-1" style={{fontSize: '14px'}}>VAL: {format(parseISO(stockToPrint.dataValidade), 'dd/MM/yyyy')}</p>}
+                           <p style={{fontSize: '8pt', color: '#666', marginTop: '2mm'}}>Escaneie para consulta em tempo real</p>
                        </div>
-                       <div className="qr-code self-center" style={{width: '170px', height: '170px'}}><Image src={`https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=${encodeURIComponent(`${stockToPrint.supplyInfo.codigo}/${stockToPrint.loteInterno}`)}`} alt="QR" width={170} height={170} /></div>
+                       <div className="qr-code self-center" style={{width: '170px', height: '170px'}}>
+                           <Image 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/dashboard/suprimentos/lista-itens?search=${stockToPrint.supplyInfo.codigo}`)}`} 
+                                alt="QR" width={170} height={170} 
+                            />
+                        </div>
                     </div>
                 </div>
                 <DialogFooter>
@@ -546,6 +555,12 @@ const SuprimentosPage = () => {
       )}
     </div>
   );
-};
+}
 
-export default SuprimentosPage;
+export default function SuprimentosPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin"/></div>}>
+            <SuprimentosContent />
+        </Suspense>
+    );
+}
