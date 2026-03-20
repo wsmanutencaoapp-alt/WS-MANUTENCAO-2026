@@ -1,38 +1,37 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Verifica se o usuário está logado
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    function getUserData() {
-      // Forçamos a busca do perfil no banco (default) independente de qual banco está sendo acessado
-      return get(/databases/(default)/documents/employees/$(request.auth.uid)).data;
-    }
-
+    // IMPORTANTE: Busca o perfil SEMPRE no banco (default)
+    // A sintaxe /databases/(default)/documents/ é a única permitida para cross-db
     function isAdmin() {
-      // Verificamos a existência do perfil no banco (default)
       let profilePath = /databases/(default)/documents/employees/$(request.auth.uid);
-      return exists(profilePath) &&
-             (get(profilePath).data.accessLevel == 'Admin' || request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1');
+      return isAuthenticated() && (
+        request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1' || 
+        (exists(profilePath) && get(profilePath).data.accessLevel == 'Admin')
+      );
     }
     
+    // Verifica permissão consultando o banco (default)
     function hasPermission(module) {
-      if (!isAuthenticated()) return false;
-      if (isAdmin()) return true;
       let profilePath = /databases/(default)/documents/employees/$(request.auth.uid);
-      return exists(profilePath) && get(profilePath).data.permissions[module] == true;
+      return isAuthenticated() && (
+        isAdmin() || 
+        (exists(profilePath) && get(profilePath).data.permissions[module] == true)
+      );
     }
     
     function isOwner(userId) {
-        return request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
-    // --- REGRAS PARA O BANCO TÉCNICO (aircraftModels, etc) ---
-    // Estas regras agora funcionarão no operation-manager porque as funções acima olham para o (default)
+    // --- REGRAS PARA O BANCO TÉCNICO (operation-manager) ---
     match /aircraftModels/{id} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_tecnica_modelos_update');
@@ -54,7 +53,7 @@ service cloud.firestore {
       allow write: if hasPermission('cadastros_tecnica_tarefas_update');
     }
 
-    // --- REGRAS DO BANCO DEFAULT (Mantidas conforme sua autorização) ---
+    // --- REGRAS PARA O BANCO PADRÃO (default) E GERAIS ---
     match /vehicles/{vehicleId} {
       allow get: if true;
       allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
@@ -71,17 +70,18 @@ service cloud.firestore {
     }
 
     match /activities/{activityId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
-        allow update: if isAuthenticated();
-        allow delete: if isAdmin();
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
     }
 
     match /purchase_requisitions/{requisitionId} {
-        allow read: if isAuthenticated();
-        allow write: if hasPermission('compras_requisicao_update') || hasPermission('compras_controle_update');
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('compras_requisicao_update') || hasPermission('compras_controle_update');
     }
 
+    // Regra fallback para garantir que o restante do app continue funcionando
     match /{document=**} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();

@@ -44,13 +44,12 @@ export default function ModelosTecnicaPage() {
     }
   };
 
-  // Consulta sem orderBy para evitar necessidade de índices imediatos durante o debug
   const currentCollectionRef = useMemoFirebase(() => (
     techFirestore ? collection(techFirestore, getCollectionName(activeTab)) : null
   ), [techFirestore, activeTab]);
 
   const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentCollectionRef, {
-    queryKey: ['tech_models_v12', activeTab], // Versão da chave para evitar cache antigo
+    queryKey: ['tech_models_v15', activeTab],
     enabled: !!techFirestore
   });
 
@@ -111,7 +110,6 @@ export default function ModelosTecnicaPage() {
       }
       setIsDialogOpen(false);
     } catch (err: any) {
-      console.error("Erro ao salvar no operation-manager:", err);
       toast({ variant: 'destructive', title: 'Erro na Operação', description: err.message });
     } finally {
       setIsSaving(false);
@@ -149,7 +147,7 @@ export default function ModelosTecnicaPage() {
         <Card className="mt-4">
           <CardHeader>
             <CardTitle>Catálogo de {activeTab}s</CardTitle>
-            <CardDescription>Visualizando dados da instância técnica <strong>operation-manager</strong>.</CardDescription>
+            <CardDescription>Dados armazenados na instância <strong>operation-manager</strong>.</CardDescription>
           </CardHeader>
           <CardContent>
             {error && (
@@ -157,8 +155,7 @@ export default function ModelosTecnicaPage() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Falha no Carregamento</AlertTitle>
                     <AlertDescription>
-                        Erro de Permissão: O Firestore bloqueou a leitura no banco <strong>operation-manager</strong>. 
-                        Verifique se as novas regras foram publicadas no console do Firebase para ambos os bancos.
+                        {error.message}
                     </AlertDescription>
                 </Alert>
             )}
