@@ -78,13 +78,15 @@ export default function LabelPrintDialog({ isOpen, onClose, tools }: LabelPrintD
       } else {
         // Etiqueta Grande com ajustes de posição e fonte
         html = `
-          <div class="label-container" style="width: 100mm; height: 60mm; padding: 4mm 8mm 8mm 8mm; flex-direction: column; text-align: center; justify-content: space-between;">
-            <img src="/logo.png" style="height: 10mm; object-fit: contain; margin-top: 2mm;" />
-            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+          <div class="label-container" style="width: 100mm; height: 60mm; padding: 2mm 8mm 8mm 8mm; flex-direction: column; text-align: center; justify-content: flex-start;">
+            <img src="/logo.png" style="height: 10mm; object-fit: contain; margin-top: 0; margin-bottom: 5mm;" />
+            <div style="display: flex; flex-direction: column; justify-content: center; margin-bottom: 4mm;">
               <div style="font-size: 12pt; font-weight: 900; color: black; margin-bottom: 1mm; text-transform: uppercase;">${tool.descricao}</div>
               <div style="font-size: 9pt; font-family: monospace; font-weight: bold; color: #444;">${tool.codigo}</div>
             </div>
-            <img src="${qrUrl}" style="width: 22mm; height: 22mm; margin-top: 1mm;" />
+            <div style="flex: 1; display: flex; align-items: flex-end; justify-content: center;">
+              <img src="${qrUrl}" style="width: 22mm; height: 22mm;" />
+            </div>
           </div>
         `;
       }
