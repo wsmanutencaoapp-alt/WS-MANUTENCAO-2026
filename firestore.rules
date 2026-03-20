@@ -32,8 +32,10 @@ service cloud.firestore {
 
     // A helper function to determine if a user can read an activity.
     function canReadActivity(activityData) {
-      // isPrivate being absent or false means public
-      return activityData.get('isPrivate', false) == false ||
+      // Access granted if activity is public OR if user is creator, assignee, or in viewer list.
+      return (activityData.get('isPrivate', false) == false) ||
+             (request.auth.uid == activityData.requesterId) ||
+             (request.auth.uid == activityData.assigneeId) ||
              (request.auth.uid in activityData.get('viewerIds', []));
     }
 
@@ -239,15 +241,19 @@ service cloud.firestore {
       allow delete: if hasPermission('gso_ficha_atendimento_delete');
     }
 
-    match /aircraft_models/{id} {
+    match /aircraftModels/{id} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
-    match /engine_models/{id} {
+    match /engineModels/{id} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
-    match /apu_models/{id} {
+    match /apuModels/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+    }
+    match /propellerModels/{id} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }

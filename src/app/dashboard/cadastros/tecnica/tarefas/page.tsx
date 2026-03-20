@@ -46,10 +46,10 @@ export default function TarefasTecnicaPage() {
   });
 
   // Fetch all possible models for the selector
-  const aircraftQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'aircraft_models'), orderBy('model')) : null), [firestore]);
-  const engineQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'engine_models'), orderBy('model')) : null), [firestore]);
-  const apuQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'apu_models'), orderBy('model')) : null), [firestore]);
-  const propellerQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'propeller_models'), orderBy('model')) : null), [firestore]);
+  const aircraftQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'aircraftModels'), orderBy('model')) : null), [firestore]);
+  const engineQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'engineModels'), orderBy('model')) : null), [firestore]);
+  const apuQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'apuModels'), orderBy('model')) : null), [firestore]);
+  const propellerQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'propellerModels'), orderBy('model')) : null), [firestore]);
 
   const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery);
   const { data: engineModels } = useCollection<WithDocId<EngineModel>>(engineQuery);

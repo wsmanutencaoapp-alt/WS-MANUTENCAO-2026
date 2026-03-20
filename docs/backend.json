@@ -1150,7 +1150,7 @@
             "Em Cotação",
             "Cotado",
             "Recebido",
-            "Cancelado"
+            "Cancelada"
           ],
           "description": "Tracks the status of an individual item within the original SC."
         },
@@ -2336,19 +2336,19 @@
         }
       },
       {
-        "path": "/aircraft_models/{id}",
+        "path": "/aircraftModels/{id}",
         "definition": { "schema": { "$ref": "#/entities/AircraftModel" }, "description": "Modelos de aeronaves." }
       },
       {
-        "path": "/engine_models/{id}",
+        "path": "/engineModels/{id}",
         "definition": { "schema": { "$ref": "#/entities/EngineModel" }, "description": "Modelos de motores." }
       },
       {
-        "path": "/apu_models/{id}",
+        "path": "/apuModels/{id}",
         "definition": { "schema": { "$ref": "#/entities/APUModel" }, "description": "Modelos de APU." }
       },
       {
-        "path": "/propeller_models/{id}",
+        "path": "/propellerModels/{id}",
         "definition": { "schema": { "$ref": "#/entities/PropellerModel" }, "description": "Modelos de hélices." }
       },
       {

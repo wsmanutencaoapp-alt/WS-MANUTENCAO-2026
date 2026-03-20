@@ -38,10 +38,10 @@ export default function ModelosTecnicaPage() {
 
   const getCollectionName = (type: ModelType) => {
     switch (type) {
-      case 'Aeronave': return 'aircraft_models';
-      case 'Motor': return 'engine_models';
-      case 'APU': return 'apu_models';
-      case 'Hélice': return 'propeller_models';
+      case 'Aeronave': return 'aircraftModels';
+      case 'Motor': return 'engineModels';
+      case 'APU': return 'apuModels';
+      case 'Hélice': return 'propellerModels';
     }
   };
 
