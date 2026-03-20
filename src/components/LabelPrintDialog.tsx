@@ -59,21 +59,20 @@ export default function LabelPrintDialog({ isOpen, onClose, tools }: LabelPrintD
 
     tools.forEach((tool) => {
       // URL Inteligente para consulta em tempo real
-      const isKit = tool.tipo === 'KIT' || !!tool.toolIds;
       const targetPath = '/dashboard/ferramentaria/lista-ferramentas';
       const qrData = `${baseUrl}${targetPath}?search=${encodeURIComponent(tool.codigo)}`;
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
       
       let html = '';
       if (labelSize === 'small') {
-        // Layout sem logo para ganhar espaço de texto
+        // Layout sem logo e com fontes reduzidas para ferramentas
         html = `
-          <div class="label-container" style="width: 120mm; height: 23mm; padding: 0 8mm; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5mm;">
+          <div class="label-container" style="width: 120mm; height: 23mm; padding: 0 10mm; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5mm;">
             <div style="text-align: left; overflow: hidden;">
-              <div style="font-size: 12pt; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: black; text-transform: uppercase;">${tool.descricao}</div>
-              <div style="font-size: 10pt; font-family: monospace; font-weight: bold; margin-top: 1mm; color: #333;">${tool.codigo}</div>
+              <div style="font-size: 10pt; font-weight: 900; line-height: 1.1; color: black; text-transform: uppercase;">${tool.descricao}</div>
+              <div style="font-size: 8pt; font-family: monospace; font-weight: bold; margin-top: 1mm; color: #333;">${tool.codigo}</div>
             </div>
-            <img src="${qrUrl}" style="width: 18mm; height: 18mm;" />
+            <img src="${qrUrl}" style="width: 16mm; height: 16mm;" />
           </div>
         `;
       } else {
