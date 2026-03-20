@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -12,9 +13,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Trash2, Plane, Settings2, Zap, Wind } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Plane, Settings2, Zap, Wind, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 type ModelType = 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
 
@@ -48,7 +50,7 @@ export default function ModelosTecnicaPage() {
     techFirestore ? query(collection(techFirestore, getCollectionName(activeTab)), orderBy('model')) : null
   ), [techFirestore, activeTab]);
 
-  const { data: models, isLoading } = useCollection<WithDocId<any>>(currentQuery, {
+  const { data: models, isLoading, error } = useCollection<WithDocId<any>>(currentQuery, {
     queryKey: ['tech_models', activeTab]
   });
 
@@ -146,9 +148,19 @@ export default function ModelosTecnicaPage() {
         <Card className="mt-4">
           <CardHeader>
             <CardTitle>Modelos de {activeTab}s</CardTitle>
-            <CardDescription>Gerencie o catálogo de {activeTab.toLowerCase()}s para controle de tarefas.</CardDescription>
+            <CardDescription>Gerencie o catálogo de {activeTab.toLowerCase()}s na instância <strong>operation-manager</strong>.</CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+                <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Erro de Permissão</AlertTitle>
+                    <AlertDescription>
+                        Não foi possível carregar os dados da instância técnica. Verifique se as regras de segurança permitem o acesso entre bancos.
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <Table>
               <TableHeader>
                 <TableRow>
@@ -168,6 +180,7 @@ export default function ModelosTecnicaPage() {
               </TableHeader>
               <TableBody>
                 {isLoading && <TableRow><TableCell colSpan={activeTab === 'Aeronave' ? 6 : 4} className="text-center h-24"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
+                {!isLoading && models?.length === 0 && <TableRow><TableCell colSpan={activeTab === 'Aeronave' ? 6 : 4} className="text-center h-24 text-muted-foreground">Nenhum modelo encontrado.</TableCell></TableRow>}
                 {!isLoading && models?.map((model) => (
                   <TableRow key={model.docId}>
                     <TableCell className="font-medium">{model.manufacturer}</TableCell>

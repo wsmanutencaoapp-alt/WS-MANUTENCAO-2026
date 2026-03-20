@@ -9,21 +9,19 @@ service cloud.firestore {
     }
     
     function getUserData() {
-      // Use get() which doesn't count as a read operation in most cases within rules
-      return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data;
+      // BUSCA SEMPRE NA BASE DEFAULT: Garante que as permissões funcionem mesmo em instâncias como 'operation-manager'
+      return get(/databases/(default)/documents/employees/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
-      // An admin is a user with Admin level or the master UID provided.
-      return exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
+      // Verifica se o usuário existe na base default e se é admin
+      return exists(/databases/(default)/documents/employees/$(request.auth.uid)) &&
              (getUserData().accessLevel == 'Admin' || request.auth.uid == 'SOID8C723XUmlniI3mpjBmBPA5v1');
     }
     
     function hasPermission(module) {
       let userData = getUserData();
-      // An admin has all permissions.
-      // A regular user must be authenticated. The active status is now checked in the layout, not globally here for all operations.
-      return isAuthenticated() && (isAdmin() || (exists(/databases/$(database)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true));
+      return isAuthenticated() && (isAdmin() || (exists(/databases/(default)/documents/employees/$(request.auth.uid)) && userData.permissions[module] == true));
     }
     
     function isOwner(userId) {
@@ -32,7 +30,6 @@ service cloud.firestore {
 
     // A helper function to determine if a user can read an activity.
     function canReadActivity(activityData) {
-      // Access granted if activity is public OR if user is creator, assignee, or in viewer list.
       return (activityData.get('isPrivate', false) == false) ||
              (request.auth.uid == activityData.requesterId) ||
              (request.auth.uid == activityData.assigneeId) ||
@@ -51,7 +48,7 @@ service cloud.firestore {
     }
 
     match /vehicles/{vehicleId} {
-      allow get: if true; // Public read for QR code check-out
+      allow get: if true; 
       allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
       allow create: if hasPermission('cadastros_veiculos_create');
       allow update: if 
@@ -78,10 +75,10 @@ service cloud.firestore {
     }
     
     match /vehicle_movements/{movementId} {
-      allow read: if hasPermission('portaria_controle_veiculos_view'); // Secured endpoint
-      allow create: if true; // Public write for vehicle check-out and check-in
-      allow update: if hasPermission('portaria_controle_veiculos_update'); // Secured
-      allow delete: if hasPermission('portaria_controle_veiculos_delete'); // Secured
+      allow read: if hasPermission('portaria_controle_veiculos_view'); 
+      allow create: if true; 
+      allow update: if hasPermission('portaria_controle_veiculos_update'); 
+      allow delete: if hasPermission('portaria_controle_veiculos_delete'); 
     }
 
     match /visits/{visitId} {
@@ -97,8 +94,6 @@ service cloud.firestore {
       allow delete: if hasPermission('cadastros_suprimentos_delete');
       
       match /stock/{stockId} {
-        // Read is handled by collectionGroup rule.
-        // This rule is for direct writes.
         allow write: if hasPermission('suprimentos_movimentacao_create') || hasPermission('cadastros_suprimentos_update') || hasPermission('compras_controle_update');
       }
     }
@@ -241,19 +236,20 @@ service cloud.firestore {
       allow delete: if hasPermission('gso_ficha_atendimento_delete');
     }
 
-    match /aircraft_models/{id} {
+    // TECNICA (OPERATION MANAGER)
+    match /aircraftModels/{id} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
-    match /engine_models/{id} {
+    match /engineModels/{id} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
-    match /apu_models/{id} {
+    match /apuModels/{id} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
-    match /propeller_models/{id} {
+    match /propellerModels/{id} {
       allow read: if isAuthenticated();
       allow write: if hasPermission('cadastros_tecnica_modelos_update');
     }
