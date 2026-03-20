@@ -52,7 +52,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from '@/components/ui/badge';
 import EditStockItemDialog from '@/components/EditStockItemDialog';
 import { useToast } from '@/hooks/use-toast';
-import ReturnMovementDialog from '@/components/ReturnMovementDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -156,15 +155,19 @@ const SuprimentosPage = () => {
     return () => unsubscribe();
   }, [supplies, firestore, isLoadingSupplies]);
   
+  // Calculate total quantities per supply ID for visual indicators
+  const totalsPerSupply = useMemo(() => {
+    const totals = new Map<string, number>();
+    enrichedStock.forEach(item => {
+        const current = totals.get(item.supplyInfo.docId) || 0;
+        totals.set(item.supplyInfo.docId, current + item.quantidade);
+    });
+    return totals;
+  }, [enrichedStock]);
+
   // Dashboard Calculations
   const stats = useMemo(() => {
     if (!supplies || !enrichedStock) return { noStock: 0, lowStock: 0, nearExpiry: 0 };
-
-    const totalsPerSupply = new Map<string, number>();
-    enrichedStock.forEach(item => {
-        const current = totalsPerSupply.get(item.supplyInfo.docId) || 0;
-        totalsPerSupply.set(item.supplyInfo.docId, current + item.quantidade);
-    });
 
     let noStock = 0;
     let lowStock = 0;
@@ -181,18 +184,11 @@ const SuprimentosPage = () => {
     }).length;
 
     return { noStock, lowStock, nearExpiry };
-  }, [supplies, enrichedStock]);
+  }, [supplies, enrichedStock, totalsPerSupply]);
 
   const filteredStock = useMemo(() => {
     if (!enrichedStock) return [];
     
-    // First aggregate totals to support the "Low Stock" filter
-    const totalsPerSupply = new Map<string, number>();
-    enrichedStock.forEach(item => {
-        const current = totalsPerSupply.get(item.supplyInfo.docId) || 0;
-        totalsPerSupply.set(item.supplyInfo.docId, current + item.quantidade);
-    });
-
     let result = enrichedStock;
 
     if (showLowStockOnly) {
@@ -214,7 +210,7 @@ const SuprimentosPage = () => {
     }
     
     return result;
-  }, [enrichedStock, searchTerm, showLowStockOnly]);
+  }, [enrichedStock, searchTerm, showLowStockOnly, totalsPerSupply]);
   
   const handleGoToCadastro = () => {
     router.push('/dashboard/cadastros/suprimentos');
@@ -403,6 +399,18 @@ const SuprimentosPage = () => {
               )}
               {!isLoading && filteredStock.map(item => {
                   const { supplyInfo } = item;
+                  const totalQty = totalsPerSupply.get(supplyInfo.docId) || 0;
+                  
+                  // Color logic based on total supply health
+                  const isLowStock = totalQty <= supplyInfo.estoqueMinimo;
+                  const isWarningStock = totalQty > supplyInfo.estoqueMinimo && totalQty <= (supplyInfo.estoqueMinimo * 1.25);
+                  
+                  const quantityColorClass = isLowStock 
+                    ? "text-destructive" 
+                    : isWarningStock 
+                    ? "text-orange-500" 
+                    : "text-foreground";
+
                   return (
                     <TableRow key={item.docId}>
                         <TableCell>
@@ -427,7 +435,9 @@ const SuprimentosPage = () => {
                     </TableCell>
                     <TableCell>{item.localizacao}</TableCell>
                     <TableCell>
-                        <div className="font-bold">{item.quantidade.toLocaleString()} {supplyInfo.unidadeMedida}</div>
+                        <div className={cn("font-bold", quantityColorClass)}>
+                            {item.quantidade.toLocaleString()} {supplyInfo.unidadeMedida}
+                        </div>
                         {item.pesoLiquido !== undefined && <div className="text-xs text-muted-foreground">{item.pesoLiquido.toLocaleString()} {supplyInfo.unidadeSecundaria}</div>}
                     </TableCell>
                     <TableCell>
