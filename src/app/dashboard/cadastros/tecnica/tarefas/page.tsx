@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useTechFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc, orderBy, getDocs } from 'firebase/firestore';
 import type { MaintenanceTask, AircraftModel, EngineModel, APUModel, PropellerModel } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
@@ -19,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 
 export default function TarefasTecnicaPage() {
-  const firestore = useFirestore();
+  const techFirestore = useTechFirestore();
   const { toast } = useToast();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -38,23 +37,23 @@ export default function TarefasTecnicaPage() {
   });
 
   const tasksQuery = useMemoFirebase(() => (
-    firestore ? query(collection(firestore, 'maintenance_tasks'), orderBy('code')) : null
-  ), [firestore]);
+    techFirestore ? query(collection(techFirestore, 'maintenance_tasks'), orderBy('code')) : null
+  ), [techFirestore]);
 
   const { data: tasks, isLoading } = useCollection<WithDocId<MaintenanceTask>>(tasksQuery, {
-    queryKey: ['maintenance_tasks']
+    queryKey: ['tech_maintenance_tasks']
   });
 
-  // Fetch all possible models for the selector
-  const aircraftQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'aircraftModels'), orderBy('model')) : null), [firestore]);
-  const engineQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'engineModels'), orderBy('model')) : null), [firestore]);
-  const apuQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'apuModels'), orderBy('model')) : null), [firestore]);
-  const propellerQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'propellerModels'), orderBy('model')) : null), [firestore]);
+  // Fetch all possible models for the selector from operation-manager
+  const aircraftQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'aircraftModels'), orderBy('model')) : null), [techFirestore]);
+  const engineQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'engineModels'), orderBy('model')) : null), [techFirestore]);
+  const apuQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'apuModels'), orderBy('model')) : null), [techFirestore]);
+  const propellerQuery = useMemoFirebase(() => (techFirestore ? query(collection(techFirestore, 'propellerModels'), orderBy('model')) : null), [techFirestore]);
 
-  const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery);
-  const { data: engineModels } = useCollection<WithDocId<EngineModel>>(engineQuery);
-  const { data: apuModels } = useCollection<WithDocId<APUModel>>(apuQuery);
-  const { data: propellerModels } = useCollection<WithDocId<PropellerModel>>(propellerQuery);
+  const { data: aircraftModels } = useCollection<WithDocId<AircraftModel>>(aircraftQuery, { queryKey: ['tech_aircraft_models'] });
+  const { data: engineModels } = useCollection<WithDocId<EngineModel>>(engineQuery, { queryKey: ['tech_engine_models'] });
+  const { data: apuModels } = useCollection<WithDocId<APUModel>>(apuQuery, { queryKey: ['tech_apu_models'] });
+  const { data: propellerModels } = useCollection<WithDocId<PropellerModel>>(propellerQuery, { queryKey: ['tech_propeller_models'] });
 
   const availableModels = useMemo(() => {
     switch (formData.modelType) {
@@ -92,7 +91,7 @@ export default function TarefasTecnicaPage() {
   };
 
   const handleSave = async () => {
-    if (!firestore) return;
+    if (!techFirestore) return;
     if (!formData.code || !formData.description || !formData.modelId) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Preencha os campos obrigatórios.' });
       return;
@@ -110,10 +109,10 @@ export default function TarefasTecnicaPage() {
 
     try {
       if (editingTask) {
-        await updateDoc(doc(firestore, 'maintenance_tasks', editingTask.docId), dataToSave);
+        await updateDoc(doc(techFirestore, 'maintenance_tasks', editingTask.docId), dataToSave);
         toast({ title: 'Sucesso', description: 'Tarefa atualizada.' });
       } else {
-        await addDoc(collection(firestore, 'maintenance_tasks'), dataToSave);
+        await addDoc(collection(techFirestore, 'maintenance_tasks'), dataToSave);
         toast({ title: 'Sucesso', description: 'Tarefa cadastrada.' });
       }
       setIsDialogOpen(false);
@@ -125,9 +124,9 @@ export default function TarefasTecnicaPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!firestore) return;
+    if (!techFirestore) return;
     try {
-      await deleteDoc(doc(firestore, 'maintenance_tasks', id));
+      await deleteDoc(doc(techFirestore, 'maintenance_tasks', id));
       toast({ title: 'Sucesso', description: 'Tarefa excluída.' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao excluir.' });

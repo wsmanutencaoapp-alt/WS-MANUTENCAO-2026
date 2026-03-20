@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useTechFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import type { AircraftModel, EngineModel, APUModel, PropellerModel } from '@/lib/types';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
@@ -20,7 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 type ModelType = 'Aeronave' | 'Motor' | 'APU' | 'Hélice';
 
 export default function ModelosTecnicaPage() {
-  const firestore = useFirestore();
+  const techFirestore = useTechFirestore();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<ModelType>('Aeronave');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -46,11 +45,11 @@ export default function ModelosTecnicaPage() {
   };
 
   const currentQuery = useMemoFirebase(() => (
-    firestore ? query(collection(firestore, getCollectionName(activeTab)), orderBy('model')) : null
-  ), [firestore, activeTab]);
+    techFirestore ? query(collection(techFirestore, getCollectionName(activeTab)), orderBy('model')) : null
+  ), [techFirestore, activeTab]);
 
   const { data: models, isLoading } = useCollection<WithDocId<any>>(currentQuery, {
-    queryKey: ['models', activeTab]
+    queryKey: ['tech_models', activeTab]
   });
 
   const handleOpenDialog = (model: WithDocId<any> | null = null) => {
@@ -72,7 +71,7 @@ export default function ModelosTecnicaPage() {
   };
 
   const handleSave = async () => {
-    if (!firestore) return;
+    if (!techFirestore) return;
     if (!formData.manufacturer || !formData.model) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Fabricante e Modelo são obrigatórios.' });
       return;
@@ -102,10 +101,10 @@ export default function ModelosTecnicaPage() {
 
     try {
       if (editingModel) {
-        await updateDoc(doc(firestore, collectionName, editingModel.docId), dataToSave);
+        await updateDoc(doc(techFirestore, collectionName, editingModel.docId), dataToSave);
         toast({ title: 'Sucesso', description: 'Modelo atualizado.' });
       } else {
-        await addDoc(collection(firestore, collectionName), dataToSave);
+        await addDoc(collection(techFirestore, collectionName), dataToSave);
         toast({ title: 'Sucesso', description: 'Modelo cadastrado.' });
       }
       setIsDialogOpen(false);
@@ -117,9 +116,9 @@ export default function ModelosTecnicaPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!firestore) return;
+    if (!techFirestore) return;
     try {
-      await deleteDoc(doc(firestore, getCollectionName(activeTab), id));
+      await deleteDoc(doc(techFirestore, getCollectionName(activeTab), id));
       toast({ title: 'Sucesso', description: 'Modelo excluído.' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível excluir o modelo.' });
