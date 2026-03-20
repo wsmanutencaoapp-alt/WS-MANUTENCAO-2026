@@ -83,7 +83,6 @@ export default function LabelPrintDialog({ isOpen, onClose, tools }: LabelPrintD
             <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
               <div style="font-size: 12pt; font-weight: 900; color: black; margin-bottom: 1mm; text-transform: uppercase;">${tool.descricao}</div>
               <div style="font-size: 9pt; font-family: monospace; font-weight: bold; color: #444;">${tool.codigo}</div>
-              <div style="font-size: 7pt; color: #666; margin-top: 2mm;">Escaneie para ver localização em tempo real</div>
             </div>
             <img src="${qrUrl}" style="width: 22mm; height: 22mm; margin-top: 1mm;" />
           </div>
