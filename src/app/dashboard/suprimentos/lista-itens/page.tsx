@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, Suspense } from 'react';
@@ -48,7 +47,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import SupplyMovementDialog from '@/components/SupplyMovementDialog';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import Image from 'next/image';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import EditStockItemDialog from '@/components/EditStockItemDialog';
 import { useToast } from '@/hooks/use-toast';
