@@ -1,4 +1,3 @@
-
 'use client';
 
 
@@ -579,6 +578,8 @@ export type MaintenanceTaskItem = {
     partNumber: string;
     quantidade: number;
     unidade: string;
+    valorUnitario?: number;
+    moeda?: string;
 };
 
 export type MaintenanceTask = {

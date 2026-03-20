@@ -34,7 +34,14 @@ function TaskDetailsAccordion({ task, onSaveSuccess }: { task: WithDocId<Mainten
   });
 
   const addItem = (type: 'pecas' | 'ferramentasEspeciais' | 'consumiveis') => {
-    const newItem: MaintenanceTaskItem = { nome: '', partNumber: '', quantidade: 1, unidade: 'UN' };
+    const newItem: MaintenanceTaskItem = { 
+        nome: '', 
+        partNumber: '', 
+        quantidade: 1, 
+        unidade: type === 'consumiveis' ? 'un' : 'UN',
+        valorUnitario: 0,
+        moeda: 'BRL'
+    };
     setLocalItems(prev => ({ ...prev, [type]: [...prev[type], newItem] }));
   };
 
@@ -70,79 +77,91 @@ function TaskDetailsAccordion({ task, onSaveSuccess }: { task: WithDocId<Mainten
     }
   };
 
-  const renderSection = (title: string, type: 'pecas' | 'ferramentasEspeciais' | 'consumiveis', icon: React.ReactNode) => (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center">
-        <h4 className="text-sm font-semibold flex items-center gap-2">
-          {icon} {title}
-        </h4>
-        <Button variant="outline" size="sm" onClick={() => addItem(type)} className="h-7 text-xs">
-          <PlusCircle className="mr-1 h-3 w-3" /> Adicionar
-        </Button>
-      </div>
-      <div className="space-y-2">
-        {localItems[type].length === 0 && (
-          <p className="text-xs text-muted-foreground text-center py-2 border border-dashed rounded-md">
-            Nenhum item necessário.
-          </p>
-        )}
-        {localItems[type].map((item, idx) => (
-          <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-muted/30 p-2 rounded-md border">
-            <div className="col-span-5">
-              <Input 
-                className="h-8 text-xs" 
-                value={item.nome} 
-                onChange={e => updateItem(type, idx, 'nome', e.target.value)} 
-                placeholder="Descrição"
-              />
-            </div>
-            <div className="col-span-3">
-              <Input 
-                className="h-8 text-xs font-mono" 
-                value={item.partNumber} 
-                onChange={e => updateItem(type, idx, 'partNumber', e.target.value)} 
-                placeholder="P/N"
-              />
-            </div>
-            <div className="col-span-2">
-              <Input 
-                className="h-8 text-xs" 
-                type="number" 
-                value={item.quantidade} 
-                onChange={e => updateItem(type, idx, 'quantidade', Number(e.target.value))} 
-              />
-            </div>
-            <div className="col-span-1">
-              <Select value={item.unidade} onValueChange={v => updateItem(type, idx, 'unidade', v)}>
-                <SelectTrigger className="h-8 text-[10px] px-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="UN">UN</SelectItem>
-                  <SelectItem value="KG">KG</SelectItem>
-                  <SelectItem value="LT">LT</SelectItem>
-                  <SelectItem value="MT">MT</SelectItem>
-                  <SelectItem value="AR">AR</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-1 text-right">
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem(type, idx)}>
-                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
   return (
     <div className="p-4 bg-muted/20 border-t space-y-6 animate-in slide-in-from-top-2">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {renderSection("Peças", "pecas", <Package className="h-4 w-4 text-blue-500" />)}
-        {renderSection("Ferramentas Especiais", "ferramentasEspeciais", <Wrench className="h-4 w-4 text-orange-500" />)}
-        {renderSection("Consumíveis", "consumiveis", <Droplets className="h-4 w-4 text-green-500" />)}
+      <div className="grid grid-cols-1 gap-8">
+        
+        {/* PEÇAS */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Package className="h-4 w-4 text-blue-500" /> Peças
+            </h4>
+            <Button variant="outline" size="sm" onClick={() => addItem('pecas')} className="h-7 text-xs">
+              <PlusCircle className="mr-1 h-3 w-3" /> Adicionar
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {localItems.pecas.length === 0 && <p className="text-xs text-muted-foreground text-center py-2 border border-dashed rounded-md">Nenhuma peça necessária.</p>}
+            {localItems.pecas.map((item, idx) => (
+              <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-muted/30 p-2 rounded-md border">
+                <div className="col-span-4"><Label className="text-[10px] text-muted-foreground ml-1">Descrição</Label><Input className="h-8 text-xs" value={item.nome} onChange={e => updateItem('pecas', idx, 'nome', e.target.value)} /></div>
+                <div className="col-span-2"><Label className="text-[10px] text-muted-foreground ml-1">Part Number</Label><Input className="h-8 text-xs font-mono" value={item.partNumber} onChange={e => updateItem('pecas', idx, 'partNumber', e.target.value)} /></div>
+                <div className="col-span-1"><Label className="text-[10px] text-muted-foreground ml-1">IW (Qtd)</Label><Input className="h-8 text-xs text-center" type="number" value={item.quantidade} onChange={e => updateItem('pecas', idx, 'quantidade', Number(e.target.value))} /></div>
+                <div className="col-span-3"><Label className="text-[10px] text-muted-foreground ml-1">Valor Unitário</Label><Input className="h-8 text-xs" type="number" value={item.valorUnitario} onChange={e => updateItem('pecas', idx, 'valorUnitario', Number(e.target.value))} /></div>
+                <div className="col-span-1"><Label className="text-[10px] text-muted-foreground ml-1">Moeda</Label>
+                    <Select value={item.moeda || 'BRL'} onValueChange={v => updateItem('pecas', idx, 'moeda', v)}>
+                        <SelectTrigger className="h-8 text-[10px] px-1"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="BRL">BRL</SelectItem><SelectItem value="USD">USD</SelectItem></SelectContent>
+                    </Select>
+                </div>
+                <div className="col-span-1 text-right pt-4"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem('pecas', idx)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* FERRAMENTAS ESPECIAIS */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-orange-500" /> Ferramentas Especiais
+            </h4>
+            <Button variant="outline" size="sm" onClick={() => addItem('ferramentasEspeciais')} className="h-7 text-xs">
+              <PlusCircle className="mr-1 h-3 w-3" /> Adicionar
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {localItems.ferramentasEspeciais.length === 0 && <p className="text-xs text-muted-foreground text-center py-2 border border-dashed rounded-md">Nenhuma ferramenta especial necessária.</p>}
+            {localItems.ferramentasEspeciais.map((item, idx) => (
+              <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-muted/30 p-2 rounded-md border">
+                <div className="col-span-6"><Label className="text-[10px] text-muted-foreground ml-1">Nome da Ferramenta</Label><Input className="h-8 text-xs" value={item.nome} onChange={e => updateItem('ferramentasEspeciais', idx, 'nome', e.target.value)} /></div>
+                <div className="col-span-5"><Label className="text-[10px] text-muted-foreground ml-1">Part Number</Label><Input className="h-8 text-xs font-mono" value={item.partNumber} onChange={e => updateItem('ferramentasEspeciais', idx, 'partNumber', e.target.value)} /></div>
+                <div className="col-span-1 text-right pt-4"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem('ferramentasEspeciais', idx)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CONSUMÍVEIS */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Droplets className="h-4 w-4 text-green-500" /> Consumíveis
+            </h4>
+            <Button variant="outline" size="sm" onClick={() => addItem('consumiveis')} className="h-7 text-xs">
+              <PlusCircle className="mr-1 h-3 w-3" /> Adicionar
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {localItems.consumiveis.length === 0 && <p className="text-xs text-muted-foreground text-center py-2 border border-dashed rounded-md">Nenhum consumível necessário.</p>}
+            {localItems.consumiveis.map((item, idx) => (
+              <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-muted/30 p-2 rounded-md border">
+                <div className="col-span-5"><Label className="text-[10px] text-muted-foreground ml-1">Descrição (O-ring, Graxa, etc.)</Label><Input className="h-8 text-xs" value={item.nome} onChange={e => updateItem('consumiveis', idx, 'nome', e.target.value)} /></div>
+                <div className="col-span-3"><Label className="text-[10px] text-muted-foreground ml-1">Part Number</Label><Input className="h-8 text-xs font-mono" value={item.partNumber} onChange={e => updateItem('consumiveis', idx, 'partNumber', e.target.value)} /></div>
+                <div className="col-span-2"><Label className="text-[10px] text-muted-foreground ml-1">Quantidade</Label><Input className="h-8 text-xs text-center" type="number" value={item.quantidade} onChange={e => updateItem('consumiveis', idx, 'quantidade', Number(e.target.value))} /></div>
+                <div className="col-span-1"><Label className="text-[10px] text-muted-foreground ml-1">Unid.</Label>
+                    <Select value={item.unidade || 'un'} onValueChange={v => updateItem('consumiveis', idx, 'unidade', v)}>
+                        <SelectTrigger className="h-8 text-[10px] px-1"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="un">un</SelectItem><SelectItem value="kg">kg</SelectItem><SelectItem value="AR">AR</SelectItem><SelectItem value="LT">LT</SelectItem></SelectContent>
+                    </Select>
+                </div>
+                <div className="col-span-1 text-right pt-4"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem('consumiveis', idx)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></div>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
       <div className="flex justify-end pt-2">
         <Button onClick={handleSaveDetails} disabled={isSaving} className="gap-2">
