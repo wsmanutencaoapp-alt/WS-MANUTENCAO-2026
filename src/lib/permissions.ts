@@ -33,6 +33,7 @@ export const permissionStructure = [
         submodules: [
             { id: 'suprimentos_lista', label: 'Lista de Itens (Estoque)', path: '/dashboard/suprimentos/lista-itens', actions: ['view', 'update', 'delete'] },
             { id: 'suprimentos_movimentacao', label: 'Histórico de Movimentação', path: '/dashboard/suprimentos/movimentacao', actions: ['view', 'create'] },
+            { id: 'suprimentos_inventario', label: 'Inventário / Contagem', path: '/dashboard/suprimentos/inventario', actions: ['view', 'update'] },
         ],
     },
     {

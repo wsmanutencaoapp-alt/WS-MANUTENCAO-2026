@@ -9,7 +9,7 @@ import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Package, Wrench, Search, MapPin, Box } from 'lucide-react';
+import { Loader2, Package, Wrench, Search, MapPin, Box, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,6 +33,7 @@ function ConsultaEndereçoContent() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [items, setItems] = useState<InventoryItem[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!firestore || !addressCode) {
@@ -42,6 +43,7 @@ function ConsultaEndereçoContent() {
 
         const fetchData = async () => {
             setIsLoading(true);
+            setError(null);
             try {
                 // 1. Fetch Tools at this address
                 const toolsQuery = query(collection(firestore, 'tools'), where('enderecamento', '==', addressCode));
@@ -59,6 +61,8 @@ function ConsultaEndereçoContent() {
                 });
 
                 // 2. Fetch Supply Stock at this address
+                // Use a standard query first to see if we can get anything
+                // If this fails, it's likely an index error
                 const stockQuery = query(collectionGroup(firestore, 'stock'), where('localizacao', '==', addressCode));
                 const stockSnapshot = await getDocs(stockQuery);
                 
@@ -94,9 +98,14 @@ function ConsultaEndereçoContent() {
 
                 setItems([...toolsItems, ...suppliesItems]);
 
-            } catch (error) {
-                console.error("Erro ao consultar endereço:", error);
-                toast({ variant: 'destructive', title: 'Erro de Consulta', description: 'Não foi possível carregar os itens deste endereço.' });
+            } catch (err: any) {
+                console.error("Erro ao consultar endereço:", err);
+                if (err.code === 'failed-precondition' || err.message?.includes('index')) {
+                    setError("O sistema precisa criar um índice para esta consulta. Contate o administrador ou aguarde a propagação.");
+                } else {
+                    setError("Não foi possível carregar os itens deste endereço.");
+                }
+                toast({ variant: 'destructive', title: 'Erro de Consulta', description: err.message });
             } finally {
                 setIsLoading(false);
             }
@@ -117,6 +126,20 @@ function ConsultaEndereçoContent() {
                 </Card>
             </div>
         );
+    }
+
+    if (error) {
+        return (
+            <div className="flex h-[60vh] items-center justify-center">
+                <Card className="max-w-md w-full border-destructive/50 bg-destructive/5">
+                    <CardContent className="pt-6 text-center">
+                        <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-4" />
+                        <h2 className="text-xl font-bold mb-2 text-destructive">Erro na Consulta</h2>
+                        <p className="text-sm">{error}</p>
+                    </CardContent>
+                </Card>
+            </div>
+        )
     }
 
     return (

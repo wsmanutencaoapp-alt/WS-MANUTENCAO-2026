@@ -40,6 +40,7 @@ import {
   Activity,
   Home,
   Megaphone,
+  ScanSearch,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -99,6 +100,7 @@ const allNavItems: NavItem[] = [
     subItems: [
         { href: '/dashboard/suprimentos/lista-itens', icon: List, label: 'Lista de Itens', permission: 'suprimentos_lista' },
         { href: '/dashboard/suprimentos/movimentacao', label: 'Movimentação', permission: 'suprimentos_movimentacao' },
+        { href: '/dashboard/suprimentos/inventario', icon: ScanSearch, label: 'Inventário / Contagem', permission: 'suprimentos_inventario' },
     ]
   },
   { 
