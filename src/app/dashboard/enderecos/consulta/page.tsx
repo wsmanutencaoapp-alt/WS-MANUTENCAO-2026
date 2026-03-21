@@ -31,48 +31,42 @@ function ConsultaEndereçoContent() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    const [isLoading, setIsLoading] = useState(true);
-    const [items, setItems] = useState<InventoryItem[]>([]);
-    const [error, setError] = useState<string | null>(null);
+    const [enrichedItems, setEnrichedItems] = useState<InventoryItem[]>([]);
+    const [isProcessing, setIsProcessing] = useState(false);
 
+    // 1. Fetch Tools directly (automatic index handles this)
+    const toolsQuery = useMemoFirebase(() => 
+        (firestore && addressCode) ? query(collection(firestore, 'tools'), where('enderecamento', '==', addressCode)) : null
+    , [firestore, addressCode]);
+    const { data: tools, isLoading: isLoadingTools } = useCollection<Tool>(toolsQuery);
+
+    // 2. Fetch ALL Supply Stock (avoiding index requirement for collectionGroup + where)
+    const allStockQuery = useMemoFirebase(() => firestore ? collectionGroup(firestore, 'stock') : null, [firestore]);
+    const { data: allStock, isLoading: isLoadingStock } = useCollection<SupplyStock>(allStockQuery, {
+        queryKey: ['allStockForAddressSearch']
+    });
+
+    // 3. Filter and Enrich data
     useEffect(() => {
-        if (!firestore || !addressCode) {
-            setIsLoading(false);
-            return;
-        }
+        if (!firestore || !addressCode || isLoadingTools || isLoadingStock) return;
 
-        const fetchData = async () => {
-            setIsLoading(true);
-            setError(null);
+        const enrichData = async () => {
+            setIsProcessing(true);
             try {
-                // 1. Fetch Tools at this address
-                const toolsQuery = query(collection(firestore, 'tools'), where('enderecamento', '==', addressCode));
-                const toolsSnapshot = await getDocs(toolsQuery);
-                const toolsItems: InventoryItem[] = toolsSnapshot.docs.map(doc => {
-                    const data = doc.data() as Tool;
-                    return {
-                        id: doc.id,
-                        type: 'tool',
-                        descricao: data.descricao,
-                        codigo: data.codigo,
-                        status: data.status,
-                        imageUrl: data.imageUrl,
-                    };
-                });
-
-                // 2. Fetch Supply Stock at this address
-                // Use a standard query first to see if we can get anything
-                // If this fails, it's likely an index error
-                const stockQuery = query(collectionGroup(firestore, 'stock'), where('localizacao', '==', addressCode));
-                const stockSnapshot = await getDocs(stockQuery);
-                
-                const stockResults = stockSnapshot.docs.map(doc => ({
-                    docId: doc.id,
-                    supplyId: doc.ref.parent.parent?.id,
-                    ...(doc.data() as SupplyStock)
+                // Filter tools (they are already filtered by query, but we map them)
+                const toolsItems: InventoryItem[] = (tools || []).map(t => ({
+                    id: t.docId,
+                    type: 'tool',
+                    descricao: t.descricao,
+                    codigo: t.codigo,
+                    status: t.status,
+                    imageUrl: t.imageUrl,
                 }));
 
-                const supplyIds = [...new Set(stockResults.map(s => s.supplyId).filter(Boolean))];
+                // Filter stock items client-side
+                const stockInAddress = (allStock || []).filter(s => s.localizacao === addressCode);
+                
+                const supplyIds = [...new Set(stockInAddress.map(s => s.path.split('/')[1]))];
                 
                 let supplyMap = new Map<string, Supply>();
                 if (supplyIds.length > 0) {
@@ -81,8 +75,9 @@ function ConsultaEndereçoContent() {
                     suppliesSnapshot.forEach(doc => supplyMap.set(doc.id, doc.data() as Supply));
                 }
 
-                const suppliesItems: InventoryItem[] = stockResults.map(stock => {
-                    const master = supplyMap.get(stock.supplyId!);
+                const suppliesItems: InventoryItem[] = stockInAddress.map(stock => {
+                    const supplyId = stock.path.split('/')[1];
+                    const master = supplyMap.get(supplyId);
                     return {
                         id: stock.docId,
                         type: 'supply',
@@ -96,23 +91,17 @@ function ConsultaEndereçoContent() {
                     };
                 });
 
-                setItems([...toolsItems, ...suppliesItems]);
-
+                setEnrichedItems([...toolsItems, ...suppliesItems]);
             } catch (err: any) {
-                console.error("Erro ao consultar endereço:", err);
-                if (err.code === 'failed-precondition' || err.message?.includes('index')) {
-                    setError("O sistema precisa criar um índice para esta consulta. Contate o administrador ou aguarde a propagação.");
-                } else {
-                    setError("Não foi possível carregar os itens deste endereço.");
-                }
-                toast({ variant: 'destructive', title: 'Erro de Consulta', description: err.message });
+                console.error("Erro ao enriquecer dados do endereço:", err);
+                toast({ variant: 'destructive', title: 'Erro de Dados', description: 'Não foi possível carregar os detalhes dos itens.' });
             } finally {
-                setIsLoading(false);
+                setIsProcessing(false);
             }
         };
 
-        fetchData();
-    }, [firestore, addressCode, toast]);
+        enrichData();
+    }, [firestore, addressCode, tools, allStock, isLoadingTools, isLoadingStock, toast]);
 
     if (!addressCode) {
         return (
@@ -128,19 +117,7 @@ function ConsultaEndereçoContent() {
         );
     }
 
-    if (error) {
-        return (
-            <div className="flex h-[60vh] items-center justify-center">
-                <Card className="max-w-md w-full border-destructive/50 bg-destructive/5">
-                    <CardContent className="pt-6 text-center">
-                        <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-4" />
-                        <h2 className="text-xl font-bold mb-2 text-destructive">Erro na Consulta</h2>
-                        <p className="text-sm">{error}</p>
-                    </CardContent>
-                </Card>
-            </div>
-        )
-    }
+    const isLoading = isLoadingTools || isLoadingStock || isProcessing;
 
     return (
         <div className="space-y-6">
@@ -165,10 +142,11 @@ function ConsultaEndereçoContent() {
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
-                        <div className="flex justify-center items-center h-48">
+                        <div className="flex flex-col items-center justify-center h-48 gap-2">
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-sm text-muted-foreground">Consultando banco de dados...</p>
                         </div>
-                    ) : items.length === 0 ? (
+                    ) : enrichedItems.length === 0 ? (
                         <div className="text-center py-12 border-2 border-dashed rounded-lg bg-muted/10">
                             <Box className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                             <p className="text-muted-foreground font-medium">Este endereço está vazio no sistema.</p>
@@ -185,7 +163,7 @@ function ConsultaEndereçoContent() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {items.map((item) => (
+                                {enrichedItems.map((item) => (
                                     <TableRow key={`${item.type}-${item.id}`}>
                                         <TableCell>
                                             <Image 

@@ -28,7 +28,7 @@ type ReceivingItem = (WithDocId<SupplyStock> | WithDocId<Tool>) & {
     loteInterno?: string,
     dataEntrada?: string,
     imageUrl?: string,
-    supplyId?: string, // Added for enrichment
+    supplyId?: string,
 };
 
 
@@ -67,7 +67,7 @@ export default function ReceivingStockTable() {
         queryKey: ['receivingStockTools']
     });
     
-    // Get unique supply IDs from receivingSupplies
+    // Get unique supply IDs from receivingSupplies using the new path property
     const supplyIdsInReceiving = useMemo(() => {
         if (!receivingSupplies) return [];
         return [...new Set(receivingSupplies.map(item => item.path.split('/')[1]))];
@@ -90,7 +90,7 @@ export default function ReceivingStockTable() {
                 const neededSuppliesQuery = query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIdsInReceiving));
                 const snapshot = await getDocs(neededSuppliesQuery);
                 const suppliesMap = new Map<string, WithDocId<Supply>>();
-                snapshot.docs.forEach(d => suppliesMap.set(d.id, { ...d.data() as Supply, docId: d.id }));
+                snapshot.docs.forEach(d => suppliesMap.set(d.id, { ...d.data() as Supply, docId: d.id, path: d.ref.path }));
                 setNeededSupplies(suppliesMap);
             } catch (e) {
                 console.error("Error fetching needed supplies:", e);
@@ -136,13 +136,12 @@ export default function ReceivingStockTable() {
     const handleSuccess = () => {
         queryClient.invalidateQueries({ queryKey: ['receivingStockSupplies'] });
         queryClient.invalidateQueries({ queryKey: ['receivingStockTools'] });
-        queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] }); // Invalidate main stock list
-        queryClient.invalidateQueries({ queryKey: ['allSupplyStockForReceiving'] }); // Invalidate the new broader query
+        queryClient.invalidateQueries({ queryKey: ['suppliesMasterDataForStockList'] });
+        queryClient.invalidateQueries({ queryKey: ['allSupplyStockForReceiving'] });
         setSelectedItem(null);
     }
     
     const isLoading = isLoadingAllStock || isLoadingTools || isLoadingNeededSupplies;
-    const error = allStockError || toolsError;
 
     return (
         <>

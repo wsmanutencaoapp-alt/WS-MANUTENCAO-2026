@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-export type WithDocId<T> = T & { docId: string };
+export type WithDocId<T> = T & { docId: string; path: string };
 
 export interface UseCollectionOptions {
   queryKey?: any[];
@@ -38,7 +38,7 @@ async function fetchCollection<T>(query: CollectionReference<DocumentData> | Que
     const snapshot = await getDocs(query);
     const results: WithDocId<T>[] = [];
     snapshot.forEach(doc => {
-      results.push({ ...(doc.data() as T), docId: doc.id });
+      results.push({ ...(doc.data() as T), docId: doc.id, path: doc.ref.path });
     });
     return results;
 }
@@ -83,7 +83,7 @@ export function useCollection<T = any>(
       (snapshot: QuerySnapshot<DocumentData>) => {
         const results: WithDocId<T>[] = [];
         snapshot.forEach(doc => {
-            results.push({ ...(doc.data() as T), docId: doc.id });
+            results.push({ ...(doc.data() as T), docId: doc.id, path: doc.ref.path });
         });
         // Directly update the query cache instead of invalidating
         queryClient.setQueryData(queryKey, results);

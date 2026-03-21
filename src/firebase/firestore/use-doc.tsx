@@ -34,7 +34,7 @@ export interface UseDocResult<T> {
 async function fetchDoc<T>(docRef: DocumentReference<DocumentData>): Promise<WithDocId<T> | null> {
     const snapshot = await getDoc(docRef);
     if (snapshot.exists()) {
-        return { ...(snapshot.data() as T), docId: snapshot.id };
+        return { ...(snapshot.data() as T), docId: snapshot.id, path: snapshot.ref.path };
     }
     return null;
 }
@@ -87,7 +87,7 @@ export function useDoc<T = any>(
       memoizedDocRef,
       (snapshot: DocumentSnapshot<DocumentData>) => {
         if (snapshot.exists()) {
-          queryClient.setQueryData(queryKey, { ...(snapshot.data() as T), docId: snapshot.id });
+          queryClient.setQueryData(queryKey, { ...(snapshot.data() as T), docId: snapshot.id, path: snapshot.ref.path });
         } else {
           queryClient.setQueryData(queryKey, null);
         }

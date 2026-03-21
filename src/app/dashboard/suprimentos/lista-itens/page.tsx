@@ -140,14 +140,15 @@ function SuprimentosContent() {
         const allStockItems: EnrichedStockItem[] = [];
         snapshot.forEach(doc => {
             const stockData = { docId: doc.id, ...doc.data() } as WithDocId<SupplyStock>;
-            const supplyId = doc.ref.parent.parent?.id;
+            const supplyId = doc.ref.path.split('/')[1];
             
             if (supplyId) {
                 const supplyInfo = supplyMap.get(supplyId);
                 if (supplyInfo) {
                     allStockItems.push({
                         ...stockData,
-                        supplyInfo
+                        supplyInfo,
+                        path: doc.ref.path
                     });
                 }
             }
@@ -210,7 +211,8 @@ function SuprimentosContent() {
                     dataEntrada: '',
                     status: 'Disponível',
                     supplyInfo: s,
-                    isVirtual: true
+                    isVirtual: true,
+                    path: ''
                 } as any);
             }
         });
@@ -583,7 +585,9 @@ function SuprimentosContent() {
         <Dialog open={!!imageToView} onOpenChange={() => setImageToView(null)}>
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>{imageToView.alt}</DialogTitle></DialogHeader>
-            <div className="relative w-full aspect-square"><Image src={imageToView.src} alt={imageToView.alt} fill className="object-contain rounded-md" /></div>
+            <div className="relative w-full aspect-square">
+                <Image src={imageToView.src} alt={imageToView.alt} fill className="object-contain rounded-md" />
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -631,7 +635,7 @@ function SuprimentosContent() {
                             {printSize === 'small' ? (
                                 <>
                                     <div style={{ textAlign: 'left', flex: 1, overflow: 'hidden' }}>
-                                        <div style={{ fontSize: '10pt', fontWeight: 900, lineHeight: 1.1, color: 'black', textTransform: 'uppercase' }}>{stockToPrint.supplyInfo.descricao}</div>
+                                        <div style={{ fontSize: '10pt', fontWeights: 900, lineHeight: 1.1, color: 'black', textTransform: 'uppercase' }}>{stockToPrint.supplyInfo.descricao}</div>
                                         <div style={{ fontSize: '8pt', fontFamily: 'monospace', fontWeight: 'bold', marginTop: '1mm', color: '#333' }}>LOTE: {stockToPrint.loteInterno}</div>
                                     </div>
                                     <Image 
@@ -642,7 +646,7 @@ function SuprimentosContent() {
                             ) : (
                                 <>
                                     <img src="/logo.png" style={{ height: '10mm', objectFit: 'contain', marginBottom: '5mm' }} alt="Logo" />
-                                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', marginBottom: '4mm' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', justify-content: 'center', marginBottom: '4mm' }}>
                                         <div style={{ fontSize: '12pt', fontWeight: 900, color: 'black', marginBottom: '1mm', textTransform: 'uppercase' }}>{stockToPrint.supplyInfo.descricao}</div>
                                         <div style={{ fontSize: '9pt', fontFamily: 'monospace', fontWeight: 'bold', color: '#444' }}>{stockToPrint.supplyInfo.codigo} | LOTE: {stockToPrint.loteInterno}</div>
                                         {stockToPrint.dataValidade && <div style={{ fontSize: '9pt', fontWeight: 'bold', color: 'black', marginTop: '1mm' }}>VAL: {format(parseISO(stockToPrint.dataValidade), 'dd/MM/yyyy')}</div>}

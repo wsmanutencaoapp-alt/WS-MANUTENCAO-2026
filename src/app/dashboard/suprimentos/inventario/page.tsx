@@ -36,7 +36,7 @@ export default function InventarioSuprimentosPage() {
     
     const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
     const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
     const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -46,73 +46,75 @@ export default function InventarioSuprimentosPage() {
     ), [firestore]);
     const { data: addresses, isLoading: isLoadingAddresses } = useCollection<WithDocId<Address>>(addressesQuery, { queryKey: ['addresses_for_inventory'] });
 
-    const handleAddressSelect = async (addressCode: string) => {
-        if (!firestore) return;
-        setSelectedAddress(addressCode);
-        setIsAddressPopoverOpen(false);
-        setIsLoading(true);
-        setInventoryItems([]);
+    // 1. Tools Query (Standard query - no manual index needed)
+    const toolsQuery = useMemoFirebase(() => 
+        (firestore && selectedAddress) ? query(collection(firestore, 'tools'), where('enderecamento', '==', selectedAddress)) : null
+    , [firestore, selectedAddress]);
+    const { data: tools, isLoading: isLoadingTools } = useCollection<Tool>(toolsQuery);
 
-        try {
-            // 1. Fetch Tools
-            const toolsQuery = query(collection(firestore, 'tools'), where('enderecamento', '==', addressCode));
-            const toolsSnapshot = await getDocs(toolsQuery);
-            const toolsItems: InventoryItem[] = toolsSnapshot.docs.map(d => {
-                const data = d.data() as Tool;
-                return {
-                    id: d.id,
+    // 2. Supply Stock Query (CollectionGroup - no filter to avoid index)
+    const allStockQuery = useMemoFirebase(() => firestore ? collectionGroup(firestore, 'stock') : null, [firestore]);
+    const { data: allStock, isLoading: isLoadingStock } = useCollection<SupplyStock>(allStockQuery, {
+        queryKey: ['allStockForInventory']
+    });
+
+    // 3. Filter and process data when tools or stock change
+    useEffect(() => {
+        if (!firestore || !selectedAddress || isLoadingTools || isLoadingStock) return;
+
+        const loadInventoryData = async () => {
+            setIsProcessing(true);
+            try {
+                // Tools in address
+                const toolsItems: InventoryItem[] = (tools || []).map(t => ({
+                    id: t.docId,
                     type: 'tool',
-                    masterInfo: data,
+                    masterInfo: t,
                     systemQty: 1,
                     countedQty: 1,
-                    localizacao: addressCode,
-                    status: data.status
-                };
-            });
+                    localizacao: selectedAddress,
+                    status: t.status
+                }));
 
-            // 2. Fetch Supplies
-            const stockQuery = query(collectionGroup(firestore, 'stock'), where('localizacao', '==', addressCode));
-            const stockSnapshot = await getDocs(stockQuery);
-            
-            const stockResults = stockSnapshot.docs.map(d => ({
-                docId: d.id,
-                supplyId: d.ref.parent.parent?.id,
-                ...(d.data() as SupplyStock)
-            }));
+                // Stock items in address (filtered client-side)
+                const stockInAddress = (allStock || []).filter(s => s.localizacao === selectedAddress);
+                
+                const supplyIds = [...new Set(stockInAddress.map(s => s.path.split('/')[1]))];
+                
+                let supplyMap = new Map<string, Supply>();
+                if (supplyIds.length > 0) {
+                    const suppliesQuery = query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds));
+                    const suppliesSnapshot = await getDocs(suppliesQuery);
+                    suppliesSnapshot.forEach(d => supplyMap.set(d.id, d.data() as Supply));
+                }
 
-            const supplyIds = [...new Set(stockResults.map(s => s.supplyId).filter(Boolean) as string[])];
-            
-            let supplyMap = new Map<string, Supply>();
-            if (supplyIds.length > 0) {
-                const suppliesQuery = query(collection(firestore, 'supplies'), where(documentId(), 'in', supplyIds));
-                const suppliesSnapshot = await getDocs(suppliesQuery);
-                suppliesSnapshot.forEach(d => supplyMap.set(d.id, d.data() as Supply));
+                const suppliesItems: InventoryItem[] = stockInAddress.map(stock => {
+                    const supplyId = stock.path.split('/')[1];
+                    const master = supplyMap.get(supplyId);
+                    return {
+                        id: stock.docId,
+                        supplyId: supplyId,
+                        type: 'supply',
+                        masterInfo: master || {},
+                        systemQty: stock.quantidade,
+                        countedQty: stock.quantidade,
+                        lote: stock.loteInterno,
+                        localizacao: selectedAddress,
+                        status: stock.status
+                    };
+                });
+
+                setInventoryItems([...toolsItems, ...suppliesItems]);
+            } catch (error: any) {
+                console.error("Erro ao carregar dados do inventário:", error);
+                toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar os itens.' });
+            } finally {
+                setIsProcessing(false);
             }
+        };
 
-            const suppliesItems: InventoryItem[] = stockResults.map(stock => {
-                const master = supplyMap.get(stock.supplyId!);
-                return {
-                    id: stock.docId,
-                    supplyId: stock.supplyId,
-                    type: 'supply',
-                    masterInfo: master || {},
-                    systemQty: stock.quantidade,
-                    countedQty: stock.quantidade,
-                    lote: stock.loteInterno,
-                    localizacao: addressCode,
-                    status: stock.status
-                };
-            });
-
-            setInventoryItems([...toolsItems, ...suppliesItems]);
-
-        } catch (error: any) {
-            console.error("Erro ao carregar itens para inventário:", error);
-            toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar os itens deste endereço.' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
+        loadInventoryData();
+    }, [firestore, selectedAddress, tools, allStock, isLoadingTools, isLoadingStock, toast]);
 
     const handleCountChange = (id: string, value: string) => {
         const numValue = parseInt(value, 10);
@@ -133,8 +135,6 @@ export default function InventarioSuprimentosPage() {
                         const stockRef = doc(firestore, 'supplies', item.supplyId, 'stock', item.id);
                         batch.update(stockRef, { quantidade: item.countedQty });
                     }
-                    // For tools, quantity is usually 1, so discrepancy usually means loss or status change
-                    // Here we just update if it's different, but tools logic is simpler
                 }
             });
 
@@ -149,6 +149,8 @@ export default function InventarioSuprimentosPage() {
             setIsSaving(false);
         }
     };
+
+    const isLoading = isLoadingTools || isLoadingStock || isProcessing;
 
     return (
         <div className="space-y-6">
@@ -186,7 +188,10 @@ export default function InventarioSuprimentosPage() {
                                                     <CommandItem
                                                         key={addr.docId}
                                                         value={addr.codigoCompleto}
-                                                        onSelect={() => handleAddressSelect(addr.codigoCompleto)}
+                                                        onSelect={() => {
+                                                            setSelectedAddress(addr.codigoCompleto);
+                                                            setIsAddressPopoverOpen(false);
+                                                        }}
                                                     >
                                                         <Check className={cn("mr-2 h-4 w-4", selectedAddress === addr.codigoCompleto ? "opacity-100" : "opacity-0")} />
                                                         {addr.codigoCompleto}
@@ -241,7 +246,7 @@ export default function InventarioSuprimentosPage() {
                                     {inventoryItems.map((item) => {
                                         const divergence = item.countedQty - item.systemQty;
                                         return (
-                                            <TableRow key={item.id} className={cn(divergence !== 0 && "bg-orange-50 dark:bg-orange-900/10")}>
+                                            <TableRow key={`${item.type}-${item.id}`} className={cn(divergence !== 0 && "bg-orange-50 dark:bg-orange-900/10")}>
                                                 <TableCell>
                                                     <div className="flex items-center gap-3">
                                                         <Image 
