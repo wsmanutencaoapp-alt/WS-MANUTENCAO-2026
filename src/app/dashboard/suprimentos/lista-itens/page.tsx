@@ -39,7 +39,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, Printer, ExternalLink, Trash2, ShoppingCart, AlertTriangle, AlertCircle, X, QrCode } from 'lucide-react';
+import { Loader2, PlusCircle, Search, LogIn, LogOut, Edit, PackageSearch, ChevronDown, Printer, ExternalLink, Trash2, ShoppingCart, AlertTriangle, AlertCircle, X, QrCode, Upload, FileText } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { WithDocId } from '@/firebase/firestore/use-collection';
 import { Input } from '@/components/ui/input';
@@ -96,7 +96,6 @@ function SuprimentosContent() {
   const [stockToPrint, setStockToPrint] = useState<EnrichedStockItem | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  // Captura busca via URL (QR Code)
   useEffect(() => {
     const urlSearch = searchParams.get('search');
     if (urlSearch) {
@@ -620,7 +619,6 @@ function SuprimentosContent() {
                     </div>
 
                     <div className="p-4 border rounded-md bg-muted/50 flex justify-center">
-                        {/* Preview Visual */}
                         <div id="printable-label-area" className="bg-white border shadow-sm" style={{ 
                             width: printSize === 'small' ? '452px' : '377px', 
                             height: printSize === 'small' ? '87px' : '226px',
@@ -635,26 +633,26 @@ function SuprimentosContent() {
                             {printSize === 'small' ? (
                                 <>
                                     <div style={{ textAlign: 'left', flex: 1, overflow: 'hidden' }}>
-                                        <div style={{ fontSize: '10pt', fontWeights: 900, lineHeight: 1.1, color: 'black', textTransform: 'uppercase' }}>{stockToPrint.supplyInfo.descricao}</div>
+                                        <div style={{ fontSize: '10pt', fontWeight: 900, lineHeight: 1.1, color: 'black', textTransform: 'uppercase' }}>{stockToPrint.supplyInfo.descricao}</div>
                                         <div style={{ fontSize: '8pt', fontFamily: 'monospace', fontWeight: 'bold', marginTop: '1mm', color: '#333' }}>LOTE: {stockToPrint.loteInterno}</div>
                                     </div>
-                                    <Image 
+                                    <img 
                                         src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/dashboard/suprimentos/lista-itens?search=${stockToPrint.supplyInfo.codigo}`)}`} 
-                                        alt="QR" width={60} height={60} 
+                                        alt="QR" style={{ width: '16mm', height: '16mm' }} 
                                     />
                                 </>
                             ) : (
                                 <>
                                     <img src="/logo.png" style={{ height: '10mm', objectFit: 'contain', marginBottom: '5mm' }} alt="Logo" />
-                                    <div style={{ display: 'flex', flexDirection: 'column', justify-content: 'center', marginBottom: '4mm' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', justifycontent: 'center', marginBottom: '4mm' }}>
                                         <div style={{ fontSize: '12pt', fontWeight: 900, color: 'black', marginBottom: '1mm', textTransform: 'uppercase' }}>{stockToPrint.supplyInfo.descricao}</div>
                                         <div style={{ fontSize: '9pt', fontFamily: 'monospace', fontWeight: 'bold', color: '#444' }}>{stockToPrint.supplyInfo.codigo} | LOTE: {stockToPrint.loteInterno}</div>
                                         {stockToPrint.dataValidade && <div style={{ fontSize: '9pt', fontWeight: 'bold', color: 'black', marginTop: '1mm' }}>VAL: {format(parseISO(stockToPrint.dataValidade), 'dd/MM/yyyy')}</div>}
                                     </div>
-                                    <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                                        <Image 
+                                    <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifycontent: 'center' }}>
+                                        <img 
                                             src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/dashboard/suprimentos/lista-itens?search=${stockToPrint.supplyInfo.codigo}`)}`} 
-                                            alt="QR" width={80} height={80} 
+                                            alt="QR" style={{ width: '22mm', height: '22mm' }} 
                                         />
                                     </div>
                                 </>
