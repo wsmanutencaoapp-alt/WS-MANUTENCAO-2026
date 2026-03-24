@@ -8,7 +8,6 @@ export const actionLabels: Record<PermissionAction, string> = {
     delete: 'Excluir',
 };
 
-// This new structure drives the permission dialog UI and navigation.
 export const permissionStructure = [
     {
         id: 'home',
@@ -16,6 +15,13 @@ export const permissionStructure = [
         path: '/dashboard',
         isModule: true,
         actions: ['view'],
+    },
+    {
+        id: 'ordem_servico',
+        label: 'Ordem de Serviço',
+        path: '/dashboard/ordem-servico',
+        isModule: true,
+        actions: ['view', 'create', 'update', 'delete'],
     },
     {
         id: 'dashboard_overview',
@@ -205,7 +211,6 @@ export const permissionStructure = [
     },
 ];
 
-// Generates a flat list of all possible permission IDs
 export const allPermissionIDs = permissionStructure.flatMap(module => {
     const mainPermissions = module.actions ? module.actions.map(action => `${module.id}_${action}`) : [];
     const subPermissions = module.submodules ? module.submodules.flatMap(sub => 
@@ -217,13 +222,12 @@ export const allPermissionIDs = permissionStructure.flatMap(module => {
 
 export const getRequiredPermissionForPath = (path: string): string | null => {
     if (path.startsWith('/retirada-veiculo') || path.startsWith('/anexo-comprovante')) return null; // Public page
-    if (path === '/dashboard/home') return 'home_view';
+    if (path === '/dashboard/home' || path === '/dashboard') return null; // Allow all loged users
     if (path.startsWith('/dashboard/overview')) return 'dashboard_overview_view';
     if (path === '/dashboard/settings') return null; // All users can see their own settings
     if (path === '/dashboard/financeiro/despesas-individuais') return null;
-    if (path === '/dashboard/enderecos/consulta') return null; // Permite consulta de QR code de endereço para todos logados
+    if (path === '/dashboard/enderecos/consulta') return null;
 
-    // Find the most specific submodule path match first
     for (const module of permissionStructure) {
         if (module.submodules) {
             for (const sub of module.submodules) {
@@ -234,7 +238,6 @@ export const getRequiredPermissionForPath = (path: string): string | null => {
         }
     }
     
-    // Then check top-level modules
     for (const module of permissionStructure) {
         if (path.startsWith(module.path)) {
             return `${module.id}_view`;

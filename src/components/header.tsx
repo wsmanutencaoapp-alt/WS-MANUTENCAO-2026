@@ -40,7 +40,9 @@ import {
   Activity,
   Home,
   Megaphone,
+  Settings2,
   ScanSearch,
+  FileText,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -75,6 +77,12 @@ const allNavItems: NavItem[] = [
     icon: Home, 
     label: 'Home',
     permission: 'home',
+  },
+  { 
+    href: '/dashboard/ordem-servico', 
+    icon: FileText, 
+    label: 'Ordem de Serviço',
+    permission: 'ordem_servico',
   },
   { 
     href: '/dashboard/overview',
@@ -130,6 +138,8 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/cadastros/enderecos', label: 'Endereços', permission: 'cadastros_enderecos' },
         { href: '/dashboard/cadastros/centro-de-custo', label: 'Centro de Custo', permission: 'cadastros_centro_custo' },
         { href: '/dashboard/cadastros/treinamentos', label: 'Treinamentos', permission: 'cadastros_treinamentos', icon: ClipboardList },
+        { href: '/dashboard/cadastros/tecnica/modelos', label: 'Técnica: Modelos', permission: 'cadastros_tecnica_modelos', icon: Settings2 },
+        { href: '/dashboard/cadastros/tecnica/tarefas', label: 'Técnica: Tarefas', permission: 'cadastros_tecnica_tarefas', icon: ClipboardList },
     ]
   },
   { 

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Header } from '@/components/header';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth } from '@/firebase';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { doc } from 'firebase/firestore';
@@ -35,7 +35,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isLoading) {
-      return; // Wait until user and employee data are loaded
+      return; 
     }
 
     if (!user) {
@@ -60,11 +60,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       const requiredPermission = getRequiredPermissionForPath(pathname);
       const isAdmin = isSuperAdmin || (employeeData && employeeData.accessLevel === 'Admin');
       
+      // Basic authorization check
       if (isAdmin || !requiredPermission || (employeeData?.permissions && employeeData.permissions[requiredPermission])) {
         setIsAuthorized(true);
       } else {
-        setIsAuthorized(false);
-        router.push('/dashboard/home'); // Redirect to home if not authorized
+        // If not authorized for this specific path, redirect to home
+        if (pathname !== '/dashboard/home' && pathname !== '/dashboard') {
+            toast({
+                variant: 'destructive',
+                title: 'Acesso Restrito',
+                description: 'Você não tem permissão para acessar este módulo.'
+            });
+            router.push('/dashboard/home');
+        } else {
+            // If they can't even see the home, we might have a configuration issue, 
+            // but for now we allow the home to render to avoid loops.
+            setIsAuthorized(true);
+        }
       }
     }
 

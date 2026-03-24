@@ -43,6 +43,7 @@ import {
   Megaphone,
   Settings2,
   ScanSearch,
+  FileText,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -62,6 +63,12 @@ const allNavItems: NavItem[] = [
     icon: Home, 
     label: 'Home',
     permission: 'home',
+  },
+  { 
+    href: '/dashboard/ordem-servico', 
+    icon: FileText, 
+    label: 'Ordem de Serviço',
+    permission: 'ordem_servico',
   },
   { 
     href: '/dashboard/overview',
