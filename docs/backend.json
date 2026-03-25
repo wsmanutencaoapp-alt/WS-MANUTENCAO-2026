@@ -16,6 +16,57 @@
       },
       "required": ["manufacturer", "model"]
     },
+    "Aircraft": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Aircraft",
+      "type": "object",
+      "description": "Represents an individual aircraft and its operator details.",
+      "properties": {
+        "id": { "type": "number", "description": "Sequential unique identifier." },
+        "prefix": { "type": "string" },
+        "modelId": { "type": "string" },
+        "modelName": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "year": { "type": "string" },
+        "mtow": { "type": "string" },
+        "operator": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "cnpj": { "type": "string" },
+            "inscricaoEstadual": { "type": "string" },
+            "inscricaoMunicipal": { "type": "string" },
+            "address": { "type": "string" },
+            "zipCode": { "type": "string" },
+            "isIcmsContributor": { "type": "boolean" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "prefix", "modelId", "serialNumber", "operator"]
+    },
+    "MarketFleet": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Market Fleet (RAB)",
+      "type": "object",
+      "description": "Dados prospectados do RAB da ANAC.",
+      "properties": {
+        "prefixo": { "type": "string" },
+        "modelo": { "type": "string" },
+        "fabricante": { "type": "string" },
+        "operador": { "type": "string" },
+        "proprietario": { "type": "string" },
+        "validadeCVA": { "type": "string" },
+        "tipoMotor": { "type": "string" },
+        "tipoAeronave": { "type": "string" },
+        "categoria": { "type": "string" },
+        "nrSerie": { "type": "string" },
+        "anoFabricacao": { "type": "string" },
+        "mtow": { "type": "string" },
+        "lastSyncedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["prefixo", "modelo"]
+    },
     "EngineModel": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Engine Model",
@@ -737,7 +788,7 @@
         },
         "patrimonio": {
           "type": "string",
-          "description": "Asset number, defined by accounting."
+          "description": "Asset number, defined by architectural standards."
         },
         "status": {
           "type": "string",
@@ -1264,10 +1315,6 @@
           "format": "date",
           "description": "A data em que a credencial do funcionário foi devolvida."
         },
-        "motivoBaixa": {
-          "type": "string",
-          "description": "O motivo da baixa do funcionário."
-        },
         "birthDate": {
           "type": "string",
           "format": "date",
@@ -1681,41 +1728,15 @@
       "type": "object",
       "description": "Represents a user notification.",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "userId": {
-          "type": "string",
-          "description": "The UID of the user this notification is for."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the notification."
-        },
-        "message": {
-          "type": "string",
-          "description": "The main content of the notification."
-        },
-        "link": {
-          "type": "string",
-          "description": "A URL to navigate to when the notification is clicked."
-        },
-        "read": {
-          "boolean": "Whether the notification has been read."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "link": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "userId",
-        "title",
-        "message",
-        "link",
-        "read",
-        "createdAt"
-      ]
+      "required": ["userId", "title", "message", "link", "read", "createdAt"]
     },
     "EmailConfiguration": {
       "title": "Email Configuration",
@@ -1841,44 +1862,16 @@
       "type": "object",
       "description": "Represents a training course and its properties.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Training entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the training."
-        },
-        "application": {
-          "type": "string",
-          "description": "Description of the training's application."
-        },
-        "validityPeriod": {
-          "type": "number",
-          "description": "Validity period in months."
-        },
-        "isSgso": {
-          "type": "boolean",
-          "description": "Flag indicating if it's an SGSO training."
-        },
-        "isAvsec": {
-          "type": "boolean",
-          "description": "Flag indicating if it's an AVSEC training."
-        },
-        "triggersAccessChange": {
-          "type": "boolean",
-          "description": "Flag indicating if it triggers access level change."
-        },
-        "accessLevelGranted": {
-          "type": "string",
-          "description": "The name of the new access level or permission granted upon completion."
-        }
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "application": { "type": "string" },
+        "validityPeriod": { "type": "number" },
+        "isSgso": { "type": "boolean" },
+        "isAvsec": { "type": "boolean" },
+        "triggersAccessChange": { "type": "boolean" },
+        "accessLevelGranted": { "type": "string" }
       },
-      "required": [
-        "name",
-        "application",
-        "validityPeriod"
-      ]
+      "required": ["name", "application", "validityPeriod"]
     },
     "EmployeeTraining": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1886,39 +1879,15 @@
       "type": "object",
       "description": "Records a training completed by an employee.",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "employeeId": {
-          "type": "string"
-        },
-        "trainingId": {
-          "type": "string"
-        },
-        "trainingName": {
-          "type": "string",
-          "description": "Denormalized training name for display."
-        },
-        "completionDate": {
-          "type": "string",
-          "format": "date"
-        },
-        "expiryDate": {
-          "type": "string",
-          "format": "date"
-        },
-        "certificateUrl": {
-          "type": "string",
-          "format": "uri"
-        }
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "trainingId": { "type": "string" },
+        "trainingName": { "type": "string" },
+        "completionDate": { "type": "string", "format": "date" },
+        "expiryDate": { "type": "string", "format": "date" },
+        "certificateUrl": { "type": "string", "format": "uri" }
       },
-      "required": [
-        "employeeId",
-        "trainingId",
-        "trainingName",
-        "completionDate",
-        "expiryDate"
-      ]
+      "required": ["employeeId", "trainingId", "trainingName", "completionDate", "expiryDate"]
     },
     "ActivityLog": {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1943,25 +1912,11 @@
             "id": { "type": "string" },
             "title": { "type": "string" },
             "description": { "type": "string" },
-            "isPrivate": { "type": "boolean", "description": "If true, the activity is only visible to the requester, assignee, and specified viewers." },
-            "viewerIds": {
-                "type": "array",
-                "description": "A list of user IDs who can view a private activity.",
-                "items": { "type": "string" }
-            },
-            "priority": {
-              "type": "string",
-              "enum": ["Normal", "Média", "Urgente"]
-            },
-            "sector": {
-              "type": "string",
-              "description": "The sector the activity belongs to.",
-              "enum": ["Ferramentaria", "Suprimentos", "Engenharia", "Manutenção", "TI", "Qualidade", "GSO", "Administrativo", "Financeiro", "Outro"]
-            },
-            "status": {
-                "type": "string",
-                "enum": ["Pendente", "Em Andamento", "Concluída", "Recusada", "Aguardando Validação", "Arquivada"]
-            },
+            "isPrivate": { "type": "boolean" },
+            "viewerIds": { "type": "array", "items": { "type": "string" } },
+            "priority": { "type": "string", "enum": ["Normal", "Média", "Urgente"] },
+            "sector": { "type": "string", "enum": ["Ferramentaria", "Suprimentos", "Engenharia", "Manutenção", "TI", "Qualidade", "GSO", "Administrativo", "Financeiro", "Outro"] },
+            "status": { "type": "string", "enum": ["Pendente", "Em Andamento", "Concluída", "Recusada", "Aguardando Validação", "Arquivada"] },
             "requesterId": { "type": "string" },
             "requesterName": { "type": "string" },
             "assigneeId": { "type": "string" },
@@ -1971,10 +1926,7 @@
             "refusalJustification": { "type": "string" },
             "validationNotes": { "type": "string" },
             "isEffective": { "type": "boolean" },
-            "history": {
-                "type": "array",
-                "items": { "$ref": "#/entities/ActivityLog" }
-            }
+            "history": { "type": "array", "items": { "$ref": "#/entities/ActivityLog" } }
         },
         "required": ["title", "status", "requesterId", "assigneeId", "createdAt", "priority", "sector"]
     },
@@ -1985,23 +1937,11 @@
       "description": "Represents an internal company announcement, event, or publication.",
       "properties": {
         "id": { "type": "string" },
-        "title": { "type": "string", "description": "The title of the communication." },
-        "content": { "type": "string", "description": "The main body/content of the communication." },
-        "category": {
-          "type": "string",
-          "enum": ["Avisos", "Eventos", "Seguranca", "RH"],
-          "description": "The category of the communication."
-        },
-        "eventDate": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The date and time of the event, if applicable."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Timestamp of when the communication was created."
-        }
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string", "enum": ["Avisos", "Eventos", "Seguranca", "RH"] },
+        "eventDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "content", "category", "createdAt"]
     },
@@ -2051,10 +1991,7 @@
         "responsavelId": { "type": "string" },
         "responsavelName": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "history": {
-          "type": "array",
-          "items": { "$ref": "#/entities/ActivityLog" }
-        }
+        "history": { "type": "array", "items": { "$ref": "#/entities/ActivityLog" } }
       },
       "required": ["modeloAeronave", "prefixo", "tipoVoo", "chegadaData", "responsavelId", "responsavelName", "createdAt"]
     }
@@ -2068,272 +2005,135 @@
     "structure": [
       {
         "path": "/vehicles/{vehicleId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Vehicle"
-          },
-          "description": "Stores company vehicles."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Vehicle" }, "description": "Stores company vehicles." }
+      },
+      {
+        "path": "/aircrafts/{aircraftId}",
+        "definition": { "schema": { "$ref": "#/entities/Aircraft" }, "description": "Armazena as aeronaves dos clientes e detalhes do operador." }
+      },
+      {
+        "path": "/market_fleet/{aircraftId}",
+        "definition": { "schema": { "$ref": "#/entities/MarketFleet" }, "description": "Dados globais de mercado do RAB ANAC filtrados." }
       },
       {
         "path": "/vehicle_movements/{movementId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/VehicleMovement"
-          },
-          "description": "Stores vehicle entry and exit records."
-        }
+        "definition": { "schema": { "$ref": "#/entities/VehicleMovement" }, "description": "Stores vehicle entry and exit records." }
       },
       {
         "path": "/visits/{visitId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Visit"
-          },
-          "description": "Stores visitor entry and exit records."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Visit" }, "description": "Stores visitor entry and exit records." }
       },
       {
         "path": "/addresses/{addressId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Address"
-          },
-          "description": "Stores hierarchical storage addresses."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Address" }, "description": "Stores hierarchical storage addresses." }
       },
       {
         "path": "/budgets/{budgetId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Budget"
-          },
-          "description": "Stores budget allocations for different sectors."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Budget" }, "description": "Stores budget allocations for different sectors." }
       },
       {
         "path": "/approval_tiers/{tierId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/ApprovalTier"
-          },
-          "description": "Stores approval tier configurations."
-        }
+        "definition": { "schema": { "$ref": "#/entities/ApprovalTier" }, "description": "Stores approval tier configurations." }
       },
       {
         "path": "/supplies/{supplyId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Supply"
-          },
-          "description": "Stores the master data for supply items."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Supply" }, "description": "Stores the master data for supply items." }
       },
       {
         "path": "/supplies/{supplyId}/stock/{stockId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/SupplyStock"
-          },
-          "description": "Stores individual, trackable batches of supplies as a subcollection of the master supply item."
-        }
+        "definition": { "schema": { "$ref": "#/entities/SupplyStock" }, "description": "Stores individual, trackable batches of supplies." }
       },
       {
         "path": "/supply_movements/{movementId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/SupplyMovement"
-          },
-          "description": "Stores the historical log of all supply movements."
-        }
+        "definition": { "schema": { "$ref": "#/entities/SupplyMovement" }, "description": "Stores the historical log of all supply movements." }
       },
       {
         "path": "/tools/{toolId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Tool"
-          },
-          "description": "Stores aircraft maintenance tools and their calibration details based on intelligent taxonomy."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Tool" }, "description": "Stores aircraft maintenance tools." }
       },
       {
         "path": "/kits/{kitId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Kit"
-          },
-          "description": "Stores tool kits, each containing references to multiple tools."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Kit" }, "description": "Stores tool kits." }
       },
       {
         "path": "/tools/{toolId}/calibration_history/{calibrationId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/CalibrationRecord"
-          },
-          "description": "Stores the historical records of all calibrations for a specific tool, ensuring traceability."
-        }
+        "definition": { "schema": { "$ref": "#/entities/CalibrationRecord" }, "description": "Stores calibration history for tools." }
       },
       {
         "path": "/suppliers/{supplierId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Supplier"
-          },
-          "description": "Stores information about suppliers of aircraft maintenance supplies."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Supplier" }, "description": "Stores supplier information." }
       },
       {
         "path": "/employees/{employeeId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Employee"
-          },
-          "description": "Stores employee information."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Employee" }, "description": "Stores employee information." }
       },
       {
         "path": "/employees/{employeeId}/notifications/{notificationId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Notification"
-          },
-          "description": "Stores user-specific notifications."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Notification" }, "description": "Stores user-specific notifications." }
       },
-       {
+      {
         "path": "/temporary_employees/{tempEmployeeId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/TemporaryEmployee"
-          },
-          "description": "Stores temporary and third-party employee information for credentialing purposes."
-        }
+        "definition": { "schema": { "$ref": "#/entities/TemporaryEmployee" }, "description": "Stores temporary employee info." }
       },
       {
         "path": "/gate_personnel/{personnelId}",
-        "definition": { "schema": { "$ref": "#/entities/GatePersonnel" }, "description": "Stores gatehouse personnel information for credentialing purposes." }
+        "definition": { "schema": { "$ref": "#/entities/GatePersonnel" }, "description": "Stores gatehouse personnel info." }
       },
       {
         "path": "/expenses/{expenseId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Despesa"
-          },
-          "description": "Stores financial expense records."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Despesa" }, "description": "Stores financial expense records." }
       },
       {
         "path": "/tool_requests/{requestId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/ToolRequest"
-          },
-          "description": "Stores requests for tool loans."
-        }
+        "definition": { "schema": { "$ref": "#/entities/ToolRequest" }, "description": "Stores requests for tool loans." }
       },
       {
         "path": "/cost_centers/{costCenterId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/CostCenter"
-          },
-          "description": "Stores cost center master data."
-        }
+        "definition": { "schema": { "$ref": "#/entities/CostCenter" }, "description": "Stores cost center master data." }
       },
       {
         "path": "/purchase_requisitions/{requisitionId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/PurchaseRequisition"
-          },
-          "description": "Stores the header for purchase requisitions and orders."
-        }
+        "definition": { "schema": { "$ref": "#/entities/PurchaseRequisition" }, "description": "Stores purchase requisitions and orders." }
       },
       {
         "path": "/purchase_requisitions/{requisitionId}/items/{itemId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/PurchaseRequisitionItem"
-          },
-          "description": "Stores the items within a specific purchase requisition or order."
-        }
+        "definition": { "schema": { "$ref": "#/entities/PurchaseRequisitionItem" }, "description": "Stores items within purchase documents." }
       },
       {
         "path": "/email_configurations/{configId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/EmailConfiguration"
-          },
-          "description": "Stores configurations for various email notifications."
-        }
+        "definition": { "schema": { "$ref": "#/entities/EmailConfiguration" }, "description": "Stores email configs." }
       },
       {
         "path": "/vehicles/{vehicleId}/maintenance_plans/{planId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/MaintenancePlan"
-          },
-          "description": "Stores maintenance plans for a vehicle."
-        }
+        "definition": { "schema": { "$ref": "#/entities/MaintenancePlan" }, "description": "Maintenance plans for a vehicle." }
       },
       {
         "path": "/vehicles/{vehicleId}/maintenance_records/{recordId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/MaintenanceRecord"
-          },
-          "description": "Stores maintenance history for a vehicle."
-        }
+        "definition": { "schema": { "$ref": "#/entities/MaintenanceRecord" }, "description": "Maintenance history for a vehicle." }
       },
       {
         "path": "/app_config/{configId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/AppAppearance"
-          },
-          "description": "Stores application-wide configuration documents, like appearance settings."
-        }
+        "definition": { "schema": { "$ref": "#/entities/AppAppearance" }, "description": "App-wide configuration." }
       },
       {
         "path": "/trainings/{trainingId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/Training"
-          },
-          "description": "Stores training course definitions."
-        }
+        "definition": { "schema": { "$ref": "#/entities/Training" }, "description": "Training course definitions." }
       },
       {
         "path": "/employees/{employeeId}/trainings/{trainingRecordId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/EmployeeTraining"
-          },
-          "description": "Stores training records for a specific employee."
-        }
+        "definition": { "schema": { "$ref": "#/entities/EmployeeTraining" }, "description": "Employee training records." }
       },
       {
         "path": "/activities/{activityId}",
-        "definition": { "schema": { "$ref": "#/entities/Activity" }, "description": "Stores tasks and activities for users." }
+        "definition": { "schema": { "$ref": "#/entities/Activity" }, "description": "Tasks and activities." }
       },
       {
         "path": "/communications/{communicationId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/CorporateCommunication"
-          },
-          "description": "Stores internal corporate communications like announcements, events, etc."
-        }
+        "definition": { "schema": { "$ref": "#/entities/CorporateCommunication" }, "description": "Internal announcements." }
       },
       {
         "path": "/atendimentos_gso/{atendimentoId}",
-        "definition": {
-          "schema": {
-            "$ref": "#/entities/AtendimentoGSO"
-          },
-          "description": "Armazena as fichas de atendimento a aeronaves."
-        }
+        "definition": { "schema": { "$ref": "#/entities/AtendimentoGSO" }, "description": "Fichas de atendimento GSO." }
       },
       {
         "path": "/aircraftModels/{id}",
