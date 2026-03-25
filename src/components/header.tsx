@@ -43,6 +43,9 @@ import {
   Settings2,
   ScanSearch,
   FileText,
+  BadgeDollarSign,
+  HeartHandshake,
+  Map as MapIcon,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -54,19 +57,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { doc } from 'firebase/firestore';
-import { NavMenu, NavItem } from '@/components/nav-menu';
-import { SidebarTrigger } from '@/components/ui/sidebar';
+import { NavMenu, type NavItem } from '@/components/nav-menu';
 import type { Employee } from '@/lib/types';
 import { useMemo } from 'react';
 import { ThemeToggle } from './theme-toggle';
-import Image from 'next/image';
 import Notifications from './Notifications';
 
 const SUPER_ADMIN_UID = 'SOID8C723XUmlniI3mpjBmBPA5v1';
@@ -130,6 +130,7 @@ const allNavItems: NavItem[] = [
     label: 'Cadastros',
     permission: 'cadastros',
     subItems: [
+        { href: '/dashboard/cadastros/aeronaves', label: 'Aeronaves', permission: 'cadastros_aeronaves', icon: Plane },
         { href: '/dashboard/cadastros/ferramentas', label: 'Ferramentas', permission: 'cadastros_ferramentas' },
         { href: '/dashboard/cadastros/suprimentos', label: 'Suprimentos', permission: 'cadastros_suprimentos' },
         { href: '/dashboard/cadastros/fornecedores', label: 'Fornecedores', permission: 'cadastros_fornecedores' },
@@ -151,6 +152,19 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/compras/requisicao', label: 'Requisição de Compra', permission: 'compras_requisicao', icon: FileSignature },
         { href: '/dashboard/compras/aprovacoes', label: 'Aprovações', permission: 'compras_aprovacoes' },
         { href: '/dashboard/compras/controle-compras', icon: FileCog, label: 'Controle de Compras', permission: 'compras_controle' },
+    ]
+  },
+  {
+    href: '/dashboard/comercial',
+    icon: BadgeDollarSign,
+    label: 'Comercial',
+    permission: 'comercial',
+    subItems: [
+        { href: '/dashboard/comercial/aeronaves', label: 'Aeronaves Cadastradas', permission: 'comercial_aeronaves', icon: Plane },
+        { href: '/dashboard/comercial/orcamentos', label: 'Orçamentos', permission: 'comercial_orcamentos', icon: FileText },
+        { href: '/dashboard/comercial/faturamento', label: 'Faturamento de Serviço', permission: 'comercial_faturamento', icon: DollarSign },
+        { href: '/dashboard/comercial/relacionamento', label: 'Relacionamento Cliente', permission: 'comercial_relacionamento', icon: HeartHandshake },
+        { href: '/dashboard/comercial/mapeamento', label: 'Mapeamento Clientes', permission: 'comercial_mapeamento', icon: MapIcon },
     ]
   },
   {

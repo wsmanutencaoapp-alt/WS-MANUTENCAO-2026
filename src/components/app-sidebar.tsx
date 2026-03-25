@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -44,6 +45,10 @@ import {
   Settings2,
   ScanSearch,
   FileText,
+  BadgeDollarSign,
+  ReceiptBrazilianReal,
+  HeartHandshake,
+  Map,
 } from 'lucide-react';
 import { NavMenu, type NavItem } from '@/components/nav-menu';
 import { cn } from '@/lib/utils';
@@ -116,6 +121,7 @@ const allNavItems: NavItem[] = [
     label: 'Cadastros',
     permission: 'cadastros',
     subItems: [
+        { href: '/dashboard/cadastros/aeronaves', label: 'Aeronaves', permission: 'cadastros_aeronaves', icon: Plane },
         { href: '/dashboard/cadastros/ferramentas', label: 'Ferramentas', permission: 'cadastros_ferramentas' },
         { href: '/dashboard/cadastros/suprimentos', label: 'Suprimentos', permission: 'cadastros_suprimentos' },
         { href: '/dashboard/cadastros/fornecedores', label: 'Fornecedores', permission: 'cadastros_fornecedores' },
@@ -137,6 +143,19 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/compras/requisicao', label: 'Requisição de Compra', permission: 'compras_requisicao', icon: FileSignature },
         { href: '/dashboard/compras/aprovacoes', label: 'Aprovações', permission: 'compras_aprovacoes' },
         { href: '/dashboard/compras/controle-compras', icon: FileCog, label: 'Controle de Compras', permission: 'compras_controle' },
+    ]
+  },
+  {
+    href: '/dashboard/comercial',
+    icon: BadgeDollarSign,
+    label: 'Comercial',
+    permission: 'comercial',
+    subItems: [
+        { href: '/dashboard/comercial/aeronaves', label: 'Aeronaves Cadastradas', permission: 'comercial_aeronaves', icon: Plane },
+        { href: '/dashboard/comercial/orcamentos', label: 'Orçamentos', permission: 'comercial_orcamentos', icon: FileText },
+        { href: '/dashboard/comercial/faturamento', label: 'Faturamento de Serviço', permission: 'comercial_faturamento', icon: DollarSign },
+        { href: '/dashboard/comercial/relacionamento', label: 'Relacionamento Cliente', permission: 'comercial_relacionamento', icon: HeartHandshake },
+        { href: '/dashboard/comercial/mapeamento', label: 'Mapeamento Clientes', permission: 'comercial_mapeamento', icon: Map },
     ]
   },
   {

@@ -1,3 +1,4 @@
+
 'use client';
 
 
@@ -13,6 +14,42 @@ export type Vehicle = {
   status: 'Ativo' | 'Inativo' | 'Em Manutenção' | 'Em Viagem';
   base?: string;
   dataVencimento?: string; // date
+};
+
+export type Aircraft = {
+  id: number;
+  prefix: string;
+  modelId: string;
+  modelName: string;
+  serialNumber: string;
+  year: string;
+  mtow: string;
+  operator: {
+    name: string;
+    cnpj: string;
+    inscricaoEstadual: string;
+    inscricaoMunicipal: string;
+    address: string;
+    zipCode: string;
+    isIcmsContributor: boolean;
+  };
+  createdAt?: string;
+};
+
+export type MarketFleet = {
+  prefixo: string;
+  modelo: string;
+  fabricante: string;
+  operador: string;
+  proprietario: string;
+  validadeCVA: string;
+  tipoMotor: string;
+  tipoAeronave: string;
+  categoria: string;
+  nrSerie: string;
+  anoFabricacao: string;
+  mtow: string;
+  lastSyncedAt: string;
 };
 
 export type VehicleMovement = {
@@ -215,6 +252,7 @@ export type Permissions = {
   cadastros_treinamentos?: boolean;
   cadastros_tecnica_modelos?: boolean;
   cadastros_tecnica_tarefas?: boolean;
+  cadastros_aeronaves?: boolean;
   engenharia?: boolean;
   engenharia_aprovacoes?: boolean;
   engenharia_projetos?: boolean;
@@ -531,6 +569,7 @@ export type AtendimentoGSO = {
   tripulantesCount?: number;
   passageirosCount?: number;
   origem?: string;
+  path?: string;
   saidaData?: string; // ISO String
   escala?: string;
   destinoFinal?: string;
@@ -602,8 +641,8 @@ export type MaintenanceTask = {
   
   // Frequências Iniciais
   frequenciaInicialHoras: string;
-  frequenciaInicialCiclos: string;
-  frequenciaInicialCalendario: string;
+  frequenciaCiclos: string;
+  frequenciaCalendario: string;
 
   // Itens Relacionados
   pecas?: MaintenanceTaskItem[];

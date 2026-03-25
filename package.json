@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 9002",
+    "dev": "next dev",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
@@ -52,6 +52,7 @@
     "jsbarcode": "^3.11.6",
     "lucide-react": "^0.417.0",
     "next": "14.2.35",
+    "papaparse": "^5.4.1",
     "react": "18.3.1",
     "react-day-picker": "8.10.1",
     "react-dom": "18.3.1",
@@ -60,11 +61,13 @@
     "resend": "^3.4.0",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20",
+    "@types/papaparse": "^5.3.14",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "genkit-cli": "^1.20.0",

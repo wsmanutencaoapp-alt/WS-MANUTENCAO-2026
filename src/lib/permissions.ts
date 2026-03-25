@@ -1,3 +1,4 @@
+
 export const permissionActions = ['view', 'create', 'update', 'delete'] as const;
 export type PermissionAction = typeof permissionActions[number];
 
@@ -63,6 +64,7 @@ export const permissionStructure = [
         isModule: true,
         actions: ['view'],
         submodules: [
+            { id: 'cadastros_aeronaves', label: 'Aeronaves', path: '/dashboard/cadastros/aeronaves', actions: ['view', 'create', 'update', 'delete'] },
             { id: 'cadastros_ferramentas', label: 'Ferramentas', path: '/dashboard/cadastros/ferramentas', actions: ['view', 'create', 'update', 'delete'] },
             { id: 'cadastros_suprimentos', label: 'Suprimentos', path: '/dashboard/cadastros/suprimentos', actions: ['view', 'create', 'update', 'delete'] },
             { id: 'cadastros_fornecedores', label: 'Fornecedores', path: '/dashboard/cadastros/fornecedores', actions: ['view', 'create', 'update', 'delete'] },
@@ -86,6 +88,20 @@ export const permissionStructure = [
             { id: 'compras_aprovacoes', label: 'Aprovações', path: '/dashboard/compras/aprovacoes', actions: ['view', 'update'] },
             { id: 'compras_controle', label: 'Controle de Compras', path: '/dashboard/compras/controle-compras', actions: ['view', 'create', 'update', 'delete'] },
         ],
+    },
+    {
+        id: 'comercial',
+        label: 'Comercial',
+        path: '/dashboard/comercial',
+        isModule: true,
+        actions: ['view'],
+        submodules: [
+            { id: 'comercial_aeronaves', label: 'Aeronaves Cadastradas', path: '/dashboard/comercial/aeronaves', actions: ['view', 'update'] },
+            { id: 'comercial_orcamentos', label: 'Orçamentos', path: '/dashboard/comercial/orcamentos', actions: ['view', 'create', 'update', 'delete'] },
+            { id: 'comercial_faturamento', label: 'Faturamento de Serviço', path: '/dashboard/comercial/faturamento', actions: ['view', 'create', 'update'] },
+            { id: 'comercial_relacionamento', label: 'Relacionamento Cliente', path: '/dashboard/comercial/relacionamento', actions: ['view', 'create', 'update'] },
+            { id: 'comercial_mapeamento', label: 'Mapeamento Clientes', path: '/dashboard/comercial/mapeamento', actions: ['view', 'create', 'update'] },
+        ]
     },
     {
         id: 'engenharia',
@@ -126,6 +142,8 @@ export const permissionStructure = [
         isModule: true,
         actions: ['view'],
         submodules: [
+            { id: 'contabilidade_balancete', label: 'Balancete', path: '/dashboard/contabilidade/balancete', actions: ['view', 'update'] },
+            { id: 'contabilidade_relatorios', label: 'Relatórios', path: '/dashboard/contabilidade/relatorios', actions: ['view', 'update'] },
             { id: 'contabilidade_classificacao', label: 'Classificação Contábil', path: '/dashboard/contabilidade/classificacao', actions: ['view', 'update'] },
         ]
     },
