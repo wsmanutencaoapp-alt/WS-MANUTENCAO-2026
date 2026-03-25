@@ -5,11 +5,15 @@ service cloud.firestore {
 
     // --- REGRAS PARA O MÓDULO MONITOR (ADICIONADO) ---
     match /monitors/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read, write: if isAuthenticated();
     }
 
-    // --- REGRAS ORIGINAIS RESTAURADAS ---
+    // --- REGRAS PARA CONTADORES (ESSENCIAL PARA NOVOS ITENS) ---
+    match /counters/{counterId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // --- REGRAS ORIGINAIS RESTAURADAS E AMPLIADAS ---
 
     // Verifica se o usuário está logado
     function isAuthenticated() {
@@ -17,7 +21,6 @@ service cloud.firestore {
     }
     
     // IMPORTANTE: Busca o perfil SEMPRE no banco (default)
-    // A sintaxe /databases/(default)/documents/ é a única permitida para cross-db
     function isAdmin() {
       let profilePath = /databases/(default)/documents/employees/$(request.auth.uid);
       return isAuthenticated() && (
@@ -39,42 +42,78 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    // --- REGRAS PARA O BANCO TÉCNICO (operation-manager) ---
+    // --- CADASTROS TÉCNICOS ---
     match /aircraftModels/{id} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('cadastros_tecnica_modelos');
     }
     match /engineModels/{id} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('cadastros_tecnica_modelos');
     }
     match /apuModels/{id} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('cadastros_tecnica_modelos');
     }
     match /propellerModels/{id} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_modelos_update');
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('cadastros_tecnica_modelos');
     }
     match /maintenance_tasks/{id} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('cadastros_tecnica_tarefas_update');
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('cadastros_tecnica_tarefas');
     }
 
-    // --- REGRAS PARA O BANCO PADRÃO (default) E GERAIS ---
+    // --- SUPRIMENTOS E FERRAMENTARIA (ADICIONADO ESPECIFICAMENTE) ---
+    match /supplies/{id} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('cadastros_suprimentos') || hasPermission('suprimentos_movimentacao');
+        
+        match /stock/{stockId} {
+            allow read, write: if isAuthenticated();
+        }
+    }
+    
+    match /tools/{id} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('cadastros_ferramentas') || hasPermission('ferramentaria_movimentacao');
+        
+        match /calibration_history/{historyId} {
+            allow read, write: if isAuthenticated();
+        }
+    }
+    
+    match /kits/{id} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('ferramentaria_kits');
+    }
+
+    match /supply_movements/{id} {
+        allow read: if isAuthenticated();
+        allow write: if hasPermission('suprimentos_movimentacao');
+    }
+
+    // --- OUTROS CADASTROS ---
     match /vehicles/{vehicleId} {
       allow get: if true;
-      allow list: if hasPermission('cadastros_veiculos_view') || hasPermission('portaria_controle_veiculos_view');
-      allow create: if hasPermission('cadastros_veiculos_create');
-      allow update: if hasPermission('cadastros_veiculos_update') || hasPermission('portaria_controle_veiculos_update');
-      allow delete: if hasPermission('cadastros_veiculos_delete');
+      allow list: if hasPermission('cadastros_veiculos') || hasPermission('portaria_controle_veiculos_view');
+      allow create: if hasPermission('cadastros_veiculos');
+      allow update: if hasPermission('cadastros_veiculos') || hasPermission('portaria_controle_veiculos_update');
+      allow delete: if hasPermission('cadastros_veiculos');
     }
 
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
-      allow create: if hasPermission('cadastros_funcionarios_create') || isOwner(employeeId);
-      allow update: if hasPermission('cadastros_funcionarios_update') || isOwner(employeeId);
-      allow delete: if hasPermission('cadastros_funcionarios_delete');
+      allow create: if hasPermission('cadastros_funcionarios') || isOwner(employeeId);
+      allow update: if hasPermission('cadastros_funcionarios') || isOwner(employeeId);
+      allow delete: if hasPermission('cadastros_funcionarios');
+      
+      match /trainings/{id} {
+          allow read, write: if isAuthenticated();
+      }
+      match /notifications/{id} {
+          allow read, write: if isOwner(employeeId);
+      }
     }
 
     match /activities/{activityId} {
@@ -86,13 +125,17 @@ service cloud.firestore {
 
     match /purchase_requisitions/{requisitionId} {
       allow read: if isAuthenticated();
-      allow write: if hasPermission('compras_requisicao_update') || hasPermission('compras_controle_update');
+      allow write: if hasPermission('compras_requisicao') || hasPermission('compras_controle');
+      
+      match /items/{itemId} {
+          allow read, write: if isAuthenticated();
+      }
     }
 
     // Regra fallback para garantir que o restante do app continue funcionando
     match /{document=**} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if isAuthenticated(); // Tornando o write mais permissivo como era em versões antigas
     }
   }
 }
