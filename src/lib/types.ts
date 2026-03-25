@@ -268,6 +268,7 @@ export type Permissions = {
   configurador_disparo_email?: boolean;
   recursos_humanos?: boolean;
   recursos_humanos_mural?: boolean;
+  monitor_view?: boolean;
   [key: string]: boolean | undefined;
 };
 
@@ -641,11 +642,25 @@ export type MaintenanceTask = {
   
   // Frequências Iniciais
   frequenciaInicialHoras: string;
-  frequenciaCiclos: string;
-  frequenciaCalendario: string;
+  frequenciaInicialCiclos: string;
+  frequenciaInicialCalendario: string;
 
   // Itens Relacionados
   pecas?: MaintenanceTaskItem[];
   ferramentasEspeciais?: MaintenanceTaskItem[];
   consumiveis?: MaintenanceTaskItem[];
+};
+
+export type MonitorWidget = {
+  type: 'mural' | 'os' | 'inventory';
+  config?: any;
+};
+
+export type Monitor = {
+  id?: string;
+  name: string;
+  sector: string;
+  widgets: MonitorWidget[];
+  active: boolean;
+  createdAt: string;
 };

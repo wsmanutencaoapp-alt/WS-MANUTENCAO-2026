@@ -42,11 +42,11 @@ import {
   Activity,
   Home,
   Megaphone,
+  Monitor,
   Settings2,
   ScanSearch,
   FileText,
   BadgeDollarSign,
-  ReceiptBrazilianReal,
   HeartHandshake,
   Map,
 } from 'lucide-react';
@@ -188,7 +188,13 @@ const allNavItems: NavItem[] = [
         { href: '/dashboard/financeiro/budget', label: 'Budget', permission: 'financeiro_budget' },
     ]
   },
-   { 
+  {
+    href: '/dashboard/monitor',
+    icon: Monitor,
+    label: 'Monitor',
+    permission: 'monitor',
+  },
+  { 
     href: '/dashboard/contabilidade', 
     icon: Landmark, 
     label: 'Fiscal/Contábil',

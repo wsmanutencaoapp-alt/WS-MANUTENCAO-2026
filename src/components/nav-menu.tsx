@@ -19,12 +19,12 @@ export interface NavItem {
   href: string;
   icon: LucideIcon;
   label: string;
-  permission?: keyof Employee['permissions'];
+  permission?: string;
   subItems?: {
     href: string;
     label: string;
     icon?: LucideIcon;
-    permission?: keyof Employee['permissions'];
+    permission?: string;
   }[];
 }
 

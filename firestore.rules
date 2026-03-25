@@ -26,6 +26,11 @@ service cloud.firestore {
         (exists(profilePath) && get(profilePath).data.permissions[module] == true)
       );
     }
+
+    // Monitor rules moved to the top for priority
+    match /monitors/{id} {
+      allow read, write: if isAuthenticated();
+    }
     
     function isOwner(userId) {
       return request.auth.uid == userId;
@@ -80,6 +85,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if hasPermission('compras_requisicao_update') || hasPermission('compras_controle_update');
     }
+
 
     // Regra fallback para garantir que o restante do app continue funcionando
     match /{document=**} {
